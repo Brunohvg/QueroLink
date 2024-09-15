@@ -12,9 +12,11 @@ class PagarMeOrder(models.Model):
 
 class PagarMeTransaction(models.Model):
     order = models.ForeignKey(PagarMeOrder, on_delete=models.CASCADE)
+    #cliente_nome = models.CharField(max_length=100, blank=True, null=True)
     transaction_id = models.CharField(max_length=50)
     status = models.CharField(max_length=50)
     created_at = models.DateTimeField(auto_now_add=True)
+    link= models.CharField(max_length=400, blank=True, null=True)
 
     def __str__(self):
         return f"Transaction {self.id} - {self.transaction_id}"

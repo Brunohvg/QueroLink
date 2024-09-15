@@ -1,0 +1,28 @@
+<form action="{% url 'link:create_link' %}" method="post">
+  {% csrf_token %}
+  <div class="form-group">
+    <i class="fas fa-tag input-icon"></i>
+    <input type="text" class="form-control" id="linkName" name="linkName" placeholder="Nome do Link" required />
+  </div>
+  <div class="form-group">
+    <i class="fas fa-dollar-sign input-icon"></i>
+    <input type="text" class="form-control" id="linkValue" name="linkValue" placeholder="Valor do Link" min="0" step="0.01" required />
+  </div>
+  <div class="form-group">
+    <i class="fas fa-credit-card input-icon"></i>
+    <select class="form-select" id="installments" name="installments">
+      <option value="1">1x (à vista)</option>
+      <option value="2">2x sem juros</option>
+      <option value="3">3x sem juros</option>
+    </select>
+  </div>
+  <div class="form-group">
+    <i class="fab fa-whatsapp input-icon"></i>
+    <input type="tel" class="form-control" id="whatsapp" name="whatsapp" placeholder="WhatsApp para contato" required />
+  </div>
+  <button type="submit" class="btn btn-primary w-100">
+    <i class="fas fa-magic me-2"></i>Gerar Link de Pagamento
+  </button>
+  
+
+</form>

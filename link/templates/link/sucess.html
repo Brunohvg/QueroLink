@@ -1,0 +1,304 @@
+{% load static %}
+<html>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Recibo de Pagamento | Linkpay - Loja Bibelô</title>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto+Mono:wght@400;700&family=Roboto:wght@300;400;700&display=swap" rel="stylesheet" />
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+    <style>
+      :root {
+        --primary-color: #1a3d5c;
+        --secondary-color: #5d9e31;
+        --background-color: #f4f4f4;
+        --text-color: #333;
+        --border-color: #ddd;
+      }
+      
+      html {
+        font-size: 87%; /* Redução de 13% */
+      }
+      
+      body {
+        font-family: 'Roboto', sans-serif;
+        background-color: var(--background-color);
+        color: var(--text-color);
+        line-height: 1.6;
+        display: flex;
+        flex-direction: column;
+        min-height: 100vh;
+        margin: 0;
+        padding: 0;
+      }
+      
+      .container {
+        max-width: 100%;
+        width: 100%;
+        margin: 0 auto;
+        background-color: #fff;
+        border: 1px solid var(--border-color);
+        border-radius: 8px;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        padding: 1.5rem;
+        flex-grow: 1;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+      }
+      
+      .header {
+        text-align: center;
+        margin-bottom: 1rem;
+        border-bottom: 2px solid var(--primary-color);
+        padding-bottom: 1rem;
+      }
+      
+      .logo {
+        width: 60px;
+        height: 60px;
+        margin-bottom: 0.5rem;
+      }
+      
+      h1 {
+        color: var(--primary-color);
+        font-weight: 700;
+        font-size: 1.3rem;
+        margin-bottom: 0.25rem;
+      }
+      
+      .confirmation-message {
+        font-size: 0.9rem;
+        color: var(--secondary-color);
+        margin-bottom: 0.5rem;
+      }
+      
+      .receipt-details {
+        font-family: 'Roboto Mono', monospace;
+        background-color: #fff;
+        border: 1px solid var(--border-color);
+        border-radius: 4px;
+        padding: 1rem;
+        margin-bottom: 1rem;
+      }
+      
+      .receipt-details h2 {
+        color: var(--primary-color);
+        font-size: 1.1rem;
+        margin-bottom: 0.75rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        border-bottom: 1px dashed var(--border-color);
+        padding-bottom: 0.5rem;
+      }
+      
+      .detail-item {
+        display: flex;
+        justify-content: space-between;
+        margin-bottom: 0.5rem;
+        font-size: 0.85rem;
+      }
+      
+      .detail-label {
+        font-weight: 400;
+      }
+      
+      .detail-value {
+        font-weight: 700;
+      }
+      
+      .action-buttons {
+        display: flex;
+        justify-content: space-between;
+        margin-bottom: 1rem;
+      }
+      
+      .btn-custom {
+        padding: 0.5rem 1rem;
+        border-radius: 4px;
+        font-weight: 500;
+        transition: all 0.2s ease;
+        font-size: 0.85rem;
+      }
+      
+      .btn-primary {
+        background-color: var(--primary-color);
+        border: none;
+      }
+      
+      .btn-primary:hover {
+        background-color: #15314a;
+      }
+      
+      .btn-outline {
+        color: var(--primary-color);
+        border: 1px solid var(--primary-color);
+        background-color: transparent;
+      }
+      
+      .btn-outline:hover {
+        background-color: #e6eef4;
+      }
+      
+      .support-links {
+        text-align: center;
+        font-size: 0.8rem;
+        margin-top: 1rem;
+      }
+      
+      .support-links a {
+        color: var(--primary-color);
+        text-decoration: none;
+        margin: 0 0.5rem;
+      }
+      
+      .support-links a:hover {
+        text-decoration: underline;
+      }
+      
+      footer {
+        background-color: var(--primary-color);
+        color: #fff;
+        padding: 1rem 0;
+        font-size: 0.8rem;
+        text-align: center;
+      }
+      
+      .footer-content {
+        max-width: 100%;
+        margin: 0 auto;
+      }
+      
+      .developer-info {
+        margin-top: 0.5rem;
+        font-style: italic;
+      }
+      
+      .receipt-stamp {
+        text-align: center;
+        margin-top: 1rem;
+        font-size: 1.2rem;
+        font-weight: 700;
+        color: var(--secondary-color);
+        transform: rotate(-5deg);
+        opacity: 0.7;
+      }
+      
+      @media (min-width: 768px) {
+        .container {
+          max-width: 600px;
+          margin: 2rem auto;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <div class="header">
+        <svg class="logo" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M20 4H4C2.89543 4 2 4.89543 2 6V18C2 19.1046 2.89543 20 4 20H20C21.1046 20 22 19.1046 22 18V6C22 4.89543 21.1046 4 20 4Z" stroke="#1a3d5c" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+          <path d="M2 10H22" stroke="#1a3d5c" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+        </svg>
+        <h1>Recibo de Pagamento</h1>
+        <p class="confirmation-message">Pagamento processado com sucesso</p>
+      </div>
+
+      <div class="receipt-details">
+        <h2>Detalhes da Transação</h2>
+        <div class="detail-item">
+          <span class="detail-label">Nº da Transação:</span>
+          <span class="detail-value" id="transactionNumber"></span>
+        </div>
+        <div class="detail-item">
+          <span class="detail-label">Data e Hora:</span>
+          <span class="detail-value" id="transactionDate"></span>
+        </div>
+        <div class="detail-item">
+          <span class="detail-label">Valor Pago:</span>
+          <span class="detail-value" id="transactionValue"></span>
+        </div>
+        <div class="detail-item">
+          <span class="detail-label">Método de Pagamento:</span>
+          <span class="detail-value">Cartão de Crédito</span>
+        </div>
+        <div class="detail-item">
+          <span class="detail-label">Status:</span>
+          <span class="detail-value" style="color: var(--secondary-color);">APROVADO</span>
+        </div>
+      </div>
+
+      <div class="receipt-stamp">PAGO</div>
+
+      <div class="action-buttons">
+        <button onclick="printReceipt()" class="btn btn-custom btn-outline"><i class="fas fa-print"></i> Imprimir</button>
+        <button onclick="shareReceipt()" class="btn btn-custom btn-primary"><i class="fas fa-share-alt"></i> Compartilhar</button>
+      </div>
+
+      <div class="support-links">
+        <a href="/suporte">Suporte</a>
+        <a href="/termos-de-uso">Termos de Uso</a>
+        <a href="https://bibelo.com.br">Loja Bibelô</a>
+      </div>
+    </div>
+
+    <footer>
+      <div class="footer-content">
+        <p>&copy; 2024 LinkPay Pro - Loja Bibelô. Todos os direitos reservados.</p>
+        <p class="developer-info">Desenvolvido por Bruno Vidal</p>
+      </div>
+    </footer>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+      document.addEventListener('DOMContentLoaded', function () {
+        const transactionNumber =
+          'LNK' +
+          Math.floor(Math.random() * 1000000 + 1000000)
+            .toString()
+            .padStart(7, '0')
+        const transactionValue = (Math.random() * 500 + 50).toFixed(2)
+        const transactionDate = new Date().toLocaleString('pt-BR', {
+          year: 'numeric',
+          month: '2-digit',
+          day: '2-digit',
+          hour: '2-digit',
+          minute: '2-digit',
+          second: '2-digit'
+        })
+      
+        document.getElementById('transactionNumber').textContent = transactionNumber
+        document.getElementById('transactionValue').textContent = `R$ ${transactionValue}`
+        document.getElementById('transactionDate').textContent = transactionDate
+      })
+      
+      function shareReceipt() {
+        const transactionNumber = document.getElementById('transactionNumber').textContent
+        const transactionValue = document.getElementById('transactionValue').textContent
+        const transactionDate = document.getElementById('transactionDate').textContent
+      
+        const receiptText = `Recibo de Pagamento - Loja Bibelô\n\nTransação: ${transactionNumber}\nValor: ${transactionValue}\nData: ${transactionDate}\nStatus: APROVADO\n\nObrigado pela sua compra!`
+      
+        if (navigator.share) {
+          navigator
+            .share({
+              title: 'Recibo de Pagamento - Loja Bibelô',
+              text: receiptText,
+              url: window.location.href
+            })
+            .then(() => {
+              console.log('Recibo compartilhado com sucesso')
+            })
+            .catch((error) => {
+              console.log('Erro ao compartilhar:', error)
+            })
+        } else {
+          alert('Seu navegador não suporta compartilhamento direto. Por favor, copie o texto abaixo:\n\n' + receiptText)
+        }
+      }
+      
+      function printReceipt() {
+        window.print()
+      }
+    </script>
+  </body>
+</html>

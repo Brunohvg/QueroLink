@@ -6,5 +6,5 @@ app_name = 'link'
 urlpatterns = [
     path('', views.index, name='index'),
     path('create_link/', views.create_link, name='create_link'),
-    path('save_order/', views.save_order, name='save_order'),
+    path('sucess/<str:transaction_id>/', views.paid_transaction, name='paid_transaction')
 ]

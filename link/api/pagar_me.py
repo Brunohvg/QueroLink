@@ -3,7 +3,7 @@ import os
 from decouple import config
 
 
-class PagarMeOrder:
+class PagarMeOrderApi:
     """
     Classe para criar e gerenciar pedidos na API do Pagar.me.
 
@@ -96,6 +96,6 @@ if __name__ == "__main__":
     max_installments = 3
     customer_name = "Campo_Obrigatorio"
 
-    order = PagarMeOrder(total_amount, max_installments, customer_name)
+    order = PagarMeOrderApi(total_amount, max_installments, customer_name)
     response = order.create_order()
     print(response)
