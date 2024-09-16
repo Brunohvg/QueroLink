@@ -1,7 +1,7 @@
 import requests
 from decouple import config
 class Whatsapp:
-    def __init__(self, instance='Bruno', api_key=config("API_KEY_INSTANCIA")):
+    def __init__(self, instance=config('INSTANCE'), api_key=config("API_KEY_INSTANCIA")):
         self.instance = instance
         self.api_key = api_key
     
@@ -21,7 +21,7 @@ class Whatsapp:
         try:
             response = requests.post(url, json=payload, headers=headers)
             response.raise_for_status()
-            return response.json()
+            return (response.json(), {"status_envio":200})
         except requests.exceptions.HTTPError as http_err:
             print(f"HTTP error occurred: {http_err}")
         except Exception as err:

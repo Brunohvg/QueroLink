@@ -1,0 +1,49 @@
+version: "3.8"
+
+services:
+  web:
+    image: brunobh51/linkpay:latest
+    environment:
+      - DEBUG=${DEBUG}
+      - SECRET_KEY=${SECRET_KEY}
+      - API_KEY_PAGAR_ME=${API_KEY_PAGAR_ME}
+      - API_KEY_INSTANCIA=${API_KEY_INSTANCIA}
+      - ALLOWED_HOSTS=${ALLOWED_HOSTS}
+      - INSTANCE=${INSTANCE}
+    ports:
+      - "8082:8000"
+    volumes:
+      - static_data:/app/staticfiles
+    deploy:
+      mode: replicated
+      replicas: 1
+      placement:
+        constraints:
+          - node.role == manager
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 1024M
+      labels:
+        - traefik.enable=true
+        - traefik.http.routers.web.rule=Host(`linkpay.lojabibelo.com.br`)
+        - traefik.http.routers.web.entrypoints=websecure
+        - traefik.http.routers.web.tls.certresolver=le
+        - traefik.http.routers.web.tls=true
+        - traefik.http.services.web.loadbalancer.server.port=8000
+        - traefik.http.middlewares.web-compress.compress=true
+        - traefik.http.routers.web.middlewares=web-compress
+    networks:
+      - traefik_public
+      - app_network
+
+volumes:
+  static_data:
+    # Pode ser necessário adicionar drivers ou opções, dependendo do uso
+  media_data: # Este volume parece não estar em uso, remova ou utilize conforme necessário
+
+networks:
+  traefik_public:
+    external: true
+  app_network:
+    external: true

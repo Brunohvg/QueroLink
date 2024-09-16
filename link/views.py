@@ -39,10 +39,9 @@ def create_link(request):
         try:
             total_amount = int(float(valor_formatado) * 100)
 
-            # Verifica se já existe um link gerado na sessão
+            # Limpa o link anterior da sessão
             if 'generated_link' in request.session:
-                messages.info(request, "Você já gerou um link. Por favor, carregue a página para ver o link.")
-                return redirect("link:index")
+                del request.session['generated_link']
 
             order = PagarMeOrder.objects.create(
                 total_amount=total_amount,
@@ -72,7 +71,7 @@ def create_link(request):
                 link=link
             )
 
-            # Armazena o link gerado na sessão
+            # Armazena o novo link gerado na sessão
             request.session['generated_link'] = link
             messages.success(request, "Link gerado com sucesso!")
             return redirect("link:index")  # Redireciona após sucesso
