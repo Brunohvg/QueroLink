@@ -42,7 +42,7 @@ def create_link(request):
                 whatsapp=whatsapp,
             )
 
-            api_order = PagarMeOrderApi(total_amount, int(installments), link_name)
+            api_order = PagarMeOrderApi(total_amount, int(installments),customer_name='.')
             response = api_order.create_order()
             link = response.get("checkouts", [{}])[0].get("payment_url", "")
 
