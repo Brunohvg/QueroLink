@@ -13,6 +13,7 @@ def index(request):
     """Renderiza a página inicial."""
     return render(request, "link/index.html")
 
+
 def create_link(request):
     """Cria um link de pagamento e envia via WhatsApp."""
     if request.method == "POST":
@@ -36,10 +37,13 @@ def create_link(request):
         )
 
         try:
-            # Converte o valor para float e em seguida para inteiro em centavos
             total_amount = int(float(valor_formatado) * 100)
 
-            # Cria uma nova instância do modelo PagarMeOrder
+            # Verifica se já existe um link gerado na sessão
+            if 'generated_link' in request.session:
+                messages.info(request, "Você já gerou um link. Por favor, carregue a página para ver o link.")
+                return redirect("link:index")
+
             order = PagarMeOrder.objects.create(
                 total_amount=total_amount,
                 max_installments=int(installments),
@@ -47,11 +51,10 @@ def create_link(request):
                 whatsapp=whatsapp,
             )
 
-            # Cria a instância da API com o valor total em centavos
             api_order = PagarMeOrderApi(total_amount, int(installments), str(link_name))
             response = api_order.create_order()
             link = response.get('checkouts', [{}])[0].get('payment_url', '')
-            
+
             # Tenta enviar a mensagem via WhatsApp
             try:
                 NUMERO_ENVIO = formatar_numero(numero=whatsapp)
@@ -62,20 +65,17 @@ def create_link(request):
             except Exception as sms_error:
                 messages.warning(request, f"Mensagem não enviada: {str(sms_error)}")
 
-            # Salva a transação
             PagarMeTransaction.objects.create(
                 order=order,
                 transaction_id=response.get('id', ''),
                 status=response.get('status', 'pending'),
-                link=response.get('checkouts', [{}])[0].get('payment_url', '')
+                link=link
             )
 
-            # Passa o link gerado para o contexto
-            context = {
-                'link': link,
-            }
+            # Armazena o link gerado na sessão
+            request.session['generated_link'] = link
             messages.success(request, "Link gerado com sucesso!")
-            return render(request, "link/index.html", context)  # Renderiza o template com o link
+            return redirect("link:index")  # Redireciona após sucesso
 
         except ValueError as e:
             messages.error(request, f"Erro de valor: {str(e)}")

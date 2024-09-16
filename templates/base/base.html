@@ -240,9 +240,9 @@
       {% block content %}
 
       {% endblock %}
-      {% if link %}
+      {% if request.session.generated_link %}
         <div id="generatedLinkContainer" class="mt-4">
-          <div class="generated-link" id="generatedLink">{{ link }}</div>
+          <div class="generated-link" id="generatedLink">{{ request.session.generated_link }}</div>
           <button class="btn btn-secondary w-100 mt-3" onclick="copyLink()"><i class="fas fa-copy me-2"></i>Copiar Link</button>
         </div>
       {% endif %}
