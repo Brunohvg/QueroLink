@@ -15,6 +15,7 @@ def index(request):
     """Renderiza a página inicial."""
     return render(request, "link/index.html")
 
+
 def create_link(request):
     """Cria um link de pagamento e envia via WhatsApp."""
     if request.method == "POST":
@@ -91,6 +92,4 @@ def create_link(request):
             return redirect("link:index")
 
     return HttpResponse("Erro: Método não suportado.")
-
-
 

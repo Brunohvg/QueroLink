@@ -7,7 +7,7 @@ class PagarMePayment(models.Model):
     max_installments = models.IntegerField()
     customer_name = models.CharField(max_length=255)
     whatsapp = models.CharField(max_length=20)
-    link = models.URLField(max_length=500)
+    link = models.URLField(max_length=500, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     
