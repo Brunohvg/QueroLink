@@ -45,3 +45,7 @@ if __name__ == '__main__':
     numero_formatado = formatar_numero('(31) 97312-1650')
     response = whatsapp_instance.message_send_text(numero_formatado, "Isso é um teste")
     print(response)  # Imprime a resposta da API
+    
+    
+    
+    
