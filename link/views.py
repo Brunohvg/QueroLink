@@ -1,9 +1,9 @@
-from django.shortcuts import render, redirect, get_object_or_404
-from .api.pagar_me import PagarMeOrderApi
+from django.shortcuts import render, redirect
+from .api.pagar_me import PagarMePaymentlinks
 from .api.whatsapp import Whatsapp, formatar_numero
-from .models import PagarMeOrder, PagarMeTransaction
+from .models import PagarMePayment
 from django.contrib import messages
-from django.http import HttpResponse, HttpResponseNotFound
+from django.http import HttpResponse
 
 ENVIAR_MENSAGEM = Whatsapp()
 
@@ -29,24 +29,27 @@ def create_link(request):
             return redirect("link:index")
 
         try:
+            # Converte o valor para centavos
             valor_formatado = float(link_value.replace("R$", "").replace(",", ".").strip())
-            total_amount = int(valor_formatado * 100)
+            total_amount = int(valor_formatado * 100)  # Converte para centavos
 
             # Limpa o link anterior da sessão
             request.session.pop("generated_link", None)
 
-            order = PagarMeOrder.objects.create(
-                total_amount=total_amount,
-                max_installments=int(installments),
-                customer_name=link_name,
-                whatsapp=whatsapp,
+            # Cria o link de pagamento via API do PagarMe
+            api_order = PagarMePaymentlinks(
+                total_amount, int(installments), link_name, free_installments=int(installments)
             )
+            response = api_order.create_link_api()
 
-            api_order = PagarMeOrderApi(total_amount, int(installments),customer_name='.')
-            response = api_order.create_order()
-            link = response.get("checkouts", [{}])[0].get("payment_url", "")
+            # Obtém o link gerado pela API
+            link = response.get("url", "")
 
-            # Envio da mensagem via WhatsApp
+            if not link:
+                messages.error(request, "Falha ao gerar o link de pagamento.")
+                return redirect("link:index")
+
+            # Envia a mensagem via WhatsApp
             try:
                 NUMERO_ENVIO = formatar_numero(numero=whatsapp)
                 MESSAGE = (
@@ -60,16 +63,25 @@ def create_link(request):
             except Exception as sms_error:
                 messages.warning(request, f"Mensagem não enviada: {str(sms_error)}")
 
-            PagarMeTransaction.objects.create(
-                order=order,
-                transaction_id=response.get("id", ""),
-                status=response.get("status", "pending"),
-                link=link,
-            )
+            # Cria o pagamento no banco de dados (pedido + transação em um único modelo)
+            try:
+                payment = PagarMePayment.objects.create(
+                    total_amount=total_amount,
+                    max_installments=int(installments),
+                    customer_name=link_name,
+                    whatsapp=whatsapp,
+                    transaction_id=response.get("id", ""),
+                    status=response.get("status", "pending"),
+                    link=link,
+                )
 
-            request.session["generated_link"] = link
-            messages.success(request, "Link gerado com sucesso!")
-            return redirect("link:index")
+                # Salva o link gerado na sessão
+                request.session["generated_link"] = link
+                messages.success(request, "Link gerado com sucesso!")
+                return redirect("link:index")
+            except Exception as e:
+                messages.error(request, f"Ocorreu um erro ao salvar os dados no banco de dados: {str(e)}")
+                return redirect("link:index")
 
         except ValueError:
             messages.error(request, "Valor inválido.")
@@ -80,27 +92,5 @@ def create_link(request):
 
     return HttpResponse("Erro: Método não suportado.")
 
-def paid_transaction(request, transaction_id):
-    """Processa a confirmação de um pagamento."""
-    if request.method == "GET":
-        transaction = get_object_or_404(PagarMeTransaction, transaction_id=transaction_id)
 
-        if transaction.status == "pending":
-            transaction.status = "Pago"
-            transaction.save()
 
-            try:
-                NUMERO_ENVIO = formatar_numero(numero=transaction.order.whatsapp)
-                valor_em_reais = formatar_valor(transaction.order.total_amount)
-
-                ENVIAR_MENSAGEM.message_send_text(
-                    NUMERO_ENVIO,
-                    f"Olá! Seu pedido no valor de R${valor_em_reais:.2f} foi recebido e está marcado como PAGO. Obrigado pela sua compra! 🎉"
-                )
-            except Exception as sms_error:
-                messages.warning(request, f"Mensagem de confirmação não enviada: {str(sms_error)}")
-            return HttpResponse("Transação marcada como paga.")
-        else:
-            return HttpResponse("Estado já é pago.")
-
-    return HttpResponse("Método de requisição inválido.")
