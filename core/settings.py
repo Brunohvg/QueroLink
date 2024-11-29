@@ -56,6 +56,7 @@ INSTALLED_APPS = [
     "django.contrib.staticfiles",
     "link",
     'rest_framework',
+    'rest_framework.authtoken',
 ]
 
 MIDDLEWARE = [
@@ -156,3 +157,10 @@ CSRF_TRUSTED_ORIGINS = [
     'https://linkpay.lojabibelo.com.br',
     'https://www.linkpay.lojabibelo.com.br',  # Adicione se necessário
 ]
+
+
+REST_FRAMEWORK = {
+    'DEFAULT_AUTHENTICATION_CLASSES': [
+        'rest_framework.authentication.TokenAuthentication',
+    ],
+}

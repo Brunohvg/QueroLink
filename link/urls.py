@@ -11,5 +11,5 @@ router.register(r'pagamentos', PagarMePaymentViewSet)
 urlpatterns = [
     path('', views.index, name='index'),
     path('create_link/', views.create_link, name='create_link'),
-    path('api/', include(router.urls)),  # URL da API que inclui todas as rotas registradas pelo DefaultRouter
+    path('api/v1/', include(router.urls)),  # URL da API que inclui todas as rotas registradas pelo DefaultRouter
 ]

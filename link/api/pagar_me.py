@@ -127,8 +127,6 @@ class PagarMePaymentlinks:
         self.free_installments = free_installments  # Número de parcelamentos sem juros
         self.interest_rate = interest_rate  # Taxa de juros
 
-
-
 class PagarMePaymentlinks:
     """
     Classe para criar e gerenciar links na API do Pagar.me.
@@ -171,7 +169,7 @@ class PagarMePaymentlinks:
                         "max_installments": self.max_installments,
                         "amount": self.total_amount,
                         "interest_rate": self.interest_rate,  # Taxa de juros configurável
-                        "free_installments": self.free_installments
+                        "free_installments": self.free_installments,
                     },
                     "operation_type": "auth_and_capture"
                 },
@@ -187,7 +185,9 @@ class PagarMePaymentlinks:
             ]},
             "name": self.customer_name,
             "type": "order",
-            "expires_in": 1200
+            "expires_in": 1200,
+            "max_paid_sessions": 1,
+            
         }
 
         headers = {
