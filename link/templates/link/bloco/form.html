@@ -19,38 +19,37 @@
 
   <div class="form-group">
     <i class="fas fa-users input-icon"></i>
-    <select class="form-select" id="drop_vendedor" name="drop_vendedor">
+    <select class="form-select" id="drop_vendedor" name="drop_vendedor" required>
       <option value="" selected disabled>Selecione um vendedor</option>
       <option value="(31) 99243-0500">Bibelô</option>
-      <option value="(31) 97312-1606">Célia</option>
-      <option value="(31) 98234-5678">Danúbia</option>
-      <option value="(31) 99123-4567">Eliete</option>
-      <option value="(31) 99345-6789">Flaviane</option>
-      <option value="(31) 98123-2345">Iolando</option>
-      <option value="(31) 98765-4321">Léo</option>
-      <option value="(31) 97312-1650">Leonardo Bruno</option>
-      <option value="(31) 98432-1234">Luciana</option>
-      <option value="(31) 99012-3456">Luana</option>
-      <option value="(31) 97432-5678">Marcila</option>
-      <option value="(31) 99654-7890">Maria</option>
-      <option value="(31) 98321-6543">Nelma</option>
-      <option value="(31) 99234-5678">Regiane</option>
-      <option value="(31) 97890-1234">Tamara</option>
+      <option value="(31) 99166-2461">Célia</option>
+      <option value="(31) 98982-3859">Danúbia</option>
+      <option value="(31) 99981-8017">Eliete</option>
+      <option value="(31) 97232-0859">Flaviane</option>
+      <option value="(31) 99748-1638">Iolando</option>
+      <option value="(31) 98457-0657">Léo</option>
+      <option value="(31) 98014-5966">Leonardo Bruno</option>
+      <option value="(31) 97364-3559">Luciana</option>
+      <option value="(31) 97575-8998">Luana</option>
+      <option value="(31) 99748-6119">Marcila</option>
+      <option value="(31) 97131-7368">Maria</option>
+      <option value="(31) 99480-7724">Nelma</option>
+      <option value="(31) 98471-9920">Regiane</option>
+      <option value="(31) 97349-6057">Tamara</option>
+      <option value="(31) 97312-1650">Bruno Vidal</option>
     </select>
   </div>
-  
-  <button type="submit" class="btn btn-primary w-100" id="generate-link-btn">
-    <i class="fas fa-magic me-2"></i>Gerar Link de Pagamento
-  </button>
+
+  <button type="submit" class="btn btn-primary w-100" id="generate-link-btn"><i class="fas fa-magic me-2"></i>Gerar Link de Pagamento</button>
 </form>
 
 <script>
-  document.getElementById('create-link-form').addEventListener('submit', function(event) {
-    var btn = document.getElementById('generate-link-btn');
-    btn.disabled = true;  // Desabilita o botão
-    btn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Aguarde...';  // Exibe um ícone de carregamento e muda o texto
-
+  document.getElementById('create-link-form').addEventListener('submit', function (event) {
+    var btn = document.getElementById('generate-link-btn')
+    btn.disabled = true // Desabilita o botão
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Aguarde...' // Exibe um ícone de carregamento e muda o texto
+  
     // Após o envio do formulário, o botão permanece desabilitado para evitar múltiplos cliques
     // Não é necessário adicionar tempo de espera aqui, pois o processamento da requisição já acontece no backend
-  });
+  })
 </script>
