@@ -22,10 +22,10 @@ def create_link(request):
         link_name = request.POST.get("linkName")
         link_value = request.POST.get("linkValue")
         installments = request.POST.get("installments")
-        whatsapp = request.POST.get("whatsapp")
+        vendedor = request.POST.get("drop_vendedor")
 
         # Validação de entrada
-        if not all([link_name, link_value, installments, whatsapp]):
+        if not all([link_name, link_value, installments, vendedor]):
             messages.error(request, "Todos os campos são obrigatórios.")
             return redirect("link:index")
 
@@ -33,6 +33,15 @@ def create_link(request):
             # Converte o valor para centavos
             valor_formatado = float(link_value.replace("R$", "").replace(",", ".").strip())
             total_amount = int(valor_formatado * 100)  # Converte para centavos
+
+            # Recupera o link e os dados anteriores armazenados na sessão
+            session_data = request.session.get("generated_link_data", {})
+
+            # Verifica se os dados são os mesmos
+            if session_data.get("link_name") == link_name and session_data.get("link_value") == link_value and session_data.get("vendedor") == vendedor:
+                # Se os dados não mudaram, impede gerar outro link
+                messages.info(request, "O link já foi gerado com os mesmos dados.")
+                return redirect("link:index")
 
             # Limpa o link anterior da sessão
             request.session.pop("generated_link", None)
@@ -52,14 +61,15 @@ def create_link(request):
 
             # Envia a mensagem via WhatsApp
             try:
-                NUMERO_ENVIO = formatar_numero(numero=whatsapp)
+                NUMERO_ENVIO = formatar_numero(numero=vendedor)
                 MESSAGE = (
-                    f"Olá, {link_name}! 😊\n"
-                    "Seu link está disponível. 🔗\n"
-                    "Envie para seu cliente. 📤\n"
-                    "Assim que recebermos o pagamento, avisaremos: 💰\n"
-                    f"{link} 📩"
+                    f"Olá, {link_name}! 😊\n\n"
+                    "Seu link de pagamento está pronto! 🔗\n"
+                    "Agora você pode enviar este link para o seu cliente. 📤\n"
+                    "Assim que o pagamento for confirmado, nós te avisaremos. 💰\n\n"
+                    f"{link} 📩\n\n"
                 )
+
                 ENVIAR_MENSAGEM.message_send_text(NUMERO_ENVIO, MESSAGE)
             except Exception as sms_error:
                 messages.warning(request, f"Mensagem não enviada: {str(sms_error)}")
@@ -70,14 +80,19 @@ def create_link(request):
                     total_amount=total_amount,
                     max_installments=int(installments),
                     customer_name=link_name,
-                    whatsapp=whatsapp,
+                    whatsapp=vendedor,
                     transaction_id=response.get("id", ""),
                     status=response.get("status", "pending"),
                     link=link,
                 )
 
-                # Salva o link gerado na sessão
+                # Salva o link gerado e os dados na sessão
                 request.session["generated_link"] = link
+                request.session["generated_link_data"] = {
+                    "link_name": link_name,
+                    "link_value": link_value,
+                    "vendedor": vendedor
+                }
                 messages.success(request, "Link gerado com sucesso!")
                 return redirect("link:index")
             except Exception as e:
@@ -92,4 +107,3 @@ def create_link(request):
             return redirect("link:index")
 
     return HttpResponse("Erro: Método não suportado.")
-

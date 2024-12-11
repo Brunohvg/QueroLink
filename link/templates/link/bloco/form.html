@@ -1,4 +1,4 @@
-<form action="{% url 'link:create_link' %}" method="post">
+<form action="{% url 'link:create_link' %}" method="post" id="create-link-form">
   {% csrf_token %}
   <div class="form-group">
     <i class="fas fa-tag input-icon"></i>
@@ -16,13 +16,41 @@
       <option value="3">3x sem juros</option>
     </select>
   </div>
+
   <div class="form-group">
-    <i class="fab fa-whatsapp input-icon"></i>
-    <input type="tel" class="form-control" id="whatsapp" name="whatsapp" placeholder="WhatsApp para contato" required />
+    <i class="fas fa-users input-icon"></i>
+    <select class="form-select" id="drop_vendedor" name="drop_vendedor">
+      <option value="" selected disabled>Selecione um vendedor</option>
+      <option value="(31) 99243-0500">Bibelô</option>
+      <option value="(31) 97312-1606">Célia</option>
+      <option value="(31) 98234-5678">Danúbia</option>
+      <option value="(31) 99123-4567">Eliete</option>
+      <option value="(31) 99345-6789">Flaviane</option>
+      <option value="(31) 98123-2345">Iolando</option>
+      <option value="(31) 98765-4321">Léo</option>
+      <option value="(31) 97312-1650">Leonardo Bruno</option>
+      <option value="(31) 98432-1234">Luciana</option>
+      <option value="(31) 99012-3456">Luana</option>
+      <option value="(31) 97432-5678">Marcila</option>
+      <option value="(31) 99654-7890">Maria</option>
+      <option value="(31) 98321-6543">Nelma</option>
+      <option value="(31) 99234-5678">Regiane</option>
+      <option value="(31) 97890-1234">Tamara</option>
+    </select>
   </div>
-  <button type="submit" class="btn btn-primary w-100">
+  
+  <button type="submit" class="btn btn-primary w-100" id="generate-link-btn">
     <i class="fas fa-magic me-2"></i>Gerar Link de Pagamento
   </button>
-  
-
 </form>
+
+<script>
+  document.getElementById('create-link-form').addEventListener('submit', function(event) {
+    var btn = document.getElementById('generate-link-btn');
+    btn.disabled = true;  // Desabilita o botão
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Aguarde...';  // Exibe um ícone de carregamento e muda o texto
+
+    // Após o envio do formulário, o botão permanece desabilitado para evitar múltiplos cliques
+    // Não é necessário adicionar tempo de espera aqui, pois o processamento da requisição já acontece no backend
+  });
+</script>
