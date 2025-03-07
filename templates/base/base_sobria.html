@@ -10,18 +10,18 @@
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <style>
     :root {
-      --primary-color: #4361ee;
-      --primary-light: #eef2ff;
-      --primary-dark: #3051d3;
-      --secondary-color: #3bc47d;
-      --secondary-light: #ecfdf5;
-      --accent-color: #7209b7;
-      --text-color: #2d3748;
-      --text-light: #64748b;
-      --bg-light: #f8fafc;
-      --card-bg: rgba(255, 255, 255, 0.98);
-      --success-color: #31c48d;
-      --error-color: #e53e3e;
+      --primary-color: #2C3E50;      /* Tom sóbrio para títulos e botões */
+      --primary-light: #ECF0F1;      /* Fundo claro para contraste */
+      --primary-dark: #34495E;       /* Variante para hover e realces */
+      --secondary-color: #18BC9C;    /* Destaque para elementos secundários */
+      --secondary-light: #D1F2EB;    /* Fundo suave para elementos secundários */
+      --accent-color: #E74C3C;       /* Chamada de atenção para ações importantes */
+      --text-color: #2D3436;         /* Texto principal */
+      --text-light: #636E72;         /* Texto secundário */
+      --bg-light: #FFFFFF;           /* Fundo principal */
+      --card-bg: rgba(255, 255, 255, 0.95); /* Fundo dos cards */
+      --success-color: #27AE60;
+      --error-color: #C0392B;
       --border-radius: 16px;
       --box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
       --transition: all 0.3s ease;
@@ -34,7 +34,7 @@
       min-height: 100vh;
       display: flex;
       flex-direction: column;
-      background: linear-gradient(135deg, #4361ee, #7209b7);
+      background: linear-gradient(135deg, #2C3E50, #34495E);
       background-size: 400% 400%;
       animation: gradientBG 15s ease infinite;
       padding: 0;
@@ -82,7 +82,7 @@
 
     .logo-container {
       display: inline-block;
-      background: rgba(255, 255, 255, 0.95);
+      background: var(--primary-light);
       border-radius: 50%;
       padding: 15px;
       box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
@@ -117,19 +117,19 @@
     }
 
     .app-title {
-      color: white;
+      color: var(--bg-light);
       font-weight: 700;
       font-size: 2.5rem;
       margin: 0;
       text-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
-      background: linear-gradient(to right, #ffffff, #e0e7ff);
+      background: linear-gradient(to right, var(--bg-light), var(--primary-light));
       -webkit-background-clip: text;
       -webkit-text-fill-color: transparent;
       background-clip: text;
     }
 
     .app-subtitle {
-      color: rgba(255, 255, 255, 0.9);
+      color: var(--bg-light);
       font-size: 1.05rem;
       margin-top: 5px;
       font-weight: 400;
@@ -152,9 +152,9 @@
     }
 
     .card-header {
-      background: linear-gradient(to right, rgba(67, 97, 238, 0.1), rgba(114, 9, 183, 0.05));
+      background: linear-gradient(to right, rgba(44, 62, 80, 0.1), rgba(52, 73, 94, 0.05));
       padding: 20px 25px;
-      border-bottom: 1px solid rgba(67, 97, 238, 0.1);
+      border-bottom: 1px solid rgba(44, 62, 80, 0.1);
       display: flex;
       align-items: center;
     }
@@ -203,7 +203,7 @@
       padding: 14px 14px 14px 50px;
       font-size: 15px;
       transition: var(--transition);
-      background-color: white;
+      background-color: var(--bg-light);
       color: var(--text-color);
       height: auto;
       box-shadow: 0 2px 5px rgba(0, 0, 0, 0.02);
@@ -211,7 +211,7 @@
 
     .form-control:focus,
     .form-select:focus {
-      box-shadow: 0 0 0 3px rgba(67, 97, 238, 0.15);
+      box-shadow: 0 0 0 3px rgba(44, 62, 80, 0.15);
       border-color: var(--primary-color);
     }
 
@@ -264,7 +264,7 @@
       flex-direction: column;
       align-items: center;
       justify-content: center;
-      background-color: white;
+      background-color: var(--bg-light);
       border: 2px solid #e2e8f0;
       border-radius: 12px;
       padding: 12px 10px;
@@ -280,7 +280,7 @@
     .installment-option input[type="radio"]:checked + label {
       border-color: var(--primary-color);
       background-color: var(--primary-light);
-      box-shadow: 0 0 0 3px rgba(67, 97, 238, 0.15);
+      box-shadow: 0 0 0 3px rgba(44, 62, 80, 0.15);
     }
 
     .installment-option span {
@@ -325,22 +325,24 @@
 
     .btn-primary {
       background: linear-gradient(to right, var(--primary-color), var(--primary-dark));
+      color: var(--bg-light);
     }
 
     .btn-primary:hover {
       background: linear-gradient(to right, var(--primary-dark), var(--primary-color));
       transform: translateY(-2px);
-      box-shadow: 0 6px 15px rgba(67, 97, 238, 0.25);
+      box-shadow: 0 6px 15px rgba(44, 62, 80, 0.25);
     }
 
     .btn-secondary {
-      background: linear-gradient(to right, var(--secondary-color), #2faa6a);
+      background: linear-gradient(to right, var(--secondary-color), #16A085);
+      color: var(--bg-light);
     }
 
     .btn-secondary:hover {
-      background: linear-gradient(to right, #2faa6a, var(--secondary-color));
+      background: linear-gradient(to right, #16A085, var(--secondary-color));
       transform: translateY(-2px);
-      box-shadow: 0 6px 15px rgba(59, 196, 125, 0.25);
+      box-shadow: 0 6px 15px rgba(22, 160, 133, 0.25);
     }
 
     .btn i {
@@ -366,7 +368,7 @@
     }
 
     .generated-link-container {
-      background-color: #f8fafc;
+      background-color: var(--bg-light);
       border: 2px solid #e2e8f0;
       border-radius: 12px;
       padding: 20px;
@@ -393,17 +395,17 @@
       color: var(--primary-color);
       word-break: break-all;
       line-height: 1.5;
-      background-color: white;
+      background-color: var(--bg-light);
       padding: 15px;
       border-radius: 8px;
-      border: 1px solid rgba(67, 97, 238, 0.2);
+      border: 1px solid rgba(44, 62, 80, 0.2);
     }
 
     .copy-btn {
       position: absolute;
       top: 18px;
       right: 20px;
-      background-color: white;
+      background-color: var(--bg-light);
       border: none;
       border-radius: 8px;
       width: 36px;
@@ -434,12 +436,12 @@
 
     .success {
       background-color: var(--success-color);
-      color: white;
+      color: var(--bg-light);
     }
 
     .error {
       background-color: var(--error-color);
-      color: white;
+      color: var(--bg-light);
     }
 
     @keyframes fadeInUp {
@@ -460,7 +462,7 @@
     footer {
       text-align: center;
       padding: 20px 0 10px;
-      color: rgba(255, 255, 255, 0.9);
+      color: var(--bg-light);
     }
 
     footer p {
@@ -481,7 +483,7 @@
     }
 
     .badge-success {
-      background-color: rgba(49, 196, 141, 0.15);
+      background-color: rgba(39, 174, 96, 0.15);
       color: var(--success-color);
     }
 
@@ -496,7 +498,7 @@
     .feature-box {
       flex: 1;
       min-width: calc(33.333% - 15px);
-      background-color: white;
+      background-color: var(--bg-light);
       border-radius: 12px;
       padding: 15px;
       text-align: center;
@@ -547,7 +549,7 @@
       height: 12px;
       background-color: var(--success-color);
       border-radius: 50%;
-      border: 2px solid white;
+      border: 2px solid var(--bg-light);
     }
 
     .pulse {
@@ -698,8 +700,8 @@
                 </div>
               </div>
               
-              <button type="submit" class="btn btn-primary w-100" id="generate-link-btn">
-                <i class="fas fa-magic"></i>Gerar Link de Pagamento
+              <button type="submit" class="btn btn-primary w-100" id="generate-link-btn" aria-label="Gerar Link de Pagamento">
+                <i class="fas fa-magic"></i> Gerar Link de Pagamento
               </button>
             </form>
           </div>
@@ -719,10 +721,13 @@
               <div class="generated-link" id="generatedLink">
                 {% if request.session.generated_link %}{{ request.session.generated_link }}{% endif %}
               </div>
-              <button class="copy-btn" onclick="copyLink()" title="Copiar link">
+              <button class="copy-btn" onclick="copyLink()" title="Copiar link" aria-label="Copiar link">
                 <i class="fas fa-copy"></i>
               </button>
             </div>
+            
+            <!-- QR Code gerado dinamicamente -->
+            <div id="qrcode" style="text-align: center; margin-top: 20px;"></div>
             
             <div class="feature-boxes">
               <div class="feature-box">
@@ -743,11 +748,11 @@
             </div>
             
             <div class="action-buttons">
-              <button class="btn btn-secondary" onclick="copyLink()">
-                <i class="fas fa-copy"></i>Copiar Link
+              <button class="btn btn-secondary" onclick="copyLink()" aria-label="Copiar Link">
+                <i class="fas fa-copy"></i> Copiar Link
               </button>
-              <a href="#" class="btn btn-primary" id="shareBtn">
-                <i class="fas fa-share-alt"></i>Compartilhar
+              <a href="#" class="btn btn-primary" id="shareBtn" aria-label="Compartilhar Link">
+                <i class="fas fa-share-alt"></i> Compartilhar
               </a>
             </div>
           </div>
@@ -764,8 +769,10 @@
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+  <!-- QRCode.js para geração do QR Code -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
   <script>
-    // Função para exibir mensagens ao usuário
+    // Exibe mensagens para o usuário
     function showMessage(text, type) {
       const messageElement = document.getElementById('message');
       messageElement.textContent = text;
@@ -776,67 +783,54 @@
       }, 3000);
     }
 
-    // Validação do campo de valor (linkValue)
+    // Máscara e validação para o campo Valor
     document.getElementById('linkValue').addEventListener('input', function(e) {
-      let value = e.target.value.replace(/\D/g, ''); // Remove caracteres não numéricos
+      let value = e.target.value.replace(/\D/g, '');
       if (value) {
-        value = (value / 100).toFixed(2).replace('.', ','); // Converte para formato de moeda
-        e.target.value = 'R$ ' + value; // Adiciona o símbolo de moeda
+        value = (value / 100).toFixed(2).replace('.', ',');
+        e.target.value = 'R$ ' + value;
       } else {
-        e.target.value = ''; // Se não houver valor, limpa o campo
+        e.target.value = '';
       }
-      // Atualiza os cálculos de parcelas quando o valor for alterado
       updateInstallmentsLabels();
     });
 
-    // Validação e máscara para o campo de telefone (whatsapp)
+    // Validação e máscara para o campo de telefone (caso exista)
     document.getElementById('whatsapp')?.addEventListener('input', function(e) {
-      let value = e.target.value.replace(/\D/g, ''); // Remove caracteres não numéricos
-
-      // Limita o tamanho máximo de dígitos a 11 (2 dígitos do DDD + 9 do número)
+      let value = e.target.value.replace(/\D/g, '');
       if (value.length > 11) {
         value = value.slice(0, 11);
       }
-
-      // Aplica a máscara para formato (xx) xxxx-xxxx ou (xx) xxxxx-xxxx
       if (value.length <= 10) {
         value = value.replace(/(\d{2})(\d{4})(\d{0,4})/, '($1) $2-$3');
       } else {
         value = value.replace(/(\d{2})(\d{5})(\d{0,4})/, '($1) $2-$3');
       }
-
       e.target.value = value;
     });
 
     // Função para copiar o link gerado
     function copyLink() {
       const generatedLinkElement = document.getElementById('generatedLink');
-      const linkText = generatedLinkElement.textContent;
-
-      navigator.clipboard
-        .writeText(linkText)
+      const linkText = generatedLinkElement.textContent.trim();
+      navigator.clipboard.writeText(linkText)
         .then(() => {
           showMessage('Link copiado para a área de transferência!', 'success');
         })
         .catch((err) => {
-          console.error('Erro ao copiar o link: ', err);
+          console.error('Erro ao copiar o link:', err);
           showMessage('Erro ao copiar o link. Por favor, tente novamente.', 'error');
         });
     }
 
-    // Atualiza os labels das opções de parcelamento com os valores calculados
+    // Atualiza os valores de parcelamento com base no valor total
     function updateInstallmentsLabels() {
       const totalValueInput = document.getElementById('linkValue').value;
       if (!totalValueInput) return;
-      
-      const totalValue = parseFloat(
-        totalValueInput.replace(/[R$ .]/g, '').replace(',', '.')
-      );
-      
+      const totalValue = parseFloat(totalValueInput.replace(/[R$ .]/g, '').replace(',', '.'));
       if (!isNaN(totalValue) && totalValue > 0) {
         const valueIn2x = (totalValue / 2).toFixed(2).replace('.', ',');
         const valueIn3x = (totalValue / 3).toFixed(2).replace('.', ',');
-        
         document.querySelector('label[for="installment-2"] .installment-value').innerHTML = 
           `2x <small>R$ ${valueIn2x}</small>`;
         document.querySelector('label[for="installment-3"] .installment-value').innerHTML = 
@@ -844,12 +838,10 @@
       }
     }
 
-    // Função para compartilhar o link (usando Web Share API se disponível)
+    // Compartilha o link usando a API Web Share, com fallback para copiar o link
     document.getElementById('shareBtn').addEventListener('click', function(e) {
       e.preventDefault();
-      const linkText = document.getElementById('generatedLink').textContent;
-      const clientName = document.getElementById('linkName')?.value || 'cliente';
-      
+      const linkText = document.getElementById('generatedLink').textContent.trim();
       if (navigator.share) {
         navigator.share({
           title: 'Link de Pagamento - Loja Bibelô',
@@ -859,29 +851,34 @@
         .then(() => showMessage('Link compartilhado com sucesso!', 'success'))
         .catch((error) => {
           console.error('Erro ao compartilhar:', error);
-          copyLink(); // Fallback para copiar se o compartilhamento falhar
+          copyLink();
         });
       } else {
-        copyLink(); // Fallback para navegadores sem suporte à API Web Share
+        copyLink();
       }
     });
 
-    // Manipulação do formulário para estado de carregamento
+    // Estado de carregamento ao enviar o formulário
     document.getElementById('create-link-form').addEventListener('submit', function(event) {
       const btn = document.getElementById('generate-link-btn');
-      btn.disabled = true; // Desabilita o botão
-      btn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Aguarde...'; // Exibe um ícone de carregamento e muda o texto
+      btn.disabled = true;
+      btn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i> Aguarde...';
     });
 
-    // Inicializa a interface
+    // Inicialização da interface e geração do QR Code se houver link gerado
     document.addEventListener('DOMContentLoaded', function() {
-      // Se houver um link já gerado, garante que o card de resultado seja exibido
       if (document.getElementById('generatedLink').textContent.trim()) {
         document.getElementById('generatedLinkContainer').classList.add('visible');
         document.getElementById('generatedLinkContainer').style.display = 'block';
+        new QRCode(document.getElementById("qrcode"), {
+          text: document.getElementById('generatedLink').textContent.trim(),
+          width: 128,
+          height: 128,
+          colorDark : "#2C3E50",
+          colorLight : "#ECF0F1",
+          correctLevel : QRCode.CorrectLevel.H
+        });
       }
-      
-      // Inicializa os cálculos de parcelas
       setTimeout(updateInstallmentsLabels, 500);
     });
   </script>
