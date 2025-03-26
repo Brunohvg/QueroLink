@@ -64,12 +64,12 @@ def create_link(request):
                 NUMERO_ENVIO = formatar_numero(numero=vendedor)
                 MESSAGE = (
                     f"Olá, {link_name}! 😊\n\n"
-                    "Seu link de pagamento está pronto! 🔗\n"
-                    "Agora você pode enviar este link para o seu cliente. 📤\n"
-                    "Assim que o pagamento for confirmado, nós te avisaremos. 💰\n\n"
-                    f"{link} 📩\n\n"
+                    "Obrigado por sua compra na Loja Bibelo!\n"
+                    "Finalize seu pedido efetuando o pagamento pelo link:\n"
+                    f"{link}\n\n"
+                    "Qualquer dúvida, estamos à disposição!"
                 )
-
+                
                 ENVIAR_MENSAGEM.message_send_text(NUMERO_ENVIO, MESSAGE)
             except Exception as sms_error:
                 messages.warning(request, f"Mensagem não enviada: {str(sms_error)}")
