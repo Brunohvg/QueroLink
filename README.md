@@ -1,109 +1,109 @@
-QueroLink / LinkPay
-Este é um projeto Django desenvolvido para atuar como um gerador de links de pagamento, integrando-se diretamente com a API v5 do Pagar.me. A aplicação permite a criação de links de pagamento (checkout) e armazena um registro das transações no banco de dados. Adicionalmente, possui uma integração para enviar os links gerados via WhatsApp para os clientes.
+# QueroLink / LinkPay
 
-A aplicação é projetada para ser executada em containers Docker e está pré-configurada para deploy por trás de um reverse proxy Traefik.
+Um projeto **Django** para gerar links de pagamento integrados à **API v5 do Pagar.me**, com envio automático de links via WhatsApp. Desenvolvido para rodar em **Docker**, pré-configurado para deploy por trás de um **proxy reverso Traefik**.
 
-Funcionalidades Principais
-Geração de Link de Pagamento: Cria links de pagamento dinâmicos utilizando a API do Pagar.me, especificando valor total, nome e número de parcelas.
+---
 
-API REST: Expõe uma API REST (construída com Django Rest Framework) para listar e gerenciar os registros de pagamentos criados.
+## 🚀 Funcionalidades
 
-Integração com WhatsApp: Conecta-se a uma API externa de WhatsApp (api.lojabibelo.com.br) para enviar mensagens de texto, provavelmente o link de pagamento, para o cliente.
+- **Geração de Link de Pagamento:** Cria links dinâmicos usando a API do Pagar.me, com valor, nome e número de parcelas.  
+- **API REST:** CRUD completo de pagamentos usando Django Rest Framework.  
+- **Integração WhatsApp:** Envia links de pagamento via API externa (`api.lojabibelo.com.br`).  
+- **Deploy com Docker:** Inclui `Dockerfile` e `docker-compose.yml` prontos para rodar em containers.  
+- **Serviço de Arquivos Estáticos:** Whitenoise para servir arquivos estáticos em produção de forma eficiente.
 
-Deploy com Docker: O projeto inclui um Dockerfile e um docker-compose.yml para facilitar o build e a execução da aplicação em um ambiente containerizado.
+---
 
-Serviço de Arquivos Estáticos: Utiliza o Whitenoise para servir arquivos estáticos em produção de forma eficiente.
+## 🛠 Tecnologias
 
-Tecnologias Utilizadas
-Backend: Python 3.12, Django 5.1, Django Rest Framework
+- **Backend:** Python 3.12, Django 5.1, Django Rest Framework  
+- **Servidor WSGI:** Gunicorn  
+- **Arquivos Estáticos:** Whitenoise  
+- **Configuração:** Python Decouple  
+- **Deploy:** Docker, Docker Compose  
+- **Banco de Dados:** SQLite (desenvolvimento)  
+- **APIs Externas:** Pagar.me v5, API WhatsApp (Lojabibelo)
 
-Servidor WSGI: Gunicorn
+---
 
-Arquivos Estáticos: Whitenoise
+## ⚙️ Configuração
 
-Configuração: Python Decouple
+O projeto utiliza **variáveis de ambiente** via `python-decouple`. Crie um arquivo `.env` na raiz do projeto ou configure as variáveis no ambiente de deploy.
 
-Deploy: Docker, Docker Compose
+Variáveis principais:
 
-Banco de Dados: SQLite (padrão de desenvolvimento)
+```env
+SECRET_KEY=your_django_secret_key
+DEBUG=True
+ALLOWED_HOSTS=localhost,linkpay.lojabibelo.com.br
+API_KEY_PAGAR_ME=your_pagarme_api_key
+API_KEY_INSTANCIA=your_whatsapp_api_key
+INSTANCE=nome_da_instancia_whatsapp
+🐳 Executando com Docker
+Clone o repositório:
 
-APIs Externas: Pagar.me v5, API de WhatsApp (Lojabibelo)
+bash
+Copiar código
+git clone <seu-repo-url>
+cd linkpay
+Crie o .env com as variáveis descritas acima.
 
-Configuração
-O projeto é configurado via variáveis de ambiente, gerenciadas pelo python-decouple. É esperado que um arquivo .env seja criado na raiz do projeto (ou que as variáveis sejam injetadas no ambiente de deploy).
+Certifique-se de que as redes Docker traefik_public e app_network existam, ou remova external: true do docker-compose.yml.
 
-As seguintes variáveis são necessárias:
+bash
+Copiar código
+docker network create traefik_public
+docker network create app_network
+Build e start:
 
-SECRET_KEY: Chave secreta do Django.
-
-DEBUG: Define o modo debug (ex: True ou False).
-
-ALLOWED_HOSTS: Lista de hosts permitidos (ex: linkpay.lojabibelo.com.br,localhost).
-
-API_KEY_PAGAR_ME: Chave de API (Basic Auth) para a integração com o Pagar.me.
-
-API_KEY_INSTANCIA: Chave de API para a integração com o serviço de WhatsApp.
-
-INSTANCE: Nome da instância utilizada no serviço de WhatsApp.
-
-Executando com Docker
-Clone o repositório.
-
-Crie um arquivo .env na raiz do projeto com as variáveis de ambiente descritas acima.
-
-O docker-compose.yml está configurado para usar redes Docker externas (traefik_public e app_network). Certifique-se de que essas redes existam (docker network create traefik_public) ou remova a diretiva external: true do docker-compose.yml para que o compose as crie.
-
-Execute o build e suba o serviço:
-
-Bash
-
+bash
+Copiar código
 docker-compose up -d --build
-O script entrypoint.sh irá automaticamente aplicar as migrações do banco de dados (migrate), coletar os arquivos estáticos (collectstatic) e iniciar o servidor Gunicorn.
+O script entrypoint.sh aplicará migrações, coletará arquivos estáticos e iniciará o servidor Gunicorn.
 
-A aplicação estará disponível na porta 8082 do host, ou será roteada pelo Traefik se ele estiver configurado na mesma rede, respondendo pelo host linkpay.lojabibelo.com.br.
+Porta padrão: 8082
 
-Estrutura do Projeto
-core/: Contém as configurações principais do Django (settings.py, urls.py).
+Se estiver usando Traefik, disponível via linkpay.lojabibelo.com.br.
 
-link/: É o app principal do Django.
+📂 Estrutura do Projeto
+bash
+Copiar código
+core/                  # Configurações principais do Django
+link/                  # App principal
+  ├─ models.py         # Modelo PagarMePayment
+  ├─ urls.py           # Rotas web e API
+  ├─ views.py          # Views web
+  ├─ viewsets.py       # ViewSets da API
+  └─ api/
+      ├─ pagar_me.py   # Cliente Pagar.me
+      └─ whatsapp.py   # Cliente WhatsApp
+Dockerfile
+docker-compose.yml
+entrypoint.sh
+requisitos.txt
+📡 API REST
+Base: /api/v1/pagamentos/
+Autenticação: TokenAuthentication do Django Rest Framework
 
-models.py: Define o modelo PagarMePayment para armazenar os dados da transação.
+Rotas
+Método	Endpoint	Descrição
+GET	/api/v1/pagamentos/	Lista todos os pagamentos
+POST	/api/v1/pagamentos/	Cria novo pagamento
+GET	/api/v1/pagamentos/<id>/	Detalha pagamento
+PUT	/api/v1/pagamentos/<id>/	Atualiza pagamento
+PATCH	/api/v1/pagamentos/<id>/	Atualiza parcialmente
+DELETE	/api/v1/pagamentos/<id>/	Remove pagamento
 
-urls.py: Define as rotas da aplicação web e da API.
+💡 Observações
+Pronto para produção usando Traefik e Docker.
 
-views.py: (Não fornecido) Controla as views da interface web (index, create_link).
+Arquivos estáticos servidos com Whitenoise, sem necessidade de Nginx extra.
 
-viewsets.py: (Não fornecido) Define o ViewSet para a API PagarMePaymentViewSet.
+Integração completa com Pagar.me e WhatsApp, facilitando envios automáticos.
 
-api/pagar_me.py: Contém a lógica de cliente para se comunicar com a API do Pagar.me.
+📌 Desenvolvido por [Seu Nome / Lojabibelo]
 
-api/whatsapp.py: Contém a lógica de cliente para se comunicar com a API de WhatsApp.
+arduino
+Copiar código
 
-Dockerfile: Instruções para construir a imagem Docker da aplicação.
-
-docker-compose.yml: Define o serviço web para orquestração com Docker Compose.
-
-entrypoint.sh: Script executado quando o container inicia.
-
-requirements.txt: Lista de dependências Python.
-
-API
-A aplicação expõe uma API REST para o modelo PagarMePayment.
-
-Endpoint Base: /api/v1/pagamentos/
-
-Autenticação: A API está configurada para usar TokenAuthentication do Django Rest Framework.
-
-Rotas Disponíveis (via DefaultRouter):
-
-GET /api/v1/pagamentos/: Lista todos os pagamentos registrados.
-
-POST /api/v1/pagamentos/: Cria um novo registro de pagamento.
-
-GET /api/v1/pagamentos/<id>/: Detalha um pagamento específico.
-
-PUT /api/v1/pagamentos/<id>/: Atualiza um pagamento específico.
-
-PATCH /api/v1/pagamentos/<id>/: Atualiza parcialmente um pagamento específico.
-
-DELETE /api/v1/pagamentos/<id>/: Deleta um pagamento específico.
+Se quiser, posso fazer uma **versão ainda mais “profissional GitHub”**, com badges, demo, setup rápido e t
