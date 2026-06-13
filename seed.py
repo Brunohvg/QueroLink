@@ -5,7 +5,7 @@ import django
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'app.config.settings.production')
 django.setup()
 
-from app.apps.accounts.models import Tenant
+from app.apps.accounts.models import Tenant, User
 from app.apps.sellers.models import Seller
 
 def run_seed():
@@ -24,6 +24,20 @@ def run_seed():
         print(f"Tenant criado: {tenant.company_name}")
     else:
         print(f"Tenant já existia: {tenant.company_name}")
+
+    # Cria o superusuário padrão se não existir
+    admin_email = os.environ.get("DJANGO_SUPERUSER_EMAIL", "admin@bibelo.com.br")
+    admin_password = os.environ.get("DJANGO_SUPERUSER_PASSWORD", "admin123")
+    
+    if not User.objects.filter(email=admin_email).exists() and not User.objects.filter(username=admin_email).exists():
+        User.objects.create_superuser(
+            username=admin_email,
+            email=admin_email,
+            password=admin_password
+        )
+        print(f"Superusuário criado: {admin_email} / Senha: {admin_password}")
+    else:
+        print(f"Superusuário já existia: {admin_email}")
 
     # Lista dos antigos vendedores em HTML
     antigos_vendedores = [

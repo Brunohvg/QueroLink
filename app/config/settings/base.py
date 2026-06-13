@@ -46,6 +46,7 @@ INSTALLED_APPS = [
     "app.apps.notifications",
     "app.apps.analytics",
     "app.apps.audit",
+    "app.apps.dashboard",
 
     'rest_framework',
     'rest_framework.authtoken',
@@ -144,9 +145,13 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 AUTH_USER_MODEL = 'accounts.User'
 
-# Sessões
+# Sessões e Login
 SESSION_COOKIE_AGE = 3600  # 1 hora
-SESSION_EXPIRE_AT_BROWSER_CLOSE = True  # A sessão não persiste após fechar o navegador
+SESSION_EXPIRE_AT_BROWSER_CLOSE = True
+
+LOGIN_URL = 'dashboard:login'
+LOGIN_REDIRECT_URL = 'dashboard:home'
+LOGOUT_REDIRECT_URL = 'dashboard:login'
 
 # CSRF
 CSRF_TRUSTED_ORIGINS = [

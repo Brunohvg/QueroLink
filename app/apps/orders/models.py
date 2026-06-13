@@ -30,6 +30,10 @@ class Order(models.Model):
     def __str__(self):
         return f"Order {self.uuid} - {self.customer_name}"
 
+    @property
+    def total_amount_decimal(self):
+        return f"{self.total_amount / 100:.2f}".replace('.', ',')
+
 class PaymentLink(models.Model):
     uuid = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     order = models.OneToOneField(Order, on_delete=models.CASCADE, related_name='payment_link')

@@ -1,0 +1,56 @@
+{% extends 'dashboard/base.html' %}
+
+{% block page_title %}Visão Geral{% endblock %}
+
+{% block content %}
+    <div class="metrics-grid">
+        <div class="metric-card glass">
+            <div class="metric-title">TOTAL DE LINKS GERADOS</div>
+            <div class="metric-value">{{ total_orders }}</div>
+        </div>
+        <div class="metric-card glass">
+            <div class="metric-title">LINKS PAGOS</div>
+            <div class="metric-value" style="color: var(--success-color);">{{ paid_orders_count }}</div>
+        </div>
+        <div class="metric-card glass">
+            <div class="metric-title">RECEITA TOTAL</div>
+            <div class="metric-value">R$ {{ total_revenue|floatformat:2 }}</div>
+        </div>
+    </div>
+
+    <h3 style="margin-bottom: 1rem;">Últimos Links Gerados</h3>
+    <div class="data-table-container glass">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>Cliente / Referência</th>
+                    <th>Vendedor</th>
+                    <th>Valor</th>
+                    <th>Status</th>
+                    <th>Data</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for order in recent_orders %}
+                <tr>
+                    <td>{{ order.customer_name }}</td>
+                    <td>{{ order.seller.name }}</td>
+                    <td>R$ {{ order.total_amount_decimal }}</td>
+                    <td>
+                        <span class="badge {% if order.status == 'PAID' %}paid{% elif order.status == 'CANCELED' %}canceled{% else %}pending{% endif %}">
+                            {{ order.get_status_display }}
+                        </span>
+                    </td>
+                    <td style="color: var(--text-secondary);">{{ order.created_at|date:"d/m/Y H:i" }}</td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="5" style="text-align: center; color: var(--text-secondary); padding: 2rem;">
+                        Nenhum link gerado ainda.
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+{% endblock %}

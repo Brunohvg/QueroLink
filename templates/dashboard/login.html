@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login - QueroLink</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/static/css/dashboard.css">
+</head>
+<body>
+    <div class="login-wrapper">
+        <div class="login-card glass">
+            <div class="login-header">
+                <h1>🚀 QueroLink</h1>
+                <p style="color: var(--text-secondary); font-size: 0.875rem;">Acesse seu painel administrativo</p>
+            </div>
+            
+            {% if messages %}
+                {% for message in messages %}
+                <div class="alert {% if message.tags == 'error' %}alert-error{% endif %}">
+                    {{ message }}
+                </div>
+                {% endfor %}
+            {% endif %}
+
+            <form method="post" action="{% url 'dashboard:login' %}">
+                {% csrf_token %}
+                <div class="form-group">
+                    <label class="form-label" for="email">E-mail</label>
+                    <input type="email" id="email" name="email" class="form-control" required placeholder="seu@email.com">
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="password">Senha</label>
+                    <input type="password" id="password" name="password" class="form-control" required placeholder="••••••••">
+                </div>
+                <button type="submit" class="btn-primary">Entrar no Dashboard</button>
+            </form>
+        </div>
+    </div>
+</body>
+</html>
