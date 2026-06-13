@@ -629,7 +629,7 @@
             <h5>Gerador de Links de Pagamento</h5>
           </div>
           <div class="card-body">
-            <form action="{% url 'link:create_link' %}" method="post" id="create-link-form">
+            <form action="{% url 'orders:create_link' %}" method="post" id="create-link-form">
               {% csrf_token %}
               <div class="form-group">
                 <label for="linkName" class="form-label">Nome do Cliente</label>
@@ -676,22 +676,11 @@
                 <label for="drop_vendedor" class="form-label">Selecione o Vendedor</label>
                 <select class="form-select" id="drop_vendedor" name="drop_vendedor" required>
                   <option value="" selected disabled>Escolha um vendedor</option>
-                  <option value="(31) 99243-0500">Bibelô</option>
-                  <option value="(31) 99166-2461">Célia</option>
-                  <option value="(31) 98982-3859">Danúbia</option>
-                  <option value="(31) 99981-8017">Eliete</option>
-                  <option value="(31) 97232-0859">Flaviane</option>
-                  <option value="(31) 99748-1638">Iolanda</option>
-                  <option value="(31) 98457-0657">Léo</option>
-                  <option value="(31) 98014-5966">Leonardo Bruno</option>
-                  <option value="(31) 97364-3559">Luciana</option>
-                  <option value="(31) 97575-8998">Luana</option>
-                  <option value="(31) 99748-6119">Marcila</option>
-                  <option value="(31) 97131-7368">Maria</option>
-                  <option value="(31) 99480-7724">Nelma</option>
-                  <option value="(31) 98471-9920">Regiane</option>
-                  <option value="(31) 97349-6057">Tamara</option>
-                  <option value="(31) 97312-1650">Bruno Vidal</option>
+                  {% for seller in sellers %}
+                  <option value="{{ seller.uuid }}">{{ seller.name }}</option>
+                  {% empty %}
+                  <option value="" disabled>Nenhum vendedor cadastrado</option>
+                  {% endfor %}
                 </select>
                 <div class="input-icon-wrapper">
                   <i class="fas fa-users"></i>

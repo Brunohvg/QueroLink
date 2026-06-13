@@ -1,26 +1,27 @@
-FROM python:3.12.3
+FROM python:3.12.3-slim
 
-# Definir a variável de ambiente PYTHONUNBUFFERED
 ENV PYTHONUNBUFFERED=1
+ENV PYTHONDONTWRITEBYTECODE=1
 
-# Definir o diretório de trabalho dentro do container
 WORKDIR /app
 
-# Copiar apenas o arquivo de requisitos primeiro para otimizar o cache
-COPY requirements.txt ./
+# Instalar dependências de sistema para o postgres e redis
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends \
+        curl \
+        libpq-dev \
+        gcc \
+    && rm -rf /var/lib/apt/lists/*
 
-# Instalar as dependências do Python
-RUN pip install --no-cache-dir -r requirements.txt
+COPY requirements/base.txt ./requirements/base.txt
+COPY requirements/production.txt ./requirements/production.txt
 
-# Copiar o restante do código para o contêiner
+RUN pip install --no-cache-dir -r requirements/production.txt
+
 COPY . .
 
-# Expor a porta 8000, que o Django usará
+RUN chmod +x /app/entrypoint.sh
+
 EXPOSE 8000
 
-# Copiar o script de entrada e garantir que tenha permissões de execução
-COPY entrypoint.sh /entrypoint.sh
-RUN chmod +x /entrypoint.sh
-
-# Usar o script de entrada para iniciar o Django e o Gunicorn
-ENTRYPOINT ["/entrypoint.sh"]
+ENTRYPOINT ["/app/entrypoint.sh"]
