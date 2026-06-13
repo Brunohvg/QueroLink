@@ -38,7 +38,7 @@ def dashboard_home(request):
 
     # Métricas
     total_orders = Order.objects.filter(tenant=tenant).count()
-    paid_orders = Order.objects.filter(tenant=tenant, status=Order.Status.PAID)
+    paid_orders = Order.objects.filter(tenant=tenant, status=Order.Status.COMPLETED)
     total_revenue = paid_orders.aggregate(total=Sum('total_amount'))['total'] or 0
     total_revenue_formatted = total_revenue / 100
 

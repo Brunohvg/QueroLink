@@ -37,7 +37,7 @@
                     <td>{{ order.seller.name }}</td>
                     <td>R$ {{ order.total_amount_decimal }}</td>
                     <td>
-                        <span class="badge {% if order.status == 'PAID' %}paid{% elif order.status == 'CANCELED' %}canceled{% else %}pending{% endif %}">
+                        <span class="badge {% if order.status == 'COMPLETED' %}paid{% elif order.status == 'CANCELED' %}canceled{% else %}pending{% endif %}">
                             {{ order.get_status_display }}
                         </span>
                     </td>
