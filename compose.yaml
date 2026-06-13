@@ -8,13 +8,14 @@ services:
     image: quero-link-web:latest
     restart: always
     environment:
+      - DJANGO_SETTINGS_MODULE=app.config.settings.production
       - DEBUG=${DEBUG:-False}
       - SECRET_KEY=${SECRET_KEY}
       - DATABASE_URL=postgres://${DB_USER}:${DB_PASSWORD}@db:5432/${DB_NAME}
       - REDIS_URL=redis://redis:6379/0
       - ALLOWED_HOSTS=${ALLOWED_HOSTS:-*}
     ports:
-      - "8000:8000"
+      - "8001:8000"
     volumes:
       - static_volume:/app/staticfiles
       - media_volume:/app/media
@@ -62,6 +63,7 @@ services:
     command: celery -A app.config worker --loglevel=info
     restart: always
     environment:
+      - DJANGO_SETTINGS_MODULE=app.config.settings.production
       - DEBUG=${DEBUG:-False}
       - SECRET_KEY=${SECRET_KEY}
       - DATABASE_URL=postgres://${DB_USER}:${DB_PASSWORD}@db:5432/${DB_NAME}
@@ -79,6 +81,7 @@ services:
     command: celery -A app.config beat --loglevel=info
     restart: always
     environment:
+      - DJANGO_SETTINGS_MODULE=app.config.settings.production
       - DEBUG=${DEBUG:-False}
       - SECRET_KEY=${SECRET_KEY}
       - DATABASE_URL=postgres://${DB_USER}:${DB_PASSWORD}@db:5432/${DB_NAME}

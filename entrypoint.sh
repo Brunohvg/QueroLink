@@ -6,6 +6,9 @@ echo "Waiting for database to be ready..."
 sleep 5 # Para evitar timeout antes do healthcheck
 
 # Executar migrações
+echo "Making database migrations..."
+python manage.py makemigrations --noinput
+
 echo "Applying database migrations..."
 python manage.py migrate --noinput
 
