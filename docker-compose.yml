@@ -86,7 +86,4 @@ volumes:
   static_volume:
   media_volume:
 
-networks:
-  default:
-    name: coolify
-    external: true
+
