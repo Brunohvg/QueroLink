@@ -18,7 +18,7 @@ services:
       - API_KEY_INSTANCIA=${API_KEY_INSTANCIA}
       - INSTANCE=${INSTANCE}
     ports:
-      - "8002:8000"
+      - "8001:8000"
     volumes:
       - static_volume:/app/staticfiles
       - media_volume:/app/media
