@@ -156,7 +156,9 @@ LOGOUT_REDIRECT_URL = 'dashboard:login'
 # CSRF
 CSRF_TRUSTED_ORIGINS = [
     'https://linkpay.lojabibelo.com.br',
-    'https://www.linkpay.lojabibelo.com.br',  # Adicione se necessário
+    'https://www.linkpay.lojabibelo.com.br',
+    'https://querolink.lojabibelo.com.br',
+    'https://www.querolink.lojabibelo.com.br',
 ]
 
 REST_FRAMEWORK = {
