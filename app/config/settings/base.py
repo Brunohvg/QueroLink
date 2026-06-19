@@ -24,6 +24,11 @@ BASE_DIR = Path(__file__).resolve().parent.parent.parent.parent
 # SECURITY WARNING: keep the secret key used in production secret!  
 SECRET_KEY = config('SECRET_KEY', default='unsafe-secret-key')
 
+# APIs e Integrações
+API_KEY_PAGAR_ME = config('API_KEY_PAGAR_ME', default='')
+API_KEY_INSTANCIA = config('API_KEY_INSTANCIA', default='')
+INSTANCE = config('INSTANCE', default='')
+
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = config('DEBUG', default=True, cast=bool)
 
