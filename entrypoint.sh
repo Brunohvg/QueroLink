@@ -5,17 +5,20 @@ set -e
 echo "Waiting for database to be ready..."
 sleep 5 # Para evitar timeout antes do healthcheck
 
-# Executar migrações
-echo "Making database migrations..."
-python manage.py makemigrations --noinput
+# Apenas o container principal (sem parâmetros ou gunicorn) deve rodar as migrações
+if [ -z "$1" ] || [ "$1" = 'gunicorn' ]; then
+    echo "Making database migrations..."
+    python manage.py makemigrations --noinput
 
-echo "Applying database migrations..."
-python manage.py migrate --noinput
+    echo "Applying database migrations..."
+    python manage.py migrate --noinput
 
-# Coletar arquivos estáticos
-echo "Collecting static files..."
-python manage.py collectstatic --noinput
+    echo "Collecting static files..."
+    python manage.py collectstatic --noinput
 
-# Iniciar o Gunicorn
-echo "Starting Gunicorn..."
-exec gunicorn app.config.wsgi:application --bind 0.0.0.0:8000 --workers 3
+    echo "Starting Gunicorn..."
+    exec gunicorn app.config.wsgi:application --bind 0.0.0.0:8000 --workers 3
+else
+    echo "Starting background service: $@"
+    exec "$@"
+fi
