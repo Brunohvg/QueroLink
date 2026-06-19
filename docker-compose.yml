@@ -17,8 +17,7 @@ services:
       - API_KEY_PAGAR_ME=${API_KEY_PAGAR_ME}
       - API_KEY_INSTANCIA=${API_KEY_INSTANCIA}
       - INSTANCE=${INSTANCE}
-    ports:
-      - "8001:8000"
+
     volumes:
       - static_volume:/app/staticfiles
       - media_volume:/app/media
