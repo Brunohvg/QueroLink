@@ -7,8 +7,10 @@ from app.apps.accounts.models import Tenant
 from django.db.models import Sum
 
 def login_view(request):
+    next_url = request.GET.get('next', 'dashboard:home')
+    
     if request.user.is_authenticated:
-        return redirect('dashboard:home')
+        return redirect(next_url)
         
     if request.method == 'POST':
         email = request.POST.get('email')
@@ -17,11 +19,11 @@ def login_view(request):
         user = authenticate(request, username=email, password=password)
         if user is not None:
             auth_login(request, user)
-            return redirect('dashboard:home')
+            return redirect(request.POST.get('next', 'dashboard:home'))
         else:
             messages.error(request, 'Email ou senha inválidos.')
             
-    return render(request, 'dashboard/login.html')
+    return render(request, 'dashboard/login.html', {'next': next_url})
 
 def logout_view(request):
     auth_logout(request)
@@ -29,12 +31,17 @@ def logout_view(request):
 
 @login_required
 def dashboard_home(request):
-    # Por enquanto assumimos que o usuário pertence ao primeiro tenant (ou criamos uma lógica de multi-tenant se o usuário tiver tenant atrelado)
-    # Como o sistema tem um tenant único no momento ("Bibelô Oficial"):
-    tenant = Tenant.objects.first()
+    # O dashboard agora é multi-tenant real: usa o tenant vinculado ao usuário logado
+    tenant = request.user.tenant
     
     if not tenant:
-        return render(request, 'dashboard/index.html', {"error": "Nenhum tenant configurado."})
+        # Se for um superuser sem tenant, ele pode ter uma visão global ou ser bloqueado
+        if request.user.is_superuser:
+            tenant = Tenant.objects.first()
+            if not tenant:
+                return render(request, 'dashboard/index.html', {"error": "Nenhum tenant cadastrado no sistema ainda."})
+        else:
+            return render(request, 'dashboard/index.html', {"error": "Sua conta não está vinculada a nenhuma loja/tenant."})
 
     # Métricas
     total_orders = Order.objects.filter(tenant=tenant).count()

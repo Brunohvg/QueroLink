@@ -3,6 +3,12 @@
 {% block page_title %}Visão Geral{% endblock %}
 
 {% block content %}
+    {% if error %}
+    <div class="alert alert-error" style="margin-bottom: 2rem;">
+        <h3 style="margin-bottom: 0.5rem;">Acesso Restrito</h3>
+        <p>{{ error }}</p>
+    </div>
+    {% else %}
     <div class="metrics-grid">
         <div class="metric-card glass">
             <div class="metric-title">TOTAL DE LINKS GERADOS</div>
@@ -53,4 +59,5 @@
             </tbody>
         </table>
     </div>
+    {% endif %}
 {% endblock %}
