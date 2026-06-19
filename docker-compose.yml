@@ -18,7 +18,7 @@ services:
       - API_KEY_INSTANCIA=${API_KEY_INSTANCIA}
       - INSTANCE=${INSTANCE}
     ports:
-      - "8001:8000"
+      - "8002:8000"
     volumes:
       - static_volume:/app/staticfiles
       - media_volume:/app/media
@@ -26,13 +26,12 @@ services:
       querolink-redis:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/health/"]
+      test: [ "CMD", "curl", "-f", "http://localhost:8000/health/" ]
       interval: 10s
       timeout: 5s
       retries: 3
     networks:
       - coolify
-
 
   querolink-redis:
     image: redis:7-alpine
@@ -40,7 +39,7 @@ services:
     volumes:
       - redis_data:/data
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: [ "CMD", "redis-cli", "ping" ]
       interval: 10s
       timeout: 5s
       retries: 3
