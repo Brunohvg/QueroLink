@@ -54,7 +54,7 @@ services:
       - DEBUG=${DEBUG:-False}
       - SECRET_KEY=${SECRET_KEY}
       - DATABASE_URL=${DATABASE_URL}
-      - REDIS_URL=${REDIS_URL:-redis://redis:6379/0}
+      - REDIS_URL=redis://redis:6379/0
       - API_KEY_PAGAR_ME=${API_KEY_PAGAR_ME}
       - API_KEY_INSTANCIA=${API_KEY_INSTANCIA}
       - INSTANCE=${INSTANCE}
@@ -73,7 +73,7 @@ services:
       - DEBUG=${DEBUG:-False}
       - SECRET_KEY=${SECRET_KEY}
       - DATABASE_URL=${DATABASE_URL}
-      - REDIS_URL=${REDIS_URL:-redis://redis:6379/0}
+      - REDIS_URL=redis://redis:6379/0
       - API_KEY_PAGAR_ME=${API_KEY_PAGAR_ME}
       - API_KEY_INSTANCIA=${API_KEY_INSTANCIA}
       - INSTANCE=${INSTANCE}
