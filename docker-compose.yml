@@ -1,6 +1,12 @@
 version: "3.8"
 
+# ============================================================
+# QueroLink — docker-compose.yml
+# Uso: docker compose up -d --build
+# ============================================================
+
 services:
+  # ── Aplicação principal (Django + Gunicorn) ──────────────
   web:
     build:
       context: .
@@ -10,14 +16,20 @@ services:
     environment:
       - DJANGO_SETTINGS_MODULE=app.config.settings.production
       - DEBUG=${DEBUG:-False}
-      - SECRET_KEY=${SECRET_KEY}
-      - DATABASE_URL=${DATABASE_URL}
+      - SECRET_KEY=${SECRET_KEY:?SECRET_KEY obrigatorio}
+      - DATABASE_URL=${DATABASE_URL:?DATABASE_URL obrigatorio}
       - REDIS_URL=redis://querolink-redis:6379/0
       - ALLOWED_HOSTS=${ALLOWED_HOSTS:-*}
-      - API_KEY_PAGAR_ME=${API_KEY_PAGAR_ME}
-      - API_KEY_INSTANCIA=${API_KEY_INSTANCIA}
-      - INSTANCE=${INSTANCE}
-
+      - API_KEY_PAGAR_ME=${API_KEY_PAGAR_ME:-}
+      - API_KEY_INSTANCIA=${API_KEY_INSTANCIA:-}
+      - INSTANCE=${INSTANCE:-}
+      - JWT_ACCESS_TOKEN_LIFETIME_MINUTES=${JWT_ACCESS_TOKEN_LIFETIME_MINUTES:-30}
+      - JWT_REFRESH_TOKEN_LIFETIME_DAYS=${JWT_REFRESH_TOKEN_LIFETIME_DAYS:-7}
+      - SEED_ON_START=${SEED_ON_START:-false}
+      - GUNICORN_WORKERS=${GUNICORN_WORKERS:-3}
+      - GUNICORN_TIMEOUT=${GUNICORN_TIMEOUT:-120}
+      - SERVICE_URL_WEB=${SERVICE_URL_WEB:-}
+      - SERVICE_FQDN_WEB=${SERVICE_FQDN_WEB:-}
     volumes:
       - static_volume:/app/staticfiles
       - media_volume:/app/media
@@ -25,47 +37,51 @@ services:
       querolink-redis:
         condition: service_healthy
     healthcheck:
-      test: [ "CMD", "curl", "-f", "http://localhost:8000/health/" ]
-      interval: 10s
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health/"]
+      interval: 15s
       timeout: 5s
-      retries: 3
+      retries: 5
+      start_period: 30s
     networks:
       - coolify
 
+  # ── Redis (broker Celery) ────────────────────────────────
   querolink-redis:
     image: redis:7-alpine
     restart: always
     volumes:
       - redis_data:/data
     healthcheck:
-      test: [ "CMD", "redis-cli", "ping" ]
+      test: ["CMD", "redis-cli", "ping"]
       interval: 10s
       timeout: 5s
-      retries: 3
+      retries: 5
     networks:
       - coolify
 
+  # ── Celery Worker (tarefas assíncronas) ──────────────────
   celery_worker:
     build:
       context: .
       dockerfile: Dockerfile
-    command: celery -A app.config worker --loglevel=info
+    command: celery -A app.config worker --loglevel=info --concurrency=2
     restart: always
     environment:
       - DJANGO_SETTINGS_MODULE=app.config.settings.production
       - DEBUG=${DEBUG:-False}
-      - SECRET_KEY=${SECRET_KEY}
-      - DATABASE_URL=${DATABASE_URL}
+      - SECRET_KEY=${SECRET_KEY:?}
+      - DATABASE_URL=${DATABASE_URL:?}
       - REDIS_URL=redis://querolink-redis:6379/0
-      - API_KEY_PAGAR_ME=${API_KEY_PAGAR_ME}
-      - API_KEY_INSTANCIA=${API_KEY_INSTANCIA}
-      - INSTANCE=${INSTANCE}
+      - API_KEY_PAGAR_ME=${API_KEY_PAGAR_ME:-}
+      - API_KEY_INSTANCIA=${API_KEY_INSTANCIA:-}
+      - INSTANCE=${INSTANCE:-}
     depends_on:
       querolink-redis:
         condition: service_healthy
     networks:
       - coolify
 
+  # ── Celery Beat (tarefas agendadas) ──────────────────────
   celery_beat:
     build:
       context: .
@@ -75,12 +91,12 @@ services:
     environment:
       - DJANGO_SETTINGS_MODULE=app.config.settings.production
       - DEBUG=${DEBUG:-False}
-      - SECRET_KEY=${SECRET_KEY}
-      - DATABASE_URL=${DATABASE_URL}
+      - SECRET_KEY=${SECRET_KEY:?}
+      - DATABASE_URL=${DATABASE_URL:?}
       - REDIS_URL=redis://querolink-redis:6379/0
-      - API_KEY_PAGAR_ME=${API_KEY_PAGAR_ME}
-      - API_KEY_INSTANCIA=${API_KEY_INSTANCIA}
-      - INSTANCE=${INSTANCE}
+      - API_KEY_PAGAR_ME=${API_KEY_PAGAR_ME:-}
+      - API_KEY_INSTANCIA=${API_KEY_INSTANCIA:-}
+      - INSTANCE=${INSTANCE:-}
     depends_on:
       querolink-redis:
         condition: service_healthy

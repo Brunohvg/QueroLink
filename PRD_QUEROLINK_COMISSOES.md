@@ -1,7 +1,8 @@
 # PRD — QueroLink Sistema de Comissões
 
-> **Status geral:** Lote 1 e Lote 1.5 implementados. 30 testes passando.
-> Última atualização: 2026-06-20
+> **Status geral:** MVP completo — Lotes 1 a 5 implementados. 55 testes passando.
+> **Versão:** 1.0.0-MVP | **Última atualização:** 2026-06-20
+> **Recomendação:** ✅ PRONTO PARA STAGING (ver `READINESS_REPORT.md`)
 
 ---
 
@@ -508,6 +509,43 @@ Fora de escopo. Não corrigir.
 - `VALIDATION_CHECKLIST_LOTE5.md` com 52 itens
 - `READINESS_REPORT.md`: ✅ PRONTO PARA STAGING
 - Pendente: provisionar Coolify staging, testar WhatsApp real, validar PWA em celular real
+
+---
+
+## 16. Deploy e Automação
+
+### entrypoint.sh (inicialização automática)
+1. Aguarda banco de dados responder (30 tentativas, 2s cada)
+2. `makemigrations --noinput` + `migrate --noinput`
+3. Seed opcional via `SEED_ON_START=true` (16 vendedores criados automaticamente)
+4. Templates padrão de notificação garantidos (idempotente)
+5. `collectstatic --noinput`
+6. Gunicorn com workers configuráveis (`GUNICORN_WORKERS`, `GUNICORN_TIMEOUT`)
+
+### docker-compose.yml
+4 serviços: `web` (Gunicorn), `querolink-redis` (broker), `celery_worker`, `celery_beat`
+- Healthchecks em todos os serviços
+- `start_period: 30s` no web para aguardar migrations
+- Volumes: `static_volume`, `media_volume`, `redis_data`
+- Rede `coolify` externa
+
+### Dockerfile multi-stage
+- Estágio 1: `node:20-alpine` → `npm install` → `tailwindcss` build → `tailwind.css`
+- Estágio 2: `python:3.12.3-slim` → `pip install` → copia `tailwind.css` → sem Node na imagem final
+
+### Makefile
+17 comandos: `make help`, `dev`, `test`, `seed`, `build`, `up`, `down`, `logs`, `reset-db`, `deploy-check`, `clean`, etc.
+
+### scripts/deploy.sh
+Deploy com um comando: `scripts/deploy.sh [staging|production]`
+- Valida `.env`
+- Produção: tenta backup `pg_dump`
+- `docker compose build --no-cache` + `up -d`
+- Aguarda healthcheck
+- Exibe logs
+
+### .env.example
+Todas as 18 variáveis documentadas: Django, banco, Redis, APIs externas, JWT, Gunicorn, URLs
 
 ---
 
