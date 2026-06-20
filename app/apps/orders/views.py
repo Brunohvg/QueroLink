@@ -51,26 +51,6 @@ def create_link(request):
                 messages.error(request, "Vendedor não encontrado.")
                 return redirect("orders:index")
 
-            # Gateway call
-            gateway = PagarMeGateway(api_key=tenant.pagarme_api_key)
-            response = gateway.create_payment_link(
-                total_amount=total_amount,
-                max_installments=int(installments),
-                name=link_name,
-                free_installments=int(installments)
-            )
-
-            link_url = response.get("url", "")
-            gateway_id = response.get("id", "")
-
-            if not link_url:
-                messages.error(request, "Falha ao gerar o link de pagamento no Pagar.me.")
-                return redirect("orders:index")
-
-            # Em vez de enviar o WhatsApp aqui de forma síncrona,
-            # nós vamos registrar no banco e o Celery poderia cuidar disso.
-            # (No app notifications)
-
             with transaction.atomic():
                 order = Order.objects.create(
                     tenant=tenant,
@@ -79,7 +59,32 @@ def create_link(request):
                     total_amount=total_amount,
                     status=Order.Status.PENDING
                 )
-                
+
+                # Gateway call
+                gateway = PagarMeGateway(api_key=tenant.pagarme_api_key)
+                response = gateway.create_payment_link(
+                    total_amount=total_amount,
+                    max_installments=int(installments),
+                    name=link_name,
+                    free_installments=int(installments),
+                    order_code=str(order.uuid)
+                )
+
+                link_url = response.get("url", "")
+                gateway_id = response.get("id", "")
+
+                if not link_url:
+                    # Em caso de falha, se quisermos reverter o Order,
+                    # o transaction.atomic já garante se houver exceção, 
+                    # mas como a exception não foi lançada aqui, forçamos um erro:
+                    raise Exception("Falha ao gerar o link de pagamento no Pagar.me.")
+
+            # Em vez de enviar o WhatsApp aqui de forma síncrona,
+            # nós vamos registrar no banco e o Celery poderia cuidar disso.
+            # (No app notifications)
+
+                # O order já foi criado no início do bloco atomic.
+                # Só precisamos criar o payment e payment_link.
                 payment = Payment.objects.create(
                     order=order,
                     gateway_name='pagarme',

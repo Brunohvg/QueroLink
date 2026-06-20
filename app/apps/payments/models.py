@@ -20,6 +20,7 @@ class Payment(models.Model):
     order = models.ForeignKey(Order, on_delete=models.CASCADE, related_name='payments')
     gateway_name = models.CharField(max_length=50, default='pagarme')
     gateway_transaction_id = models.CharField(max_length=100, unique=True, blank=True, null=True)
+    gateway_order_id = models.CharField(max_length=100, blank=True, null=True, db_index=True)
     payment_method = models.CharField(max_length=20, choices=PaymentMethod.choices, default=PaymentMethod.UNKNOWN)
     installments = models.PositiveSmallIntegerField(default=1)
     status = models.CharField(max_length=20, choices=Status.choices, default=Status.PENDING)

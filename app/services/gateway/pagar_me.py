@@ -18,7 +18,7 @@ class PagarMeGateway:
             "authorization": f"Basic {self.api_key}"
         }
 
-    def create_payment_link(self, total_amount, max_installments, name, free_installments, interest_rate=2):
+    def create_payment_link(self, total_amount, max_installments, name, free_installments, interest_rate=2, order_code=None):
         payload = {
             "is_building": False,
             "payment_settings": {
@@ -49,6 +49,9 @@ class PagarMeGateway:
             "expires_in": 1200,
             "max_paid_sessions": 1,
         }
+
+        if order_code:
+            payload["order_code"] = order_code
 
         response = requests.post(self.api_url_links, json=payload, headers=self._get_headers())
         response.raise_for_status()
