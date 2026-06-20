@@ -49,7 +49,7 @@ class SellerCommission(models.Model):
     def __str__(self):
         return f"{self.seller.name} - {self.period}"
 
-    def recalculate(self):
+    def recalculate(self, commit=True):
         """Recalcula total vendido e comissão a partir das Sales do período."""
         from app.apps.sales.models import Sale
         import calendar
@@ -63,3 +63,5 @@ class SellerCommission(models.Model):
         total = sum(s.amount for s in sales)
         self.total_sold_amount = total
         self.commission_amount = int(total * self.commission_rate)
+        if commit:
+            self.save(update_fields=['total_sold_amount', 'commission_amount'])

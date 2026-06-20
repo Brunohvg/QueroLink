@@ -17,9 +17,9 @@ def run_seed():
     tenant, created = Tenant.objects.get_or_create(
         company_name="Bibelô Oficial",
         defaults={
-            "pagarme_api_key": "sua_chave_pagar_me_aqui",
-            "whatsapp_instance_id": "sua_instancia_aqui",
-            "whatsapp_token": "seu_token_aqui"
+            "pagarme_api_key": os.environ.get("API_KEY_PAGAR_ME", ""),
+            "whatsapp_instance_id": os.environ.get("INSTANCE", ""),
+            "whatsapp_token": os.environ.get("API_KEY_INSTANCIA", ""),
         }
     )
     if created:
@@ -31,13 +31,14 @@ def run_seed():
     admin_password = os.environ.get("DJANGO_SUPERUSER_PASSWORD", "admin123")
 
     if not User.objects.filter(email=admin_email).exists() and not User.objects.filter(username=admin_email).exists():
-        User.objects.create_superuser(
+        admin = User.objects.create_superuser(
             username=admin_email,
             email=admin_email,
             password=admin_password
         )
-        print(f"Superusuario criado: {admin_email} / Senha: {admin_password}")
+        print(f"Superusuario criado: {admin_email}")
     else:
+        admin = User.objects.filter(username=admin_email).first()
         print(f"Superusuario ja existia: {admin_email}")
 
     antigos_vendedores = [
@@ -83,7 +84,7 @@ def run_seed():
             tenant=tenant,
         )
 
-        seller = Seller.objects.create(
+        Seller.objects.create(
             tenant=tenant,
             user=user,
             name=dados['name'],
@@ -91,7 +92,7 @@ def run_seed():
             commission_rate=tenant.default_commission_rate,
         )
 
-        print(f"Vendedor criado: {seller.name} | usuario={username} | senha={password}")
+        print(f"Vendedor criado: {dados['name']}")
 
     print("Seed finalizado com sucesso!")
 

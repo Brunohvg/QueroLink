@@ -130,7 +130,6 @@ class CommissionPeriodViewSet(viewsets.ModelViewSet):
 
         for sc in period.seller_commissions.select_related('seller').all():
             sc.recalculate()
-            sc.save(update_fields=['total_sold_amount', 'commission_amount'])
 
         period.status = CommissionPeriod.Status.EM_CONFERENCIA
         period.save(update_fields=['status', 'updated_at'])

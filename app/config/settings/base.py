@@ -22,7 +22,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent.parent.parent
 # See https://docs.djangoproject.com/en/5.1/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!  
-SECRET_KEY = config('SECRET_KEY', default='unsafe-secret-key')
+SECRET_KEY = config('SECRET_KEY', default='dev-insecure-key-change-in-production')
 
 # APIs e Integrações
 API_KEY_PAGAR_ME = config('API_KEY_PAGAR_ME', default='')
@@ -30,9 +30,9 @@ API_KEY_INSTANCIA = config('API_KEY_INSTANCIA', default='')
 INSTANCE = config('INSTANCE', default='')
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = config('DEBUG', default=True, cast=bool)
+DEBUG = config('DEBUG', default=False, cast=bool)
 
-ALLOWED_HOSTS = ['*']  # Para desenvolvimento, use '*' mas para produção ajuste para seu domínio específico
+ALLOWED_HOSTS = config('ALLOWED_HOSTS', default='localhost,127.0.0.1').split(',')
 
 # Application definition
 
@@ -54,6 +54,7 @@ INSTALLED_APPS = [
     "app.apps.audit",
     "app.apps.dashboard",
     "app.apps.api",
+    "app.apps.analytics",
 
     'rest_framework',
     'rest_framework.authtoken',
@@ -61,8 +62,9 @@ INSTALLED_APPS = [
 ]
 
 MIDDLEWARE = [
+    "corsheaders.middleware.CorsMiddleware",
     "django.middleware.security.SecurityMiddleware",
-    "whitenoise.middleware.WhiteNoiseMiddleware",  # Middleware do Whitenoise
+    "whitenoise.middleware.WhiteNoiseMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
@@ -162,12 +164,18 @@ LOGIN_REDIRECT_URL = 'dashboard:home'
 LOGOUT_REDIRECT_URL = 'dashboard:login'
 
 # CSRF
-CSRF_TRUSTED_ORIGINS = [
-    'https://linkpay.lojabibelo.com.br',
-    'https://www.linkpay.lojabibelo.com.br',
-    'https://querolink.lojabibelo.com.br',
-    'https://www.querolink.lojabibelo.com.br',
-]
+CSRF_TRUSTED_ORIGINS = config(
+    'CSRF_TRUSTED_ORIGINS',
+    default='https://querolink.lojabibelo.com.br,https://www.querolink.lojabibelo.com.br',
+    cast=lambda v: [s.strip() for s in v.split(',') if s.strip()],
+)
+
+CORS_ALLOWED_ORIGINS = config(
+    'CORS_ALLOWED_ORIGINS',
+    default='',
+    cast=lambda v: [s.strip() for s in v.split(',') if s.strip()],
+)
+CORS_ALLOW_CREDENTIALS = True
 
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': [

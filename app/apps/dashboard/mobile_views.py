@@ -35,7 +35,9 @@ def mobile_logout(request):
 
 
 def mobile_forgot_password(request):
-    return render(request, 'mobile/forgot_password.html')
+    return render(request, 'mobile/forgot_password.html', {
+        'message': 'Entre em contato com o administrador do sistema para redefinir sua senha.',
+    })
 
 
 @login_required
@@ -53,13 +55,20 @@ def mobile_home(request):
         seller=seller,
         sale_date__year=today.year,
         sale_date__month=today.month,
+    ).aggregate(total=Sum('amount'))['total'] or 0
+
+    month_count = Sale.objects.filter(
+        seller=seller,
+        sale_date__year=today.year,
+        sale_date__month=today.month,
     ).count()
 
     return render(request, 'mobile/home.html', {
         'seller': seller,
         'today_total': today_total,
         'today_count': today_count,
-        'month_count': month_total,
+        'month_total': month_total,
+        'month_count': month_count,
     })
 
 

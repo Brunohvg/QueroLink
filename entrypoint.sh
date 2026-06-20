@@ -34,7 +34,7 @@ if [ -z "$1" ] || [ "$1" = 'gunicorn' ]; then
 
     # ── Checar banco ───────────────────────────────────────
     if [ -n "$DATABASE_URL" ]; then
-        wait_for_db || true
+        wait_for_db
     fi
 
     # ── Migrations ─────────────────────────────────────────
@@ -86,5 +86,11 @@ print('Templates verificados.')
 else
     # ── Serviços auxiliares (celery worker, celery beat) ──
     log "Iniciando serviço: $*"
+
+    # ── Esperar banco para serviços Celery ─────────────────
+    if [ -n "$DATABASE_URL" ]; then
+        wait_for_db
+    fi
+
     exec "$@"
 fi
