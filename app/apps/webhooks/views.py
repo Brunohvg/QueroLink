@@ -13,8 +13,8 @@ def pagarme_webhook(request):
                 gateway='pagarme',
                 payload=payload
             )
-            # Enfileira tarefa do Celery para processar
-            # process_pagarme_webhook.delay(event.id)
+            from app.apps.webhooks.tasks import process_pagarme_webhook
+            process_pagarme_webhook.delay(event.id)
             return JsonResponse({"status": "received"}, status=200)
         except json.JSONDecodeError:
             return JsonResponse({"error": "Invalid JSON"}, status=400)

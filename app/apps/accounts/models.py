@@ -20,6 +20,8 @@ class User(AbstractUser):
     class Role(models.TextChoices):
         ADMIN = 'ADMIN', 'Admin'
         MANAGER = 'MANAGER', 'Manager'
+        FINANCEIRO = 'FINANCEIRO', 'Financeiro'
+        SELLER = 'SELLER', 'Vendedor'
     
     tenant = models.ForeignKey(Tenant, on_delete=models.CASCADE, null=True, blank=True, related_name='users')
     role = models.CharField(max_length=10, choices=Role.choices, default=Role.MANAGER)

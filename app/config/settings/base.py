@@ -47,6 +47,8 @@ INSTALLED_APPS = [
     "app.apps.sellers",
     "app.apps.orders",
     "app.apps.payments",
+    "app.apps.sales",
+    "app.apps.commissions",
     "app.apps.webhooks",
     "app.apps.notifications",
     "app.apps.analytics",
