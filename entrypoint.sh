@@ -39,7 +39,6 @@ if [ -z "$1" ] || [ "$1" = 'gunicorn' ]; then
 
     # ── Migrations ─────────────────────────────────────────
     log "===== MIGRATIONS ====="
-    python manage.py makemigrations --noinput || true
     python manage.py migrate --noinput
     log "Migrations concluídas."
 
@@ -56,7 +55,7 @@ exec(open('seed.py').read())
 
     # ── Templates padrão (força criação) ───────────────────
     log "===== TEMPLATES ====="
-    python manage.py shell -c "
+    if ! python manage.py shell -c "
 from app.apps.accounts.models import Tenant
 from app.apps.notifications.models import MessageTemplate
 DEFAULT = [
@@ -67,7 +66,9 @@ for t in Tenant.objects.all():
     for et, ch, body in DEFAULT:
         MessageTemplate.objects.get_or_create(tenant=t, event_type=et, channel=ch, defaults={'body':body})
 print('Templates verificados.')
-" 2>/dev/null || true
+"; then
+        log "AVISO: falha ao criar templates padrão — verificar manualmente. Continuando o boot."
+    fi
 
     # ── Static files ───────────────────────────────────────
     log "===== COLLECTSTATIC ====="

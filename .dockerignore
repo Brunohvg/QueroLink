@@ -19,3 +19,4 @@ README.md
 .dockerignore
 Dockerfile
 docker-compose.yml
+static/css/tailwind.css

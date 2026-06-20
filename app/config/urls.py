@@ -13,10 +13,12 @@ def health_check(request):
     except OperationalError:
         db_ok = False
 
-    return JsonResponse({
+    payload = {
         'status': 'ok' if db_ok else 'degraded',
         'database': 'ok' if db_ok else 'error',
-    })
+    }
+    status_code = 200 if db_ok else 503
+    return JsonResponse(payload, status=status_code)
 
 urlpatterns = [
     path('health/', health_check),

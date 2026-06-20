@@ -26,8 +26,9 @@ COPY requirements/production.txt ./requirements/production.txt
 
 RUN pip install --no-cache-dir -r requirements/production.txt
 
-COPY --from=tailwind-build /app/static/css/tailwind.css ./static/css/tailwind.css
 COPY . .
+
+COPY --from=tailwind-build /app/static/css/tailwind.css ./static/css/tailwind.css
 
 RUN chmod +x /app/entrypoint.sh
 
