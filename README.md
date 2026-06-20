@@ -1,109 +1,126 @@
-# QueroLink / LinkPay
+# QueroLink — Sistema de Comissões Multi-Tenant
 
-Um projeto **Django** para gerar links de pagamento integrados à **API v5 do Pagar.me**, com envio automático de links via WhatsApp. Desenvolvido para rodar em **Docker**, pré-configurado para deploy por trás de um **proxy reverso Traefik**.
-
----
-
-## 🚀 Funcionalidades
-
-- **Geração de Link de Pagamento:** Cria links dinâmicos usando a API do Pagar.me, com valor, nome e número de parcelas.  
-- **API REST:** CRUD completo de pagamentos usando Django Rest Framework.  
-- **Integração WhatsApp:** Envia links de pagamento via API externa (`api.lojabibelo.com.br`).  
-- **Deploy com Docker:** Inclui `Dockerfile` e `docker-compose.yml` prontos para rodar em containers.  
-- **Serviço de Arquivos Estáticos:** Whitenoise para servir arquivos estáticos em produção de forma eficiente.
+Sistema de gestão de comissões para vendedores de lojas.
+Tenant principal: Loja Bibelô (16 vendedores reais).
 
 ---
 
-## 🛠 Tecnologias
+## Stack
 
-- **Backend:** Python 3.12, Django 5.1, Django Rest Framework  
-- **Servidor WSGI:** Gunicorn  
-- **Arquivos Estáticos:** Whitenoise  
-- **Configuração:** Python Decouple  
-- **Deploy:** Docker, Docker Compose  
-- **Banco de Dados:** SQLite (desenvolvimento)  
-- **APIs Externas:** Pagar.me v5, API WhatsApp (Lojabibelo)
+| Camada | Tecnologia |
+|--------|------------|
+| Backend | Python 3.12, Django 5.1, Django REST Framework |
+| Async | Celery 5.4 + Redis 7 |
+| Auth | JWT (simplejwt) + Token + Session |
+| Frontend mobile | Alpine.js + Tailwind CSS (CDN) |
+| Frontend desktop | Django Templates (futuro: Tailwind build) |
+| PWA | Service Worker + Web Manifest |
+| Banco | SQLite (dev) / PostgreSQL (prod) |
+| Deploy | Docker, Gunicorn, Whitenoise |
+| APIs externas | Pagar.me v5, Evolution API (WhatsApp) |
+| Docs API | Swagger UI (drf-spectacular) |
 
 ---
 
-## ⚙️ Configuração
+## Decisão de frontend mobile: Alpine.js
 
-O projeto utiliza **variáveis de ambiente** via `python-decouple`. Crie um arquivo `.env` na raiz do projeto ou configure as variáveis no ambiente de deploy.
+**Escolha:** Alpine.js sobre HTMX para as telas mobile do vendedor.
 
-Variáveis principais:
+**Justificativa:**
+- A API REST do Lote 2 retorna JSON. Alpine.js consome JSON nativamente via `fetch()`, enquanto HTMX espera HTML do servidor — exigiria endpoints HTML duplicados ou renderização server-side adicional.
+- Alpine.js oferece reatividade local (`x-data`, `x-model`, `x-show`, `x-for`) sem build step, ideal para telas como "Lançar Venda" (máscara monetária, feedback instantâneo) e "Minhas Vendas" (agrupamento por data, exclusão condicional).
+- Dispositivos móveis de loja são frequentemente compartilhados entre turnos; a autenticação via sessão Django (cookie de sessão) é mais segura que JWT em localStorage.
+- Para comunicação com a API: as telas mobile usam sessão Django (`SessionAuthentication` adicionado ao DRF). O JWT permanece disponível para consumidores externos (app nativo futuro, integrações).
 
-```env
-SECRET_KEY=your_django_secret_key
-DEBUG=True
-ALLOWED_HOSTS=localhost,linkpay.lojabibelo.com.br
-API_KEY_PAGAR_ME=your_pagarme_api_key
-API_KEY_INSTANCIA=your_whatsapp_api_key
-INSTANCE=nome_da_instancia_whatsapp
-🐳 Executando com Docker
-Clone o repositório:
+---
 
-bash
-Copiar código
-git clone <seu-repo-url>
-cd linkpay
-Crie o .env com as variáveis descritas acima.
+## Setup rápido (dev)
 
-Certifique-se de que as redes Docker traefik_public e app_network existam, ou remova external: true do docker-compose.yml.
+```bash
+python3 -m venv .venv && source .venv/bin/activate
+uv pip install -r requirements/base.txt
+cp .env.example .env
+python manage.py migrate
+python manage.py runserver
+```
 
-bash
-Copiar código
-docker network create traefik_public
-docker network create app_network
-Build e start:
+### Popular banco local (demo)
 
-bash
-Copiar código
-docker-compose up -d --build
-O script entrypoint.sh aplicará migrações, coletará arquivos estáticos e iniciará o servidor Gunicorn.
+```bash
+python manage.py shell < seed.py
+```
 
-Porta padrão: 8082
+---
 
-Se estiver usando Traefik, disponível via linkpay.lojabibelo.com.br.
+## Estrutura
 
-📂 Estrutura do Projeto
-bash
-Copiar código
-core/                  # Configurações principais do Django
-link/                  # App principal
-  ├─ models.py         # Modelo PagarMePayment
-  ├─ urls.py           # Rotas web e API
-  ├─ views.py          # Views web
-  ├─ viewsets.py       # ViewSets da API
-  └─ api/
-      ├─ pagar_me.py   # Cliente Pagar.me
-      └─ whatsapp.py   # Cliente WhatsApp
-Dockerfile
-docker-compose.yml
-entrypoint.sh
-requisitos.txt
-📡 API REST
-Base: /api/v1/pagamentos/
-Autenticação: TokenAuthentication do Django Rest Framework
+```
+app/
+├── apps/
+│   ├── accounts/     # Tenant, User (AbstractUser com roles)
+│   ├── api/          # REST API (Lote 2)
+│   ├── commissions/  # CommissionPeriod, SellerCommission
+│   ├── dashboard/    # Dashboard gestor + telas mobile
+│   ├── notifications/# MessageTemplate, Notification, tasks Celery
+│   ├── orders/       # Order, PaymentLink
+│   ├── payments/     # Payment
+│   ├── sales/        # Sale
+│   ├── sellers/      # Seller
+│   └── webhooks/     # WebhookEvent (Pagar.me)
+├── config/           # settings, urls, celery
+├── services/
+│   └── messaging/    # WhatsappClient (Evolution API)
+static/
+├── manifest.json     # PWA manifest
+├── sw.js             # Service Worker
+templates/
+├── base/             # Base templates
+├── dashboard/        # Desktop dashboard
+├── mobile/           # Telas mobile (vendedor) — Lote 3
+└── orders/           # Tela pública de link
+```
 
-Rotas
-Método	Endpoint	Descrição
-GET	/api/v1/pagamentos/	Lista todos os pagamentos
-POST	/api/v1/pagamentos/	Cria novo pagamento
-GET	/api/v1/pagamentos/<id>/	Detalha pagamento
-PUT	/api/v1/pagamentos/<id>/	Atualiza pagamento
-PATCH	/api/v1/pagamentos/<id>/	Atualiza parcialmente
-DELETE	/api/v1/pagamentos/<id>/	Remove pagamento
+---
 
-💡 Observações
-Pronto para produção usando Traefik e Docker.
+## API REST
 
-Arquivos estáticos servidos com Whitenoise, sem necessidade de Nginx extra.
+Swagger UI: `/api/schema/swagger-ui/`
 
-Integração completa com Pagar.me e WhatsApp, facilitando envios automáticos.
+Autenticação: JWT (`/api/auth/login/`), Token, Session.
 
-📌 Desenvolvido por [Seu Nome / Lojabibelo]
+Rate limit login: 5 tentativas/minuto (IP + username).
 
-arduino
-Copiar código
+### Endpoints principais
 
-Se quiser, posso fazer uma **versão ainda mais “profissional GitHub”**, com badges, demo, setup rápido e t
+| Método | URL | Permissão |
+|--------|-----|-----------|
+| POST | `/api/auth/login/` | Público |
+| GET/POST | `/api/sales/` | SELLER/MANAGER/ADMIN |
+| GET | `/api/seller/sales/` | SELLER |
+| GET | `/api/manager/sales/` | MANAGER/ADMIN |
+| GET/POST | `/api/sellers/` | MANAGER/ADMIN |
+| GET/POST | `/api/commissions/periods/` | MANAGER/ADMIN |
+
+---
+
+## Comandos de management
+
+```bash
+python manage.py reset_seller_password <seller_uuid>
+```
+
+---
+
+## Variáveis de ambiente
+
+Ver `.env.example`. Principais: `SECRET_KEY`, `DEBUG`, `DATABASE_URL` (prod), `REDIS_URL`, `API_KEY_PAGAR_ME`, `API_KEY_INSTANCIA`, `INSTANCE`, `JWT_ACCESS_TOKEN_LIFETIME_MINUTES`, `JWT_REFRESH_TOKEN_LIFETIME_DAYS`.
+
+---
+
+## Testes
+
+```bash
+python manage.py test app.apps.sellers app.apps.notifications app.apps.dashboard app.apps.api
+```
+
+55 testes. Cobertura: models, migrations, API auth, CRUD, multi-tenant isolation, máquina de estados de comissão, WhatsApp notifications.

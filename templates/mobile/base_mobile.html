@@ -1,0 +1,121 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="theme-color" content="#4361ee">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="QueroLink">
+    <link rel="manifest" href="{% static 'manifest.json' %}">
+    <link rel="apple-touch-icon" href="{% static 'icons/icon-192.png' %}">
+    <title>{% block title %}QueroLink{% endblock %}</title>
+    <script src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.9/dist/cdn.min.js" defer></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#4361ee',
+                        'primary-dark': '#3051d3',
+                        success: '#31c48d',
+                        danger: '#e53e3e',
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+        body { font-family: 'Inter', sans-serif; }
+        .safe-bottom { padding-bottom: env(safe-area-inset-bottom, 16px); }
+        .nav-shadow { box-shadow: 0 -2px 10px rgba(0,0,0,0.08); }
+        .tap-target { min-height: 44px; min-width: 44px; }
+        input, select, button { font-size: 16px !important; }
+    </style>
+</head>
+<body class="bg-gray-50 text-gray-900 antialiased">
+    <div class="min-h-screen flex flex-col max-w-lg mx-auto relative">
+        <main class="flex-1 px-4 pt-4 pb-24 safe-bottom">
+            {% block content %}{% endblock %}
+        </main>
+
+        {% if request.user.is_authenticated and request.user.role == 'SELLER' %}
+        <nav class="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 nav-shadow safe-bottom z-50">
+            <div class="max-w-lg mx-auto flex items-center justify-around h-16">
+                <a href="{% url 'dashboard:mobile_home' %}" class="flex flex-col items-center justify-center tap-target {% if request.resolver_match.url_name == 'mobile_home' %}text-primary{% else %}text-gray-400{% endif %}">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"></path></svg>
+                    <span class="text-xs mt-1">Início</span>
+                </a>
+                <a href="{% url 'dashboard:mobile_lancar_venda' %}" class="flex flex-col items-center justify-center tap-target {% if request.resolver_match.url_name == 'mobile_lancar_venda' %}text-primary{% else %}text-gray-400{% endif %}">
+                    <div class="w-12 h-12 bg-primary rounded-full flex items-center justify-center -mt-4 shadow-lg">
+                        <svg class="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
+                    </div>
+                    <span class="text-xs mt-1">Lançar</span>
+                </a>
+                <a href="{% url 'dashboard:mobile_meu_desempenho' %}" class="flex flex-col items-center justify-center tap-target {% if request.resolver_match.url_name == 'mobile_meu_desempenho' %}text-primary{% else %}text-gray-400{% endif %}">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path></svg>
+                    <span class="text-xs mt-1">Desempenho</span>
+                </a>
+            </div>
+        </nav>
+        {% endif %}
+    </div>
+
+    <script>
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register("{% static 'sw.js' %}")
+                .then(function(reg) { console.log('SW registrado'); })
+                .catch(function(err) { console.log('SW falhou:', err); });
+        }
+        let deferredPrompt;
+        window.addEventListener('beforeinstallprompt', function(e) {
+            e.preventDefault();
+            deferredPrompt = e;
+            var loginCount = parseInt(localStorage.getItem('ql_login_count') || '0');
+            if (loginCount >= 2 && !localStorage.getItem('ql_pwa_dismissed')) {
+                setTimeout(function() {
+                    var banner = document.getElementById('install-banner');
+                    if (banner) banner.classList.remove('hidden');
+                }, 3000);
+            }
+        });
+        function installPWA() {
+            if (deferredPrompt) {
+                deferredPrompt.prompt();
+                deferredPrompt.userChoice.then(function(result) {
+                    localStorage.setItem('ql_pwa_dismissed', '1');
+                    document.getElementById('install-banner').classList.add('hidden');
+                });
+            }
+        }
+        function dismissInstall() {
+            localStorage.setItem('ql_pwa_dismissed', '1');
+            document.getElementById('install-banner').classList.add('hidden');
+        }
+        window.addEventListener('appinstalled', function() {
+            localStorage.setItem('ql_pwa_dismissed', '1');
+        });
+        var currentCount = parseInt(localStorage.getItem('ql_login_count') || '0');
+        localStorage.setItem('ql_login_count', currentCount + 1);
+    </script>
+
+    <div id="install-banner" class="hidden fixed bottom-20 left-4 right-4 bg-white rounded-xl shadow-xl p-4 border border-gray-200 z-40 max-w-lg mx-auto safe-bottom">
+        <div class="flex items-center gap-3">
+            <div class="w-10 h-10 bg-primary rounded-xl flex items-center justify-center flex-shrink-0">
+                <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z"></path></svg>
+            </div>
+            <div class="flex-1">
+                <p class="text-sm font-semibold text-gray-900">Adicionar a tela inicial</p>
+                <p class="text-xs text-gray-500">Instale o app para acesso rapido</p>
+            </div>
+            <button onclick="installPWA()" class="bg-primary text-white px-4 py-2 rounded-lg text-sm font-medium tap-target">Instalar</button>
+            <button onclick="dismissInstall()" class="text-gray-400 p-2 tap-target">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+            </button>
+        </div>
+    </div>
+</body>
+</html>

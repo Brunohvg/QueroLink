@@ -11,4 +11,5 @@ urlpatterns = [
     path('dashboard/', include('app.apps.dashboard.urls')),
     path('', include('app.apps.orders.urls')),
     path('api/webhooks/', include('app.apps.webhooks.urls')),
+    path('api/', include('app.apps.api.urls')),
 ]

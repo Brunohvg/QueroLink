@@ -1,0 +1,96 @@
+{% extends 'mobile/base_mobile.html' %}
+{% block title %}Minhas Vendas — QueroLink{% endblock %}
+{% block content %}
+<div class="space-y-4" x-data="minhasVendas()">
+    <div class="flex items-center gap-3">
+        <a href="{% url 'dashboard:mobile_home' %}" class="tap-target flex items-center justify-center w-10 h-10">
+            <svg class="w-6 h-6 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path></svg>
+        </a>
+        <h1 class="text-xl font-bold text-gray-900">Minhas Vendas</h1>
+    </div>
+
+    {% if error %}
+    <div class="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl text-sm">{{ error }}</div>
+    {% endif %}
+
+    {% if not sales %}
+    <div class="text-center py-12">
+        <div class="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-3">
+            <svg class="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path></svg>
+        </div>
+        <p class="text-gray-500">Nenhuma venda registrada ainda.</p>
+        <a href="{% url 'dashboard:mobile_lancar_venda' %}"
+           class="inline-block mt-3 bg-primary text-white font-medium px-5 py-2.5 rounded-xl tap-target">
+            Lancar primeira venda
+        </a>
+    </div>
+    {% else %}
+
+    <div id="sales-list">
+        {% regroup sales by sale_date|date:"d/m/Y" as sales_by_date %}
+        {% for group in sales_by_date %}
+        <div class="mb-4">
+            <div class="flex items-center justify-between mb-2">
+                <h3 class="text-sm font-semibold text-gray-500">{{ group.grouper }}</h3>
+                <span class="text-xs text-gray-400">{{ group.list|length }} venda{{ group.list|length|pluralize:'s' }}</span>
+            </div>
+
+            {% for sale in group.list %}
+            <div class="bg-white rounded-xl p-3 mb-2 shadow-sm border border-gray-100 flex items-center justify-between"
+                 x-data="{ saleId: '{{ sale.uuid }}', deleted: false }" x-show="!deleted">
+                <div class="flex-1 min-w-0">
+                    <div class="flex items-center gap-2">
+                        <span class="text-xs px-2 py-0.5 rounded-full font-medium
+                            {% if sale.origin == 'LINK' %}bg-blue-100 text-blue-700{% else %}bg-green-100 text-green-700{% endif %}">
+                            {{ sale.get_origin_display }}
+                        </span>
+                    </div>
+                    <p class="font-semibold text-gray-900 mt-1">
+                        R$ {{ sale.amount|stringformat:"d"|slice:":-2" }},{{ sale.amount|stringformat:"d"|slice:"-2:" }}
+                    </p>
+                    {% if sale.notes %}
+                    <p class="text-xs text-gray-400 truncate mt-0.5">{{ sale.notes }}</p>
+                    {% endif %}
+                </div>
+                <button x-on:click="deleteSale('{{ sale.uuid }}', '{{ sale.sale_date|date:"Y-m-d" }}')"
+                        x-show="canDelete('{{ sale.sale_date|date:"Y-m-d" }}')"
+                        class="tap-target flex items-center justify-center w-10 h-10 text-gray-400 hover:text-danger transition ml-2">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                </button>
+            </div>
+            {% endfor %}
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+</div>
+
+<script>
+function minhasVendas() {
+    return {
+        canDelete(saleDateStr) {
+            var today = new Date().toISOString().split('T')[0];
+            return saleDateStr === today;
+        },
+        async deleteSale(uuid, saleDateStr) {
+            if (!this.canDelete(saleDateStr)) return;
+            if (!confirm('Excluir esta venda?')) return;
+            try {
+                var resp = await fetch('/api/sales/' + uuid + '/', {
+                    method: 'DELETE',
+                    headers: {'Content-Type': 'application/json'},
+                });
+                if (resp.ok || resp.status === 204) {
+                    location.reload();
+                } else {
+                    var data = await resp.json();
+                    alert(data.detail || data.error || 'Erro ao excluir venda.');
+                }
+            } catch (e) {
+                alert('Erro de conexao ao excluir venda.');
+            }
+        }
+    }
+}
+</script>
+{% endblock %}
