@@ -491,6 +491,24 @@ Fora de escopo. Não corrigir.
 - Fluxo MVP completo verificado: cadastro → lançamento → fechamento → aprovação → pagamento
 - **55 testes passando** + fluxo end-to-end com audit logs confirmados
 
+### Lote 4.5 — Design system e refinamento visual (2026-06-20)
+- `tailwind.config.js` com tokens `brand-*`, `success-*`, `warning-*`, `danger-*` (50/500/700)
+- 5 component partials: `_button.html`, `_metric_card.html`, `_status_badge.html`, `_bottom_nav.html`, `_sidebar.html`
+- 10 telas refatoradas com partials; zero cores hardcoded (`blue-*`, `green-*`, `red-*`)
+- Tipografia Inter com hierarquia 28/18/14/13px
+- Botão "Lançar venda" em `success-500`; botão "Devolver" como outline `danger-500`
+- Gráfico ranking: líder em `brand-700` (#2540ad), demais em tom claro
+- Zero mudanças em views/endpoints — só templates/CSS
+
+### Lote 5 — Validação em staging (2026-06-20)
+- Migrations do zero: todas 12 aplicam em ordem correta
+- Seed atualizado para criar `User` + `Seller` (16 vendedores Bibelô)
+- Validação local: centavos sem arredondamento (R$ 47,90), recalculate == manual (57990)
+- Máquina de estados: ABERTA → PAGA sem erro
+- `VALIDATION_CHECKLIST_LOTE5.md` com 52 itens
+- `READINESS_REPORT.md`: ✅ PRONTO PARA STAGING
+- Pendente: provisionar Coolify staging, testar WhatsApp real, validar PWA em celular real
+
 ---
 
 ## 14. Consolidação Final do MVP — Decisões por Lote

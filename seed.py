@@ -1,17 +1,19 @@
 import os
 import django
 
-# Configura o ambiente do Django
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'app.config.settings.production')
 django.setup()
+
+from django.utils.crypto import get_random_string
+from django.utils.text import slugify
 
 from app.apps.accounts.models import Tenant, User
 from app.apps.sellers.models import Seller
 
+
 def run_seed():
     print("Iniciando seed...")
-    
-    # Cria o tenant padrão se não existir
+
     tenant, created = Tenant.objects.get_or_create(
         company_name="Bibelô Oficial",
         defaults={
@@ -23,23 +25,21 @@ def run_seed():
     if created:
         print(f"Tenant criado: {tenant.company_name}")
     else:
-        print(f"Tenant já existia: {tenant.company_name}")
+        print(f"Tenant ja existia: {tenant.company_name}")
 
-    # Cria o superusuário padrão se não existir
     admin_email = os.environ.get("DJANGO_SUPERUSER_EMAIL", "admin@bibelo.com.br")
     admin_password = os.environ.get("DJANGO_SUPERUSER_PASSWORD", "admin123")
-    
+
     if not User.objects.filter(email=admin_email).exists() and not User.objects.filter(username=admin_email).exists():
         User.objects.create_superuser(
             username=admin_email,
             email=admin_email,
             password=admin_password
         )
-        print(f"Superusuário criado: {admin_email} / Senha: {admin_password}")
+        print(f"Superusuario criado: {admin_email} / Senha: {admin_password}")
     else:
-        print(f"Superusuário já existia: {admin_email}")
+        print(f"Superusuario ja existia: {admin_email}")
 
-    # Lista dos antigos vendedores em HTML
     antigos_vendedores = [
         {"name": "Bibelô", "phone": "(31) 99243-0500"},
         {"name": "Célia", "phone": "(31) 99166-2461"},
@@ -59,16 +59,42 @@ def run_seed():
         {"name": "Bruno Vidal", "phone": "(31) 97312-1650"},
     ]
 
+    existing_usernames = set(User.objects.values_list("username", flat=True))
+
     for dados in antigos_vendedores:
-        seller, s_created = Seller.objects.get_or_create(
+        if Seller.objects.filter(tenant=tenant, name=dados['name']).exists():
+            print(f"Vendedor ja existe: {dados['name']}")
+            continue
+
+        base = slugify(dados['name'])
+        username = base
+        n = 2
+        while username in existing_usernames:
+            username = f"{base}-{n}"
+            n += 1
+        existing_usernames.add(username)
+
+        password = get_random_string(12)
+
+        user = User.objects.create_user(
+            username=username,
+            password=password,
+            role=User.Role.SELLER,
             tenant=tenant,
-            name=dados['name'],
-            defaults={'phone': dados['phone']}
         )
-        if s_created:
-            print(f"Vendedor criado: {seller.name}")
+
+        seller = Seller.objects.create(
+            tenant=tenant,
+            user=user,
+            name=dados['name'],
+            phone=dados['phone'],
+            commission_rate=tenant.default_commission_rate,
+        )
+
+        print(f"Vendedor criado: {seller.name} | usuario={username} | senha={password}")
 
     print("Seed finalizado com sucesso!")
+
 
 if __name__ == '__main__':
     run_seed()
