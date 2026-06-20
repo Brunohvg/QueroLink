@@ -6,11 +6,11 @@
         <a href="{% url 'dashboard:mobile_home' %}" class="tap-target flex items-center justify-center w-10 h-10">
             <svg class="w-6 h-6 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path></svg>
         </a>
-        <h1 class="text-xl font-bold text-gray-900">Minhas Vendas</h1>
+        <h1 class="text-[18px] font-semibold text-gray-900">Minhas Vendas</h1>
     </div>
 
     {% if error %}
-    <div class="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl text-sm">{{ error }}</div>
+    <div class="bg-danger-50 border border-danger-500/20 text-danger-700 px-4 py-3 rounded-xl text-sm">{{ error }}</div>
     {% endif %}
 
     {% if not sales %}
@@ -20,8 +20,8 @@
         </div>
         <p class="text-gray-500">Nenhuma venda registrada ainda.</p>
         <a href="{% url 'dashboard:mobile_lancar_venda' %}"
-           class="inline-block mt-3 bg-primary text-white font-medium px-5 py-2.5 rounded-xl tap-target">
-            Lancar primeira venda
+           class="inline-block mt-3 bg-brand-500 hover:bg-brand-600 text-white font-medium px-5 py-2.5 rounded-xl tap-target text-[15px]">
+            Lançar primeira venda
         </a>
     </div>
     {% else %}
@@ -31,7 +31,7 @@
         {% for group in sales_by_date %}
         <div class="mb-4">
             <div class="flex items-center justify-between mb-2">
-                <h3 class="text-sm font-semibold text-gray-500">{{ group.grouper }}</h3>
+                <h3 class="text-[13px] font-semibold text-gray-500">{{ group.grouper }}</h3>
                 <span class="text-xs text-gray-400">{{ group.list|length }} venda{{ group.list|length|pluralize:'s' }}</span>
             </div>
 
@@ -39,13 +39,11 @@
             <div class="bg-white rounded-xl p-3 mb-2 shadow-sm border border-gray-100 flex items-center justify-between"
                  x-data="{ saleId: '{{ sale.uuid }}', deleted: false }" x-show="!deleted">
                 <div class="flex-1 min-w-0">
-                    <div class="flex items-center gap-2">
-                        <span class="text-xs px-2 py-0.5 rounded-full font-medium
-                            {% if sale.origin == 'LINK' %}bg-blue-100 text-blue-700{% else %}bg-green-100 text-green-700{% endif %}">
-                            {{ sale.get_origin_display }}
-                        </span>
-                    </div>
-                    <p class="font-semibold text-gray-900 mt-1">
+                    <span class="text-xs px-2 py-0.5 rounded-full font-medium
+                        {% if sale.origin == 'LINK' %}bg-brand-50 text-brand-600{% else %}bg-success-50 text-success-700{% endif %}">
+                        {{ sale.get_origin_display }}
+                    </span>
+                    <p class="font-semibold text-gray-900 text-[14px] mt-1">
                         R$ {{ sale.amount|stringformat:"d"|slice:":-2" }},{{ sale.amount|stringformat:"d"|slice:"-2:" }}
                     </p>
                     {% if sale.notes %}
@@ -54,7 +52,7 @@
                 </div>
                 <button x-on:click="deleteSale('{{ sale.uuid }}', '{{ sale.sale_date|date:"Y-m-d" }}')"
                         x-show="canDelete('{{ sale.sale_date|date:"Y-m-d" }}')"
-                        class="tap-target flex items-center justify-center w-10 h-10 text-gray-400 hover:text-danger transition ml-2">
+                        class="tap-target flex items-center justify-center w-10 h-10 text-gray-400 hover:text-danger-500 transition ml-2">
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
                 </button>
             </div>
@@ -68,27 +66,15 @@
 <script>
 function minhasVendas() {
     return {
-        canDelete(saleDateStr) {
-            var today = new Date().toISOString().split('T')[0];
-            return saleDateStr === today;
-        },
-        async deleteSale(uuid, saleDateStr) {
-            if (!this.canDelete(saleDateStr)) return;
+        canDelete(d) { return d === new Date().toISOString().split('T')[0]; },
+        async deleteSale(u, d) {
+            if (!this.canDelete(d)) return;
             if (!confirm('Excluir esta venda?')) return;
             try {
-                var resp = await fetch('/api/sales/' + uuid + '/', {
-                    method: 'DELETE',
-                    headers: {'Content-Type': 'application/json'},
-                });
-                if (resp.ok || resp.status === 204) {
-                    location.reload();
-                } else {
-                    var data = await resp.json();
-                    alert(data.detail || data.error || 'Erro ao excluir venda.');
-                }
-            } catch (e) {
-                alert('Erro de conexao ao excluir venda.');
-            }
+                var r = await fetch('/api/sales/' + u + '/', { method: 'DELETE', headers: { 'Content-Type': 'application/json' } });
+                if (r.ok || r.status === 204) location.reload();
+                else { var j = await r.json(); alert(j.detail || 'Erro ao excluir.'); }
+            } catch (e) { alert('Erro de conexao.'); }
         }
     }
 }

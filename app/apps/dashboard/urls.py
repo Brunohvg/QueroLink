@@ -1,5 +1,5 @@
 from django.urls import path
-from . import views, mobile_views
+from . import views, mobile_views, desktop_views
 
 app_name = 'dashboard'
 
@@ -8,6 +8,13 @@ urlpatterns = [
     path('logout/', views.logout_view, name='logout'),
     path('', views.dashboard_home, name='home'),
     path('sellers/create/', views.seller_create, name='seller_create'),
+
+    path('gestor/ranking/', desktop_views.gestor_ranking, name='gestor_ranking'),
+    path('gestor/vendedores/', desktop_views.gestor_vendedores, name='gestor_vendedores'),
+    path('gestor/fechamento/', desktop_views.gestor_fechamento, name='gestor_fechamento'),
+
+    path('financeiro/fila/', desktop_views.financeiro_fila, name='financeiro_fila'),
+    path('financeiro/historico/', desktop_views.financeiro_historico, name='financeiro_historico'),
 ]
 
 urlpatterns += [

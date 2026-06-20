@@ -4,43 +4,36 @@
 <div class="flex flex-col items-center justify-center min-h-[80vh]">
     <div class="w-full max-w-sm">
         <div class="text-center mb-8">
-            <div class="w-20 h-20 bg-primary rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg">
+            <div class="w-20 h-20 bg-brand-500 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg">
                 <svg class="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
             </div>
             <h1 class="text-2xl font-bold text-gray-900">QueroLink</h1>
-            <p class="text-gray-500 mt-1">Acesso do Vendedor</p>
+            <p class="text-[13px] text-gray-500 mt-1">Acesso do Vendedor</p>
         </div>
 
         {% if error %}
-        <div class="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl text-sm mb-4">
-            {{ error }}
-        </div>
+        <div class="bg-danger-50 border border-danger-500/20 text-danger-700 px-4 py-3 rounded-xl text-sm mb-4">{{ error }}</div>
         {% endif %}
 
         <form method="post" action="{% url 'dashboard:mobile_login' %}" class="space-y-4">
             {% csrf_token %}
             <div>
-                <label for="username" class="block text-sm font-medium text-gray-700 mb-1">Usuário</label>
+                <label for="username" class="block text-[13px] text-gray-500 mb-1">Usuário</label>
                 <input type="text" id="username" name="username" required autofocus
-                       class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
-                       placeholder="Seu nome de usuário"
-                       style="font-size: 16px !important;">
+                       class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent"
+                       placeholder="Seu nome de usuário" style="font-size:16px!important">
             </div>
             <div>
-                <label for="password" class="block text-sm font-medium text-gray-700 mb-1">Senha</label>
+                <label for="password" class="block text-[13px] text-gray-500 mb-1">Senha</label>
                 <input type="password" id="password" name="password" required
-                       class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
-                       placeholder="Sua senha"
-                       style="font-size: 16px !important;">
+                       class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent"
+                       placeholder="Sua senha" style="font-size:16px!important">
             </div>
-            <button type="submit"
-                    class="w-full bg-primary text-white font-semibold py-3.5 rounded-xl hover:bg-primary-dark transition shadow-lg tap-target">
-                Entrar
-            </button>
+            {% include 'components/_button.html' with variant='primary' label='Entrar' type='submit' size='lg' class='w-full' %}
         </form>
 
         <p class="text-center mt-6 text-sm text-gray-500">
-            <a href="{% url 'dashboard:mobile_forgot_password' %}" class="text-primary hover:underline">Esqueci minha senha</a>
+            <a href="{% url 'dashboard:mobile_forgot_password' %}" class="text-brand-500 hover:underline">Esqueci minha senha</a>
         </p>
     </div>
 </div>

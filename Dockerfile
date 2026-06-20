@@ -1,3 +1,12 @@
+FROM node:20-alpine AS tailwind-build
+
+WORKDIR /app
+COPY package.json tailwind.config.js ./
+RUN npm install
+COPY static/css/input.css ./static/css/
+COPY templates/ ./templates/
+RUN npm run build:css
+
 FROM python:3.12.3-slim
 
 ENV PYTHONUNBUFFERED=1
@@ -5,7 +14,6 @@ ENV PYTHONDONTWRITEBYTECODE=1
 
 WORKDIR /app
 
-# Instalar dependências de sistema para o postgres e redis
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
         curl \
@@ -18,6 +26,7 @@ COPY requirements/production.txt ./requirements/production.txt
 
 RUN pip install --no-cache-dir -r requirements/production.txt
 
+COPY --from=tailwind-build /app/static/css/tailwind.css ./static/css/tailwind.css
 COPY . .
 
 RUN chmod +x /app/entrypoint.sh

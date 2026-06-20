@@ -1,0 +1,88 @@
+{% extends 'dashboard/base_desktop.html' %}
+{% block title %}Ranking — QueroLink{% endblock %}
+{% block content %}
+<div x-data="rankingPage()" x-init="load()">
+    <div class="flex items-center justify-between mb-6">
+        <h1 class="text-[18px] font-semibold">Ranking de Vendedores</h1>
+        <div class="flex items-center gap-3">
+            <select x-model="month" @change="load()" class="px-3 py-2 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
+                {% for m in "123456789101112"|make_list %}
+                <option value="{{ forloop.counter }}">{{ forloop.counter|stringformat:"02d" }}</option>
+                {% endfor %}
+            </select>
+            <select x-model="year" @change="load()" class="px-3 py-2 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
+                <option value="2025">2025</option><option value="2026">2026</option><option value="2027">2027</option>
+            </select>
+        </div>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+        <div class="col-span-2 bg-white rounded-2xl shadow-sm border border-gray-100 p-6" x-show="ranking.length">
+            <h2 class="text-[13px] font-semibold text-gray-500 mb-4">VENDAS DO MÊS</h2>
+            <div class="h-64"><canvas id="rankingChart"></canvas></div>
+        </div>
+        <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 text-center" x-show="topSeller">
+            <div class="w-16 h-16 bg-warning-50 rounded-full flex items-center justify-center mx-auto mb-3">
+                <svg class="w-8 h-8 text-warning-500" fill="currentColor" viewBox="0 0 24 24"><path d="M5 16L3 5l5.5 5L12 4l3.5 6L21 5l-2 11H5zm14 3H5v-2h14v2z"></path></svg>
+            </div>
+            <p class="text-[13px] text-gray-500 mb-1">Vendedor do Mês</p>
+            <p class="text-[18px] font-semibold text-gray-900" x-text="topSeller?.seller__name || '-'"></p>
+            <p class="text-[28px] font-semibold text-brand-500 mt-1" x-text="'R$ ' + fmtMoney(topSeller?.total_sold || 0)"></p>
+            <p class="text-[13px] text-gray-500" x-text="(topSeller?.sale_count || 0) + ' vendas'"></p>
+        </div>
+    </div>
+
+    <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6" x-show="ranking.length">
+        <table class="w-full text-left text-[14px]">
+            <thead>
+                <tr><th class="px-4 py-3 font-semibold text-gray-500 border-b border-gray-200 bg-gray-50">#</th><th class="px-4 py-3 font-semibold text-gray-500 border-b border-gray-200 bg-gray-50">Vendedor</th><th class="px-4 py-3 font-semibold text-gray-500 border-b border-gray-200 bg-gray-50">Total</th><th class="px-4 py-3 font-semibold text-gray-500 border-b border-gray-200 bg-gray-50">Vendas</th><th class="px-4 py-3 font-semibold text-gray-500 border-b border-gray-200 bg-gray-50">Ticket Médio</th></tr>
+            </thead>
+            <tbody>
+                <template x-for="(s, i) in ranking" :key="s.seller__uuid">
+                    <tr class="hover:bg-gray-50">
+                        <td class="px-4 py-3 border-b border-gray-100 font-bold" x-text="i + 1"></td>
+                        <td class="px-4 py-3 border-b border-gray-100 font-medium" x-text="s.seller__name"></td>
+                        <td class="px-4 py-3 border-b border-gray-100 font-semibold" x-text="'R$ ' + fmtMoney(s.total_sold)"></td>
+                        <td class="px-4 py-3 border-b border-gray-100" x-text="s.sale_count"></td>
+                        <td class="px-4 py-3 border-b border-gray-100" x-text="'R$ ' + fmtMoney(Math.round(s.total_sold / s.sale_count))"></td>
+                    </tr>
+                </template>
+            </tbody>
+        </table>
+    </div>
+    <div class="text-center py-12 text-gray-500" x-show="!ranking.length">Nenhuma venda neste período.</div>
+</div>
+
+<script>
+function rankingPage() {
+    return {
+        month: new Date().getMonth()+1, year: new Date().getFullYear(), ranking: [], topSeller: null, chart: null,
+        async load() {
+            var r = await fetch(`/api/manager/ranking/?month=${this.month}&year=${this.year}`);
+            var d = await r.json();
+            this.ranking = d.ranking || []; this.topSeller = d.top_seller || null;
+            this.$nextTick(() => this.drawChart());
+        },
+        drawChart() {
+            if (this.chart) this.chart.destroy();
+            var ctx = document.getElementById('rankingChart');
+            if (!ctx || !this.ranking.length) return;
+            this.chart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: this.ranking.map(s => s.seller__name),
+                    datasets: [{
+                        label: 'Total Vendido (R$)',
+                        data: this.ranking.map(s => s.total_sold / 100),
+                        backgroundColor: this.ranking.map((_, i) => i === 0 ? '#2540ad' : '#a5b4fc'),
+                        borderRadius: 8,
+                    }]
+                },
+                options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true } } }
+            });
+        },
+        fmtMoney(c) { var r = Math.floor(c/100); return r.toLocaleString('pt-BR')+','+String(c%100).padStart(2,'0'); }
+    }
+}
+</script>
+{% endblock %}

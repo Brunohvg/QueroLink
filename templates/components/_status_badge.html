@@ -1,0 +1,14 @@
+{# Usage: {% include 'components/_status_badge.html' with status='APROVADA' %}
+   CommissionPeriod status: ABERTA | EM_CONFERENCIA | ENVIADA_FINANCEIRO | APROVADA | PAGA
+   Also works for: ativo/inativo (is_active) #}
+<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium
+    {% if status == 'ABERTA' or status == 'PENDING' or status == False %}bg-gray-100 text-gray-600
+    {% elif status == 'EM_CONFERENCIA' %}bg-warning-50 text-warning-700
+    {% elif status == 'ENVIADA_FINANCEIRO' %}bg-brand-50 text-brand-700
+    {% elif status == 'APROVADA' %}bg-success-50 text-success-700
+    {% elif status == 'PAGA' or status == 'COMPLETED' or status == 'PAID' or status == True %}bg-success-50 text-success-700 font-semibold
+    {% elif status == 'SENT' %}bg-brand-50 text-brand-600
+    {% elif status == 'FAILED' or status == 'CANCELED' %}bg-danger-50 text-danger-700
+    {% else %}bg-gray-100 text-gray-600{% endif %}">
+    {% if label %}{{ label }}{% else %}{{ status }}{% endif %}
+</span>

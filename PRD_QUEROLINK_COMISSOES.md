@@ -249,14 +249,24 @@ Pronta para ser chamada pelo Lote 2 (API) e Lote 4 (tela financeiro).
 - Máscara monetária em JS (entrada em R$, submit em centavos)
 - Sessão Django (cookie) para autenticação — mais seguro que JWT em localStorage para dispositivos compartilhados
 
-### 8.4 Pendentes (Lote 4)
+### 8.4 Telas desktop — Lote 4
 
-| Tela | Lote previsto |
-|------|---------------|
-| Lista de vendedores (desktop) | Lote 4 |
-| Perfil do vendedor (trocar senha) | Lote 4 |
-| Tela financeiro (aprovar/pagar comissão) | Lote 4 |
-| Dashboard visual (Tailwind, ranking) | Lote 4 |
+| Tela | URL | Template | Status |
+|------|-----|----------|--------|
+| Ranking gestor | `/dashboard/gestor/ranking/` | `dashboard/gestor/ranking.html` | ✅ Lote 4 |
+| Vendedores gestor | `/dashboard/gestor/vendedores/` | `dashboard/gestor/vendedores.html` | ✅ Lote 4 |
+| Fechamento gestor | `/dashboard/gestor/fechamento/` | `dashboard/gestor/fechamento.html` | ✅ Lote 4 |
+| Fila aprovação financeiro | `/dashboard/financeiro/fila/` | `dashboard/financeiro/fila_aprovacao.html` | ✅ Lote 4 |
+| Histórico pagamentos | `/dashboard/financeiro/historico/` | `dashboard/financeiro/historico_pagamentos.html` | ✅ Lote 4 |
+
+### 8.5 Infraestrutura Tailwind (Lote 4)
+
+- `package.json` + `tailwind.config.js` com paleta curada (Inter, cores primárias)
+- Dockerfile multi-stage: `node:20-alpine` (build CSS) → `python:3.12.3-slim` (sem Node na imagem final)
+- `static/css/input.css` com `@tailwind` directives + componentes utilitários
+- `templates/dashboard/base_desktop.html` — sidebar com menu role-based
+- Chart.js 4.4 para gráfico de ranking
+- `app.apps.audit` registrado em `INSTALLED_APPS`, migration gerada, logging em approve/reject
 
 ---
 
@@ -471,11 +481,51 @@ Fora de escopo. Não corrigir.
 - Prompt de instalação via `beforeinstallprompt` (aparece após 2+ logins)
 - **55 testes passando** (sem regressão) + **9 passos de fluxo mobile verificados**
 
-### Próximo: Lote 4 — Telas visuais definitivas (Tailwind)
+### Lote 4 — Telas desktop + Infraestrutura final (2026-06-20)
+- Tailwind: `package.json`, `tailwind.config.js`, `Dockerfile` multi-stage (Node build → Python runtime)
+- 5 telas desktop: ranking (Chart.js), vendedores (CRUD visual + reset senha), fechamento, fila aprovação, histórico pagamentos
+- Audit logging em approve/reject + comando reset_seller_password
+- API: +`/api/manager/ranking/`, +`/api/manager/commissions/<status>/`, +CSV export, +`reset_password` action
+- Sidebar desktop com navegação role-based
+- Exportação CSV via stdlib
+- Fluxo MVP completo verificado: cadastro → lançamento → fechamento → aprovação → pagamento
+- **55 testes passando** + fluxo end-to-end com audit logs confirmados
 
 ---
 
-## 14. Arquivos de Resíduo (identificados, NÃO removidos)
+## 14. Consolidação Final do MVP — Decisões por Lote
+
+### Lote 1
+- `Seller.user`: `on_delete=CASCADE` desde a primeira migration (não `SET_NULL`)
+- `commission_rate` no Seller copia `Tenant.default_commission_rate` no cadastro; não é fallback dinâmico
+- Username gerado via `slugify(name)` + sufixo numérico se colisão
+
+### Lote 1.5
+- `Notification` generalizada com 3 FKs opcionais (não `GenericForeignKey`) — mais simples para 2-3 tipos
+- Templates padrão `SELLER_CREDENTIALS` e `COMMISSION_PAID` via data migration
+- Senha temporária impressa na tela UMA vez; WhatsApp assíncrono não bloqueante
+
+### Lote 2
+- `TokenAuthentication` mantido em paralelo com JWT (legacy)
+- SELLER auto-força próprio `seller_profile` no `SaleCreateSerializer` (ignora payload)
+- Rate limit usa `LocMemCache`; testes limpam cache no `setUp`
+- `django-ratelimit` com `block=True` retorna 403
+
+### Lote 3
+- Alpine.js sobre HTMX: API JSON, reatividade sem build step
+- Sessão Django para mobile (não JWT em localStorage)
+- Tailwind CDN para dev; build compilado no Docker para prod
+- Forgot password: tela informativa, sem fluxo automático
+
+### Lote 4
+- Chart.js para gráfico de ranking (não lib mais pesada)
+- CSV export via `csv` stdlib (sem dependência nova)
+- Audit via model `AuditLog` existente (não mecanismo paralelo)
+- `mark_paid`: URL path com underscore (`mark_paid/`), nome reverso com hífen (`api-commission-period-mark-paid`)
+
+---
+
+## 15. Arquivos de Resíduo (identificados, NÃO removidos)
 
 | Arquivo | Motivo |
 |---------|--------|

@@ -1,0 +1,12 @@
+{# Usage: {% include 'components/_metric_card.html' with label='Total hoje' value=total type='money' %}
+   Types: money (R$ format), number, plain
+   Optional: color (brand|success|warning), subtitle #}
+<div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 {% if highlight %}ring-2 ring-brand-500{% endif %}">
+    <p class="text-[13px] text-gray-500 mb-1">{{ label }}</p>
+    <p class="text-[28px] font-semibold
+              {% if color == 'success' %}text-success-700
+              {% elif color == 'warning' %}text-warning-500
+              {% else %}text-brand-500{% endif %}
+              leading-tight">{{ value }}</p>
+    {% if subtitle %}<p class="text-xs text-gray-400 mt-1">{{ subtitle }}</p>{% endif %}
+</div>

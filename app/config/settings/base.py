@@ -51,6 +51,7 @@ INSTALLED_APPS = [
     "app.apps.commissions",
     "app.apps.webhooks",
     "app.apps.notifications",
+    "app.apps.audit",
     "app.apps.dashboard",
     "app.apps.api",
 

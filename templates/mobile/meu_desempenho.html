@@ -2,52 +2,45 @@
 {% block title %}Meu Desempenho — QueroLink{% endblock %}
 {% block content %}
 <div class="space-y-4">
-    <h1 class="text-xl font-bold text-gray-900">Meu Desempenho</h1>
+    <h1 class="text-[18px] font-semibold text-gray-900">Meu Desempenho</h1>
 
     {% if error %}
-    <div class="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl text-sm">{{ error }}</div>
+    <div class="bg-danger-50 border border-danger-500/20 text-danger-700 px-4 py-3 rounded-xl text-sm">{{ error }}</div>
     {% else %}
 
-    <div class="bg-white rounded-xl p-5 shadow-sm border border-gray-100">
-        <p class="text-xs text-gray-500 mb-1">Total vendido em {{ current_month }}</p>
-        <p class="text-3xl font-bold text-primary">
+    <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-5">
+        <p class="text-[13px] text-gray-500 mb-1">Total vendido em {{ current_month }}</p>
+        <p class="text-[28px] font-semibold text-brand-500">
             R$ {{ month_total|stringformat:"d"|slice:":-2" }},{{ month_total|stringformat:"d"|slice:"-2:" }}
         </p>
     </div>
 
-    <h2 class="text-lg font-semibold text-gray-900">Comissões</h2>
+    <h2 class="text-[18px] font-semibold text-gray-900 mt-6">Comissões</h2>
 
     {% if commissions %}
     <div class="space-y-2">
         {% for sc in commissions %}
         <div class="bg-white rounded-xl p-4 shadow-sm border border-gray-100">
             <div class="flex items-center justify-between mb-2">
-                <span class="text-sm font-semibold text-gray-900">
+                <span class="text-[14px] font-semibold text-gray-900">
                     {{ sc.period.month|stringformat:"02d" }}/{{ sc.period.year }}
                 </span>
-                <span class="text-xs px-2 py-0.5 rounded-full font-medium
-                    {% if sc.period.status == 'PAGA' %}bg-green-100 text-green-700
-                    {% elif sc.period.status == 'APROVADA' %}bg-blue-100 text-blue-700
-                    {% elif sc.period.status == 'ENVIADA_FINANCEIRO' %}bg-purple-100 text-purple-700
-                    {% elif sc.period.status == 'EM_CONFERENCIA' %}bg-yellow-100 text-yellow-700
-                    {% else %}bg-gray-100 text-gray-600{% endif %}">
-                    {{ sc.period.get_status_display }}
-                </span>
+                {% include 'components/_status_badge.html' with status=sc.period.status %}
             </div>
             <div class="grid grid-cols-3 gap-2 text-center">
                 <div>
-                    <p class="text-xs text-gray-500">Vendas</p>
-                    <p class="font-semibold text-gray-900">
+                    <p class="text-[13px] text-gray-500">Vendas</p>
+                    <p class="text-[14px] font-semibold text-gray-900">
                         R$ {{ sc.total_sold_amount|stringformat:"d"|slice:":-2" }},{{ sc.total_sold_amount|stringformat:"d"|slice:"-2:" }}
                     </p>
                 </div>
                 <div>
-                    <p class="text-xs text-gray-500">Taxa</p>
-                    <p class="font-semibold text-gray-900">{{ sc.commission_rate|floatformat:2 }}%</p>
+                    <p class="text-[13px] text-gray-500">Taxa</p>
+                    <p class="text-[14px] font-semibold text-gray-900">{{ sc.commission_rate|floatformat:2 }}%</p>
                 </div>
                 <div>
-                    <p class="text-xs text-gray-500">Comissão</p>
-                    <p class="font-semibold text-primary">
+                    <p class="text-[13px] text-gray-500">Comissão</p>
+                    <p class="text-[14px] font-semibold text-success-700">
                         R$ {{ sc.commission_amount|stringformat:"d"|slice:":-2" }},{{ sc.commission_amount|stringformat:"d"|slice:"-2:" }}
                     </p>
                 </div>
@@ -60,7 +53,7 @@
         <div class="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-3">
             <svg class="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path></svg>
         </div>
-        <p class="text-gray-500">Nenhuma competencia de comissao ainda.</p>
+        <p class="text-gray-500">Nenhuma competência de comissão ainda.</p>
     </div>
     {% endif %}
     {% endif %}

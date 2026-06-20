@@ -16,6 +16,9 @@ urlpatterns = [
 
     path('seller/sales/', views.SellerSalesListView.as_view(), name='api-seller-sales'),
     path('manager/sales/', views.ManagerSalesListView.as_view(), name='api-manager-sales'),
+    path('manager/ranking/', views.RankingView.as_view(), name='api-ranking'),
+    path('manager/commissions/<str:status>/', views.CommissionPeriodsByStatusView.as_view(), name='api-commissions-by-status'),
+    path('financial/commissions/<uuid:pk>/csv/', views.CommissionPeriodCsvView.as_view(), name='api-commission-csv'),
 
     path('schema/', SpectacularAPIView.as_view(), name='api-schema'),
     path('schema/swagger-ui/', SpectacularSwaggerView.as_view(url_name='api-schema'), name='api-swagger'),
