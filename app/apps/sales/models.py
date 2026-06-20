@@ -35,3 +35,5 @@ class Sale(models.Model):
             raise ValidationError("O valor da venda deve ser maior que zero.")
         if self.origin == self.Origin.LINK and self.order is None:
             raise ValidationError("Venda de origem LINK precisa estar vinculada a um Order.")
+        if self.seller.tenant_id != self.tenant_id:
+            raise ValidationError("O vendedor nao pertence ao tenant da venda.")

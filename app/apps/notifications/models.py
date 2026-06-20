@@ -3,6 +3,9 @@ from django.db import models
 from django.template import Template, Context
 from app.apps.accounts.models import Tenant
 from app.apps.orders.models import Order
+from app.apps.sellers.models import Seller
+from app.apps.commissions.models import CommissionPeriod
+
 
 class MessageTemplate(models.Model):
     class EventType(models.TextChoices):
@@ -14,6 +17,8 @@ class MessageTemplate(models.Model):
         PAYMENT_EXPIRED = 'payment_expired', 'Payment Expired'
         PAYMENT_REFUNDED = 'payment_refunded', 'Payment Refunded'
         PAYMENT_CHARGEBACK = 'payment_chargeback', 'Payment Chargeback'
+        SELLER_CREDENTIALS = 'seller_credentials', 'Seller Credentials'
+        COMMISSION_PAID = 'commission_paid', 'Commission Paid'
 
     class Channel(models.TextChoices):
         WHATSAPP = 'whatsapp', 'WhatsApp'
@@ -24,7 +29,7 @@ class MessageTemplate(models.Model):
     event_type = models.CharField(max_length=50, choices=EventType.choices)
     channel = models.CharField(max_length=20, choices=Channel.choices)
     title = models.CharField(max_length=255, blank=True, null=True)
-    body = models.TextField(help_text="Supports Jinja variables: {{cliente}}, {{valor}}, {{link}}, {{vendedor}}")
+    body = models.TextField(help_text="Supports Django template variables: {{vendedor}}, {{usuario}}, {{senha}}, {{periodo}}, {{valor}}, {{cliente}}, {{link}}")
     is_active = models.BooleanField(default=True)
 
     class Meta:
@@ -48,7 +53,11 @@ class Notification(models.Model):
         FAILED = 'FAILED', 'Failed'
 
     uuid = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    order = models.ForeignKey(Order, on_delete=models.CASCADE, related_name='notifications')
+    tenant = models.ForeignKey(Tenant, on_delete=models.CASCADE, related_name='notifications', null=True, blank=True)
+    order = models.ForeignKey(Order, on_delete=models.CASCADE, related_name='notifications', null=True, blank=True)
+    seller = models.ForeignKey(Seller, on_delete=models.CASCADE, related_name='notifications', null=True, blank=True)
+    commission_period = models.ForeignKey(CommissionPeriod, on_delete=models.CASCADE, related_name='notifications', null=True, blank=True)
+    event_type = models.CharField(max_length=50, choices=MessageTemplate.EventType.choices, default=MessageTemplate.EventType.LINK_CREATED)
     channel = models.CharField(max_length=20, choices=MessageTemplate.Channel.choices)
     recipient = models.CharField(max_length=255)
     message_body = models.TextField()
@@ -60,8 +69,17 @@ class Notification(models.Model):
 
     class Meta:
         indexes = [
+            models.Index(fields=['tenant', 'event_type', 'status']),
             models.Index(fields=['order', 'status']),
         ]
 
     def __str__(self):
-        return f"Notification {self.uuid} - {self.status}"
+        return f"Notification {self.uuid} - {self.event_type} ({self.status})"
+
+    def save(self, *args, **kwargs):
+        if not self.tenant_id:
+            if self.order_id:
+                self.tenant = self.order.tenant
+            elif self.seller_id:
+                self.tenant = self.seller.tenant
+        super().save(*args, **kwargs)

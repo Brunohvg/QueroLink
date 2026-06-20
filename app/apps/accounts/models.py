@@ -9,6 +9,7 @@ class Tenant(models.Model):
     pagarme_api_key = models.CharField(max_length=255, blank=True, null=True)
     whatsapp_instance_id = models.CharField(max_length=100, blank=True, null=True)
     whatsapp_token = models.CharField(max_length=255, blank=True, null=True)
+    default_commission_rate = models.DecimalField(max_digits=5, decimal_places=4, default=0.01)
     is_active = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
