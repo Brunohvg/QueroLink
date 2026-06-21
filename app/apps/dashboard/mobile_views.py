@@ -134,9 +134,9 @@ def mobile_home(request):
     from app.apps.commissions.models import SellerCommission, CommissionPeriod
     comissao_a_receber = SellerCommission.objects.filter(
         seller=seller,
-        approval_status=SellerCommission.ApprovalStatus.APROVADO,
     ).exclude(
         period__status=CommissionPeriod.Status.PAGA,
+        approval_status=SellerCommission.ApprovalStatus.REJEITADO,
     ).aggregate(total=Sum('commission_amount'))['total'] or 0
 
     total_vendido = Sale.objects.filter(

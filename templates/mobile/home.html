@@ -1,7 +1,7 @@
 {% extends 'mobile/base_mobile.html' %}
 {% block title %}Inicio — QueroLink{% endblock %}
 {% block content %}
-<div class="space-y-4">
+<div class="space-y-4" x-data="sellerHomePage()">
     <div class="flex items-center justify-between">
         <div>
             <h1 class="text-[18px] font-semibold text-gray-900">Ola, {{ seller.name|default:'Vendedor' }}</h1>
@@ -49,11 +49,33 @@
         </div>
     </div>
 
+    <!-- Quick Link Form -->
+    <div x-show="showLinkForm" class="surface-card space-y-3" @click.away="showLinkForm=false">
+        <p class="text-[14px] font-semibold text-gray-900">Gerar Link de Pagamento</p>
+        <input type="text" x-model="linkForm.customer" class="w-full px-4 py-3 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-brand-500" placeholder="Nome do cliente" style="font-size:16px!important">
+        <input type="text" x-model="linkForm.value" class="w-full px-4 py-3 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-brand-500" placeholder="Valor (ex: 100,00)" style="font-size:16px!important">
+        <p x-show="linkError" class="text-[12px] text-danger-500" x-text="linkError"></p>
+        <p x-show="linkSuccess" class="text-[12px] text-success-700" x-text="linkSuccess"></p>
+        <div class="flex gap-2">
+            <button @click="createQuickLink()" :disabled="linkCreating" class="flex-1 bg-brand-500 hover:bg-brand-600 disabled:opacity-50 text-white font-medium py-3 rounded-xl transition text-[15px] tap-target">
+                <span x-show="!linkCreating">Gerar Link</span>
+                <span x-show="linkCreating">Gerando...</span>
+            </button>
+            <button @click="showLinkForm=false; linkError=''; linkSuccess=''" class="px-4 py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl text-[15px] font-medium transition tap-target">Cancelar</button>
+        </div>
+    </div>
+
     <a href="{% url 'dashboard:mobile_lancar_venda' %}"
        class="flex items-center justify-center gap-2 w-full bg-brand-500 hover:bg-brand-600 text-white font-medium py-4 rounded-xl transition shadow-lg tap-target">
         <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
         <span class="text-[15px]">Lancar Venda</span>
     </a>
+
+    <button @click="showLinkForm=!showLinkForm"
+       class="flex items-center justify-center gap-2 w-full bg-success-500 hover:bg-success-700 text-white font-medium py-4 rounded-xl transition shadow-lg tap-target">
+        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"></path></svg>
+        <span class="text-[15px]">Gerar Link de Pagamento</span>
+    </button>
 
     <a href="{% url 'dashboard:mobile_minhas_vendas' %}"
        class="flex items-center justify-between surface-card tap-target">
@@ -68,4 +90,58 @@
     </a>
     {% endif %}
 </div>
+
+<script>
+function getCSRFToken() {
+    var name = 'csrftoken';
+    var cookies = document.cookie.split(';');
+    for (var i = 0; i < cookies.length; i++) {
+        var c = cookies[i].trim();
+        if (c.indexOf(name + '=') === 0) return c.substring(name.length + 1);
+    }
+    return '';
+}
+
+function sellerHomePage() {
+    return {
+        showLinkForm: false,
+        linkCreating: false,
+        linkError: '',
+        linkSuccess: '',
+        linkForm: { customer: '', value: '' },
+
+        async createQuickLink() {
+            this.linkError = '';
+            this.linkSuccess = '';
+            if (!this.linkForm.customer || !this.linkForm.value) {
+                this.linkError = 'Preencha nome do cliente e valor.';
+                return;
+            }
+            this.linkCreating = true;
+            try {
+                var r = await fetch('/api/seller/links/', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCSRFToken() },
+                    body: JSON.stringify({
+                        customer_name: this.linkForm.customer,
+                        amount: this.linkForm.value,
+                        installments: 1,
+                    })
+                });
+                var d = await r.json();
+                if (r.ok) {
+                    this.linkSuccess = 'Link gerado com sucesso!';
+                    this.showLinkForm = false;
+                    this.linkForm = { customer: '', value: '' };
+                } else {
+                    this.linkError = d.error || d.detail || 'Erro ao gerar link.';
+                }
+            } catch (e) {
+                this.linkError = 'Erro de conexao.';
+            }
+            this.linkCreating = false;
+        }
+    }
+}
+</script>
 {% endblock %}
