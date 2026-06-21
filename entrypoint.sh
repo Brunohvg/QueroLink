@@ -54,6 +54,36 @@ if [ -z "$1" ] || [ "$1" = 'gunicorn' ]; then
     python manage.py migrate --noinput
     log "Migrations concluídas."
 
+    # ── Bootstrap superuser (sempre roda, idempotente) ─────
+    log "===== BOOTSTRAP SUPERUSER ====="
+    python -c "
+import os; os.environ.setdefault('DJANGO_SETTINGS_MODULE','app.config.settings.production')
+import django; django.setup()
+from django.utils.crypto import get_random_string
+from app.apps.accounts.models import User
+
+if User.objects.filter(is_superuser=True).exists():
+    print('Superuser ja existe. Nada a fazer.')
+else:
+    email = os.environ.get('DJANGO_SUPERUSER_EMAIL', '').strip()
+    password = os.environ.get('DJANGO_SUPERUSER_PASSWORD', '').strip()
+    if email and password and len(password) >= 12:
+        User.objects.create_superuser(username=email, email=email, password=password)
+        print(f'Superuser criado com email fornecido: {email}')
+    else:
+        password = get_random_string(20)
+        email = 'admin@querolink.local'
+        User.objects.create_superuser(username=email, email=email, password=password)
+        print('========================================')
+        print('ATENCAO: Superuser criado com senha aleatoria.')
+        print(f'  Email : {email}')
+        print(f'  Senha : {password}')
+        print('GUARDE ESSA SENHA. Ela nao sera exibida novamente.')
+        print('Configure DJANGO_SUPERUSER_EMAIL e DJANGO_SUPERUSER_PASSWORD no Coolify.')
+        print('========================================')
+"
+    log "Bootstrap superuser concluido."
+
     # ── Seed (opcional, só se SEED_ON_START=true) ──────────
     if [ "${SEED_ON_START:-false}" = "true" ]; then
         log "===== SEED ====="

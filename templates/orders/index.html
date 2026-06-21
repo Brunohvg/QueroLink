@@ -1,5 +1,27 @@
 {% extends "base/base.html" %}
 
-{% block content %}
-
-{% endblock content %}
+{% block page_content %}
+{% if setup_needed %}
+<div class="card">
+  <div class="card-header">
+    <div class="card-header-icon">
+      <i class="fas fa-cog"></i>
+    </div>
+    <h5>Sistema em Configuracao</h5>
+  </div>
+  <div class="card-body" style="text-align: center; padding: 48px 24px;">
+    <p style="font-size: 1rem; color: var(--text-color); margin-bottom: 8px;">
+      O sistema ainda nao possui vendedores cadastrados.
+    </p>
+    <p style="font-size: 0.875rem; color: var(--text-light); margin-bottom: 24px;">
+      Acesse o painel administrativo para configurar sua loja e cadastrar vendedores antes de gerar links de pagamento.
+    </p>
+    <a href="{% url 'dashboard:login' %}" class="btn btn-primary" style="text-decoration: none; display: inline-block;">
+      <i class="fas fa-arrow-right"></i>Acessar Painel
+    </a>
+  </div>
+</div>
+{% else %}
+{{ block.super }}
+{% endif %}
+{% endblock page_content %}

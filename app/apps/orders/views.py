@@ -1,6 +1,7 @@
-from django.shortcuts import render, redirect
+from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib import messages
 from django.http import HttpResponse
+from django.conf import settings
 from app.services.gateway.pagar_me import PagarMeGateway
 from app.apps.orders.models import Order, PaymentLink
 from app.apps.payments.models import Payment
@@ -14,9 +15,13 @@ def formatar_valor(valor):
     return valor / 100
 
 def index(request):
-    """Renderiza a página inicial."""
+    """Renderiza a pagina inicial."""
     sellers = Seller.objects.filter(is_active=True)
-    return render(request, "orders/index.html", {"sellers": sellers})
+    setup_needed = not sellers.exists() or not Tenant.objects.exists()
+    return render(request, "orders/index.html", {
+        "sellers": sellers,
+        "setup_needed": setup_needed,
+    })
 
 def create_link(request):
     if request.method == "POST":
@@ -61,13 +66,15 @@ def create_link(request):
                 )
 
                 # Gateway call
+                success_url = f"https://{settings.SERVICE_FQDN_WEB}/pago/{order.uuid}/"
                 gateway = PagarMeGateway(api_key=tenant.pagarme_api_key)
                 response = gateway.create_payment_link(
                     total_amount=total_amount,
                     max_installments=int(installments),
                     name=link_name,
                     free_installments=int(installments),
-                    order_code=str(order.uuid)
+                    order_code=str(order.uuid),
+                    success_url=success_url,
                 )
 
                 link_url = response.get("url", "")
@@ -116,4 +123,13 @@ def create_link(request):
             messages.error(request, f"Ocorreu um erro: {str(e)}")
             return redirect("orders:index")
 
-    return HttpResponse("Erro: Método não suportado.")
+    return HttpResponse("Erro: Metodo nao suportado.")
+
+
+def payment_success(request, order_uuid):
+    order = get_object_or_404(Order, uuid=order_uuid)
+    completed = order.status == Order.Status.COMPLETED
+    return render(request, "orders/payment_success.html", {
+        "order": order,
+        "completed": completed,
+    })

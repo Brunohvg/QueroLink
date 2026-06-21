@@ -1,0 +1,27 @@
+{% extends "base/base.html" %}
+
+{% block page_content %}
+<div class="card">
+  <div class="card-header">
+    <div class="card-header-icon">
+      <i class="fas fa-{% if completed %}check-circle{% else %}clock{% endif %}" style="color: var(--{% if completed %}secondary{% else %}primary{% endif %}-color);"></i>
+    </div>
+    <h5>{% if completed %}Pagamento Confirmado{% else %}Pagamento em Andamento{% endif %}</h5>
+  </div>
+  <div class="card-body" style="text-align: center; padding: 40px 24px;">
+    <p style="font-size: 1.125rem; color: var(--text-color); margin-bottom: 8px;">
+      {% if completed %}
+      O pagamento de <strong>R$ {{ order.total_amount_decimal }}</strong> foi confirmado.
+      {% else %}
+      Seu pagamento de <strong>R$ {{ order.total_amount_decimal }}</strong> esta sendo processado.
+      {% endif %}
+    </p>
+    <p style="font-size: 0.875rem; color: var(--text-light); margin-bottom: 4px;">
+      Cliente: {{ order.customer_name }}
+    </p>
+    <p style="font-size: 0.75rem; color: var(--text-light);">
+      Pedido: {{ order.uuid }}
+    </p>
+  </div>
+</div>
+{% endblock page_content %}

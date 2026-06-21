@@ -28,6 +28,7 @@ SECRET_KEY = config('SECRET_KEY', default='dev-insecure-key-change-in-production
 API_KEY_PAGAR_ME = config('API_KEY_PAGAR_ME', default='')
 API_KEY_INSTANCIA = config('API_KEY_INSTANCIA', default='')
 INSTANCE = config('INSTANCE', default='')
+SERVICE_FQDN_WEB = config('SERVICE_FQDN_WEB', default='localhost')
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = config('DEBUG', default=False, cast=bool)
