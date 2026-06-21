@@ -2,7 +2,7 @@ import dj_database_url
 from .base import *
 
 DEBUG = config('DEBUG', default=False, cast=bool)
-ALLOWED_HOSTS = config('ALLOWED_HOSTS', default='*').split(',')
+ALLOWED_HOSTS = config('ALLOWED_HOSTS', default='*').split(',') + ['localhost', '127.0.0.1']
 
 DATABASES = {
     'default': dj_database_url.config(
