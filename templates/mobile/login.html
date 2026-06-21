@@ -13,13 +13,13 @@
         <div class="bg-danger-50 border border-danger-500/20 text-danger-700 px-4 py-3 rounded-xl text-sm mb-4">{{ error }}</div>
         {% endif %}
 
-        <form method="post" action="{% url 'dashboard:mobile_login' %}" class="space-y-4">
+        <form method="post" action="{% url 'dashboard:login' %}" class="space-y-4">
             {% csrf_token %}
             <div>
-                <label for="username" class="block text-[13px] text-gray-500 mb-1">Usuario</label>
-                <input type="text" id="username" name="username" required autofocus
+                <label for="identifier" class="block text-[13px] text-gray-500 mb-1">E-mail ou usuario</label>
+                <input type="text" id="identifier" name="identifier" required autofocus
                        class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent"
-                       placeholder="Seu nome de usuario" style="font-size:16px!important">
+                       placeholder="seu@email.com ou usuario" style="font-size:16px!important">
             </div>
             <div>
                 <label for="password" class="block text-[13px] text-gray-500 mb-1">Senha</label>

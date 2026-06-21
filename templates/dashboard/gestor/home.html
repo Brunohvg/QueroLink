@@ -1,7 +1,7 @@
 {% extends 'dashboard/base_desktop.html' %}
 {% block title %}Painel do Gestor — QueroLink{% endblock %}
 {% block content %}
-{% with valor_text=total_mes|stringformat:"d" %}
+<div x-data="gestorHomePage()" x-init="loadSummary()">
 
 {% if not config_ok %}
 <div class="surface-card mb-6 border-l-4 border-l-warning-500">
@@ -15,38 +15,31 @@
 
 <div class="surface-hero mb-6">
     <p class="text-[13px] font-semibold text-gray-500 uppercase tracking-wide mb-2">Total vendido no mes</p>
-    <p class="font-display text-[40px] font-semibold text-brand-500 leading-none">
-        R$ {{ valor_text|slice:":-2" }},{{ valor_text|slice:"-2:" }}
-    </p>
+    <p class="font-display text-[40px] font-semibold text-brand-500 leading-none" x-text="summary ? formatMoneyBRL(summary.total_vendido) : 'R$ {{ total_mes_fmt }}'"></p>
 </div>
 
-<div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+<div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
     <div class="surface-card">
         <p class="text-[13px] font-semibold text-gray-500 uppercase tracking-wide mb-1">Competencia</p>
         <p class="text-[18px] font-semibold text-gray-900">
-            {% if competencia %}
-            {{ competencia.month|stringformat:"02d" }}/{{ competencia.year }}
-            {% else %}
-            —
-            {% endif %}
+            {% if competencia %}{{ competencia.month|stringformat:"02d" }}/{{ competencia.year }}{% else %}—{% endif %}
         </p>
         <div class="mt-1">
-            {% if competencia %}
-            {% include 'components/_status_badge.html' with status=competencia.status %}
-            {% else %}
-            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-600">Sem periodo</span>
-            {% endif %}
+            {% if competencia %}{% include 'components/_status_badge.html' with status=competencia.status %}{% else %}<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-600">Sem periodo</span>{% endif %}
         </div>
     </div>
     <div class="surface-card">
         <p class="text-[13px] font-semibold text-gray-500 uppercase tracking-wide mb-1">Vendedores ativos</p>
-        <p class="text-[28px] font-semibold text-gray-900">{{ vendedores_ativos }}</p>
+        <p class="text-[28px] font-semibold text-gray-900" x-text="summary ? summary.vendedores_ativos : '{{ vendedores_ativos }}'"></p>
+        <p class="text-[12px] text-gray-400 mt-1" x-text="summary ? 'de ' + summary.vendedores_total + ' total' : ''"></p>
+    </div>
+    <div class="surface-card">
+        <p class="text-[13px] font-semibold text-gray-500 uppercase tracking-wide mb-1">Comissao a pagar</p>
+        <p class="font-display text-[28px] font-semibold text-success-700" x-text="summary ? formatMoneyBRL(summary.comissao_a_pagar) : '—'"></p>
     </div>
     <div class="surface-card">
         <p class="text-[13px] font-semibold text-gray-500 uppercase tracking-wide mb-1">Integracoes</p>
-        <p class="text-[14px] font-medium {% if config_ok %}text-success-700{% else %}text-gray-500{% endif %}">
-            {% if config_ok %}Pagamento e WhatsApp configurados{% else %}Configuracao pendente{% endif %}
-        </p>
+        <p class="text-[14px] font-medium {% if config_ok %}text-success-700{% else %}text-gray-500{% endif %}">{% if config_ok %}Tudo configurado{% else %}Pendente{% endif %}</p>
     </div>
 </div>
 
@@ -61,27 +54,85 @@
     </div>
 </div>
 
+{% verbatim %}
+<div x-show="summary?.sellers_inativos?.length" class="surface-card border-l-4 border-l-warning-500 mb-6">
+    <p class="text-[13px] font-semibold text-gray-500 uppercase tracking-wide mb-2">Vendedores sem venda ha 7 dias</p>
+    <p class="text-[14px] text-gray-600" x-text="summary?.sellers_inativos?.join(', ')"></p>
+</div>
+
+<div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+    <div class="surface-card">
+        <p class="text-[13px] font-semibold text-gray-500 uppercase tracking-wide mb-3">Top 5 vendedores do mes</p>
+        <table class="w-full text-[13px]" x-show="summary?.top5_mes?.length">
+            <template x-for="(s,i) in summary?.top5_mes" :key="i">
+                <tr class="border-t border-gray-100">
+                    <td class="py-2 font-medium" x-text="s.seller__name"></td>
+                    <td class="py-2 text-right font-medium" x-text="formatMoneyBRL(s.total)"></td>
+                </tr>
+            </template>
+        </table>
+        <p x-show="!summary?.top5_mes?.length" class="text-gray-400 text-[13px]">Nenhuma venda no periodo.</p>
+    </div>
+    <div class="surface-card">
+        <p class="text-[13px] font-semibold text-gray-500 uppercase tracking-wide mb-3">Top 5 vendedores do ano</p>
+        <table class="w-full text-[13px]" x-show="summary?.top5_ano?.length">
+            <template x-for="(s,i) in summary?.top5_ano" :key="i">
+                <tr class="border-t border-gray-100">
+                    <td class="py-2 font-medium" x-text="s.seller__name"></td>
+                    <td class="py-2 text-right font-medium" x-text="formatMoneyBRL(s.total)"></td>
+                </tr>
+            </template>
+        </table>
+        <p x-show="!summary?.top5_ano?.length" class="text-gray-400 text-[13px]">Nenhuma venda no ano.</p>
+    </div>
+</div>
+
+<div x-show="summary?.total_ano_anterior > 0" class="surface-card mb-6">
+    <p class="text-[13px] font-semibold text-gray-500 uppercase tracking-wide mb-1">Comparativo com mesmo mes do ano anterior</p>
+    <div class="flex items-baseline gap-3">
+        <p class="text-[18px] font-semibold text-gray-900" x-text="formatMoneyBRL(summary?.total_vendido || 0)"></p>
+        <p class="text-[14px] text-gray-500">vs</p>
+        <p class="text-[18px] font-semibold text-gray-400" x-text="formatMoneyBRL(summary?.total_ano_anterior || 0)"></p>
+        <p class="text-[13px] font-semibold" :class="(summary?.total_vendido||0) > (summary?.total_ano_anterior||0) ? 'text-success-700' : 'text-danger-700'">
+            <span x-show="(summary?.total_vendido||0) > (summary?.total_ano_anterior||0)">+</span>
+            <span x-text="summary?.total_ano_anterior > 0 ? (((summary?.total_vendido||0) - summary.total_ano_anterior) / summary.total_ano_anterior * 100).toFixed(0) + '%' : ''"></span>
+        </p>
+    </div>
+</div>
+{% endverbatim %}
+
 <h2 class="font-display text-[18px] font-semibold text-gray-900 mb-4">Acesso rapido</h2>
 <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
     <a href="{% url 'dashboard:gestor_ranking' %}" class="surface-card hover:border-brand-500 transition tap-target block">
         <div class="flex items-center gap-3">
-            <svg class="w-6 h-6 text-brand-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path></svg>
+            <svg class="w-6 h-6 text-brand-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path></svg>
             <span class="font-medium text-[15px] text-gray-900">Ranking</span>
         </div>
     </a>
     <a href="{% url 'dashboard:gestor_vendedores' %}" class="surface-card hover:border-brand-500 transition tap-target block">
         <div class="flex items-center gap-3">
-            <svg class="w-6 h-6 text-brand-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"></path></svg>
+            <svg class="w-6 h-6 text-brand-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"></path></svg>
             <span class="font-medium text-[15px] text-gray-900">Vendedores</span>
         </div>
     </a>
     <a href="{% url 'dashboard:gestor_fechamento' %}" class="surface-card hover:border-brand-500 transition tap-target block">
         <div class="flex items-center gap-3">
-            <svg class="w-6 h-6 text-brand-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
+            <svg class="w-6 h-6 text-brand-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
             <span class="font-medium text-[15px] text-gray-900">Fechamento</span>
         </div>
     </a>
 </div>
 
-{% endwith %}
+</div>
+<script>
+function gestorHomePage() {
+    return {
+        summary: null,
+        async loadSummary() {
+            var r = await fetch('/api/manager/dashboard/summary/');
+            this.summary = await r.json();
+        }
+    }
+}
+</script>
 {% endblock %}

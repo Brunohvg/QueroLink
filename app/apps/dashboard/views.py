@@ -9,15 +9,24 @@ from django.db.models import Sum
 
 def login_view(request):
     next_url = request.GET.get('next', 'dashboard:home')
-    
+
     if request.user.is_authenticated:
         return redirect(next_url)
-        
+
     if request.method == 'POST':
-        email = request.POST.get('email')
-        password = request.POST.get('password')
-        
-        user = authenticate(request, username=email, password=password)
+        identifier = request.POST.get('identifier', request.POST.get('email', '')).strip()
+        password = request.POST.get('password', '')
+
+        user = authenticate(request, username=identifier, password=password)
+        # If not found by username, try by email
+        if user is None and '@' in identifier:
+            from app.apps.accounts.models import User as UserModel
+            try:
+                u = UserModel.objects.get(email=identifier)
+                user = authenticate(request, username=u.username, password=password)
+            except UserModel.DoesNotExist:
+                pass
+
         if user is not None:
             auth_login(request, user)
             next_url = request.POST.get('next', '')
@@ -30,8 +39,8 @@ def login_view(request):
                     next_url = 'dashboard:mobile_home'
             return redirect(next_url)
         else:
-            messages.error(request, 'Email ou senha inválidos.')
-            
+            messages.error(request, 'Credenciais invalidas.')
+
     return render(request, 'dashboard/login.html', {'next': next_url})
 
 def logout_view(request):

@@ -41,7 +41,7 @@
     {% verbatim %}
     <div class="surface-hero mb-6">
         <p class="text-[13px] font-semibold text-gray-500 uppercase tracking-wide mb-2">Total no periodo</p>
-        <p class="font-display text-[40px] font-semibold text-brand-500 leading-none" x-text="'R$ ' + fmtMoney(sellerData?.total_amount || 0)"></p>
+        <p class="font-display text-[40px] font-semibold text-brand-500 leading-none" x-text="'R$ ' + formatMoneyBRL(sellerData?.total_amount || 0)"></p>
         <p class="text-[14px] text-gray-500 mt-2" x-text="(sellerData?.sale_count || 0) + ' vendas'"></p>
     </div>
 
@@ -61,8 +61,8 @@
                         <tr class="border-t border-gray-100">
                             <td class="py-2 font-medium" x-text="c.month"></td>
                             <td class="py-2 text-right" x-text="c.sale_count"></td>
-                            <td class="py-2 text-right font-medium" x-text="'R$ ' + fmtMoney(c.total)"></td>
-                            <td class="py-2 text-right" x-text="'R$ ' + fmtMoney(c.commission)"></td>
+                            <td class="py-2 text-right font-medium" x-text="'R$ ' + formatMoneyBRL(c.total)"></td>
+                            <td class="py-2 text-right" x-text="'R$ ' + formatMoneyBRL(c.commission)"></td>
                         </tr>
                     </template>
                 </tbody>
@@ -80,7 +80,7 @@
                 <template x-for="s in sellerData?.sales" :key="s.uuid">
                     <tr class="hover:bg-gray-50">
                         <td class="px-4 py-3 border-b border-gray-100 text-gray-500" x-text="new Date(s.sale_date).toLocaleDateString('pt-BR')"></td>
-                        <td class="px-4 py-3 border-b border-gray-100 font-semibold" x-text="'R$ ' + fmtMoney(s.amount)"></td>
+                        <td class="px-4 py-3 border-b border-gray-100 font-semibold" x-text="'R$ ' + formatMoneyBRL(s.amount)"></td>
                         <td class="px-4 py-3 border-b border-gray-100"><span class="text-xs px-2 py-0.5 rounded-full font-medium" :class="s.origin==='LINK'?'bg-brand-50 text-brand-600':'bg-success-50 text-success-700'" x-text="s.origin_display"></span></td>
                         <td class="px-4 py-3 border-b border-gray-100 text-gray-500" x-text="s.notes || '—'"></td>
                     </tr>
@@ -101,8 +101,8 @@
                                    'bg-brand-50 text-brand-700': c.period_status==='ENVIADA_FINANCEIRO',
                                    'bg-success-50 text-success-700': c.period_status==='APROVADA' || c.period_status==='PAGA'}"
                           x-text="c.period_status.replace(/_/g,' ')"></span>
-                    <span class="text-[13px] text-gray-500" x-text="'Vendas: R$ '+fmtMoney(c.total_sold_amount)"></span>
-                    <span class="text-[14px] font-semibold text-success-700" x-text="'R$ '+fmtMoney(c.commission_amount)"></span>
+                    <span class="text-[13px] text-gray-500" x-text="'Vendas: R$ '+formatMoneyBRL(c.total_sold_amount)"></span>
+                    <span class="text-[14px] font-semibold text-success-700" x-text="'R$ '+formatMoneyBRL(c.commission_amount)"></span>
                 </div>
             </template>
         </div>
@@ -167,11 +167,7 @@ function sellerDetailPage() {
             });
         },
 
-        fmtMoney(c) {
-            if (!c && c !== 0) return '0,00';
-            var r = Math.floor(c / 100);
-            return r.toLocaleString('pt-BR') + ',' + String(c % 100).padStart(2, '0');
-        },
+
 
         buildParams() {
             var p = new URLSearchParams();

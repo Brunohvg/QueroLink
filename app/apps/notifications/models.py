@@ -83,3 +83,22 @@ class Notification(models.Model):
             elif self.seller_id:
                 self.tenant = self.seller.tenant
         super().save(*args, **kwargs)
+
+
+class PasswordResetRequest(models.Model):
+    uuid = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    user = models.ForeignKey('accounts.User', on_delete=models.CASCADE, related_name='password_resets')
+    pin = models.CharField(max_length=6)
+    expires_at = models.DateTimeField()
+    used = models.BooleanField(default=False)
+    attempts = models.PositiveSmallIntegerField(default=0)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        indexes = [
+            models.Index(fields=['user', 'used']),
+            models.Index(fields=['pin', 'expires_at']),
+        ]
+
+    def __str__(self):
+        return f'Reset for {self.user.username}'

@@ -161,11 +161,27 @@ class CommissionPeriodViewSet(viewsets.ModelViewSet):
                 {'error': f'Nao e possivel aprovar competencia com status {period.status}. O status deve ser ENVIADA_FINANCEIRO.'},
                 status=status.HTTP_400_BAD_REQUEST,
             )
-        period.status = CommissionPeriod.Status.APROVADA
-        period.approved_at = timezone.now()
-        period.save(update_fields=['status', 'approved_at', 'updated_at'])
-        _log_audit(request.user, 'approve', 'CommissionPeriod', str(period.uuid),
-                   {'month': period.month, 'year': period.year}, request)
+        seller_commissions = request.data.get('seller_commissions', None)
+        if seller_commissions:
+            for sc in period.seller_commissions.all():
+                if str(sc.id) in seller_commissions:
+                    sc.approval_status = SellerCommission.ApprovalStatus.APROVADO
+                    sc.save(update_fields=['approval_status'])
+        else:
+            for sc in period.seller_commissions.all():
+                sc.approval_status = SellerCommission.ApprovalStatus.APROVADO
+                sc.save(update_fields=['approval_status'])
+
+        all_approved = all(
+            sc.approval_status == SellerCommission.ApprovalStatus.APROVADO
+            for sc in period.seller_commissions.all()
+        )
+        if all_approved:
+            period.status = CommissionPeriod.Status.APROVADA
+            period.approved_at = timezone.now()
+            period.save(update_fields=['status', 'approved_at', 'updated_at'])
+            _log_audit(request.user, 'approve', 'CommissionPeriod', str(period.uuid),
+                       {'month': period.month, 'year': period.year}, request)
         return Response(self.get_serializer(period).data)
 
     @action(detail=True, methods=['post'], permission_classes=[IsAuthenticated, IsFinancialOrAdmin])
@@ -596,3 +612,103 @@ class SellerReportPdfView(generics.GenericAPIView):
         response = HttpResponse(pdf, content_type='application/pdf')
         response['Content-Disposition'] = f'attachment; filename="{seller.name}_{start}_{end}.pdf"'
         return response
+
+
+class AnnualRankingView(generics.GenericAPIView):
+    permission_classes = [IsAuthenticated, IsManagerOrAdmin]
+
+    def get(self, request):
+        tenant = request.user.tenant
+        year = int(request.query_params.get('year', timezone.localdate().year))
+
+        rankings = SellerCommission.objects.filter(
+            period__tenant=tenant,
+            period__year=year,
+        ).values('seller__uuid', 'seller__name').annotate(
+            total=Sum('total_sold_amount'),
+            commission_total=Sum('commission_amount'),
+        ).order_by('-total')[:5]
+
+        return Response({
+            'year': year,
+            'ranking': list(rankings),
+        })
+
+
+class DashboardSummaryView(generics.GenericAPIView):
+    permission_classes = [IsAuthenticated, IsManagerOrAdmin]
+
+    def get(self, request):
+        from datetime import date, timedelta
+        import calendar
+
+        tenant = request.user.tenant
+        hoje = timezone.localdate()
+        start_str = request.query_params.get('start')
+        end_str = request.query_params.get('end')
+
+        if start_str and end_str:
+            start = date.fromisoformat(start_str)
+            end = date.fromisoformat(end_str)
+        else:
+            month = int(request.query_params.get('month', hoje.month))
+            year = int(request.query_params.get('year', hoje.year))
+            start = date(year, month, 1)
+            end = date(year, month, calendar.monthrange(year, month)[1])
+
+        total_vendido = Sale.objects.filter(
+            tenant=tenant,
+            sale_date__gte=start, sale_date__lte=end,
+        ).aggregate(t=Sum('amount'))['t'] or 0
+
+        comissao_a_pagar = SellerCommission.objects.filter(
+            period__tenant=tenant,
+            approval_status=SellerCommission.ApprovalStatus.APROVADO,
+        ).exclude(period__status=CommissionPeriod.Status.PAGA).aggregate(
+            t=Sum('commission_amount')
+        )['t'] or 0
+
+        top5_mes = Sale.objects.filter(
+            tenant=tenant,
+            sale_date__gte=start, sale_date__lte=end,
+        ).values('seller__name').annotate(
+            total=Sum('amount'),
+        ).order_by('-total')[:5]
+
+        top5_ano = SellerCommission.objects.filter(
+            period__tenant=tenant,
+            period__year=hoje.year,
+        ).values('seller__name').annotate(
+            total=Sum('total_sold_amount'),
+        ).order_by('-total')[:5]
+
+        same_month_last_year = start.replace(year=start.year - 1)
+        last_day_lastyear = calendar.monthrange(start.year - 1, start.month)[1]
+        end_lastyear = date(start.year - 1, start.month, last_day_lastyear)
+        total_ano_anterior = Sale.objects.filter(
+            tenant=tenant,
+            sale_date__gte=same_month_last_year,
+            sale_date__lte=end_lastyear,
+        ).aggregate(t=Sum('amount'))['t'] or 0
+
+        semana_atras = hoje - timedelta(days=7)
+        sellers_inativos = list(
+            Seller.objects.filter(tenant=tenant, is_active=True).exclude(
+                sales__sale_date__gte=semana_atras
+            ).values_list('name', flat=True)
+        )
+
+        vendedores_ativos = Seller.objects.filter(tenant=tenant, is_active=True).count()
+        vendedores_total = Seller.objects.filter(tenant=tenant).count()
+
+        return Response({
+            'period': {'start': start.isoformat(), 'end': end.isoformat()},
+            'total_vendido': total_vendido,
+            'comissao_a_pagar': comissao_a_pagar,
+            'top5_mes': list(top5_mes),
+            'top5_ano': list(top5_ano),
+            'total_ano_anterior': total_ano_anterior,
+            'sellers_inativos': sellers_inativos,
+            'vendedores_ativos': vendedores_ativos,
+            'vendedores_total': vendedores_total,
+        })

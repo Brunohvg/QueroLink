@@ -34,11 +34,17 @@ class CommissionPeriod(models.Model):
 
 class SellerCommission(models.Model):
     """Consolidado de comissão de UM vendedor em UMA competência mensal."""
+    class ApprovalStatus(models.TextChoices):
+        PENDENTE = 'PENDENTE', 'Pendente'
+        APROVADO = 'APROVADO', 'Aprovado'
+        REJEITADO = 'REJEITADO', 'Rejeitado'
+
     period = models.ForeignKey(CommissionPeriod, on_delete=models.CASCADE, related_name='seller_commissions')
     seller = models.ForeignKey(Seller, on_delete=models.CASCADE, related_name='commissions')
     total_sold_amount = models.PositiveIntegerField(default=0, help_text="Total vendido em centavos")
     commission_rate = models.DecimalField(max_digits=5, decimal_places=4, default=0.01)
     commission_amount = models.PositiveIntegerField(default=0, help_text="Comissão devida em centavos")
+    approval_status = models.CharField(max_length=20, choices=ApprovalStatus.choices, default=ApprovalStatus.PENDENTE)
     payment_date = models.DateField(null=True, blank=True)
     payment_method = models.CharField(max_length=50, blank=True, null=True)
     payment_notes = models.TextField(blank=True, null=True)

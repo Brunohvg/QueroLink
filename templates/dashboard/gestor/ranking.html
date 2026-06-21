@@ -23,7 +23,7 @@
         </div>
         <div class="surface-hero text-center" x-show="topSeller">
             <p class="text-[13px] font-semibold text-gray-500 uppercase tracking-wide mb-6">Vendedor do mes</p>
-            <p class="font-display text-[36px] font-semibold text-gray-900 leading-tight" x-text="'R$ ' + fmtMoney(topSeller?.total_sold || 0)"></p>
+            <p class="font-display text-[36px] font-semibold text-gray-900 leading-tight" x-text="'R$ ' + formatMoneyBRL(topSeller?.total_sold || 0)"></p>
             <p class="text-[15px] font-medium text-gray-700 mt-2">
                 <a :href="'/dashboard/gestor/vendedores/' + (topSeller?.seller__uuid || '') + '/'" class="text-brand-500 hover:underline" x-text="topSeller?.seller__name || '-'"></a>
             </p>
@@ -43,9 +43,9 @@
                         <td class="px-4 py-3 border-b border-gray-100 font-medium">
                             <a :href="'/dashboard/gestor/vendedores/' + s.seller__uuid + '/'" class="text-brand-500 hover:underline" x-text="s.seller__name"></a>
                         </td>
-                        <td class="px-4 py-3 border-b border-gray-100 font-semibold" x-text="'R$ ' + fmtMoney(s.total_sold)"></td>
+                        <td class="px-4 py-3 border-b border-gray-100 font-semibold" x-text="'R$ ' + formatMoneyBRL(s.total_sold)"></td>
                         <td class="px-4 py-3 border-b border-gray-100" x-text="s.sale_count"></td>
-                        <td class="px-4 py-3 border-b border-gray-100" x-text="'R$ ' + fmtMoney(Math.round(s.total_sold / s.sale_count))"></td>
+                        <td class="px-4 py-3 border-b border-gray-100" x-text="'R$ ' + formatMoneyBRL(Math.round(s.total_sold / s.sale_count))"></td>
                     </tr>
                 </template>
             </tbody>
@@ -82,7 +82,7 @@ function rankingPage() {
                 options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true } } }
             });
         },
-        fmtMoney(c) { var r = Math.floor(c/100); return r.toLocaleString('pt-BR')+','+String(c%100).padStart(2,'0'); }
+
     }
 }
 </script>

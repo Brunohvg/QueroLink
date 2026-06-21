@@ -113,40 +113,42 @@ class SaleCreateSerializer(SaleSerializer):
 
 class CommissionPeriodSerializer(serializers.ModelSerializer):
     seller_commissions = serializers.SerializerMethodField()
+    is_current_month = serializers.SerializerMethodField()
 
     class Meta:
         model = CommissionPeriod
         fields = [
             'uuid', 'tenant', 'month', 'year', 'status',
             'sent_to_financial_at', 'approved_at', 'paid_at',
-            'created_at', 'seller_commissions',
+            'created_at', 'seller_commissions', 'is_current_month',
         ]
         read_only_fields = [
             'uuid', 'tenant', 'sent_to_financial_at', 'approved_at',
-            'paid_at', 'created_at', 'seller_commissions',
+            'paid_at', 'created_at', 'seller_commissions', 'is_current_month',
         ]
 
-    def get_seller_commissions(self, obj):
-        return SellerCommissionReadSerializer(
-            obj.seller_commissions.select_related('seller').all(),
-            many=True,
-        ).data
+    def get_is_current_month(self, obj):
+        from django.utils import timezone
+        hoje = timezone.localdate()
+        return obj.month == hoje.month and obj.year == hoje.year
 
 
 class SellerCommissionReadSerializer(serializers.ModelSerializer):
     seller_name = serializers.CharField(source='seller.name', read_only=True)
     seller_uuid = serializers.CharField(source='seller.uuid', read_only=True)
+    approval_status = serializers.CharField(read_only=True)
 
     class Meta:
         model = SellerCommission
         fields = [
             'id', 'seller_uuid', 'seller_name',
             'total_sold_amount', 'commission_rate', 'commission_amount',
+            'approval_status',
             'payment_date', 'payment_method', 'payment_notes',
         ]
         read_only_fields = [
             'id', 'seller_uuid', 'seller_name', 'total_sold_amount',
-            'commission_rate', 'commission_amount',
+            'commission_rate', 'commission_amount', 'approval_status',
             'payment_date', 'payment_method', 'payment_notes',
         ]
 

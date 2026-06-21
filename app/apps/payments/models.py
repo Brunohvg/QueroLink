@@ -36,3 +36,13 @@ class Payment(models.Model):
 
     def __str__(self):
         return f"Payment {self.uuid} - {self.status}"
+
+    @property
+    def refusal_reason(self):
+        payload = self.raw_callback_payload or {}
+        last_transaction = (payload.get('last_transaction') or {})
+        if last_transaction:
+            return (last_transaction.get('refuse_reason')
+                    or last_transaction.get('acquirer_message')
+                    or last_transaction.get('status_reason'))
+        return payload.get('refuse_reason') or payload.get('acquirer_message')

@@ -14,6 +14,7 @@ urlpatterns = [
     path('gestor/vendedores/<uuid:seller_id>/', desktop_views.gestor_vendedor_detalhe, name='gestor_vendedor_detalhe'),
     path('gestor/fechamento/', desktop_views.gestor_fechamento, name='gestor_fechamento'),
     path('gestor/configuracoes/', desktop_views.gestor_configuracoes, name='gestor_configuracoes'),
+    path('gestor/links/', desktop_views.gestor_links, name='gestor_links'),
 
     path('financeiro/fila/', desktop_views.financeiro_fila, name='financeiro_fila'),
     path('financeiro/historico/', desktop_views.financeiro_historico, name='financeiro_historico'),
@@ -27,4 +28,5 @@ urlpatterns += [
     path('mobile/lancar/', mobile_views.mobile_lancar_venda, name='mobile_lancar_venda'),
     path('mobile/vendas/', mobile_views.mobile_minhas_vendas, name='mobile_minhas_vendas'),
     path('mobile/desempenho/', mobile_views.mobile_meu_desempenho, name='mobile_meu_desempenho'),
+    path('mobile/links/', mobile_views.mobile_links, name='mobile_links'),
 ]

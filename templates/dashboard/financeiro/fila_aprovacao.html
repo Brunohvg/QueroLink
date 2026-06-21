@@ -12,23 +12,29 @@
                     <p class="text-[13px] text-gray-500" x-text="'Enviado em '+new Date(p.sent_to_financial_at).toLocaleString('pt-BR')"></p>
                 </div>
                 <div class="flex gap-2">
-                    <button @click="approve(p)" class="bg-success-500 hover:bg-success-700 text-white font-medium py-2 px-4 rounded-xl transition tap-target text-[15px] shadow-md">Aprovar</button>
+                    <button @click="approve(p)" class="bg-success-500 hover:bg-success-700 text-white font-medium py-2 px-4 rounded-xl transition tap-target text-[15px] shadow-md">Aprovar selecionados</button>
                     <button @click="openRejectModal(p)" class="bg-white border border-danger-500 text-danger-500 hover:bg-danger-50 font-medium py-2 px-4 rounded-xl transition tap-target text-[15px]">Devolver</button>
                 </div>
             </div>
 
             <div x-show="expanded===p.uuid" class="mb-4">
                 {% with value_text='(p.seller_commissions||[]).reduce((a,c)=>a+(c.total_sold_amount||0),0)' %}
-                <p class="font-display text-[28px] font-semibold text-brand-500 mb-4">Total: R$ <span x-text="fmtMoney((p.seller_commissions||[]).reduce((a,c)=>a+(c.total_sold_amount||0),0))"></span></p>
+                <p class="font-display text-[28px] font-semibold text-brand-500 mb-4">Total: R$ <span x-text="formatMoneyBRL((p.seller_commissions||[]).reduce((a,c)=>a+(c.total_sold_amount||0),0))"></span></p>
                 {% endwith %}
                 <table class="w-full text-left text-[14px]">
-                    <thead><tr><th class="px-4 py-3 font-semibold text-gray-500 border-b border-gray-200 bg-gray-50">Vendedor</th><th class="px-4 py-3 font-semibold text-gray-500 border-b border-gray-200 bg-gray-50">Total Vendido</th><th class="px-4 py-3 font-semibold text-gray-500 border-b border-gray-200 bg-gray-50">Comissão</th></tr></thead>
+                    <thead><tr><th class="px-4 py-3 font-semibold text-gray-500 border-b border-gray-200 bg-gray-50 w-10"><input type="checkbox" @change="toggleAll(p)" :checked="isAllSelected(p)"></th><th class="px-4 py-3 font-semibold text-gray-500 border-b border-gray-200 bg-gray-50">Vendedor</th><th class="px-4 py-3 font-semibold text-gray-500 border-b border-gray-200 bg-gray-50">Total Vendido</th><th class="px-4 py-3 font-semibold text-gray-500 border-b border-gray-200 bg-gray-50">Comissao</th><th class="px-4 py-3 font-semibold text-gray-500 border-b border-gray-200 bg-gray-50">Status</th></tr></thead>
                     <tbody>
                         <template x-for="sc in p.seller_commissions" :key="sc.id">
                             <tr class="hover:bg-gray-50">
+                                <td class="px-4 py-3 border-b border-gray-100"><input type="checkbox" @change="toggle(p, sc)" :checked="isSelected(p, sc)"></td>
                                 <td class="px-4 py-3 border-b border-gray-100 font-medium" x-text="sc.seller_name"></td>
-                                <td class="px-4 py-3 border-b border-gray-100" x-text="'R$ '+fmtMoney(sc.total_sold_amount)"></td>
-                                <td class="px-4 py-3 border-b border-gray-100 font-semibold text-brand-500" x-text="'R$ '+fmtMoney(sc.commission_amount)"></td>
+                                <td class="px-4 py-3 border-b border-gray-100" x-text="'R$ '+formatMoneyBRL(sc.total_sold_amount)"></td>
+                                <td class="px-4 py-3 border-b border-gray-100 font-semibold text-brand-500" x-text="'R$ '+formatMoneyBRL(sc.commission_amount)"></td>
+                                <td class="px-4 py-3 border-b border-gray-100">
+                                    <span x-show="sc.approval_status==='PENDENTE'" class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-600">Pendente</span>
+                                    <span x-show="sc.approval_status==='APROVADO'" class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-success-50 text-success-700">Aprovado</span>
+                                    <span x-show="sc.approval_status==='REJEITADO'" class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-danger-50 text-danger-700">Rejeitado</span>
+                                </td>
                             </tr>
                         </template>
                     </tbody>
@@ -68,17 +74,31 @@ function filaPage() {
     return {
         periods: [], expanded: null, showReject: false, rejectPeriod: null, rejectReason: '',
         async load() { var r = await fetch('/api/manager/commissions/ENVIADA_FINANCEIRO/'); this.periods = await r.json(); },
+        isAllSelected(p) { return (p.seller_commissions||[]).every(sc => this.isSelected(p, sc)); },
+        isSelected(p, sc) { return p._selected ? p._selected.has(sc.id) : false; },
+        toggleAll(p) {
+            if (!p._selected) p._selected = new Set();
+            if (this.isAllSelected(p)) { p._selected.clear(); return; }
+            (p.seller_commissions||[]).forEach(sc => p._selected.add(sc.id));
+        },
+        toggle(p, sc) {
+            if (!p._selected) p._selected = new Set();
+            p._selected.has(sc.id) ? p._selected.delete(sc.id) : p._selected.add(sc.id);
+        },
         async approve(p) {
-            if (!confirm('Aprovar esta competencia?')) return;
-            var r = await fetch(`/api/commissions/periods/${p.uuid}/approve/`, { method:'POST', headers:{'X-CSRFToken': getCSRFToken()} });
-            if (r.ok) this.load(); else { var d = await r.json(); alert(d.error||'Erro'); }
+            var sellers = p._selected ? Array.from(p._selected) : [];
+            var all = sellers.length === 0 || sellers.length === (p.seller_commissions||[]).length;
+            var msg = all ? 'Aprovar TODOS os vendedores desta competencia?' : 'Aprovar apenas os ' + sellers.length + ' vendedores selecionados?';
+            if (!confirm(msg)) return;
+            var body = all ? {} : { seller_commissions: sellers };
+            var r = await fetch('/api/commissions/periods/' + p.uuid + '/approve/', { method:'POST', headers:{'Content-Type':'application/json', 'X-CSRFToken': getCSRFToken()}, body: JSON.stringify(body) });
+            if (r.ok) { delete p._selected; this.load(); } else { var d = await r.json(); alert(d.error||'Erro'); }
         },
         openRejectModal(p) { this.rejectPeriod = p; this.rejectReason = ''; this.showReject = true; },
         async doReject() {
-            var r = await fetch(`/api/commissions/periods/${this.rejectPeriod.uuid}/reject/`, { method:'POST', headers:{'Content-Type':'application/json', 'X-CSRFToken': getCSRFToken()}, body:JSON.stringify({reason:this.rejectReason}) });
+            var r = await fetch('/api/commissions/periods/' + this.rejectPeriod.uuid + '/reject/', { method:'POST', headers:{'Content-Type':'application/json', 'X-CSRFToken': getCSRFToken()}, body:JSON.stringify({reason:this.rejectReason}) });
             if (r.ok) { this.showReject = false; this.load(); } else { var d = await r.json(); alert(d.error||'Erro'); }
         },
-        fmtMoney(c) { var r = Math.floor(c/100); return r.toLocaleString('pt-BR')+','+String(c%100).padStart(2,'0'); }
     }
 }
 </script>

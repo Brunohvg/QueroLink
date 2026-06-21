@@ -41,12 +41,20 @@ def gestor_home(request):
 
     config_ok = tenant.pagarme_configured and tenant.whatsapp_configured
 
+    def _fmt(val):
+        r = val // 100
+        c = val % 100
+        return f'{r:,}.{c:02d}'.replace(',', '.')
+
+    total_mes_fmt = _fmt(total_mes)
+
     from app.apps.orders.models import Order
     total_orders = Order.objects.filter(tenant=tenant).count()
     paid_orders_count = Order.objects.filter(tenant=tenant, status='COMPLETED').count()
 
     return render(request, 'dashboard/gestor/home.html', {
         'total_mes': total_mes,
+        'total_mes_fmt': total_mes_fmt,
         'competencia': competencia,
         'vendedores_ativos': vendedores_ativos,
         'config_ok': config_ok,
@@ -150,3 +158,43 @@ def financeiro_historico(request):
     if not _check_role(request, User.Role.FINANCEIRO, User.Role.ADMIN):
         return redirect('dashboard:home')
     return render(request, 'dashboard/financeiro/historico_pagamentos.html')
+
+
+@login_required
+def gestor_links(request):
+    if not _check_role(request, User.Role.MANAGER, User.Role.ADMIN):
+        return redirect('dashboard:home')
+
+    tenant = request.user.tenant
+    if not tenant:
+        return redirect('dashboard:home')
+
+    from app.apps.orders.models import Order
+
+    seller_uuid = request.GET.get('seller')
+    orders = Order.objects.filter(tenant=tenant).select_related('seller').order_by('-created_at')[:100]
+    if seller_uuid:
+        orders = orders.filter(seller__uuid=seller_uuid)
+
+    orders_data = []
+    for o in orders:
+        payment = o.payments.first()
+        refusal = payment.refusal_reason if payment else None
+        orders_data.append({
+            'uuid': str(o.uuid),
+            'customer_name': o.customer_name,
+            'amount': o.total_amount,
+            'status': o.status,
+            'status_display': o.get_status_display(),
+            'seller_name': o.seller.name if o.seller else '-',
+            'refusal_reason': refusal,
+            'created_at': o.created_at.isoformat(),
+        })
+
+    from app.apps.sellers.models import Seller as SellerModel
+    sellers = list(SellerModel.objects.filter(tenant=tenant, is_active=True).values('uuid', 'name'))
+
+    return render(request, 'dashboard/gestor/links.html', {
+        'orders_json': orders_data,
+        'sellers': sellers,
+    })
