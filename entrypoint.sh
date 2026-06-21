@@ -34,7 +34,10 @@ if [ -z "$1" ] || [ "$1" = 'gunicorn' ]; then
 
     # ── Checar banco ───────────────────────────────────────
     if [ -n "$DATABASE_URL" ]; then
-        wait_for_db
+        if ! wait_for_db; then
+            log "FATAL: não foi possível conectar ao banco. Abortando boot."
+            exit 1
+        fi
     fi
 
     # ── Migrations ─────────────────────────────────────────
@@ -90,7 +93,10 @@ else
 
     # ── Esperar banco para serviços Celery ─────────────────
     if [ -n "$DATABASE_URL" ]; then
-        wait_for_db
+        if ! wait_for_db; then
+            log "FATAL: não foi possível conectar ao banco. Abortando boot."
+            exit 1
+        fi
     fi
 
     exec "$@"
