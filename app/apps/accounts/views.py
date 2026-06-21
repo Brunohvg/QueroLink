@@ -6,6 +6,7 @@ from django.utils import timezone
 from django_ratelimit.decorators import ratelimit
 from app.apps.accounts.forms import TenantRegistrationForm
 from app.apps.accounts.models import Tenant, User
+from app.apps.audit.utils import log_action
 
 
 # Tenant ativado imediatamente (is_active=True, login automatico) — decisao consciente do produto.
@@ -46,6 +47,7 @@ def signup_view(request):
             user = authenticate(request, username=email, password=form.cleaned_data['password'])
             if user is not None:
                 auth_login(request, user)
+                log_action(request, 'tenant.created', instance=tenant)
                 messages.success(request, f'Bem-vindo(a)! A loja "{tenant.company_name}" foi criada com sucesso.')
                 return redirect('dashboard:gestor_home')
 

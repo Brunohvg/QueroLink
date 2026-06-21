@@ -50,7 +50,7 @@
         <div class="bg-white rounded-2xl shadow-xl p-6 w-full max-w-md mx-4">
             <h3 class="text-[18px] font-semibold mb-3">Devolver competência</h3>
             <p class="text-[13px] text-gray-500 mb-4">Informe o motivo da devolução:</p>
-            <textarea x-model="rejectReason" class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-500 mb-4" rows="3" placeholder="Motivo da devolução" required></textarea>
+            <textarea x-model="rejectReason" class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-500 mb-4" rows="3" placeholder="Motivo da devolucao" required></textarea>
             <div class="flex gap-3 justify-end">
                 {% include 'components/_button.html' with variant='secondary' label='Cancelar' onclick='showReject=false' %}
                 {% include 'components/_button.html' with variant='danger' label='Devolver' onclick='doReject()' %}

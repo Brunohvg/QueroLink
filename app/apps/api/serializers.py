@@ -102,6 +102,17 @@ class SaleCreateSerializer(SaleSerializer):
             raise serializers.ValidationError(
                 {'seller': 'O vendedor nao pertence ao tenant.'}
             )
+
+        sale_date = attrs.get('sale_date')
+        if sale_date:
+            from app.apps.commissions.models import CommissionPeriod
+            if CommissionPeriod.is_locked_for(user.tenant, sale_date):
+                raise serializers.ValidationError({
+                    'sale_date': 'Este periodo ja foi fechado para conferencia ou aprovacao. '
+                                 'Nao e possivel lancar ou editar vendas para este mes. '
+                                 'Entre em contato com seu gestor se precisar de um ajuste.'
+                })
+
         return attrs
 
     def create(self, validated_data):

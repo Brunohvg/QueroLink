@@ -31,6 +31,14 @@ class CommissionPeriod(models.Model):
     def __str__(self):
         return f"Competência {self.month:02d}/{self.year} - {self.tenant.company_name} ({self.status})"
 
+    @classmethod
+    def is_locked_for(cls, tenant, sale_date):
+        return cls.objects.filter(
+            tenant=tenant,
+            month=sale_date.month,
+            year=sale_date.year,
+        ).exclude(status=cls.Status.ABERTA).exists()
+
 
 class SellerCommission(models.Model):
     """Consolidado de comissão de UM vendedor em UMA competência mensal."""

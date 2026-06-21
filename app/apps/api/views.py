@@ -1,4 +1,4 @@
-from rest_framework import viewsets, status, generics
+from rest_framework import viewsets, status, generics, serializers as drf_serializers
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
@@ -25,17 +25,7 @@ from .serializers import (
     CommissionPeriodCreateSerializer,
 )
 from .permissions import IsManagerOrAdmin, IsFinancialOrAdmin, IsSellerOwner
-
-
-def _log_audit(user, action, model_name, object_id, changes=None, request=None):
-    AuditLog.objects.create(
-        user=user,
-        action=action,
-        model_name=model_name,
-        object_id=object_id,
-        changes=changes or {},
-        ip_address=request.META.get('REMOTE_ADDR') if request else None,
-    )
+from app.apps.audit.utils import log_action
 
 
 class SellerViewSet(viewsets.ModelViewSet):
@@ -56,6 +46,8 @@ class SellerViewSet(viewsets.ModelViewSet):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         result = serializer.save()
+        seller = self.get_queryset().get(uuid=result['uuid'])
+        log_action(request, 'seller.created', instance=seller)
         return Response(result, status=status.HTTP_201_CREATED)
 
     @action(detail=True, methods=['post'])
@@ -72,7 +64,7 @@ class SellerViewSet(viewsets.ModelViewSet):
             notify_seller_credentials(seller, password)
         except Exception:
             pass
-        _log_audit(request.user, 'reset_password', 'Seller', str(seller.uuid), request=request)
+        log_action(request, 'seller.password_reset', instance=seller)
         return Response({'password': password, 'username': seller.user.username})
 
 
@@ -92,7 +84,21 @@ class SaleViewSet(viewsets.ModelViewSet):
         return qs
 
     def perform_create(self, serializer):
-        serializer.save()
+        sale = serializer.save()
+        log_action(self.request, 'sale.created', instance=sale)
+
+    def perform_update(self, serializer):
+        sale = serializer.save()
+        log_action(self.request, 'sale.updated', instance=sale)
+
+    def perform_destroy(self, instance):
+        from app.apps.commissions.models import CommissionPeriod
+        if CommissionPeriod.is_locked_for(instance.tenant, instance.sale_date):
+            raise drf_serializers.ValidationError({
+                'detail': 'Este periodo ja foi fechado. Nao e possivel excluir vendas deste mes.'
+            })
+        log_action(self.request, 'sale.deleted', instance=instance)
+        instance.delete()
 
 
 class CommissionPeriodViewSet(viewsets.ModelViewSet):
@@ -135,6 +141,8 @@ class CommissionPeriodViewSet(viewsets.ModelViewSet):
         period.status = CommissionPeriod.Status.EM_CONFERENCIA
         period.save(update_fields=['status', 'updated_at'])
 
+        log_action(request, 'commission_period.closed', instance=period,
+                   changes={'month': period.month, 'year': period.year})
         serializer = self.get_serializer(period)
         return Response(serializer.data)
 
@@ -150,6 +158,9 @@ class CommissionPeriodViewSet(viewsets.ModelViewSet):
         period.status = CommissionPeriod.Status.ENVIADA_FINANCEIRO
         period.sent_to_financial_at = timezone.now()
         period.save(update_fields=['status', 'sent_to_financial_at', 'updated_at'])
+
+        log_action(request, 'commission_period.sent', instance=period,
+                   changes={'month': period.month, 'year': period.year})
         return Response(self.get_serializer(period).data)
 
     @action(detail=True, methods=['post'], permission_classes=[IsAuthenticated, IsFinancialOrAdmin])
@@ -180,8 +191,8 @@ class CommissionPeriodViewSet(viewsets.ModelViewSet):
             period.status = CommissionPeriod.Status.APROVADA
             period.approved_at = timezone.now()
             period.save(update_fields=['status', 'approved_at', 'updated_at'])
-            _log_audit(request.user, 'approve', 'CommissionPeriod', str(period.uuid),
-                       {'month': period.month, 'year': period.year}, request)
+            log_action(request, 'commission_period.approved', instance=period,
+                       changes={'month': period.month, 'year': period.year})
         return Response(self.get_serializer(period).data)
 
     @action(detail=True, methods=['post'], permission_classes=[IsAuthenticated, IsFinancialOrAdmin])
@@ -193,12 +204,17 @@ class CommissionPeriodViewSet(viewsets.ModelViewSet):
                 {'error': f'Nao e possivel rejeitar competencia com status {period.status}. O status deve ser ENVIADA_FINANCEIRO.'},
                 status=status.HTTP_400_BAD_REQUEST,
             )
-        reason = request.data.get('reason', '')
+        reason = request.data.get('reason', '').strip()
+        if not reason:
+            return Response(
+                {'error': 'E necessario informar o motivo da rejeicao para devolver ao gestor.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
         period.status = CommissionPeriod.Status.EM_CONFERENCIA
         period.sent_to_financial_at = None
         period.save(update_fields=['status', 'sent_to_financial_at', 'updated_at'])
-        _log_audit(request.user, 'reject', 'CommissionPeriod', str(period.uuid),
-                   {'month': period.month, 'year': period.year, 'reason': reason}, request)
+        log_action(request, 'commission_period.rejected', instance=period,
+                   changes={'month': period.month, 'year': period.year, 'reason': reason})
         return Response(self.get_serializer(period).data)
 
     @action(detail=True, methods=['post'], permission_classes=[IsAuthenticated, IsFinancialOrAdmin])
@@ -213,6 +229,9 @@ class CommissionPeriodViewSet(viewsets.ModelViewSet):
         period.status = CommissionPeriod.Status.PAGA
         period.paid_at = timezone.now()
         period.save(update_fields=['status', 'paid_at', 'updated_at'])
+
+        log_action(request, 'commission_period.paid', instance=period,
+                   changes={'month': period.month, 'year': period.year})
 
         from app.apps.notifications.tasks import notify_commission_paid
         for sc in period.seller_commissions.select_related('seller').all():
