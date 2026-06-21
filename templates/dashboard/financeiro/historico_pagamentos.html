@@ -48,6 +48,16 @@
 </div>
 
 <script>
+function getCSRFToken() {
+    var name = 'csrftoken';
+    var cookies = document.cookie.split(';');
+    for (var i = 0; i < cookies.length; i++) {
+        var c = cookies[i].trim();
+        if (c.indexOf(name + '=') === 0) return c.substring(name.length + 1);
+    }
+    return '';
+}
+
 function historicoPage() {
     return {
         periods: [],
@@ -58,7 +68,7 @@ function historicoPage() {
         },
         async markPaid(p) {
             if (!confirm('Marcar como pago? Notificacoes serao enviadas.')) return;
-            var r = await fetch(`/api/commissions/periods/${p.uuid}/mark_paid/`, { method:'POST' });
+            var r = await fetch(`/api/commissions/periods/${p.uuid}/mark_paid/`, { method:'POST', headers:{'X-CSRFToken': getCSRFToken()} });
             if (r.ok) this.load(); else { var d = await r.json(); alert(d.error||'Erro'); }
         },
         fmtMoney(c) { var r = Math.floor(c/100); return r.toLocaleString('pt-BR')+','+String(c%100).padStart(2,'0'); }

@@ -47,23 +47,33 @@
 </div>
 
 <script>
+function getCSRFToken() {
+    var name = 'csrftoken';
+    var cookies = document.cookie.split(';');
+    for (var i = 0; i < cookies.length; i++) {
+        var c = cookies[i].trim();
+        if (c.indexOf(name + '=') === 0) return c.substring(name.length + 1);
+    }
+    return '';
+}
+
 function fechamentoPage() {
     return {
         periods: [],
         async load() { var r = await fetch('/api/commissions/periods/'); this.periods = await r.json(); },
         async createPeriod() {
             var now = new Date(); var m = now.getMonth()+1;
-            var r = await fetch('/api/commissions/periods/', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({month:m, year:now.getFullYear()}) });
+            var r = await fetch('/api/commissions/periods/', { method:'POST', headers:{'Content-Type':'application/json', 'X-CSRFToken': getCSRFToken()}, body:JSON.stringify({month:m, year:now.getFullYear()}) });
             if (r.ok) this.load(); else alert('Erro ao criar periodo');
         },
         async closePeriod(p) {
             if (!confirm('Fechar a competencia?')) return;
-            var r = await fetch(`/api/commissions/periods/${p.uuid}/close/`, { method:'POST' });
+            var r = await fetch(`/api/commissions/periods/${p.uuid}/close/`, { method:'POST', headers:{'X-CSRFToken': getCSRFToken()} });
             if (r.ok) this.load(); else { var d = await r.json(); alert(d.error||'Erro'); }
         },
         async sendPeriod(p) {
             if (!confirm('Enviar para o financeiro?')) return;
-            var r = await fetch(`/api/commissions/periods/${p.uuid}/send/`, { method:'POST' });
+            var r = await fetch(`/api/commissions/periods/${p.uuid}/send/`, { method:'POST', headers:{'X-CSRFToken': getCSRFToken()} });
             if (r.ok) this.load(); else { var d = await r.json(); alert(d.error||'Erro'); }
         },
         fmtMoney(c) { var r = Math.floor(c/100); return r.toLocaleString('pt-BR')+','+String(c%100).padStart(2,'0'); }

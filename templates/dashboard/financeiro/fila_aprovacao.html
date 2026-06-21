@@ -54,18 +54,28 @@
 </div>
 
 <script>
+function getCSRFToken() {
+    var name = 'csrftoken';
+    var cookies = document.cookie.split(';');
+    for (var i = 0; i < cookies.length; i++) {
+        var c = cookies[i].trim();
+        if (c.indexOf(name + '=') === 0) return c.substring(name.length + 1);
+    }
+    return '';
+}
+
 function filaPage() {
     return {
         periods: [], expanded: null, showReject: false, rejectPeriod: null, rejectReason: '',
         async load() { var r = await fetch('/api/manager/commissions/ENVIADA_FINANCEIRO/'); this.periods = await r.json(); },
         async approve(p) {
             if (!confirm('Aprovar esta competencia?')) return;
-            var r = await fetch(`/api/commissions/periods/${p.uuid}/approve/`, { method:'POST' });
+            var r = await fetch(`/api/commissions/periods/${p.uuid}/approve/`, { method:'POST', headers:{'X-CSRFToken': getCSRFToken()} });
             if (r.ok) this.load(); else { var d = await r.json(); alert(d.error||'Erro'); }
         },
         openRejectModal(p) { this.rejectPeriod = p; this.rejectReason = ''; this.showReject = true; },
         async doReject() {
-            var r = await fetch(`/api/commissions/periods/${this.rejectPeriod.uuid}/reject/`, { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({reason:this.rejectReason}) });
+            var r = await fetch(`/api/commissions/periods/${this.rejectPeriod.uuid}/reject/`, { method:'POST', headers:{'Content-Type':'application/json', 'X-CSRFToken': getCSRFToken()}, body:JSON.stringify({reason:this.rejectReason}) });
             if (r.ok) { this.showReject = false; this.load(); } else { var d = await r.json(); alert(d.error||'Erro'); }
         },
         fmtMoney(c) { var r = Math.floor(c/100); return r.toLocaleString('pt-BR')+','+String(c%100).padStart(2,'0'); }

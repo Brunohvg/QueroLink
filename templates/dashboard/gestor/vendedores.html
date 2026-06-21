@@ -74,6 +74,16 @@
 </div>
 
 <script>
+function getCSRFToken() {
+    var name = 'csrftoken';
+    var cookies = document.cookie.split(';');
+    for (var i = 0; i < cookies.length; i++) {
+        var c = cookies[i].trim();
+        if (c.indexOf(name + '=') === 0) return c.substring(name.length + 1);
+    }
+    return '';
+}
+
 function vendedoresPage() {
     return {
         sellers: [], showModal: false, editing: false, showPasswordModal: false, passwordResult: {}, passwordAction: '',
@@ -82,18 +92,18 @@ function vendedoresPage() {
         openCreateModal() { this.editing = false; this.form = { name: '', phone: '', commission_rate: '1.00' }; this.showModal = true; },
         openEditModal(s) { this.editing = true; this.form = { uuid: s.uuid, name: s.name, phone: s.phone, commission_rate: String(parseFloat(s.commission_rate)*100) }; this.showModal = true; },
         async createSeller() {
-            var r = await fetch('/api/sellers/', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({name:this.form.name, phone:this.form.phone}) });
+            var r = await fetch('/api/sellers/', { method:'POST', headers:{'Content-Type':'application/json', 'X-CSRFToken': getCSRFToken()}, body: JSON.stringify({name:this.form.name, phone:this.form.phone}) });
             var d = await r.json();
             if (r.ok) { this.showModal = false; this.passwordResult = d; this.passwordAction = 'create'; this.showPasswordModal = true; this.loadSellers(); }
             else alert(Object.values(d).flat().join('\\n'));
         },
         async updateSeller() {
             var b = { name:this.form.name, phone:this.form.phone, commission_rate: String(parseFloat(this.form.commission_rate)/100) };
-            var r = await fetch(`/api/sellers/${this.form.uuid}/`, { method:'PATCH', headers:{'Content-Type':'application/json'}, body: JSON.stringify(b) });
+            var r = await fetch(`/api/sellers/${this.form.uuid}/`, { method:'PATCH', headers:{'Content-Type':'application/json', 'X-CSRFToken': getCSRFToken()}, body: JSON.stringify(b) });
             if (r.ok) { this.showModal = false; this.loadSellers(); } else { var d = await r.json(); alert(Object.values(d).flat().join('\\n')); }
         },
-        async toggleActive(s) { await fetch(`/api/sellers/${s.uuid}/`, { method:'PATCH', headers:{'Content-Type':'application/json'}, body:JSON.stringify({is_active:!s.is_active}) }); this.loadSellers(); },
-        async resetPassword(s) { var r = await fetch(`/api/sellers/${s.uuid}/reset_password/`, { method:'POST' }); var d = await r.json(); if (r.ok) { this.passwordResult = d; this.passwordAction = 'reset'; this.showPasswordModal = true; } },
+        async toggleActive(s) { await fetch(`/api/sellers/${s.uuid}/`, { method:'PATCH', headers:{'Content-Type':'application/json', 'X-CSRFToken': getCSRFToken()}, body:JSON.stringify({is_active:!s.is_active}) }); this.loadSellers(); },
+        async resetPassword(s) { var r = await fetch(`/api/sellers/${s.uuid}/reset_password/`, { method:'POST', headers:{'X-CSRFToken': getCSRFToken()} }); var d = await r.json(); if (r.ok) { this.passwordResult = d; this.passwordAction = 'reset'; this.showPasswordModal = true; } },
     }
 }
 </script>

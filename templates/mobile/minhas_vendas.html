@@ -61,6 +61,16 @@
 </div>
 
 <script>
+function getCSRFToken() {
+    var name = 'csrftoken';
+    var cookies = document.cookie.split(';');
+    for (var i = 0; i < cookies.length; i++) {
+        var c = cookies[i].trim();
+        if (c.indexOf(name + '=') === 0) return c.substring(name.length + 1);
+    }
+    return '';
+}
+
 function minhasVendas() {
     return {
         canDelete(d) { return d === new Date().toISOString().split('T')[0]; },
@@ -68,7 +78,7 @@ function minhasVendas() {
             if (!this.canDelete(d)) return;
             if (!confirm('Excluir esta venda?')) return;
             try {
-                var r = await fetch('/api/sales/' + u + '/', { method: 'DELETE', headers: { 'Content-Type': 'application/json' } });
+                var r = await fetch('/api/sales/' + u + '/', { method: 'DELETE', headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCSRFToken() } });
                 if (r.ok || r.status === 204) location.reload();
                 else { var j = await r.json(); alert(j.detail || 'Erro ao excluir.'); }
             } catch (e) { alert('Erro de conexao.'); }
