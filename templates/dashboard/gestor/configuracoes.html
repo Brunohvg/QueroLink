@@ -1,0 +1,79 @@
+{% extends 'dashboard/base_desktop.html' %}
+{% block title %}Configuracoes — QueroLink{% endblock %}
+{% block content %}
+
+{% if messages %}
+    {% for message in messages %}
+    <div class="mb-4 px-4 py-3 rounded-xl text-sm {% if message.tags == 'error' %}bg-danger-50 border border-danger-500/20 text-danger-700{% else %}bg-success-50 border border-success-500/20 text-success-700{% endif %}">
+        {{ message }}
+    </div>
+    {% endfor %}
+{% endif %}
+
+<h1 class="font-display text-[18px] font-semibold text-gray-900 mb-6">Configuracoes da Loja</h1>
+
+<form method="post" action="{% url 'dashboard:gestor_configuracoes' %}" class="space-y-6">
+    {% csrf_token %}
+
+    <div class="surface-card">
+        <div class="flex items-center justify-between mb-4">
+            <h2 class="text-[15px] font-semibold text-gray-900">Pagar.me</h2>
+            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium {% if tenant.pagarme_configured %}bg-success-50 text-success-700{% else %}bg-gray-100 text-gray-600{% endif %}">
+                {% if tenant.pagarme_configured %}Configurado{% else %}Pendente{% endif %}
+            </span>
+        </div>
+        <div>
+            <label for="pagarme_api_key" class="block text-[13px] text-gray-500 mb-1">Chave de API</label>
+            <input type="password" id="pagarme_api_key" name="pagarme_api_key"
+                   class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent"
+                   placeholder="sk_test_xxxxxxxxxx"
+                   value="{% if tenant.pagarme_api_key %}••••••••{% endif %}"
+                   autocomplete="off">
+            <p class="text-xs text-gray-400 mt-1">A chave nao sera exibida apos salva. Deixe em branco para manter a atual.</p>
+        </div>
+    </div>
+
+    <div class="surface-card">
+        <div class="flex items-center justify-between mb-4">
+            <h2 class="text-[15px] font-semibold text-gray-900">WhatsApp</h2>
+            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium {% if tenant.whatsapp_configured %}bg-success-50 text-success-700{% else %}bg-gray-100 text-gray-600{% endif %}">
+                {% if tenant.whatsapp_configured %}Configurado{% else %}Pendente{% endif %}
+            </span>
+        </div>
+        <div class="space-y-4">
+            <div>
+                <label for="whatsapp_instance_id" class="block text-[13px] text-gray-500 mb-1">Instancia</label>
+                <input type="text" id="whatsapp_instance_id" name="whatsapp_instance_id"
+                       class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent"
+                       placeholder="Nome da instancia"
+                       value="{{ tenant.whatsapp_instance_id|default:'' }}">
+            </div>
+            <div>
+                <label for="whatsapp_token" class="block text-[13px] text-gray-500 mb-1">Token da API</label>
+                <input type="password" id="whatsapp_token" name="whatsapp_token"
+                       class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent"
+                       placeholder="Bearer xxxxxxxxxx"
+                       value="{% if tenant.whatsapp_token %}••••••••{% endif %}"
+                       autocomplete="off">
+                <p class="text-xs text-gray-400 mt-1">O token nao sera exibido apos salvo. Deixe em branco para manter o atual.</p>
+            </div>
+        </div>
+    </div>
+
+    <div class="surface-card">
+        <div>
+            <h2 class="text-[15px] font-semibold text-gray-900 mb-4">Taxa de Comissao Padrao</h2>
+            <label for="default_commission_rate" class="block text-[13px] text-gray-500 mb-1">Percentual (%)</label>
+            <input type="text" id="default_commission_rate" name="default_commission_rate"
+                   class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent"
+                   placeholder="Ex: 1,00"
+                   value="{{ tenant.default_commission_rate|floatformat:2 }}">
+            <p class="text-xs text-gray-400 mt-1">Aplicado automaticamente a novos vendedores. Ex: 1,00 = 1%</p>
+        </div>
+    </div>
+
+    <button type="submit" class="bg-brand-500 hover:bg-brand-600 text-white font-medium py-3 px-6 rounded-xl transition text-[15px]">
+        Salvar Configuracoes
+    </button>
+</form>
+{% endblock %}

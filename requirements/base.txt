@@ -14,3 +14,4 @@ djangorestframework-simplejwt==5.4.0
 drf-spectacular==0.28.0
 django-ratelimit==4.1.0
 django-cors-headers==4.4.0
+cryptography==49.0.0

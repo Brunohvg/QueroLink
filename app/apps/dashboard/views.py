@@ -23,7 +23,15 @@ def login_view(request):
         user = authenticate(request, username=email, password=password)
         if user is not None:
             auth_login(request, user)
-            return redirect(request.POST.get('next', 'dashboard:home'))
+            next_url = request.POST.get('next', '')
+            if not next_url or next_url == 'dashboard:home':
+                if user.role in (User.Role.MANAGER, User.Role.ADMIN):
+                    next_url = 'dashboard:gestor_home'
+                elif user.role == User.Role.FINANCEIRO:
+                    next_url = 'dashboard:financeiro_fila'
+                else:
+                    next_url = 'dashboard:mobile_home'
+            return redirect(next_url)
         else:
             messages.error(request, 'Email ou senha inválidos.')
             

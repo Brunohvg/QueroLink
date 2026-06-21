@@ -29,6 +29,7 @@ API_KEY_PAGAR_ME = config('API_KEY_PAGAR_ME', default='')
 API_KEY_INSTANCIA = config('API_KEY_INSTANCIA', default='')
 INSTANCE = config('INSTANCE', default='')
 SERVICE_FQDN_WEB = config('SERVICE_FQDN_WEB', default='localhost')
+FERNET_KEY = config('FERNET_KEY', default='')
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = config('DEBUG', default=False, cast=bool)

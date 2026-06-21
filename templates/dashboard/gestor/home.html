@@ -1,0 +1,76 @@
+{% extends 'dashboard/base_desktop.html' %}
+{% block title %}Painel do Gestor — QueroLink{% endblock %}
+{% block content %}
+{% with valor_text=total_mes|stringformat:"d" %}
+
+{% if not config_ok %}
+<div class="surface-card mb-6 border-l-4 border-l-warning-500">
+    <p class="text-[14px] font-medium text-gray-900">Configure sua loja para comecar</p>
+    <p class="text-[13px] text-gray-500 mt-1">Conecte o Pagar.me e o WhatsApp antes de gerar links de pagamento.</p>
+    <a href="{% url 'dashboard:gestor_configuracoes' %}" class="inline-block mt-3 bg-brand-500 hover:bg-brand-600 text-white font-medium px-5 py-2.5 rounded-xl transition text-[14px]">
+        Configurar agora
+    </a>
+</div>
+{% endif %}
+
+<div class="surface-hero mb-6">
+    <p class="text-[13px] font-semibold text-gray-500 uppercase tracking-wide mb-2">Total vendido no mes</p>
+    <p class="font-display text-[40px] font-semibold text-brand-500 leading-none">
+        R$ {{ valor_text|slice:":-2" }},{{ valor_text|slice:"-2:" }}
+    </p>
+</div>
+
+<div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+    <div class="surface-card">
+        <p class="text-[13px] font-semibold text-gray-500 uppercase tracking-wide mb-1">Competencia</p>
+        <p class="text-[18px] font-semibold text-gray-900">
+            {% if competencia %}
+            {{ competencia.month|stringformat:"02d" }}/{{ competencia.year }}
+            {% else %}
+            —
+            {% endif %}
+        </p>
+        <div class="mt-1">
+            {% if competencia %}
+            {% include 'components/_status_badge.html' with status=competencia.status %}
+            {% else %}
+            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-600">Sem periodo</span>
+            {% endif %}
+        </div>
+    </div>
+    <div class="surface-card">
+        <p class="text-[13px] font-semibold text-gray-500 uppercase tracking-wide mb-1">Vendedores ativos</p>
+        <p class="text-[28px] font-semibold text-gray-900">{{ vendedores_ativos }}</p>
+    </div>
+    <div class="surface-card">
+        <p class="text-[13px] font-semibold text-gray-500 uppercase tracking-wide mb-1">Integracoes</p>
+        <p class="text-[14px] font-medium {% if config_ok %}text-success-700{% else %}text-gray-500{% endif %}">
+            {% if config_ok %}Pagamento e WhatsApp configurados{% else %}Configuracao pendente{% endif %}
+        </p>
+    </div>
+</div>
+
+<h2 class="font-display text-[18px] font-semibold text-gray-900 mb-4">Acesso rapido</h2>
+<div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+    <a href="{% url 'dashboard:gestor_ranking' %}" class="surface-card hover:border-brand-500 transition tap-target block">
+        <div class="flex items-center gap-3">
+            <svg class="w-6 h-6 text-brand-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path></svg>
+            <span class="font-medium text-[15px] text-gray-900">Ranking</span>
+        </div>
+    </a>
+    <a href="{% url 'dashboard:gestor_vendedores' %}" class="surface-card hover:border-brand-500 transition tap-target block">
+        <div class="flex items-center gap-3">
+            <svg class="w-6 h-6 text-brand-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"></path></svg>
+            <span class="font-medium text-[15px] text-gray-900">Vendedores</span>
+        </div>
+    </a>
+    <a href="{% url 'dashboard:gestor_fechamento' %}" class="surface-card hover:border-brand-500 transition tap-target block">
+        <div class="flex items-center gap-3">
+            <svg class="w-6 h-6 text-brand-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
+            <span class="font-medium text-[15px] text-gray-900">Fechamento</span>
+        </div>
+    </a>
+</div>
+
+{% endwith %}
+{% endblock %}

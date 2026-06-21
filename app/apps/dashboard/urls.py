@@ -9,9 +9,11 @@ urlpatterns = [
     path('', views.dashboard_home, name='home'),
     path('sellers/create/', views.seller_create, name='seller_create'),
 
+    path('gestor/', desktop_views.gestor_home, name='gestor_home'),
     path('gestor/ranking/', desktop_views.gestor_ranking, name='gestor_ranking'),
     path('gestor/vendedores/', desktop_views.gestor_vendedores, name='gestor_vendedores'),
     path('gestor/fechamento/', desktop_views.gestor_fechamento, name='gestor_fechamento'),
+    path('gestor/configuracoes/', desktop_views.gestor_configuracoes, name='gestor_configuracoes'),
 
     path('financeiro/fila/', desktop_views.financeiro_fila, name='financeiro_fila'),
     path('financeiro/historico/', desktop_views.financeiro_historico, name='financeiro_historico'),
