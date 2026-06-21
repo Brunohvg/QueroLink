@@ -10,20 +10,22 @@ from app.apps.sellers.models import Seller
 from django.db import transaction
 import uuid
 
-def formatar_valor(valor):
-    """Converte valor em centavos para formato em reais."""
-    return valor / 100
 
-def index(request):
-    """Renderiza a pagina inicial."""
-    sellers = Seller.objects.filter(is_active=True)
-    setup_needed = not sellers.exists() or not Tenant.objects.exists()
+def index(request, tenant_slug):
+    """Renderiza a pagina de link de pagamento para um tenant especifico."""
+    tenant = get_object_or_404(Tenant, slug=tenant_slug, is_active=True)
+    sellers = Seller.objects.filter(tenant=tenant, is_active=True)
+    setup_needed = not sellers.exists()
     return render(request, "orders/index.html", {
         "sellers": sellers,
+        "tenant": tenant,
         "setup_needed": setup_needed,
     })
 
-def create_link(request):
+
+def create_link(request, tenant_slug):
+    tenant = get_object_or_404(Tenant, slug=tenant_slug, is_active=True)
+
     if request.method == "POST":
         link_name = request.POST.get("linkName")
         link_value = request.POST.get("linkValue")
@@ -32,7 +34,7 @@ def create_link(request):
 
         if not all([link_name, link_value, installments, vendedor_uuid]):
             messages.error(request, "Todos os campos são obrigatórios.")
-            return redirect("orders:index")
+            return redirect("orders:index", tenant_slug=tenant_slug)
 
         try:
             valor_formatado = float(link_value.replace("R$", "").replace(",", ".").strip())
@@ -40,21 +42,16 @@ def create_link(request):
 
             session_data = request.session.get("generated_link_data", {})
             if session_data.get("link_name") == link_name and session_data.get("link_value") == link_value and session_data.get("vendedor") == vendedor_uuid:
-                messages.info(request, "O link já foi gerado com os mesmos dados.")
-                return redirect("orders:index")
+                messages.info(request, "O link ja foi gerado com os mesmos dados.")
+                return redirect("orders:index", tenant_slug=tenant_slug)
 
             request.session.pop("generated_link", None)
 
-            # Get default tenant and seller
-            tenant = Tenant.objects.first()
-            if not tenant:
-                tenant = Tenant.objects.create(company_name="Default Tenant")
-            
             try:
-                seller = Seller.objects.get(uuid=vendedor_uuid)
+                seller = Seller.objects.get(uuid=vendedor_uuid, tenant=tenant)
             except Seller.DoesNotExist:
-                messages.error(request, "Vendedor não encontrado.")
-                return redirect("orders:index")
+                messages.error(request, "Vendedor nao encontrado.")
+                return redirect("orders:index", tenant_slug=tenant_slug)
 
             with transaction.atomic():
                 order = Order.objects.create(
@@ -65,7 +62,6 @@ def create_link(request):
                     status=Order.Status.PENDING
                 )
 
-                # Gateway call
                 success_url = f"https://{settings.SERVICE_FQDN_WEB}/pago/{order.uuid}/"
                 gateway = PagarMeGateway(api_key=tenant.pagarme_api_key)
                 response = gateway.create_payment_link(
@@ -81,17 +77,8 @@ def create_link(request):
                 gateway_id = response.get("id", "")
 
                 if not link_url:
-                    # Em caso de falha, se quisermos reverter o Order,
-                    # o transaction.atomic já garante se houver exceção, 
-                    # mas como a exception não foi lançada aqui, forçamos um erro:
                     raise Exception("Falha ao gerar o link de pagamento no Pagar.me.")
 
-            # Em vez de enviar o WhatsApp aqui de forma síncrona,
-            # nós vamos registrar no banco e o Celery poderia cuidar disso.
-            # (No app notifications)
-
-                # O order já foi criado no início do bloco atomic.
-                # Só precisamos criar o payment e payment_link.
                 payment = Payment.objects.create(
                     order=order,
                     gateway_name='pagarme',
@@ -113,15 +100,12 @@ def create_link(request):
                 "vendedor": vendedor_uuid
             }
             messages.success(request, "Link gerado com sucesso!")
-            
-            # Aqui podemos despachar a task do Celery para enviar o WhatsApp:
-            # send_whatsapp_message_task.delay(order.uuid)
-            
-            return redirect("orders:index")
+
+            return redirect("orders:index", tenant_slug=tenant_slug)
 
         except Exception as e:
             messages.error(request, f"Ocorreu um erro: {str(e)}")
-            return redirect("orders:index")
+            return redirect("orders:index", tenant_slug=tenant_slug)
 
     return HttpResponse("Erro: Metodo nao suportado.")
 

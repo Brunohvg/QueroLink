@@ -1,6 +1,7 @@
 import uuid
 from django.db import models
 from django.contrib.auth.models import AbstractUser
+from django.utils.text import slugify
 from .fields import EncryptedCharField
 
 
@@ -14,6 +15,7 @@ class Tenant(models.Model):
     uuid = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     company_name = models.CharField(max_length=255)
     cnpj = models.CharField(max_length=14, unique=True, blank=True, null=True)
+    slug = models.SlugField(max_length=100, unique=True, blank=True)
     pagarme_api_key = EncryptedCharField(max_length=255, blank=True, null=True)
     whatsapp_instance_id = models.CharField(max_length=100, blank=True, null=True)
     whatsapp_token = EncryptedCharField(max_length=255, blank=True, null=True)
@@ -24,6 +26,17 @@ class Tenant(models.Model):
     billing_cycle = models.CharField(max_length=10, choices=[('MONTHLY', 'Mensal'), ('YEARLY', 'Anual')], default='MONTHLY')
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+
+    def save(self, *args, **kwargs):
+        if not self.slug:
+            base_slug = slugify(self.company_name)
+            slug = base_slug
+            counter = 1
+            while Tenant.objects.filter(slug=slug).exclude(pk=self.pk).exists():
+                counter += 1
+                slug = f"{base_slug}-{counter}"
+            self.slug = slug
+        super().save(*args, **kwargs)
 
     def __str__(self):
         return self.company_name

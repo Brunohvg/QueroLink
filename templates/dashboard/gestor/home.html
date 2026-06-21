@@ -13,6 +13,19 @@
 </div>
 {% endif %}
 
+{% if public_url %}
+<div class="surface-card mb-6">
+    <p class="text-[13px] font-semibold text-gray-500 uppercase tracking-wide mb-2">Link publico da sua loja</p>
+    <div class="flex items-center gap-2">
+        <code class="text-[14px] text-brand-500 bg-brand-50 px-3 py-1.5 rounded-lg font-mono break-all">{{ public_url }}</code>
+        <button onclick="navigator.clipboard.writeText('{{ public_url }}')" class="flex-shrink-0 p-2 text-gray-400 hover:text-brand-500 rounded-lg hover:bg-gray-50 tap-target" title="Copiar link">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg>
+        </button>
+    </div>
+    <p class="text-[12px] text-gray-400 mt-2">Compartilhe este link com seus clientes para gerar pagamentos.</p>
+</div>
+{% endif %}
+
 <div class="surface-hero mb-6">
     <p class="text-[13px] font-semibold text-gray-500 uppercase tracking-wide mb-2">Total vendido no mes</p>
     <p class="font-display text-[40px] font-semibold text-brand-500 leading-none" x-text="summary ? formatMoneyBRL(summary.total_vendido) : 'R$ {{ total_mes_fmt }}'"></p>

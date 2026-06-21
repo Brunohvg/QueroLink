@@ -398,7 +398,7 @@
             <h5>Link de Pagamento</h5>
           </div>
           <div class="card-body">
-            <form action="{% url 'orders:create_link' %}" method="post" id="create-link-form">
+            <form action="{% url 'orders:create_link' tenant_slug=tenant.slug %}" method="post" id="create-link-form">
               {% csrf_token %}
               <div class="form-group">
                 <label for="linkName" class="form-label">Nome do Cliente</label>

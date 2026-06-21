@@ -2,6 +2,7 @@ from django.shortcuts import render, redirect
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.utils import timezone
+from django.conf import settings
 from django.db.models import Sum
 from app.apps.accounts.models import User, Tenant
 from app.apps.sales.models import Sale
@@ -52,6 +53,8 @@ def gestor_home(request):
     total_orders = Order.objects.filter(tenant=tenant).count()
     paid_orders_count = Order.objects.filter(tenant=tenant, status='COMPLETED').count()
 
+    public_url = f"https://{settings.SERVICE_FQDN_WEB}/loja/{tenant.slug}/"
+
     return render(request, 'dashboard/gestor/home.html', {
         'total_mes': total_mes,
         'total_mes_fmt': total_mes_fmt,
@@ -60,6 +63,7 @@ def gestor_home(request):
         'config_ok': config_ok,
         'total_orders': total_orders,
         'paid_orders_count': paid_orders_count,
+        'public_url': public_url,
     })
 
 
