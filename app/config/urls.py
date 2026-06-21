@@ -5,6 +5,7 @@ from django.urls import path, include
 from django.http import JsonResponse
 from django.db import connections
 from django.db.utils import OperationalError
+from django.views.generic import RedirectView
 
 def health_check(request):
     db_ok = True
@@ -21,6 +22,7 @@ def health_check(request):
     return JsonResponse(payload, status=status_code)
 
 urlpatterns = [
+    path('', RedirectView.as_view(url='/dashboard/login/', permanent=False), name='root'),
     path('health/', health_check),
     path('admin/', admin.site.urls),
     path('dashboard/', include('app.apps.dashboard.urls')),
