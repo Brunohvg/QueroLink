@@ -31,6 +31,10 @@ class Migration(migrations.Migration):
             name='slug',
             field=models.SlugField(blank=True, max_length=100),
         ),
+        migrations.RunSQL(
+            sql='DROP INDEX IF EXISTS accounts_tenant_slug_b48b18a8_like;',
+            reverse_sql=migrations.RunSQL.noop,
+        ),
         migrations.RunPython(populate_slugs, reverse_code=noop),
         migrations.AlterField(
             model_name='tenant',
