@@ -76,6 +76,22 @@ class TenantRegistrationForm(forms.Form):
             'placeholder': '••••••••',
         }),
     )
+    plan = forms.ChoiceField(
+        label='Plano',
+        choices=Tenant.Plan.choices,
+        initial=Tenant.Plan.ESSENCIAL,
+        widget=forms.Select(attrs={
+            'class': 'form-control',
+        }),
+    )
+    billing_cycle = forms.ChoiceField(
+        label='Ciclo',
+        choices=[('MONTHLY', 'Mensal'), ('YEARLY', 'Anual')],
+        initial='MONTHLY',
+        widget=forms.Select(attrs={
+            'class': 'form-control',
+        }),
+    )
 
     website = forms.CharField(
         required=False,

@@ -5,6 +5,12 @@ from .fields import EncryptedCharField
 
 
 class Tenant(models.Model):
+    class Plan(models.TextChoices):
+        ESSENCIAL = 'ESSENCIAL', 'Essencial (ate 5 vendedores)'
+        PROFISSIONAL = 'PROFISSIONAL', 'Profissional (ate 15 vendedores)'
+        PLUS = 'PLUS', 'Plus (ate 30 vendedores)'
+        ENTERPRISE = 'ENTERPRISE', 'Enterprise (ilimitado)'
+
     uuid = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     company_name = models.CharField(max_length=255)
     cnpj = models.CharField(max_length=14, unique=True, blank=True, null=True)
@@ -13,6 +19,9 @@ class Tenant(models.Model):
     whatsapp_token = EncryptedCharField(max_length=255, blank=True, null=True)
     default_commission_rate = models.DecimalField(max_digits=5, decimal_places=4, default=0.01)
     is_active = models.BooleanField(default=True)
+    plan = models.CharField(max_length=20, choices=Plan.choices, default=Plan.ESSENCIAL)
+    trial_ends_at = models.DateTimeField(null=True, blank=True)
+    billing_cycle = models.CharField(max_length=10, choices=[('MONTHLY', 'Mensal'), ('YEARLY', 'Anual')], default='MONTHLY')
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

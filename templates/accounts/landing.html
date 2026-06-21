@@ -1,0 +1,231 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>QueroLink — Gestao de comissao de vendedores</title>
+    <link href="https://fonts.googleapis.com/css2?family=Lexend:wght@400;500;600;700&family=Public+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        brand: { 50:'#eef2ff',100:'#e0e7ff',400:'#6b7fee',500:'#4361ee',600:'#3051d3',700:'#2540ad',900:'#1e2a6e' },
+                        success: { 50:'#ecfdf5',500:'#31c48d',700:'#1f9d6e' },
+                    },
+                    fontFamily: {
+                        sans: ['"Public Sans"', 'system-ui', 'sans-serif'],
+                        display: ['"Lexend"', 'system-ui', 'sans-serif'],
+                    },
+                }
+            }
+        }
+    </script>
+    <style>
+        body { font-family: 'Public Sans', system-ui, sans-serif; }
+    </style>
+</head>
+<body class="bg-white text-gray-900 antialiased">
+
+<!-- Hero -->
+<section class="py-20 px-4">
+    <div class="max-w-4xl mx-auto text-center">
+        <p class="text-[13px] font-semibold text-brand-500 uppercase tracking-wide mb-4">Para lojistas que tem vendedores comissionados</p>
+        <h1 class="font-display text-[40px] sm:text-[52px] font-semibold text-gray-900 leading-[1.15] tracking-tight mb-6">
+            Pare de calcular comissao<br>de vendedor na planilha
+        </h1>
+        <p class="text-[17px] text-gray-500 max-w-xl mx-auto leading-relaxed mb-10">
+            Seus vendedores veem o proprio ganho no celular. Voce fecha o mes em minutos.
+            Comissao paga, WhatsApp disparado automaticamente.
+        </p>
+        <div class="flex flex-col sm:flex-row gap-3 justify-center">
+            <a href="{% url 'accounts:signup' %}" class="inline-block bg-brand-500 hover:bg-brand-600 text-white font-semibold px-8 py-4 rounded-xl text-[16px] transition shadow-lg">
+                Comece gratis por 14 dias
+            </a>
+            <a href="#precos" class="inline-block bg-gray-100 hover:bg-gray-200 text-gray-700 font-semibold px-8 py-4 rounded-xl text-[16px] transition">
+                Ver planos
+            </a>
+        </div>
+    </div>
+</section>
+
+<!-- O problema -->
+<section class="py-16 px-4 bg-gray-50">
+    <div class="max-w-3xl mx-auto">
+        <h2 class="font-display text-[28px] font-semibold text-gray-900 text-center mb-10">Se isso parece familiar...</h2>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div class="bg-white rounded-xl p-6 border border-gray-100">
+                <p class="text-[13px] font-semibold text-gray-500 uppercase tracking-wide mb-3">Planilhas</p>
+                <p class="text-[14px] text-gray-600 leading-relaxed">Tabela compartilhada no WhatsApp, versao desatualizada, formula que quebrou e ninguem viu.</p>
+            </div>
+            <div class="bg-white rounded-xl p-6 border border-gray-100">
+                <p class="text-[13px] font-semibold text-gray-500 uppercase tracking-wide mb-3">Invisibilidade</p>
+                <p class="text-[14px] text-gray-600 leading-relaxed">Seu vendedor nao sabe quanto ganhou. Pergunta toda semana. Voce perde tempo respondendo.</p>
+            </div>
+            <div class="bg-white rounded-xl p-6 border border-gray-100">
+                <p class="text-[13px] font-semibold text-gray-500 uppercase tracking-wide mb-3">Fechamento</p>
+                <p class="text-[14px] text-gray-600 leading-relaxed">Fim do mes e correria: puxar vendas, calcular taxa, conferir. Auditar? Nem pensar.</p>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Como funciona -->
+<section class="py-16 px-4">
+    <div class="max-w-4xl mx-auto">
+        <h2 class="font-display text-[28px] font-semibold text-gray-900 text-center mb-4">Como funciona</h2>
+        <p class="text-[15px] text-gray-500 text-center mb-12">Quatro passos. Primeiro fechamento em menos de 15 minutos.</p>
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+            <div class="text-center">
+                <p class="font-display text-[40px] font-semibold text-gray-200 mb-3">1</p>
+                <p class="text-[15px] font-semibold text-gray-900 mb-2">Cadastre sua loja</p>
+                <p class="text-[13px] text-gray-500 leading-relaxed">2 minutos. So precisa do CNPJ e do nome da empresa.</p>
+            </div>
+            <div class="text-center">
+                <p class="font-display text-[40px] font-semibold text-gray-200 mb-3">2</p>
+                <p class="text-[15px] font-semibold text-gray-900 mb-2">Adicione vendedores</p>
+                <p class="text-[13px] text-gray-500 leading-relaxed">Cada vendedor ganha login proprio e recebe a senha por WhatsApp automaticamente.</p>
+            </div>
+            <div class="text-center">
+                <p class="font-display text-[40px] font-semibold text-gray-200 mb-3">3</p>
+                <p class="text-[15px] font-semibold text-gray-900 mb-2">Vendedores lancam vendas</p>
+                <p class="text-[13px] text-gray-500 leading-relaxed">Pelo celular, em 10 segundos. Ou geram link de pagamento pro cliente.</p>
+            </div>
+            <div class="text-center">
+                <p class="font-display text-[40px] font-semibold text-gray-200 mb-3">4</p>
+                <p class="text-[15px] font-semibold text-gray-900 mb-2">Fechamento automatico</p>
+                <p class="text-[13px] text-gray-500 leading-relaxed">Fecha o mes, o sistema consolida tudo. Envie pro financeiro com 1 clique.</p>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Beneficios -->
+<section class="py-16 px-4 bg-gray-50">
+    <div class="max-w-4xl mx-auto">
+        <h2 class="font-display text-[28px] font-semibold text-gray-900 text-center mb-10">Por que lojistas escolhem o QueroLink</h2>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div class="bg-white rounded-xl p-6 border border-gray-100">
+                <p class="text-[15px] font-semibold text-gray-900 mb-1">Vendedor ve o proprio ganho em tempo real</p>
+                <p class="text-[14px] text-gray-500">Seu time acessa o app, consulta total vendido, comissao acumulada, historico. Sem te incomodar.</p>
+            </div>
+            <div class="bg-white rounded-xl p-6 border border-gray-100">
+                <p class="text-[15px] font-semibold text-gray-900 mb-1">Voce nunca mais perde tempo com planilha</p>
+                <p class="text-[14px] text-gray-500">O sistema consolida venda por venda, calcula comissao, gera relatorio para contabilidade.</p>
+            </div>
+            <div class="bg-white rounded-xl p-6 border border-gray-100">
+                <p class="text-[15px] font-semibold text-gray-900 mb-1">Financeiro audita em segundos</p>
+                <p class="text-[14px] text-gray-500">Cada competencia tem trilha completa: vendas, taxa, comissao, status. Clicou, aprovou.</p>
+            </div>
+            <div class="bg-white rounded-xl p-6 border border-gray-100">
+                <p class="text-[15px] font-semibold text-gray-900 mb-1">Notificacao automatica via WhatsApp</p>
+                <p class="text-[14px] text-gray-500">Comissao paga? Vendedor recebe WhatsApp na hora. Nao precisa avisar manualmente.</p>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Precos -->
+<section id="precos" class="py-16 px-4" x-data="{ anual: false }">
+    <div class="max-w-5xl mx-auto">
+        <h2 class="font-display text-[28px] font-semibold text-gray-900 text-center mb-2">Planos</h2>
+        <p class="text-[15px] text-gray-500 text-center mb-4">14 dias gratis em qualquer plano.</p>
+        <div class="flex items-center justify-center gap-3 mb-10">
+            <span class="text-[14px] font-medium" :class="!anual ? 'text-gray-900' : 'text-gray-400'">Mensal</span>
+            <button @click="anual = !anual" class="relative w-12 h-6 rounded-full transition" :class="anual ? 'bg-brand-500' : 'bg-gray-300'">
+                <span class="absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition" :class="anual ? 'translate-x-6' : ''"></span>
+            </button>
+            <span class="text-[14px] font-medium" :class="anual ? 'text-gray-900' : 'text-gray-400'">Anual <span class="text-success-700 text-[12px]">(-17%)</span></span>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <!-- Essencial -->
+            <div class="bg-white rounded-2xl border border-gray-200 p-6 flex flex-col">
+                <p class="text-[13px] font-semibold text-gray-500 uppercase tracking-wide mb-2">Essencial</p>
+                <p class="font-display text-[32px] font-semibold text-gray-900 mb-1">
+                    <span x-text="anual ? 'R$ 65' : 'R$ 79'"></span>
+                </p>
+                <p class="text-[13px] text-gray-500 mb-4" x-text="anual ? '/mes (R$ 790/ano)' : '/mes'"></p>
+                <ul class="space-y-2 mb-6 flex-1">
+                    <li class="text-[13px] text-gray-600 flex items-center gap-2"><span class="text-success-500 font-bold">✓</span> Ate 5 vendedores</li>
+                    <li class="text-[13px] text-gray-600 flex items-center gap-2"><span class="text-success-500 font-bold">✓</span> Fechamento automatico</li>
+                    <li class="text-[13px] text-gray-600 flex items-center gap-2"><span class="text-success-500 font-bold">✓</span> App mobile vendedor</li>
+                    <li class="text-[13px] text-gray-600 flex items-center gap-2"><span class="text-success-500 font-bold">✓</span> Dashboard do gestor</li>
+                </ul>
+                <a href="{% url 'accounts:signup' %}?plano=essencial&ciclo=monthly" class="block text-center bg-brand-500 hover:bg-brand-600 text-white font-semibold py-3 rounded-xl text-[14px] transition">Comecar gratis</a>
+            </div>
+
+            <!-- Profissional -->
+            <div class="bg-white rounded-2xl border-2 border-brand-500 p-6 flex flex-col relative">
+                <span class="absolute -top-3 left-1/2 -translate-x-1/2 bg-brand-500 text-white text-[11px] font-semibold px-4 py-1 rounded-full">Mais popular</span>
+                <p class="text-[13px] font-semibold text-gray-500 uppercase tracking-wide mb-2">Profissional</p>
+                <p class="font-display text-[32px] font-semibold text-gray-900 mb-1">
+                    <span x-text="anual ? 'R$ 124' : 'R$ 149'"></span>
+                </p>
+                <p class="text-[13px] text-gray-500 mb-4" x-text="anual ? '/mes (R$ 1.490/ano)' : '/mes'"></p>
+                <ul class="space-y-2 mb-6 flex-1">
+                    <li class="text-[13px] text-gray-600 flex items-center gap-2"><span class="text-success-500 font-bold">✓</span> Ate 15 vendedores</li>
+                    <li class="text-[13px] text-gray-600 flex items-center gap-2"><span class="text-success-500 font-bold">✓</span> Tudo do Essencial</li>
+                    <li class="text-[13px] text-gray-600 flex items-center gap-2"><span class="text-success-500 font-bold">✓</span> Links de pagamento</li>
+                    <li class="text-[13px] text-gray-600 flex items-center gap-2"><span class="text-success-500 font-bold">✓</span> Exportacao CSV/Excel/PDF</li>
+                </ul>
+                <a href="{% url 'accounts:signup' %}?plano=profissional&ciclo=monthly" class="block text-center bg-brand-500 hover:bg-brand-600 text-white font-semibold py-3 rounded-xl text-[14px] transition">Comecar gratis</a>
+            </div>
+
+            <!-- Plus -->
+            <div class="bg-white rounded-2xl border border-gray-200 p-6 flex flex-col">
+                <p class="text-[13px] font-semibold text-gray-500 uppercase tracking-wide mb-2">Plus</p>
+                <p class="font-display text-[32px] font-semibold text-gray-900 mb-1">
+                    <span x-text="anual ? 'R$ 207' : 'R$ 249'"></span>
+                </p>
+                <p class="text-[13px] text-gray-500 mb-4" x-text="anual ? '/mes (R$ 2.490/ano)' : '/mes'"></p>
+                <ul class="space-y-2 mb-6 flex-1">
+                    <li class="text-[13px] text-gray-600 flex items-center gap-2"><span class="text-success-500 font-bold">✓</span> Ate 30 vendedores</li>
+                    <li class="text-[13px] text-gray-600 flex items-center gap-2"><span class="text-success-500 font-bold">✓</span> Tudo do Profissional</li>
+                    <li class="text-[13px] text-gray-600 flex items-center gap-2"><span class="text-success-500 font-bold">✓</span> Notificacao WhatsApp</li>
+                    <li class="text-[13px] text-gray-600 flex items-center gap-2"><span class="text-success-500 font-bold">✓</span> Relatorio da contabilidade</li>
+                </ul>
+                <a href="{% url 'accounts:signup' %}?plano=plus&ciclo=monthly" class="block text-center bg-brand-500 hover:bg-brand-600 text-white font-semibold py-3 rounded-xl text-[14px] transition">Comecar gratis</a>
+            </div>
+
+            <!-- Enterprise -->
+            <div class="bg-white rounded-2xl border border-gray-200 p-6 flex flex-col">
+                <p class="text-[13px] font-semibold text-gray-500 uppercase tracking-wide mb-2">Enterprise</p>
+                <p class="font-display text-[32px] font-semibold text-gray-900 mb-1">Sob consulta</p>
+                <p class="text-[13px] text-gray-500 mb-4">&nbsp;</p>
+                <ul class="space-y-2 mb-6 flex-1">
+                    <li class="text-[13px] text-gray-600 flex items-center gap-2"><span class="text-success-500 font-bold">✓</span> Vendedores ilimitados</li>
+                    <li class="text-[13px] text-gray-600 flex items-center gap-2"><span class="text-success-500 font-bold">✓</span> Tudo do Plus</li>
+                    <li class="text-[13px] text-gray-600 flex items-center gap-2"><span class="text-success-500 font-bold">✓</span> Suporte prioritario</li>
+                    <li class="text-[13px] text-gray-600 flex items-center gap-2"><span class="text-success-500 font-bold">✓</span> Onboarding dedicado</li>
+                </ul>
+                <a href="{% url 'accounts:signup' %}?plano=enterprise&ciclo=monthly" class="block text-center bg-gray-100 hover:bg-gray-200 text-gray-700 font-semibold py-3 rounded-xl text-[14px] transition">Falar com vendas</a>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- CTA final -->
+<section class="py-20 px-4 bg-brand-500">
+    <div class="max-w-2xl mx-auto text-center">
+        <h2 class="font-display text-[32px] font-semibold text-white mb-4">Comece seu trial gratuito de 14 dias</h2>
+        <p class="text-[16px] text-brand-100/80 leading-relaxed mb-8">Sem burocracia. Cadastre sua loja, convide seus vendedores e veja o primeiro fechamento acontecer.</p>
+        <a href="{% url 'accounts:signup' %}" class="inline-block bg-white hover:bg-gray-100 text-brand-600 font-semibold px-8 py-4 rounded-xl text-[16px] transition shadow-lg">
+            Criar minha conta gratis
+        </a>
+    </div>
+</section>
+
+<!-- Footer -->
+<footer class="py-8 px-4 bg-gray-50 border-t border-gray-100">
+    <div class="max-w-4xl mx-auto flex items-center justify-between text-[13px] text-gray-400">
+        <span>QueroLink</span>
+        <a href="{% url 'dashboard:login' %}" class="hover:text-gray-600 transition">Acessar painel</a>
+    </div>
+</footer>
+
+<script src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.9/dist/cdn.min.js" defer></script>
+</body>
+</html>
