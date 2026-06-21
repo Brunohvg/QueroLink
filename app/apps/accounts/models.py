@@ -18,6 +18,9 @@ class Tenant(models.Model):
         return self.company_name
 
 class User(AbstractUser):
+    # Role.ADMIN é admin DENTRO do tenant (gerencia vendedores, fechamento, etc. da propria loja).
+    # is_superuser=True é admin do SaaS inteiro (Bruno) — acesso a TODOS os tenants e Django Admin geral.
+    # NUNCA conceder is_superuser=True para usuarios criados via autocadastro publico.
     class Role(models.TextChoices):
         ADMIN = 'ADMIN', 'Admin'
         MANAGER = 'MANAGER', 'Manager'

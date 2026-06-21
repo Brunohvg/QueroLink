@@ -3,11 +3,11 @@
 {% block content %}
 <div x-data="vendedoresPage()" x-init="loadSellers()">
     <div class="flex items-center justify-between mb-6">
-        <h1 class="text-[18px] font-semibold">Vendedores</h1>
+        <h1 class="font-display text-[18px] font-semibold text-gray-900">Vendedores</h1>
         {% include 'components/_button.html' with variant='primary' label='Novo Vendedor' icon_svg='<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>' onclick='openCreateModal()' %}
     </div>
 
-    <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+    <div class="surface-card">
         <table class="w-full text-left text-[14px]">
             <thead>
                 <tr><th class="px-4 py-3 font-semibold text-gray-500 border-b border-gray-200 bg-gray-50">Nome</th><th class="px-4 py-3 font-semibold text-gray-500 border-b border-gray-200 bg-gray-50">Telefone</th><th class="px-4 py-3 font-semibold text-gray-500 border-b border-gray-200 bg-gray-50">Usuário</th><th class="px-4 py-3 font-semibold text-gray-500 border-b border-gray-200 bg-gray-50">Comissão</th><th class="px-4 py-3 font-semibold text-gray-500 border-b border-gray-200 bg-gray-50">Status</th><th class="px-4 py-3 font-semibold text-gray-500 border-b border-gray-200 bg-gray-50 text-right">Ações</th></tr>

@@ -11,7 +11,7 @@
     <link rel="manifest" href="{% static 'manifest.json' %}">
     <link rel="apple-touch-icon" href="{% static 'icons/icon-192.png' %}">
     <title>{% block title %}QueroLink{% endblock %}</title>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Lexend:wght@400;500;600;700&family=Public+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.9/dist/cdn.min.js" defer></script>
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
@@ -24,17 +24,31 @@
                         warning: { 50:'#fffbeb',500:'#d97706',700:'#92400e' },
                         danger: { 50:'#fef2f2',500:'#e53e3e',700:'#b91c1c' },
                     },
-                    fontFamily: { sans: ['Inter', 'sans-serif'] },
+                    fontFamily: {
+                        sans: ['"Public Sans"', 'system-ui', 'sans-serif'],
+                        display: ['"Lexend"', 'system-ui', 'sans-serif'],
+                    },
                 }
             }
         }
     </script>
     <style>
-        body { font-family: 'Inter', sans-serif; }
+        body { font-family: 'Public Sans', system-ui, sans-serif; }
         .safe-bottom { padding-bottom: env(safe-area-inset-bottom, 16px); }
         .nav-shadow { box-shadow: 0 -2px 10px rgba(0,0,0,0.08); }
         .tap-target { min-height: 44px; min-width: 44px; }
         input, select, button { font-size: 16px !important; }
+
+        .surface-hero {
+            background: #fff; border-radius: 16px; padding: 2rem; border: 1px solid #e5e7eb;
+            box-shadow: 0 1px 3px rgba(15, 23, 42, 0.04), 0 8px 24px -4px rgba(67, 97, 238, 0.08);
+        }
+        .surface-card {
+            background: #fff; border-radius: 12px; padding: 1.25rem; border: 1px solid #e5e7eb; box-shadow: none;
+        }
+        .surface-flat {
+            background: transparent; border-bottom: 1px solid #e5e7eb;
+        }
     </style>
 </head>
 <body class="bg-gray-50 text-gray-900 antialiased">

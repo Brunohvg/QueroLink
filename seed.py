@@ -27,8 +27,17 @@ def run_seed():
     else:
         print(f"Tenant ja existia: {tenant.company_name}")
 
-    admin_email = os.environ.get("DJANGO_SUPERUSER_EMAIL", "admin@bibelo.com.br")
-    admin_password = os.environ.get("DJANGO_SUPERUSER_PASSWORD", "admin123")
+    admin_email = os.environ.get("DJANGO_SUPERUSER_EMAIL")
+    admin_password = os.environ.get("DJANGO_SUPERUSER_PASSWORD")
+
+    if not admin_email or not admin_password:
+        print("ERRO: DJANGO_SUPERUSER_EMAIL e DJANGO_SUPERUSER_PASSWORD sao obrigatorias para o seed.")
+        print("Configure essas variaveis no Coolify antes de rodar com SEED_ON_START=true.")
+        raise SystemExit(1)
+
+    if len(admin_password) < 12:
+        print("ERRO: DJANGO_SUPERUSER_PASSWORD precisa ter pelo menos 12 caracteres.")
+        raise SystemExit(1)
 
     if not User.objects.filter(email=admin_email).exists() and not User.objects.filter(username=admin_email).exists():
         admin = User.objects.create_superuser(

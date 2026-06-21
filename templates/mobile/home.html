@@ -1,10 +1,10 @@
 {% extends 'mobile/base_mobile.html' %}
-{% block title %}Início — QueroLink{% endblock %}
+{% block title %}Inicio — QueroLink{% endblock %}
 {% block content %}
 <div class="space-y-4">
     <div class="flex items-center justify-between">
         <div>
-            <h1 class="text-[18px] font-semibold text-gray-900">Olá, {{ seller.name|default:'Vendedor' }}</h1>
+            <h1 class="text-[18px] font-semibold text-gray-900">Ola, {{ seller.name|default:'Vendedor' }}</h1>
             <p class="text-[13px] text-gray-500">{% now "l, d/m/Y" %}</p>
         </div>
         <a href="{% url 'dashboard:mobile_logout' %}"
@@ -17,38 +17,30 @@
     <div class="bg-danger-50 border border-danger-500/20 text-danger-700 px-4 py-3 rounded-xl text-sm">{{ error }}</div>
     {% else %}
 
-    <div class="grid grid-cols-2 gap-3">
-        <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-4">
-            <p class="text-[13px] text-gray-500 mb-1">Vendas hoje</p>
-            <p class="text-[28px] font-semibold text-gray-900">{{ today_count }}</p>
-        </div>
-        {% with value_text=today_total|stringformat:"d" %}
-        <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-4">
-            <p class="text-[13px] text-gray-500 mb-1">Total hoje</p>
-            <p class="text-[28px] font-semibold text-brand-500">R$ {{ value_text|slice:":-2" }},{{ value_text|slice:"-2:" }}</p>
-        </div>
-        {% endwith %}
+    {% with value_text=today_total|stringformat:"d" %}
+    <div class="surface-hero">
+        <p class="text-[13px] font-semibold text-gray-500 uppercase tracking-wide mb-2">Total hoje</p>
+        <p class="font-display text-[40px] font-semibold text-brand-500 leading-none">R$ {{ value_text|slice:":-2" }},{{ value_text|slice:"-2:" }}</p>
+        <p class="text-[14px] text-gray-500 mt-2">{{ today_count }} venda{{ today_count|pluralize:'s' }} hoje</p>
     </div>
+    {% endwith %}
 
-    <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-4">
-        <p class="text-[13px] text-gray-500 mb-1">Vendas no mês</p>
-        <p class="text-[14px] text-gray-900">{{ month_count }} vendas</p>
+    <div class="surface-card">
+        <div class="flex items-center justify-between">
+            <span class="text-[14px] text-gray-500">Vendas no mes</span>
+            <span class="text-[15px] font-semibold text-gray-900">{{ month_count }}</span>
+        </div>
     </div>
 
     <a href="{% url 'dashboard:mobile_lancar_venda' %}"
        class="flex items-center justify-center gap-2 w-full bg-brand-500 hover:bg-brand-600 text-white font-medium py-4 rounded-xl transition shadow-lg tap-target">
         <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
-        <span class="text-[15px]">Lançar Venda</span>
+        <span class="text-[15px]">Lancar Venda</span>
     </a>
 
     <a href="{% url 'dashboard:mobile_minhas_vendas' %}"
-       class="flex items-center justify-between bg-white rounded-xl p-4 shadow-sm border border-gray-100 tap-target">
-        <div class="flex items-center gap-3">
-            <div class="w-10 h-10 bg-brand-50 rounded-xl flex items-center justify-center">
-                <svg class="w-5 h-5 text-brand-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path></svg>
-            </div>
-            <span class="font-medium text-[14px] text-gray-900">Minhas Vendas</span>
-        </div>
+       class="flex items-center justify-between surface-card tap-target">
+        <span class="font-medium text-[14px] text-gray-900">Minhas Vendas</span>
         <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
     </a>
     {% endif %}

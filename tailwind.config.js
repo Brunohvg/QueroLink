@@ -50,7 +50,8 @@ module.exports = {
         },
       },
       fontFamily: {
-        sans: ['Inter', 'system-ui', 'sans-serif'],
+        sans: ['"Public Sans"', 'system-ui', 'sans-serif'],
+        display: ['"Lexend"', 'system-ui', 'sans-serif'],
       },
       borderRadius: {
         xl: '12px',

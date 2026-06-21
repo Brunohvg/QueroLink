@@ -2,10 +2,10 @@
 {% block title %}Histórico de Pagamentos — QueroLink{% endblock %}
 {% block content %}
 <div x-data="historicoPage()" x-init="load()">
-    <h1 class="text-[18px] font-semibold mb-6">Histórico de Pagamentos</h1>
+    <h1 class="font-display text-[18px] font-semibold text-gray-900 mb-6">Historico de Pagamentos</h1>
 
     <template x-for="p in periods" :key="p.uuid">
-        <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 mb-4">
+        <div class="surface-card mb-4">
             <div class="flex items-center justify-between mb-3">
                 <div class="flex items-center gap-3">
                     <h3 class="font-semibold text-[18px]" x-text="String(p.month).padStart(2,'0')+'/'+p.year"></h3>

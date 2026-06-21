@@ -3,12 +3,12 @@
 {% block content %}
 <div x-data="fechamentoPage()" x-init="load()">
     <div class="flex items-center justify-between mb-6">
-        <h1 class="text-[18px] font-semibold">Fechamento de Comissões</h1>
+        <h1 class="font-display text-[18px] font-semibold text-gray-900">Fechamento de Comissoes</h1>
         {% include 'components/_button.html' with variant='primary' label='Novo Período' icon_svg='<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>' onclick='createPeriod()' %}
     </div>
 
     <template x-for="p in periods" :key="p.uuid">
-        <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 mb-4">
+        <div class="surface-card mb-4">
             <div class="flex items-center justify-between mb-4">
                 <div>
                     <h3 class="font-semibold text-[18px]" x-text="String(p.month).padStart(2,'0')+'/'+p.year"></h3>

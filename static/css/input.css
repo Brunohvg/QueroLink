@@ -18,8 +18,15 @@
   .btn-danger {
     @apply bg-danger text-white font-semibold py-3 px-6 rounded-xl hover:bg-red-700 transition shadow-md focus:outline-none focus:ring-2 focus:ring-danger focus:ring-offset-2;
   }
-  .card {
-    @apply bg-white rounded-2xl shadow-sm border border-gray-100 p-6;
+  .surface-hero {
+    @apply bg-white rounded-2xl p-8 border border-gray-100;
+    box-shadow: 0 1px 3px rgba(15, 23, 42, 0.04), 0 8px 24px -4px rgba(67, 97, 238, 0.08);
+  }
+  .surface-card {
+    @apply bg-white rounded-xl p-5 border border-gray-100 shadow-none;
+  }
+  .surface-flat {
+    @apply bg-transparent border-b border-gray-100;
   }
   .input-field {
     @apply w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition;
@@ -45,7 +52,7 @@
     @apply bg-gray-50;
   }
   .metric-card {
-    @apply bg-white rounded-2xl shadow-sm border border-gray-100 p-5;
+    @apply surface-card;
   }
   .metric-value {
     @apply text-2xl font-bold;
