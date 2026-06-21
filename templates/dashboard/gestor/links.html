@@ -1,0 +1,73 @@
+{% extends 'dashboard/base_desktop.html' %}
+{% block title %}Links de Pagamento — QueroLink{% endblock %}
+{% block content %}
+<div x-data="gestorLinksPage()">
+    <div class="flex items-center justify-between mb-6">
+        <h1 class="font-display text-[18px] font-semibold text-gray-900">Links de Pagamento</h1>
+        <select x-model="sellerFilter" @change="filter()" class="px-3 py-2 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
+            <option value="">Todos os vendedores</option>
+            {% for s in sellers %}
+            <option value="{{ s.uuid }}">{{ s.name }}</option>
+            {% endfor %}
+        </select>
+    </div>
+
+    <div class="surface-card">
+        <table class="w-full text-left text-[14px]">
+            <thead>
+                <tr><th class="px-4 py-3 font-semibold text-gray-500 border-b border-gray-200 bg-gray-50">Vendedor</th><th class="px-4 py-3 font-semibold text-gray-500 border-b border-gray-200 bg-gray-50">Cliente</th><th class="px-4 py-3 font-semibold text-gray-500 border-b border-gray-200 bg-gray-50">Valor</th><th class="px-4 py-3 font-semibold text-gray-500 border-b border-gray-200 bg-gray-50">Status</th><th class="px-4 py-3 font-semibold text-gray-500 border-b border-gray-200 bg-gray-50">Motivo</th><th class="px-4 py-3 font-semibold text-gray-500 border-b border-gray-200 bg-gray-50">Data</th></tr>
+            </thead>
+            <tbody>
+                {% verbatim %}
+                <template x-for="o in filteredOrders" :key="o.uuid">
+                    <tr class="hover:bg-gray-50">
+                        <td class="px-4 py-3 border-b border-gray-100 font-medium" x-text="o.seller_name"></td>
+                        <td class="px-4 py-3 border-b border-gray-100" x-text="o.customer_name"></td>
+                        <td class="px-4 py-3 border-b border-gray-100 font-semibold" x-text="formatMoneyBRL(o.amount)"></td>
+                        <td class="px-4 py-3 border-b border-gray-100">
+                            <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium"
+                                  :class="{'bg-gray-100 text-gray-600': o.status==='PENDING',
+                                           'bg-success-50 text-success-700': o.status==='COMPLETED',
+                                           'bg-danger-50 text-danger-700': o.status==='CANCELED' || o.status==='FAILED' || o.status==='EXPIRED',
+                                           'bg-warning-50 text-warning-700': o.status==='SUSPENDED'}"
+                                  x-text="o.status_display"></span>
+                        </td>
+                        <td class="px-4 py-3 border-b border-gray-100 text-[13px] text-danger-500" x-text="o.refusal_reason || '—'"></td>
+                        <td class="px-4 py-3 border-b border-gray-100 text-[13px] text-gray-500" x-text="new Date(o.created_at).toLocaleDateString('pt-BR')"></td>
+                    </tr>
+                </template>
+                {% endverbatim %}
+                <tr x-show="!filteredOrders.length">
+                    <td colspan="6" class="text-center py-8 text-gray-500">Nenhum link encontrado.</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<script>
+function gestorLinksPage() {
+    return {
+        orders: {{ orders_json|safe }},
+        sellerFilter: '',
+        filteredOrders: [],
+
+        init() { this.filter(); },
+
+        filter() {
+            if (this.sellerFilter) {
+                this.filteredOrders = this.orders.filter(o => o.seller_name === this.getSellerName(this.sellerFilter));
+            } else {
+                this.filteredOrders = this.orders;
+            }
+        },
+
+        getSellerName(uuid) {
+            var sellers = {{ sellers|safe }};
+            var s = sellers.find(function(s) { return s.uuid === uuid; });
+            return s ? s.name : '';
+        }
+    }
+}
+</script>
+{% endblock %}

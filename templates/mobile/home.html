@@ -43,6 +43,12 @@
         <span class="font-medium text-[14px] text-gray-900">Minhas Vendas</span>
         <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
     </a>
+
+    <a href="{% url 'dashboard:mobile_links' %}"
+       class="flex items-center justify-between surface-card tap-target">
+        <span class="font-medium text-[14px] text-gray-900">Meus Links</span>
+        <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
+    </a>
     {% endif %}
 </div>
 {% endblock %}

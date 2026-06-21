@@ -3,6 +3,7 @@ from django.contrib.auth import authenticate, login as auth_login, logout as aut
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.utils import timezone
+from django_ratelimit.decorators import ratelimit
 from datetime import date, timedelta
 from calendar import monthrange
 from django.db.models import Sum
@@ -23,6 +24,7 @@ def mobile_logout(request):
     return redirect('dashboard:mobile_login')
 
 
+@ratelimit(key='post:identifier', rate='3/h', method='POST', block=True)
 def mobile_forgot_password(request):
     if request.method == 'POST':
         identifier = request.POST.get('identifier', '').strip()

@@ -731,3 +731,60 @@ class DashboardSummaryView(generics.GenericAPIView):
             'vendedores_ativos': vendedores_ativos,
             'vendedores_total': vendedores_total,
         })
+
+
+class SellerLinkCreateView(generics.GenericAPIView):
+    permission_classes = [IsAuthenticated, IsSellerOwner]
+
+    def post(self, request):
+        try:
+            seller = request.user.seller_profile
+        except Exception:
+            return Response({'error': 'Perfil de vendedor nao encontrado.'}, status=400)
+
+        tenant = request.user.tenant
+        if not tenant:
+            return Response({'error': 'Usuario sem tenant.'}, status=400)
+
+        customer_name = request.data.get('customer_name', '').strip()
+        amount_str = request.data.get('amount', '').strip()
+        installments = int(request.data.get('installments', 1))
+
+        if not customer_name:
+            return Response({'error': 'Nome do cliente e obrigatorio.'}, status=400)
+        if not amount_str:
+            return Response({'error': 'Valor e obrigatorio.'}, status=400)
+
+        try:
+            amount_str = amount_str.replace('R$', '').replace(',', '.').strip()
+            amount_cents = int(float(amount_str) * 100)
+            if amount_cents <= 0:
+                raise ValueError
+        except (ValueError, TypeError):
+            return Response({'error': 'Valor invalido.'}, status=400)
+
+        if installments < 1 or installments > 12:
+            installments = 1
+
+        try:
+            from app.apps.orders.services import create_payment_link as make_link
+            order, link_url = make_link(
+                tenant=tenant,
+                seller=seller,
+                customer_name=customer_name,
+                amount_cents=amount_cents,
+                installments=installments,
+            )
+
+            from app.apps.audit.utils import log_action
+            log_action(request, 'order.link_created', instance=order)
+
+            return Response({
+                'uuid': str(order.uuid),
+                'customer_name': order.customer_name,
+                'total_amount': order.total_amount,
+                'link_url': link_url,
+            }, status=201)
+
+        except Exception as e:
+            return Response({'error': str(e)}, status=500)

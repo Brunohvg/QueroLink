@@ -1,14 +1,10 @@
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib import messages
 from django.http import HttpResponse
-from django.conf import settings
-from app.services.gateway.pagar_me import PagarMeGateway
-from app.apps.orders.models import Order, PaymentLink
-from app.apps.payments.models import Payment
+from app.apps.orders.models import Order
 from app.apps.accounts.models import Tenant
 from app.apps.sellers.models import Seller
-from django.db import transaction
-import uuid
+from app.apps.orders.services import create_payment_link
 
 
 def index(request, tenant_slug):
@@ -53,45 +49,13 @@ def create_link(request, tenant_slug):
                 messages.error(request, "Vendedor nao encontrado.")
                 return redirect("orders:index", tenant_slug=tenant_slug)
 
-            with transaction.atomic():
-                order = Order.objects.create(
-                    tenant=tenant,
-                    seller=seller,
-                    customer_name=link_name,
-                    total_amount=total_amount,
-                    status=Order.Status.PENDING
-                )
-
-                success_url = f"https://{settings.SERVICE_FQDN_WEB}/pago/{order.uuid}/"
-                gateway = PagarMeGateway(api_key=tenant.pagarme_api_key)
-                response = gateway.create_payment_link(
-                    total_amount=total_amount,
-                    max_installments=int(installments),
-                    name=link_name,
-                    free_installments=int(installments),
-                    order_code=str(order.uuid),
-                    success_url=success_url,
-                )
-
-                link_url = response.get("url", "")
-                gateway_id = response.get("id", "")
-
-                if not link_url:
-                    raise Exception("Falha ao gerar o link de pagamento no Pagar.me.")
-
-                payment = Payment.objects.create(
-                    order=order,
-                    gateway_name='pagarme',
-                    gateway_transaction_id=gateway_id,
-                    status=Payment.Status.PENDING,
-                    installments=int(installments)
-                )
-
-                payment_link = PaymentLink.objects.create(
-                    order=order,
-                    gateway_url=link_url,
-                    gateway_link_id=gateway_id
-                )
+            order, link_url = create_payment_link(
+                tenant=tenant,
+                seller=seller,
+                customer_name=link_name,
+                amount_cents=total_amount,
+                installments=int(installments),
+            )
 
             request.session["generated_link"] = link_url
             request.session["generated_link_data"] = {

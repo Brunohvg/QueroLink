@@ -1,0 +1,144 @@
+{% extends 'mobile/base_mobile.html' %}
+{% block title %}Meus Links — QueroLink{% endblock %}
+{% block content %}
+<div class="space-y-4" x-data="sellerLinksPage()">
+    <div class="flex items-center gap-3">
+        <a href="{% url 'dashboard:mobile_home' %}" class="tap-target flex items-center justify-center w-10 h-10">
+            <svg class="w-6 h-6 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path></svg>
+        </a>
+        <h1 class="font-display text-[18px] font-semibold text-gray-900">Meus Links</h1>
+    </div>
+
+    {% verbatim %}
+    <!-- Novo Link Form -->
+    <div x-show="showForm" class="surface-card space-y-3">
+        <p class="text-[14px] font-semibold text-gray-900">Novo Link de Pagamento</p>
+        <div>
+            <label class="block text-[13px] text-gray-500 mb-1">Nome do cliente</label>
+            <input type="text" x-model="form.customer" class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-500" placeholder="Nome do cliente" style="font-size:16px!important">
+        </div>
+        <div>
+            <label class="block text-[13px] text-gray-500 mb-1">Valor (R$)</label>
+            <input type="text" x-model="form.value" class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-500" placeholder="100,00" style="font-size:16px!important">
+        </div>
+        <div>
+            <label class="block text-[13px] text-gray-500 mb-1">Parcelas</label>
+            <select x-model="form.installments" class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-500" style="font-size:16px!important">
+                <option value="1">1x (a vista)</option>
+                <option value="2">2x</option>
+                <option value="3">3x</option>
+            </select>
+        </div>
+        <p x-show="formError" class="text-[13px] text-danger-500" x-text="formError"></p>
+        <p x-show="formSuccess" class="text-[13px] text-success-700" x-text="formSuccess"></p>
+        <div class="flex gap-2">
+            <button @click="createLink()" :disabled="creating" class="flex-1 bg-brand-500 hover:bg-brand-600 disabled:opacity-50 text-white font-medium py-3 rounded-xl transition text-[15px]">
+                <span x-show="!creating">Gerar Link</span>
+                <span x-show="creating">Gerando...</span>
+            </button>
+            <button @click="showForm=false; formError=''; formSuccess=''" class="px-4 py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl text-[15px] font-medium transition">Cancelar</button>
+        </div>
+    </div>
+
+    <button @click="showForm=!showForm" x-show="!showForm" class="flex items-center justify-center gap-2 w-full bg-brand-500 hover:bg-brand-600 text-white font-medium py-4 rounded-xl transition shadow-lg tap-target">
+        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
+        <span class="text-[15px]">Novo Link</span>
+    </button>
+
+    <!-- Links List -->
+    <div x-show="!orders.length" class="text-center py-12">
+        <p class="text-gray-500">Nenhum link gerado ainda.</p>
+    </div>
+
+    <template x-for="o in orders" :key="o.uuid">
+        <div class="surface-card mb-2">
+            <div class="flex items-start justify-between mb-1">
+                <span class="text-[14px] font-semibold text-gray-900" x-text="o.customer_name"></span>
+                <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium"
+                      :class="{'bg-gray-100 text-gray-600': o.status==='PENDING',
+                               'bg-success-50 text-success-700': o.status==='COMPLETED',
+                               'bg-danger-50 text-danger-700': o.status==='CANCELED' || o.status==='FAILED' || o.status==='EXPIRED',
+                               'bg-warning-50 text-warning-700': o.status==='SUSPENDED'}"
+                      x-text="o.status_display"></span>
+            </div>
+            <p class="text-[14px] font-semibold text-brand-500" x-text="formatMoneyBRL(o.total_amount)"></p>
+            <p x-show="o.refusal_reason" class="text-[12px] text-danger-500 mt-1">Motivo: <span x-text="o.refusal_reason"></span></p>
+            <div class="flex items-center gap-2 mt-2" x-show="o.link_url && o.status==='PENDING'">
+                <code class="text-[12px] text-gray-500 bg-gray-50 px-2 py-1 rounded flex-1 truncate" x-text="o.link_url"></code>
+                <button @click="copyLink(o.link_url)" class="text-brand-500 text-[12px] font-medium hover:underline flex-shrink-0">Copiar</button>
+            </div>
+            <p class="text-[12px] text-gray-400 mt-1" x-text="new Date(o.created_at).toLocaleDateString('pt-BR')"></p>
+        </div>
+    </template>
+    {% endverbatim %}
+</div>
+
+<script>
+function getCSRFToken() {
+    var name = 'csrftoken';
+    var cookies = document.cookie.split(';');
+    for (var i = 0; i < cookies.length; i++) {
+        var c = cookies[i].trim();
+        if (c.indexOf(name + '=') === 0) return c.substring(name.length + 1);
+    }
+    return '';
+}
+
+function sellerLinksPage() {
+    return {
+        orders: {{ orders_json|safe }},
+        showForm: false,
+        creating: false,
+        formError: '',
+        formSuccess: '',
+        form: { customer: '', value: '', installments: '1' },
+
+        async createLink() {
+            this.formError = '';
+            this.formSuccess = '';
+            if (!this.form.customer || !this.form.value) {
+                this.formError = 'Preencha nome do cliente e valor.';
+                return;
+            }
+            this.creating = true;
+            try {
+                var r = await fetch('/api/seller/links/', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCSRFToken() },
+                    body: JSON.stringify({
+                        customer_name: this.form.customer,
+                        amount: this.form.value,
+                        installments: parseInt(this.form.installments),
+                    })
+                });
+                var d = await r.json();
+                if (r.ok) {
+                    this.formSuccess = 'Link gerado!';
+                    this.showForm = false;
+                    this.form = { customer: '', value: '', installments: '1' };
+                    this.orders.unshift({
+                        uuid: d.uuid,
+                        customer_name: d.customer_name,
+                        total_amount: d.total_amount,
+                        status: 'PENDING',
+                        status_display: 'Pendente',
+                        link_url: d.link_url,
+                        refusal_reason: null,
+                        created_at: new Date().toISOString(),
+                    });
+                } else {
+                    this.formError = d.error || d.detail || 'Erro ao gerar link.';
+                }
+            } catch (e) {
+                this.formError = 'Erro de conexao.';
+            }
+            this.creating = false;
+        },
+
+        copyLink(url) {
+            navigator.clipboard.writeText(url);
+        }
+    }
+}
+</script>
+{% endblock %}
