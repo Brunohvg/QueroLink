@@ -131,12 +131,26 @@ def mobile_home(request):
         sale_date__month=today.month,
     ).count()
 
+    from app.apps.commissions.models import SellerCommission, CommissionPeriod
+    comissao_a_receber = SellerCommission.objects.filter(
+        seller=seller,
+        approval_status=SellerCommission.ApprovalStatus.APROVADO,
+    ).exclude(
+        period__status=CommissionPeriod.Status.PAGA,
+    ).aggregate(total=Sum('commission_amount'))['total'] or 0
+
+    total_vendido = Sale.objects.filter(
+        seller=seller,
+    ).aggregate(total=Sum('amount'))['total'] or 0
+
     return render(request, 'mobile/home.html', {
         'seller': seller,
         'today_total': today_total,
         'today_count': today_count,
         'month_total': month_total,
         'month_count': month_count,
+        'comissao_a_receber': comissao_a_receber,
+        'total_vendido': total_vendido,
     })
 
 
@@ -231,26 +245,27 @@ def mobile_links(request):
     seller = _get_seller_profile(request)
     if not seller:
         return redirect('dashboard:mobile_home')
-    from app.apps.orders.models import Order, PaymentLink
+    from app.apps.orders.models import Order
     from app.apps.payments.models import Payment
-    orders = Order.objects.filter(seller=seller).select_related('seller').order_by('-created_at')[:50]
+    orders = Order.objects.filter(
+        seller=seller, tenant=seller.tenant
+    ).select_related('seller').prefetch_related('payments').order_by('-created_at')[:50]
     orders_data = []
     for o in orders:
-        link = None
         try:
             link = o.payment_link
+            link_url = link.gateway_url if link else None
         except Exception:
-            pass
+            link_url = None
         payment = o.payments.first()
         refusal = payment.refusal_reason if payment else None
         orders_data.append({
             'uuid': str(o.uuid),
             'customer_name': o.customer_name,
             'total_amount': o.total_amount,
-            'total_amount_decimal': o.total_amount_decimal,
             'status': o.status,
             'status_display': o.get_status_display(),
-            'link_url': link.gateway_url if link else None,
+            'link_url': link_url,
             'refusal_reason': refusal,
             'created_at': o.created_at.isoformat(),
         })

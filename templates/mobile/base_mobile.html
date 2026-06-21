@@ -3,7 +3,7 @@
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <meta name="theme-color" content="#4361ee">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -98,7 +98,9 @@
             localStorage.setItem('ql_pwa_dismissed', '1');
         });
         var currentCount = parseInt(localStorage.getItem('ql_login_count') || '0');
-        localStorage.setItem('ql_login_count', currentCount + 1);
+        if (document.referrer && !document.referrer.includes(window.location.host)) {
+            localStorage.setItem('ql_login_count', currentCount + 1);
+        }
     </script>
 
     <div id="install-banner" class="hidden fixed bottom-20 left-4 right-4 bg-white rounded-xl shadow-xl p-4 border border-gray-200 z-40 max-w-lg mx-auto safe-bottom">

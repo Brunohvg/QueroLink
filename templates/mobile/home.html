@@ -20,8 +20,25 @@
     {% with value_text=today_total|stringformat:"d" %}
     <div class="surface-hero">
         <p class="text-[13px] font-semibold text-gray-500 uppercase tracking-wide mb-2">Total hoje</p>
-        <p class="font-display text-[40px] font-semibold text-brand-500 leading-none">R$ {{ value_text|slice:":-2" }},{{ value_text|slice:"-2:" }}</p>
+        <p class="font-display text-[32px] font-semibold text-brand-500 leading-none">R$ {{ value_text|slice:":-2" }},{{ value_text|slice:"-2:" }}</p>
         <p class="text-[14px] text-gray-500 mt-2">{{ today_count }} venda{{ today_count|pluralize:'s' }} hoje</p>
+    </div>
+    {% endwith %}
+
+    {% with valor_total=total_vendido|stringformat:"d" valor_comissao=comissao_a_receber|stringformat:"d" %}
+    <div class="grid grid-cols-2 gap-3">
+        <div class="surface-card">
+            <p class="text-[13px] text-gray-500 mb-1">Comissao a receber</p>
+            <p class="font-display text-[18px] sm:text-[24px] font-semibold text-success-700 leading-tight">
+                R$ {{ valor_comissao|slice:":-2" }},{{ valor_comissao|slice:"-2:" }}
+            </p>
+        </div>
+        <div class="surface-card">
+            <p class="text-[13px] text-gray-500 mb-1">Total vendido</p>
+            <p class="font-display text-[18px] sm:text-[24px] font-semibold text-gray-900 leading-tight">
+                R$ {{ valor_total|slice:":-2" }},{{ valor_total|slice:"-2:" }}
+            </p>
+        </div>
     </div>
     {% endwith %}
 

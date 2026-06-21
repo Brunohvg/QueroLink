@@ -12,7 +12,7 @@
     {% if success %}
     <div class="surface-hero text-center">
         <p class="font-display text-[20px] font-semibold text-gray-900">Venda registrada!</p>
-        <p class="font-display text-[36px] font-semibold text-success-700 mt-2" x-text="formatCurrency(lastAmount)"></p>
+        <p class="font-display text-[28px] sm:text-[36px] font-semibold text-success-700 mt-2" x-text="formatCurrency(lastAmount)"></p>
         <a href="{% url 'dashboard:mobile_lancar_venda' %}"
            class="inline-block mt-4 bg-brand-500 hover:bg-brand-600 text-white font-medium px-6 py-2.5 rounded-xl tap-target text-[15px]">
             Nova Venda

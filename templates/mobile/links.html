@@ -32,11 +32,11 @@
         <p x-show="formError" class="text-[13px] text-danger-500" x-text="formError"></p>
         <p x-show="formSuccess" class="text-[13px] text-success-700" x-text="formSuccess"></p>
         <div class="flex gap-2">
-            <button @click="createLink()" :disabled="creating" class="flex-1 bg-brand-500 hover:bg-brand-600 disabled:opacity-50 text-white font-medium py-3 rounded-xl transition text-[15px]">
+            <button @click="createLink()" :disabled="creating" class="flex-1 bg-brand-500 hover:bg-brand-600 disabled:opacity-50 text-white font-medium py-3 rounded-xl transition text-[15px] tap-target">
                 <span x-show="!creating">Gerar Link</span>
                 <span x-show="creating">Gerando...</span>
             </button>
-            <button @click="showForm=false; formError=''; formSuccess=''" class="px-4 py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl text-[15px] font-medium transition">Cancelar</button>
+            <button @click="showForm=false; formError=''; formSuccess=''" class="px-4 py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl text-[15px] font-medium transition tap-target">Cancelar</button>
         </div>
     </div>
 
@@ -53,7 +53,7 @@
     <template x-for="o in orders" :key="o.uuid">
         <div class="surface-card mb-2">
             <div class="flex items-start justify-between mb-1">
-                <span class="text-[14px] font-semibold text-gray-900" x-text="o.customer_name"></span>
+                <span class="text-[14px] font-semibold text-gray-900 truncate flex-1 min-w-0" x-text="o.customer_name"></span>
                 <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium"
                       :class="{'bg-gray-100 text-gray-600': o.status==='PENDING',
                                'bg-success-50 text-success-700': o.status==='COMPLETED',
@@ -65,7 +65,7 @@
             <p x-show="o.refusal_reason" class="text-[12px] text-danger-500 mt-1">Motivo: <span x-text="o.refusal_reason"></span></p>
             <div class="flex items-center gap-2 mt-2" x-show="o.link_url && o.status==='PENDING'">
                 <code class="text-[12px] text-gray-500 bg-gray-50 px-2 py-1 rounded flex-1 truncate" x-text="o.link_url"></code>
-                <button @click="copyLink(o.link_url)" class="text-brand-500 text-[12px] font-medium hover:underline flex-shrink-0">Copiar</button>
+                <button @click="copyLink(o.link_url)" class="text-brand-500 text-[13px] font-medium hover:underline flex-shrink-0 py-2 px-2 tap-target">Copiar</button>
             </div>
             <p class="text-[12px] text-gray-400 mt-1" x-text="new Date(o.created_at).toLocaleDateString('pt-BR')"></p>
         </div>
