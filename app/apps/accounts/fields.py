@@ -1,16 +1,22 @@
+import hashlib
+import base64
 from django.conf import settings
 from django.db import models
 from cryptography.fernet import Fernet
 
 
-def _get_fernet():
+def _derive_fernet_key():
     key = getattr(settings, 'FERNET_KEY', None)
-    if not key:
-        key = settings.SECRET_KEY.encode()[:32].ljust(32, b'0')
-    else:
-        if isinstance(key, str):
-            key = key.encode()
-    return Fernet(key)
+    if key and isinstance(key, str) and len(key) > 30:
+        return key.encode()
+
+    raw = settings.SECRET_KEY.encode()
+    digest = hashlib.sha256(raw).digest()
+    return base64.urlsafe_b64encode(digest)
+
+
+def _get_fernet():
+    return Fernet(_derive_fernet_key())
 
 
 class EncryptedCharField(models.CharField):

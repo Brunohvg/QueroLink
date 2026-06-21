@@ -1,16 +1,24 @@
+import hashlib
+import base64
 from django.db import migrations
 
 
-def encrypt_existing_plaintext(apps, schema_editor):
+def _derive_fernet_key():
     from django.conf import settings
-    from cryptography.fernet import Fernet
 
     key = getattr(settings, 'FERNET_KEY', None)
-    if not key:
-        key = settings.SECRET_KEY.encode()[:32].ljust(32, b'0')
-    if isinstance(key, str):
-        key = key.encode()
-    fernet = Fernet(key)
+    if key and isinstance(key, str) and len(key) > 30:
+        return key.encode()
+
+    raw = settings.SECRET_KEY.encode()
+    digest = hashlib.sha256(raw).digest()
+    return base64.urlsafe_b64encode(digest)
+
+
+def encrypt_existing_plaintext(apps, schema_editor):
+    from cryptography.fernet import Fernet
+
+    fernet = Fernet(_derive_fernet_key())
 
     Tenant = apps.get_model('accounts', 'Tenant')
     for tenant in Tenant.objects.all():
