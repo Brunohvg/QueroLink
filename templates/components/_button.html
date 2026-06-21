@@ -1,8 +1,10 @@
-{# Usage: include components/_button.html with variant='primary' label='Salvar' type='submit'
-   Variants: primary | secondary | danger | success
-   Optional: icon_svg (HTML string), href (renders as <a> instead of <button>), onclick, disabled, class #}
+{% comment %}
+Usage: include components/_button.html with variant='primary' label='Salvar' type='submit'
+Variants: primary | secondary | danger | success
+Optional: icon_svg, href, onclick, disabled, size, class
+{% endcomment %}
 {% if href %}
-<a href="{{ href }}" {% if onclick %}onclick="{{ onclick }}"{% endif %}
+<a href="{{ href }}" {% if onclick %}onclick="{{ onclick }}" x-on:click="{{ onclick }}"{% endif %}
    class="{% if variant == 'primary' %}bg-brand-500 hover:bg-brand-600 text-white shadow-lg
           {% elif variant == 'secondary' %}bg-gray-100 hover:bg-gray-200 text-gray-700
           {% elif variant == 'danger' %}bg-danger-500 hover:bg-danger-700 text-white shadow-md
@@ -16,7 +18,7 @@
     {{ label }}
 </a>
 {% else %}
-<button type="{{ type|default:'button' }}" {% if onclick %}onclick="{{ onclick }}"{% endif %}
+<button type="{{ type|default:'button' }}" {% if onclick %}onclick="{{ onclick }}" x-on:click="{{ onclick }}"{% endif %}
         {% if disabled %}disabled{% endif %}
         class="{% if variant == 'primary' %}bg-brand-500 hover:bg-brand-600 text-white shadow-lg
                {% elif variant == 'secondary' %}bg-gray-100 hover:bg-gray-200 text-gray-700

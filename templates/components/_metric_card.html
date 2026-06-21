@@ -1,6 +1,8 @@
-{# Usage: include components/_metric_card.html with label='Total hoje' value=total type='money'
-   Types: money (R$ format), number, plain
-   Optional: color (brand|success|warning), subtitle #}
+{% comment %}
+Usage: include components/_metric_card.html with label='Total hoje' value=total type='money'
+Types: money (R$ format), number, plain
+Optional: color (brand|success|warning), subtitle, highlight
+{% endcomment %}
 <div class="surface-card {% if highlight %}ring-2 ring-brand-500{% endif %}">
     <p class="text-[13px] font-semibold text-gray-500 uppercase tracking-wide mb-1">{{ label }}</p>
     <p class="font-display text-[28px] font-semibold

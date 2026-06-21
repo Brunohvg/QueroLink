@@ -1,6 +1,8 @@
-{# Usage: include components/_status_badge.html with status='APROVADA'
-   CommissionPeriod status: ABERTA | EM_CONFERENCIA | ENVIADA_FINANCEIRO | APROVADA | PAGA
-   Also works for: ativo/inativo (is_active) #}
+{% comment %}
+Usage: include components/_status_badge.html with status='APROVADA'
+CommissionPeriod status: ABERTA | EM_CONFERENCIA | ENVIADA_FINANCEIRO | APROVADA | PAGA
+Also works for: ativo/inativo (is_active)
+{% endcomment %}
 <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium
     {% if status == 'ABERTA' or status == 'PENDING' or status == False %}bg-gray-100 text-gray-600
     {% elif status == 'EM_CONFERENCIA' %}bg-warning-50 text-warning-700

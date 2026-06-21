@@ -1,11 +1,11 @@
-{# Usage: include components/_bottom_nav.html — mobile vendedor bottom nav, 3 icons #}
+{% comment %}Usage: include components/_bottom_nav.html — mobile vendedor bottom nav, 3 icons{% endcomment %}
 <nav class="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 nav-shadow safe-bottom z-50">
     <div class="max-w-lg mx-auto flex items-center justify-around h-16">
         <a href="{% url 'dashboard:mobile_home' %}"
            class="flex flex-col items-center justify-center tap-target w-full h-full
                   {% if request.resolver_match.url_name == 'mobile_home' %}text-brand-500{% else %}text-gray-400{% endif %}">
             <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"></path></svg>
-            <span class="text-xs mt-1">Início</span>
+            <span class="text-xs mt-1">Inicio</span>
         </a>
         <a href="{% url 'dashboard:mobile_lancar_venda' %}"
            class="flex flex-col items-center justify-center tap-target w-full h-full
@@ -13,7 +13,7 @@
             <div class="w-12 h-12 bg-brand-500 rounded-full flex items-center justify-center -mt-4 shadow-lg">
                 <svg class="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
             </div>
-            <span class="text-xs mt-1">Lançar</span>
+            <span class="text-xs mt-1">Lancar</span>
         </a>
         <a href="{% url 'dashboard:mobile_meu_desempenho' %}"
            class="flex flex-col items-center justify-center tap-target w-full h-full
