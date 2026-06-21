@@ -5,6 +5,7 @@ from rest_framework.permissions import IsAuthenticated
 from django.utils import timezone
 from django.db import transaction
 from django.db.models import Sum
+from django.http import HttpResponse
 from django_ratelimit.decorators import ratelimit
 from django.utils.decorators import method_decorator
 from rest_framework_simplejwt.views import TokenObtainPairView
@@ -458,7 +459,7 @@ class SellerReportCsvView(generics.GenericAPIView):
         writer.writerow([f'Empresa: {tenant.company_name}'])
         writer.writerow([f'Periodo: {start.isoformat()} a {end.isoformat()}'])
 
-        response = Response(buf.getvalue(), content_type='text/csv; charset=utf-8')
+        response = HttpResponse(buf.getvalue(), content_type='text/csv; charset=utf-8')
         response['Content-Disposition'] = f'attachment; filename="{seller.name}_{start}_{end}.csv"'
         return response
 
@@ -543,7 +544,7 @@ class SellerReportExcelView(generics.GenericAPIView):
         wb.save(buf)
         buf.seek(0)
 
-        response = Response(buf.getvalue(), content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+        response = HttpResponse(buf.getvalue(), content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
         response['Content-Disposition'] = f'attachment; filename="{seller.name}_{start}_{end}.xlsx"'
         return response
 
@@ -592,6 +593,6 @@ class SellerReportPdfView(generics.GenericAPIView):
         from weasyprint import HTML
         pdf = HTML(string=html).write_pdf()
 
-        response = Response(pdf, content_type='application/pdf')
+        response = HttpResponse(pdf, content_type='application/pdf')
         response['Content-Disposition'] = f'attachment; filename="{seller.name}_{start}_{end}.pdf"'
         return response
