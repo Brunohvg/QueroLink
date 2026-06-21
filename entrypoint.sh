@@ -11,21 +11,24 @@ log() { echo "[$(date +%H:%M:%S)] $*"; }
 wait_for_db() {
     log "Aguardando banco de dados..."
     local retries=30
+    local last_error=""
     while [ $retries -gt 0 ]; do
-        if python -c "
+        last_error=$(python -c "
 import dj_database_url, os, psycopg2
 url = dj_database_url.parse(os.environ['DATABASE_URL'])
 conn = psycopg2.connect(**{k:v for k,v in url.items() if k in ('host','port','user','password','dbname')})
 conn.close()
 print('OK')
-" 2>/dev/null; then
+" 2>&1)
+        if [ "$last_error" = "OK" ]; then
             log "Banco disponível."
             return 0
         fi
         retries=$((retries - 1))
         sleep 2
     done
-    log "ERRO: Banco não respondeu após 60s."
+    log "ERRO: Banco não respondeu após 60s. Último erro capturado:"
+    log "$last_error"
     return 1
 }
 
