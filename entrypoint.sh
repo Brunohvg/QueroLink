@@ -16,7 +16,13 @@ wait_for_db() {
         last_error=$(python -c "
 import dj_database_url, os, psycopg2
 url = dj_database_url.parse(os.environ['DATABASE_URL'])
-conn = psycopg2.connect(**{k:v for k,v in url.items() if k in ('host','port','user','password','dbname')})
+conn = psycopg2.connect(
+    host=url.get('HOST', ''),
+    port=url.get('PORT', 5432),
+    user=url.get('USER', ''),
+    password=url.get('PASSWORD', ''),
+    dbname=url.get('NAME', ''),
+)
 conn.close()
 print('OK')
 " 2>&1)
