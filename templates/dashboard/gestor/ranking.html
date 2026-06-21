@@ -6,9 +6,8 @@
         <h1 class="font-display text-[18px] font-semibold text-gray-900">Ranking de Vendedores</h1>
         <div class="flex items-center gap-3">
             <select x-model="month" @change="load()" class="px-3 py-2 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
-                {% for m in "123456789101112"|make_list %}
-                <option value="{{ forloop.counter }}">{{ forloop.counter|stringformat:"02d" }}</option>
-                {% endfor %}
+                <option value="1">01</option><option value="2">02</option><option value="3">03</option><option value="4">04</option><option value="5">05</option><option value="6">06</option><option value="7">07</option><option value="8">08</option><option value="9">09</option><option value="10">10</option><option value="11">11</option><option value="12">12</option>
+            </select>
             </select>
             <select x-model="year" @change="load()" class="px-3 py-2 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
                 <option value="2025">2025</option><option value="2026">2026</option><option value="2027">2027</option>
@@ -23,7 +22,7 @@
         </div>
         <div class="surface-hero text-center" x-show="topSeller">
             <p class="text-[13px] font-semibold text-gray-500 uppercase tracking-wide mb-6">Vendedor do mes</p>
-            <p class="font-display text-[36px] font-semibold text-gray-900 leading-tight" x-text="'R$ ' + formatMoneyBRL(topSeller?.total_sold || 0)"></p>
+            <p class="font-display text-[36px] font-semibold text-gray-900 leading-tight" x-text="formatMoneyBRL(topSeller?.total_sold || 0)"></p>
             <p class="text-[15px] font-medium text-gray-700 mt-2">
                 <a :href="'/dashboard/gestor/vendedores/' + (topSeller?.seller__uuid || '') + '/'" class="text-brand-500 hover:underline" x-text="topSeller?.seller__name || '-'"></a>
             </p>
@@ -43,9 +42,9 @@
                         <td class="px-4 py-3 border-b border-gray-100 font-medium">
                             <a :href="'/dashboard/gestor/vendedores/' + s.seller__uuid + '/'" class="text-brand-500 hover:underline" x-text="s.seller__name"></a>
                         </td>
-                        <td class="px-4 py-3 border-b border-gray-100 font-semibold" x-text="'R$ ' + formatMoneyBRL(s.total_sold)"></td>
+                        <td class="px-4 py-3 border-b border-gray-100 font-semibold" x-text="formatMoneyBRL(s.total_sold)"></td>
                         <td class="px-4 py-3 border-b border-gray-100" x-text="s.sale_count"></td>
-                        <td class="px-4 py-3 border-b border-gray-100" x-text="'R$ ' + formatMoneyBRL(Math.round(s.total_sold / s.sale_count))"></td>
+                        <td class="px-4 py-3 border-b border-gray-100" x-text="formatMoneyBRL(Math.round(s.total_sold / s.sale_count))"></td>
                     </tr>
                 </template>
             </tbody>

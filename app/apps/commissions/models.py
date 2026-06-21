@@ -76,6 +76,6 @@ class SellerCommission(models.Model):
         )
         total = sum(s.amount for s in sales)
         self.total_sold_amount = total
-        self.commission_amount = int(total * self.commission_rate)
+        self.commission_amount = round(total * self.commission_rate)
         if commit:
             self.save(update_fields=['total_sold_amount', 'commission_amount'])

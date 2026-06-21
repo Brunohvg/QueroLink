@@ -212,6 +212,9 @@ class CommissionPeriodViewSet(viewsets.ModelViewSet):
             )
         period.status = CommissionPeriod.Status.EM_CONFERENCIA
         period.sent_to_financial_at = None
+        for sc in period.seller_commissions.all():
+            sc.approval_status = SellerCommission.ApprovalStatus.PENDENTE
+            sc.save(update_fields=['approval_status'])
         period.save(update_fields=['status', 'sent_to_financial_at', 'updated_at'])
         log_action(request, 'commission_period.rejected', instance=period,
                    changes={'month': period.month, 'year': period.year, 'reason': reason})

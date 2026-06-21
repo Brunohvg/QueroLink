@@ -52,8 +52,22 @@
     <!-- Quick Link Form -->
     <div x-show="showLinkForm" class="surface-card space-y-3" @click.away="showLinkForm=false">
         <p class="text-[14px] font-semibold text-gray-900">Gerar Link de Pagamento</p>
-        <input type="text" x-model="linkForm.customer" class="w-full px-4 py-3 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-brand-500" placeholder="Nome do cliente" style="font-size:16px!important">
-        <input type="text" x-model="linkForm.value" class="w-full px-4 py-3 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-brand-500" placeholder="Valor (ex: 100,00)" style="font-size:16px!important">
+        <div>
+            <label class="block text-[13px] text-gray-500 mb-1">Nome do cliente</label>
+            <input type="text" x-model="linkForm.customer" class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-500" placeholder="Nome do cliente" style="font-size:16px!important">
+        </div>
+        <div>
+            <label class="block text-[13px] text-gray-500 mb-1">Valor (R$)</label>
+            <input type="text" x-model="linkForm.value" class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-500" placeholder="100,00" style="font-size:16px!important">
+        </div>
+        <div>
+            <label class="block text-[13px] text-gray-500 mb-1">Parcelas</label>
+            <select x-model="linkForm.installments" class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-500" style="font-size:16px!important">
+                <option value="1">1x (a vista)</option>
+                <option value="2">2x</option>
+                <option value="3">3x</option>
+            </select>
+        </div>
         <p x-show="linkError" class="text-[12px] text-danger-500" x-text="linkError"></p>
         <p x-show="linkSuccess" class="text-[12px] text-success-700" x-text="linkSuccess"></p>
         <div class="flex gap-2">
@@ -72,7 +86,7 @@
     </a>
 
     <button @click="showLinkForm=!showLinkForm"
-       class="flex items-center justify-center gap-2 w-full bg-success-500 hover:bg-success-700 text-white font-medium py-4 rounded-xl transition shadow-lg tap-target">
+       class="flex items-center justify-center gap-2 w-full bg-brand-500 hover:bg-brand-600 text-white font-medium py-4 rounded-xl transition shadow-lg tap-target">
         <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"></path></svg>
         <span class="text-[15px]">Gerar Link de Pagamento</span>
     </button>
@@ -108,7 +122,7 @@ function sellerHomePage() {
         linkCreating: false,
         linkError: '',
         linkSuccess: '',
-        linkForm: { customer: '', value: '' },
+        linkForm: { customer: '', value: '', installments: '1' },
 
         async createQuickLink() {
             this.linkError = '';
@@ -125,7 +139,7 @@ function sellerHomePage() {
                     body: JSON.stringify({
                         customer_name: this.linkForm.customer,
                         amount: this.linkForm.value,
-                        installments: 1,
+                        installments: parseInt(this.linkForm.installments),
                     })
                 });
                 var d = await r.json();

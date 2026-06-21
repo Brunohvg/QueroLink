@@ -36,7 +36,7 @@
                 </div>
                 <div class="overflow-hidden">
                     <p class="text-[12px] sm:text-[13px] text-gray-500">Taxa</p>
-                    <p class="text-[13px] sm:text-[14px] font-semibold text-gray-900 truncate">{{ sc.commission_rate|floatformat:2 }}%</p>
+                    <p class="text-[13px] sm:text-[14px] font-semibold text-gray-900 truncate">{% widthratio sc.commission_rate 1 100 %},00%</p>
                 </div>
                 <div class="overflow-hidden">
                     <p class="text-[12px] sm:text-[13px] text-gray-500">Comissao</p>

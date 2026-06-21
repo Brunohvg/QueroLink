@@ -138,6 +138,12 @@ class CommissionPeriodSerializer(serializers.ModelSerializer):
             'paid_at', 'created_at', 'seller_commissions', 'is_current_month',
         ]
 
+    def get_seller_commissions(self, obj):
+        return SellerCommissionReadSerializer(
+            obj.seller_commissions.select_related('seller').all(),
+            many=True,
+        ).data
+
     def get_is_current_month(self, obj):
         from django.utils import timezone
         hoje = timezone.localdate()

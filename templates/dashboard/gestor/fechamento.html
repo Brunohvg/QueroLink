@@ -12,7 +12,6 @@
             <div class="flex items-center justify-between mb-4">
                 <div>
                     <h3 class="font-semibold text-[18px]" x-text="String(p.month).padStart(2,'0')+'/'+p.year"></h3>
-                    {% include 'components/_status_badge.html' with status='' label='' %}
                     <span x-show="p.status==='ABERTA'" class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-600">ABERTA</span>
                     <span x-show="p.is_current_month && p.status==='ABERTA'" class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-warning-50 text-warning-700">Mes em andamento</span>
                     <span x-show="p.status==='EM_CONFERENCIA'" class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-warning-50 text-warning-700">EM CONFERÊNCIA</span>
@@ -34,9 +33,9 @@
                     <template x-for="sc in p.seller_commissions" :key="sc.id">
                         <tr class="hover:bg-gray-50">
                             <td class="px-4 py-3 border-b border-gray-100 font-medium" x-text="sc.seller_name"></td>
-                            <td class="px-4 py-3 border-b border-gray-100" x-text="'R$ '+formatMoneyBRL(sc.total_sold_amount)"></td>
+                            <td class="px-4 py-3 border-b border-gray-100" x-text="formatMoneyBRL(sc.total_sold_amount)"></td>
                             <td class="px-4 py-3 border-b border-gray-100" x-text="(parseFloat(sc.commission_rate)*100).toFixed(2)+'%'"></td>
-                            <td class="px-4 py-3 border-b border-gray-100 font-semibold text-brand-500" x-text="'R$ '+formatMoneyBRL(sc.commission_amount)"></td>
+                            <td class="px-4 py-3 border-b border-gray-100 font-semibold text-brand-500" x-text="formatMoneyBRL(sc.commission_amount)"></td>
                         </tr>
                     </template>
                 </tbody>
