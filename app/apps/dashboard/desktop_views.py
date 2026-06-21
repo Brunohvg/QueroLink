@@ -41,11 +41,17 @@ def gestor_home(request):
 
     config_ok = tenant.pagarme_configured and tenant.whatsapp_configured
 
+    from app.apps.orders.models import Order
+    total_orders = Order.objects.filter(tenant=tenant).count()
+    paid_orders_count = Order.objects.filter(tenant=tenant, status='COMPLETED').count()
+
     return render(request, 'dashboard/gestor/home.html', {
         'total_mes': total_mes,
         'competencia': competencia,
         'vendedores_ativos': vendedores_ativos,
         'config_ok': config_ok,
+        'total_orders': total_orders,
+        'paid_orders_count': paid_orders_count,
     })
 
 
@@ -100,6 +106,29 @@ def gestor_vendedores(request):
     if not _check_role(request, User.Role.MANAGER, User.Role.ADMIN):
         return redirect('dashboard:home')
     return render(request, 'dashboard/gestor/vendedores.html')
+
+
+@login_required
+def gestor_vendedor_detalhe(request, seller_id):
+    if not _check_role(request, User.Role.MANAGER, User.Role.ADMIN):
+        return redirect('dashboard:home')
+
+    tenant = request.user.tenant
+    if not tenant:
+        return redirect('dashboard:home')
+
+    try:
+        seller = Seller.objects.get(uuid=seller_id, tenant=tenant)
+    except Seller.DoesNotExist:
+        return redirect('dashboard:gestor_vendedores')
+
+    return render(request, 'dashboard/gestor/vendedor_detalhe.html', {
+        'seller': seller,
+        'seller_json': {
+            'uuid': str(seller.uuid),
+            'name': seller.name,
+        },
+    })
 
 
 @login_required

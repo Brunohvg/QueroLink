@@ -1,0 +1,194 @@
+{% extends 'dashboard/base_desktop.html' %}
+{% block title %}{{ seller.name }} — QueroLink{% endblock %}
+{% block content %}
+<div x-data="sellerDetailPage()" x-init="init('{{ seller.uuid }}')">
+
+    <div class="flex items-center gap-3 mb-6">
+        <a href="{% url 'dashboard:gestor_vendedores' %}" class="tap-target flex items-center justify-center w-10 h-10 rounded-xl hover:bg-gray-100">
+            <svg class="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path></svg>
+        </a>
+        <div>
+            <h1 class="font-display text-[18px] font-semibold text-gray-900" x-text="sellerData?.seller?.name || '{{ seller.name }}'"></h1>
+            <p class="text-[13px] text-gray-500" x-text="sellerData?.seller?.phone || '{{ seller.phone }}'"></p>
+        </div>
+        <span class="ml-auto inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-success-50 text-success-700"
+              x-show="sellerData?.seller?.is_active">Ativo</span>
+        <span class="ml-auto inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-600"
+              x-show="!sellerData?.seller?.is_active">Inativo</span>
+    </div>
+
+    <div class="flex flex-wrap items-center gap-3 mb-6">
+        <select x-model="month" @change="load()" class="px-3 py-2 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
+            {% for m in "123456789101112"|make_list %}
+            <option value="{{ forloop.counter }}">{{ forloop.counter|stringformat:"02d" }}</option>
+            {% endfor %}
+        </select>
+        <select x-model="year" @change="load()" class="px-3 py-2 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
+            <option value="2025">2025</option><option value="2026">2026</option><option value="2027">2027</option>
+        </select>
+        <span class="text-[13px] text-gray-400">ou</span>
+        <input type="date" x-model="startDate" @change="load()" class="px-3 py-2 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
+        <span class="text-[13px] text-gray-400">ate</span>
+        <input type="date" x-model="endDate" @change="load()" class="px-3 py-2 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
+        <div class="flex items-center gap-2 ml-auto">
+            <span class="text-[13px] text-gray-500">Exportar:</span>
+            <button @click="exportCsv()" class="px-3 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl text-sm font-medium transition">CSV</button>
+            <button @click="exportXlsx()" class="px-3 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl text-sm font-medium transition">Excel</button>
+            <button @click="exportPdf()" class="px-3 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl text-sm font-medium transition">PDF</button>
+        </div>
+    </div>
+
+    {% verbatim %}
+    <div class="surface-hero mb-6">
+        <p class="text-[13px] font-semibold text-gray-500 uppercase tracking-wide mb-2">Total no periodo</p>
+        <p class="font-display text-[40px] font-semibold text-brand-500 leading-none" x-text="'R$ ' + fmtMoney(sellerData?.total_amount || 0)"></p>
+        <p class="text-[14px] text-gray-500 mt-2" x-text="(sellerData?.sale_count || 0) + ' vendas'"></p>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+        <div class="surface-card" x-show="sellerData?.evolution?.length">
+            <h2 class="text-[13px] font-semibold text-gray-500 uppercase tracking-wide mb-4">Evolucao no periodo</h2>
+            <div class="h-56"><canvas id="evolutionChart"></canvas></div>
+        </div>
+        <div class="surface-card" x-show="sellerData?.comparison?.length">
+            <h2 class="text-[13px] font-semibold text-gray-500 uppercase tracking-wide mb-4">Comparacao mensal</h2>
+            <table class="w-full text-left text-[13px]">
+                <thead>
+                    <tr><th class="py-2 text-gray-500">Mes</th><th class="py-2 text-gray-500 text-right">Vendas</th><th class="py-2 text-gray-500 text-right">Total</th><th class="py-2 text-gray-500 text-right">Comissao</th></tr>
+                </thead>
+                <tbody>
+                    <template x-for="c in sellerData?.comparison" :key="c.month">
+                        <tr class="border-t border-gray-100">
+                            <td class="py-2 font-medium" x-text="c.month"></td>
+                            <td class="py-2 text-right" x-text="c.sale_count"></td>
+                            <td class="py-2 text-right font-medium" x-text="'R$ ' + fmtMoney(c.total)"></td>
+                            <td class="py-2 text-right" x-text="'R$ ' + fmtMoney(c.commission)"></td>
+                        </tr>
+                    </template>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <div class="surface-card mb-6" x-show="sellerData?.sales?.length">
+        <h2 class="text-[13px] font-semibold text-gray-500 uppercase tracking-wide mb-4">Vendas do periodo</h2>
+        <table class="w-full text-left text-[14px]">
+            <thead>
+                <tr><th class="px-4 py-3 font-semibold text-gray-500 border-b border-gray-200 bg-gray-50">Data</th><th class="px-4 py-3 font-semibold text-gray-500 border-b border-gray-200 bg-gray-50">Valor</th><th class="px-4 py-3 font-semibold text-gray-500 border-b border-gray-200 bg-gray-50">Origem</th><th class="px-4 py-3 font-semibold text-gray-500 border-b border-gray-200 bg-gray-50">Observacao</th></tr>
+            </thead>
+            <tbody>
+                <template x-for="s in sellerData?.sales" :key="s.uuid">
+                    <tr class="hover:bg-gray-50">
+                        <td class="px-4 py-3 border-b border-gray-100 text-gray-500" x-text="new Date(s.sale_date).toLocaleDateString('pt-BR')"></td>
+                        <td class="px-4 py-3 border-b border-gray-100 font-semibold" x-text="'R$ ' + fmtMoney(s.amount)"></td>
+                        <td class="px-4 py-3 border-b border-gray-100"><span class="text-xs px-2 py-0.5 rounded-full font-medium" :class="s.origin==='LINK'?'bg-brand-50 text-brand-600':'bg-success-50 text-success-700'" x-text="s.origin_display"></span></td>
+                        <td class="px-4 py-3 border-b border-gray-100 text-gray-500" x-text="s.notes || '—'"></td>
+                    </tr>
+                </template>
+            </tbody>
+        </table>
+    </div>
+
+    <div class="surface-card" x-show="sellerData?.commissions?.length">
+        <h2 class="text-[13px] font-semibold text-gray-500 uppercase tracking-wide mb-4">Historico de comissoes</h2>
+        <div class="space-y-2">
+            <template x-for="c in sellerData?.commissions" :key="c.period_month + '/' + c.period_year">
+                <div class="flex items-center justify-between py-2 border-b border-gray-100 last:border-0">
+                    <span class="text-[14px] font-medium" x-text="String(c.period_month).padStart(2,'0')+'/'+c.period_year"></span>
+                    <span class="text-xs px-2 py-0.5 rounded-full font-medium"
+                          :class="{'bg-gray-100 text-gray-600': c.period_status==='ABERTA',
+                                   'bg-warning-50 text-warning-700': c.period_status==='EM_CONFERENCIA',
+                                   'bg-brand-50 text-brand-700': c.period_status==='ENVIADA_FINANCEIRO',
+                                   'bg-success-50 text-success-700': c.period_status==='APROVADA' || c.period_status==='PAGA'}"
+                          x-text="c.period_status.replace(/_/g,' ')"></span>
+                    <span class="text-[13px] text-gray-500" x-text="'Vendas: R$ '+fmtMoney(c.total_sold_amount)"></span>
+                    <span class="text-[14px] font-semibold text-success-700" x-text="'R$ '+fmtMoney(c.commission_amount)"></span>
+                </div>
+            </template>
+        </div>
+    </div>
+    {% endverbatim %}
+</div>
+
+<script>
+function sellerDetailPage() {
+    return {
+        sellerData: null,
+        month: new Date().getMonth() + 1,
+        year: new Date().getFullYear(),
+        startDate: '',
+        endDate: '',
+        sellerId: '',
+        chart: null,
+
+        init(sellerId) {
+            this.sellerId = sellerId;
+            this.load();
+        },
+
+        async load() {
+            var apiUrl = `/api/manager/seller/${this.sellerId}/`;
+            var params = new URLSearchParams();
+            if (this.startDate && this.endDate) {
+                params.set('start', this.startDate);
+                params.set('end', this.endDate);
+            } else {
+                params.set('month', this.month);
+                params.set('year', this.year);
+            }
+            var r = await fetch(apiUrl + '?' + params.toString());
+            this.sellerData = await r.json();
+            this.$nextTick(() => this.drawChart());
+        },
+
+        drawChart() {
+            if (this.chart) this.chart.destroy();
+            var ctx = document.getElementById('evolutionChart');
+            if (!ctx || !this.sellerData?.evolution?.length) return;
+            this.chart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: this.sellerData.evolution.map(e => new Date(e.date).toLocaleDateString('pt-BR', {day: '2-digit', month: '2-digit'})),
+                    datasets: [{
+                        label: 'Total (R$)',
+                        data: this.sellerData.evolution.map(e => e.total / 100),
+                        borderColor: '#4361ee',
+                        backgroundColor: 'rgba(67, 97, 238, 0.08)',
+                        fill: true,
+                        tension: 0.3,
+                        pointRadius: 2,
+                    }]
+                },
+                options: {
+                    responsive: true, maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: { y: { beginAtZero: true } }
+                }
+            });
+        },
+
+        fmtMoney(c) {
+            if (!c && c !== 0) return '0,00';
+            var r = Math.floor(c / 100);
+            return r.toLocaleString('pt-BR') + ',' + String(c % 100).padStart(2, '0');
+        },
+
+        buildParams() {
+            var p = new URLSearchParams();
+            if (this.startDate && this.endDate) {
+                p.set('start', this.startDate);
+                p.set('end', this.endDate);
+            } else {
+                p.set('month', this.month);
+                p.set('year', this.year);
+            }
+            return p.toString();
+        },
+
+        exportCsv() { window.open('/api/manager/seller/' + this.sellerId + '/csv/?' + this.buildParams()); },
+        exportXlsx() { window.open('/api/manager/seller/' + this.sellerId + '/xlsx/?' + this.buildParams()); },
+        exportPdf() { window.open('/api/manager/seller/' + this.sellerId + '/pdf/?' + this.buildParams()); },
+    }
+}
+</script>
+{% endblock %}

@@ -297,3 +297,301 @@ class ManagerSalesListView(generics.ListAPIView):
         if seller_uuid:
             qs = qs.filter(seller__uuid=seller_uuid)
         return qs
+
+
+class SellerDetailView(generics.GenericAPIView):
+    permission_classes = [IsAuthenticated, IsManagerOrAdmin]
+
+    def get(self, request, seller_id=None):
+        from datetime import date, timedelta
+
+        tenant = request.user.tenant
+        try:
+            seller = Seller.objects.select_related('user').get(uuid=seller_id, tenant=tenant)
+        except Seller.DoesNotExist:
+            return Response({'error': 'Vendedor nao encontrado.'}, status=404)
+
+        start_str = request.query_params.get('start')
+        end_str = request.query_params.get('end')
+        hoje = timezone.localdate()
+
+        if start_str and end_str:
+            start = date.fromisoformat(start_str)
+            end = date.fromisoformat(end_str)
+        else:
+            month = int(request.query_params.get('month', hoje.month))
+            year = int(request.query_params.get('year', hoje.year))
+            start = date(year, month, 1)
+            import calendar
+            last_day = calendar.monthrange(year, month)[1]
+            end = date(year, month, last_day)
+
+        sales_qs = Sale.objects.filter(
+            tenant=tenant, seller=seller,
+            sale_date__gte=start, sale_date__lte=end,
+        ).order_by('-sale_date', '-created_at')
+
+        total_amount = sales_qs.aggregate(t=Sum('amount'))['t'] or 0
+
+        sales = []
+        for s in sales_qs[:200]:
+            sales.append({
+                'uuid': str(s.uuid),
+                'amount': s.amount,
+                'origin': s.origin,
+                'origin_display': s.get_origin_display(),
+                'sale_date': s.sale_date.isoformat(),
+                'notes': s.notes or '',
+            })
+
+        commissions = SellerCommission.objects.filter(
+            seller=seller,
+        ).select_related('period').order_by('-period__year', '-period__month')
+
+        commissions_data = []
+        for sc in commissions:
+            commissions_data.append({
+                'period_month': sc.period.month,
+                'period_year': sc.period.year,
+                'period_status': sc.period.status,
+                'total_sold_amount': sc.total_sold_amount,
+                'commission_rate': float(sc.commission_rate),
+                'commission_amount': sc.commission_amount,
+            })
+
+        evo = sales_qs.values('sale_date').annotate(day_total=Sum('amount')).order_by('sale_date')
+        evolution = [{'date': e['sale_date'].isoformat(), 'total': e['day_total']} for e in evo]
+
+        comp_data = []
+        for m in range(5, -1, -1):
+            cm = hoje.month - m
+            cy = hoje.year
+            if cm <= 0:
+                cm += 12
+                cy -= 1
+            ms = date(cy, cm, 1)
+            import calendar
+            me = date(cy, cm, calendar.monthrange(cy, cm)[1])
+            mt = Sale.objects.filter(
+                tenant=tenant, seller=seller,
+                sale_date__gte=ms, sale_date__lte=me,
+            ).aggregate(t=Sum('amount'))['t'] or 0
+            mc = Sale.objects.filter(
+                tenant=tenant, seller=seller,
+                sale_date__gte=ms, sale_date__lte=me,
+            ).count()
+            sc_c = commissions.filter(period__month=cm, period__year=cy).first()
+            comp_data.append({
+                'month': f'{cm:02d}/{cy}',
+                'total': mt,
+                'sale_count': mc,
+                'commission': sc_c.commission_amount if sc_c else 0,
+            })
+
+        return Response({
+            'seller': {
+                'uuid': str(seller.uuid),
+                'name': seller.name,
+                'phone': seller.phone,
+                'is_active': seller.is_active,
+                'commission_rate': float(seller.commission_rate),
+                'created_at': seller.created_at.isoformat() if seller.created_at else None,
+                'username': seller.user.username if seller.user else None,
+            },
+            'period': {'start': start.isoformat(), 'end': end.isoformat()},
+            'total_amount': total_amount,
+            'sale_count': sales_qs.count(),
+            'sales': sales,
+            'commissions': commissions_data,
+            'evolution': evolution,
+            'comparison': comp_data,
+        })
+
+
+class SellerReportCsvView(generics.GenericAPIView):
+    permission_classes = [IsAuthenticated, IsManagerOrAdmin]
+
+    def get(self, request, seller_id=None):
+        import csv, io
+
+        tenant = request.user.tenant
+        seller = Seller.objects.get(uuid=seller_id, tenant=tenant)
+
+        start_str = request.query_params.get('start')
+        end_str = request.query_params.get('end')
+        hoje = timezone.localdate()
+
+        if start_str and end_str:
+            from datetime import date
+            start = date.fromisoformat(start_str)
+            end = date.fromisoformat(end_str)
+        else:
+            from datetime import date
+            import calendar
+            month = int(request.query_params.get('month', hoje.month))
+            year = int(request.query_params.get('year', hoje.year))
+            start = date(year, month, 1)
+            end = date(year, month, calendar.monthrange(year, month)[1])
+
+        sales = Sale.objects.filter(
+            tenant=tenant, seller=seller,
+            sale_date__gte=start, sale_date__lte=end,
+        ).order_by('sale_date')
+
+        buf = io.StringIO()
+        writer = csv.writer(buf)
+        writer.writerow(['Data', 'Valor (R$)', 'Origem', 'Observacao'])
+        total = 0
+        for s in sales:
+            writer.writerow([
+                s.sale_date.isoformat(),
+                f'{s.amount / 100:.2f}',
+                s.get_origin_display(),
+                s.notes or '',
+            ])
+            total += s.amount
+
+        writer.writerow([])
+        writer.writerow(['TOTAL', f'{total / 100:.2f}', '', ''])
+        writer.writerow([])
+        writer.writerow([f'Vendedor: {seller.name}'])
+        writer.writerow([f'Empresa: {tenant.company_name}'])
+        writer.writerow([f'Periodo: {start.isoformat()} a {end.isoformat()}'])
+
+        response = Response(buf.getvalue(), content_type='text/csv; charset=utf-8')
+        response['Content-Disposition'] = f'attachment; filename="{seller.name}_{start}_{end}.csv"'
+        return response
+
+
+class SellerReportExcelView(generics.GenericAPIView):
+    permission_classes = [IsAuthenticated, IsManagerOrAdmin]
+
+    def get(self, request, seller_id=None):
+        import io
+        from datetime import date
+        import calendar
+        from openpyxl import Workbook
+        from openpyxl.styles import Font, Alignment, PatternFill, numbers
+
+        tenant = request.user.tenant
+        seller = Seller.objects.get(uuid=seller_id, tenant=tenant)
+
+        start_str = request.query_params.get('start')
+        end_str = request.query_params.get('end')
+        hoje = timezone.localdate()
+
+        if start_str and end_str:
+            start = date.fromisoformat(start_str)
+            end = date.fromisoformat(end_str)
+        else:
+            month = int(request.query_params.get('month', hoje.month))
+            year = int(request.query_params.get('year', hoje.year))
+            start = date(year, month, 1)
+            end = date(year, month, calendar.monthrange(year, month)[1])
+
+        sales = Sale.objects.filter(
+            tenant=tenant, seller=seller,
+            sale_date__gte=start, sale_date__lte=end,
+        ).order_by('sale_date')
+
+        wb = Workbook()
+        ws = wb.active
+        ws.title = 'Vendas'
+
+        header_font = Font(bold=True, size=12)
+        total_font = Font(bold=True, size=11)
+        header_fill = PatternFill(start_color='4361EE', end_color='4361EE', fill_type='solid')
+        header_font_white = Font(bold=True, color='FFFFFF', size=11)
+
+        ws.merge_cells('A1:D1')
+        ws['A1'] = f'{seller.name} — {tenant.company_name}'
+        ws['A1'].font = header_font
+        ws.merge_cells('A2:D2')
+        ws['A2'] = f'Periodo: {start.strftime("%d/%m/%Y")} a {end.strftime("%d/%m/%Y")}'
+        ws['A2'].font = Font(size=10, color='666666')
+
+        ws.append([])
+        headers = ['Data', 'Valor (R$)', 'Origem', 'Observacao']
+        ws.append(headers)
+        for col in range(1, 5):
+            cell = ws.cell(row=4, column=col)
+            cell.font = header_font_white
+            cell.fill = header_fill
+            cell.alignment = Alignment(horizontal='center')
+
+        total = 0
+        for s in sales:
+            ws.append([
+                s.sale_date.strftime('%d/%m/%Y'),
+                s.amount / 100,
+                s.get_origin_display(),
+                s.notes or '',
+            ])
+            total += s.amount
+
+        ws.append([])
+        ws.append(['TOTAL', total / 100, '', ''])
+        for col in range(1, 5):
+            ws.cell(row=ws.max_row, column=col).font = total_font
+
+        ws.column_dimensions['A'].width = 14
+        ws.column_dimensions['B'].width = 16
+        ws.column_dimensions['C'].width = 12
+        ws.column_dimensions['D'].width = 40
+
+        buf = io.BytesIO()
+        wb.save(buf)
+        buf.seek(0)
+
+        response = Response(buf.getvalue(), content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+        response['Content-Disposition'] = f'attachment; filename="{seller.name}_{start}_{end}.xlsx"'
+        return response
+
+
+class SellerReportPdfView(generics.GenericAPIView):
+    permission_classes = [IsAuthenticated, IsManagerOrAdmin]
+
+    def get(self, request, seller_id=None):
+        from datetime import date
+        import calendar
+        from django.template.loader import render_to_string
+
+        tenant = request.user.tenant
+        seller = Seller.objects.get(uuid=seller_id, tenant=tenant)
+
+        start_str = request.query_params.get('start')
+        end_str = request.query_params.get('end')
+        hoje = timezone.localdate()
+
+        if start_str and end_str:
+            start = date.fromisoformat(start_str)
+            end = date.fromisoformat(end_str)
+        else:
+            month = int(request.query_params.get('month', hoje.month))
+            year = int(request.query_params.get('year', hoje.year))
+            start = date(year, month, 1)
+            end = date(year, month, calendar.monthrange(year, month)[1])
+
+        sales = Sale.objects.filter(
+            tenant=tenant, seller=seller,
+            sale_date__gte=start, sale_date__lte=end,
+        ).order_by('sale_date')
+
+        total = sum(s.amount for s in sales)
+
+        html = render_to_string('reports/seller_report_pdf.html', {
+            'seller': seller,
+            'tenant': tenant,
+            'start': start,
+            'end': end,
+            'sales': sales,
+            'total': total,
+            'hoje': hoje,
+        })
+
+        from weasyprint import HTML
+        pdf = HTML(string=html).write_pdf()
+
+        response = Response(pdf, content_type='application/pdf')
+        response['Content-Disposition'] = f'attachment; filename="{seller.name}_{start}_{end}.pdf"'
+        return response

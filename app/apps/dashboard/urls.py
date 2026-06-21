@@ -12,6 +12,7 @@ urlpatterns = [
     path('gestor/', desktop_views.gestor_home, name='gestor_home'),
     path('gestor/ranking/', desktop_views.gestor_ranking, name='gestor_ranking'),
     path('gestor/vendedores/', desktop_views.gestor_vendedores, name='gestor_vendedores'),
+    path('gestor/vendedores/<uuid:seller_id>/', desktop_views.gestor_vendedor_detalhe, name='gestor_vendedor_detalhe'),
     path('gestor/fechamento/', desktop_views.gestor_fechamento, name='gestor_fechamento'),
     path('gestor/configuracoes/', desktop_views.gestor_configuracoes, name='gestor_configuracoes'),
 

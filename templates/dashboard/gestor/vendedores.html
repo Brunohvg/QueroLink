@@ -15,7 +15,9 @@
             <tbody>
                 <template x-for="s in sellers" :key="s.uuid">
                     <tr class="hover:bg-gray-50">
-                        <td class="px-4 py-3 border-b border-gray-100 font-medium" x-text="s.name"></td>
+                        <td class="px-4 py-3 border-b border-gray-100 font-medium">
+                            <a :href="'/dashboard/gestor/vendedores/' + s.uuid + '/'" class="text-brand-500 hover:underline" x-text="s.name"></a>
+                        </td>
                         <td class="px-4 py-3 border-b border-gray-100 text-gray-500" x-text="s.phone"></td>
                         <td class="px-4 py-3 border-b border-gray-100 text-sm text-gray-500" x-text="s.username || '-'"></td>
                         <td class="px-4 py-3 border-b border-gray-100" x-text="(parseFloat(s.commission_rate)*100).toFixed(2)+'%'"></td>

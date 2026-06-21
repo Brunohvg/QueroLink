@@ -43,33 +43,33 @@ def logout_view(request):
 
 @login_required
 def dashboard_home(request):
-    # O dashboard agora é multi-tenant real: usa o tenant vinculado ao usuário logado
+    user = request.user
+    if user.role in (User.Role.MANAGER, User.Role.ADMIN):
+        return redirect('dashboard:gestor_home')
+    elif user.role == User.Role.FINANCEIRO:
+        return redirect('dashboard:financeiro_fila')
+    elif user.role == User.Role.SELLER:
+        return redirect('dashboard:mobile_home')
+
     tenant = request.user.tenant
-    
     if not tenant:
-        # Se for um superuser sem tenant, ele pode ter uma visão global ou ser bloqueado
         if request.user.is_superuser:
             tenant = Tenant.objects.first()
-            if not tenant:
-                return render(request, 'dashboard/index.html', {"error": "Nenhum tenant cadastrado no sistema ainda."})
-        else:
-            return render(request, 'dashboard/index.html', {"error": "Sua conta não está vinculada a nenhuma loja/tenant."})
+        if not tenant:
+            return render(request, 'dashboard/index.html', {"error": "Nenhum tenant cadastrado no sistema ainda."})
 
-    # Métricas
     total_orders = Order.objects.filter(tenant=tenant).count()
     paid_orders = Order.objects.filter(tenant=tenant, status=Order.Status.COMPLETED)
     total_revenue = paid_orders.aggregate(total=Sum('total_amount'))['total'] or 0
     total_revenue_formatted = total_revenue / 100
-
     recent_orders = Order.objects.filter(tenant=tenant).order_by('-created_at')[:10]
 
-    context = {
+    return render(request, 'dashboard/index.html', {
         'total_orders': total_orders,
         'paid_orders_count': paid_orders.count(),
         'total_revenue': total_revenue_formatted,
         'recent_orders': recent_orders,
-    }
-    return render(request, 'dashboard/index.html', context)
+    })
 
 
 @login_required

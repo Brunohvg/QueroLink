@@ -50,6 +50,17 @@
     </div>
 </div>
 
+<div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+    <div class="surface-card">
+        <p class="text-[13px] font-semibold text-gray-500 uppercase tracking-wide mb-1">Links de pagamento gerados</p>
+        <p class="text-[28px] font-semibold text-gray-900">{{ total_orders }}</p>
+    </div>
+    <div class="surface-card">
+        <p class="text-[13px] font-semibold text-gray-500 uppercase tracking-wide mb-1">Links pagos</p>
+        <p class="text-[28px] font-semibold text-success-700">{{ paid_orders_count }}</p>
+    </div>
+</div>
+
 <h2 class="font-display text-[18px] font-semibold text-gray-900 mb-4">Acesso rapido</h2>
 <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
     <a href="{% url 'dashboard:gestor_ranking' %}" class="surface-card hover:border-brand-500 transition tap-target block">

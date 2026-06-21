@@ -35,7 +35,7 @@ class TenantRegistrationFormTest(TestCase):
     def test_successful_registration_creates_tenant_and_user(self):
         response = self._post()
         self.assertEqual(response.status_code, 302)
-        self.assertRedirects(response, reverse('dashboard:home'))
+        self.assertRedirects(response, reverse('dashboard:gestor_home'))
 
         tenant = Tenant.objects.get(company_name='Loja Teste')
         self.assertEqual(tenant.cnpj, VALID_CNPJ)
@@ -123,8 +123,8 @@ class TenantRegistrationFormTest(TestCase):
             tenant=tenant,
         )
         self.client.force_login(user)
-        response = self.client.get(self.url)
-        self.assertRedirects(response, reverse('dashboard:home'))
+        response = self.client.get(self.url, follow=True)
+        self.assertRedirects(response, reverse('dashboard:gestor_home'))
 
 
 class TenantIsolationAfterSignupTest(TestCase):
@@ -187,7 +187,7 @@ class TenantIsolationAfterSignupTest(TestCase):
         )
 
         self.client.force_login(self.admin_a)
-        response = self.client.get(reverse('dashboard:home'))
+        response = self.client.get(reverse('dashboard:gestor_home'))
         self.assertEqual(response.status_code, 200)
 
         tenant_a_sellers = Seller.objects.filter(tenant=self.tenant_a)
