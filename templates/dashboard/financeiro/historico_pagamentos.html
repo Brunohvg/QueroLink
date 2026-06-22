@@ -1,5 +1,5 @@
 {% extends 'dashboard/base_desktop.html' %}
-{% block title %}Histórico de Pagamentos — QueroLink{% endblock %}
+{% block title %}Historico de Pagamentos — QueroLink{% endblock %}
 {% block content %}
 <div x-data="historicoPage()" x-init="load()">
     <h1 class="font-display text-[18px] font-semibold text-gray-900 mb-6">Historico de Pagamentos</h1>
@@ -9,11 +9,12 @@
             <div class="flex items-center justify-between mb-3">
                 <div class="flex items-center gap-3">
                     <h3 class="font-semibold text-[18px]" x-text="String(p.month).padStart(2,'0')+'/'+p.year"></h3>
-                    <span x-show="p.status==='APROVADA'" class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-success-50 text-success-700">APROVADA</span>
+                    <span x-show="p.status==='FECHADA'" class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-warning-50 text-warning-700">FECHADA</span>
                     <span x-show="p.status==='PAGA'" class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-success-50 text-success-700">PAGA</span>
+                    <span x-show="p.status==='AJUSTADA'" class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-amber-50 text-amber-700">AJUSTADA</span>
                 </div>
                 <div class="flex items-center gap-2">
-                    <button @click="markPaid(p)" x-show="p.status==='APROVADA'" class="bg-success-500 hover:bg-success-700 text-white font-medium py-2 px-4 rounded-xl transition tap-target text-[15px] shadow-md flex items-center gap-1">
+                    <button @click="markPaid(p)" x-show="p.status==='FECHADA'" class="bg-success-500 hover:bg-success-700 text-white font-medium py-2 px-4 rounded-xl transition tap-target text-[15px] shadow-md flex items-center gap-1">
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
                         Marcar Pago
                     </button>
@@ -25,7 +26,7 @@
             </div>
 
             <table class="w-full text-left text-[14px]">
-                <thead><tr><th class="px-4 py-3 font-semibold text-gray-500 border-b border-gray-200 bg-gray-50">Vendedor</th><th class="px-4 py-3 font-semibold text-gray-500 border-b border-gray-200 bg-gray-50">Total Vendido</th><th class="px-4 py-3 font-semibold text-gray-500 border-b border-gray-200 bg-gray-50">Comissão</th><th class="px-4 py-3 font-semibold text-gray-500 border-b border-gray-200 bg-gray-50">Notificação</th></tr></thead>
+                <thead><tr><th class="px-4 py-3 font-semibold text-gray-500 border-b border-gray-200 bg-gray-50">Vendedor</th><th class="px-4 py-3 font-semibold text-gray-500 border-b border-gray-200 bg-gray-50">Total Vendido</th><th class="px-4 py-3 font-semibold text-gray-500 border-b border-gray-200 bg-gray-50">Comissao</th><th class="px-4 py-3 font-semibold text-gray-500 border-b border-gray-200 bg-gray-50">Notificacao</th></tr></thead>
                 <tbody>
                     <template x-for="sc in p.seller_commissions" :key="sc.id">
                         <tr class="hover:bg-gray-50">
@@ -44,7 +45,7 @@
             </table>
         </div>
     </template>
-    <div x-show="!periods.length" class="text-center py-12 text-gray-500">Nenhuma competência aprovada ou paga.</div>
+    <div x-show="!periods.length" class="text-center py-12 text-gray-500">Nenhuma competencia fechada ou paga.</div>
 </div>
 
 <script>
@@ -62,16 +63,17 @@ function historicoPage() {
     return {
         periods: [],
         async load() {
-            var a = await fetch('/api/manager/commissions/APROVADA/').then(r=>r.json());
+            var a = await fetch('/api/manager/commissions/FECHADA/').then(r=>r.json());
             var p = await fetch('/api/manager/commissions/PAGA/').then(r=>r.json());
-            this.periods = [...a, ...p].sort((a,b)=>b.year-a.year||b.month-a.month);
+            var aj = await fetch('/api/manager/commissions/AJUSTADA/').then(r=>r.json());
+            this.periods = [...a, ...p, ...aj].sort((a,b)=>b.year-a.year||b.month-a.month);
         },
+        formatMoneyBRL(cents) { return 'R$ ' + (cents / 100).toFixed(2).replace('.', ','); },
         async markPaid(p) {
             if (!confirm('Marcar como pago? Notificacoes serao enviadas.')) return;
             var r = await fetch(`/api/commissions/periods/${p.uuid}/mark_paid/`, { method:'POST', headers:{'X-CSRFToken': getCSRFToken()} });
             if (r.ok) this.load(); else { var d = await r.json(); alert(d.error||'Erro'); }
         },
-
     }
 }
 </script>

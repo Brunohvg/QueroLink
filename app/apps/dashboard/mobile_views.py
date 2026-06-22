@@ -1,5 +1,7 @@
 from django.shortcuts import render, redirect
-from django.contrib.auth import authenticate, login as auth_login, logout as auth_logout
+from django.contrib.auth import (
+    authenticate, login as auth_login, logout as auth_logout,
+)
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.utils import timezone
@@ -11,10 +13,14 @@ from django.db.models import Sum
 from app.apps.accounts.models import User
 from app.apps.sales.models import Sale
 from app.apps.commissions.models import CommissionPeriod, SellerCommission
+from app.apps.audit.utils import log_action
 
 
 def mobile_login(request):
-    if request.user.is_authenticated and request.user.role == User.Role.SELLER:
+    if (
+        request.user.is_authenticated
+        and request.user.role == User.Role.SELLER
+    ):
         return redirect('dashboard:mobile_home')
     return render(request, 'mobile/login.html')
 
@@ -30,41 +36,65 @@ def mobile_forgot_password(request):
         identifier = request.POST.get('identifier', '').strip()
         pin = request.POST.get('pin', '').strip()
         new_password = request.POST.get('new_password', '').strip()
-        confirm_password = request.POST.get('confirm_password', '').strip()
+        confirm_password = request.POST.get(
+            'confirm_password', '',
+        ).strip()
 
         if pin and new_password:
             if new_password != confirm_password:
-                return render(request, 'mobile/forgot_password.html', {'step': 'verify', 'identifier': identifier, 'error': 'Senhas nao conferem.'})
+                return render(request, 'mobile/forgot_password.html', {
+                    'step': 'verify', 'identifier': identifier,
+                    'error': 'Senhas nao conferem.',
+                })
 
             if len(new_password) < 8:
-                return render(request, 'mobile/forgot_password.html', {'step': 'verify', 'identifier': identifier, 'error': 'Senha deve ter pelo menos 8 caracteres.'})
+                return render(request, 'mobile/forgot_password.html', {
+                    'step': 'verify', 'identifier': identifier,
+                    'error': 'Senha deve ter pelo menos 8 caracteres.',
+                })
 
-            from app.apps.notifications.models import PasswordResetRequest as PRR
-            from django.utils import timezone
+            from app.apps.notifications.models import (
+                PasswordResetRequest as PRR,
+            )
+            from django.utils import timezone as tz
 
             try:
-                reset = PRR.objects.get(pin=pin, used=False, expires_at__gt=timezone.now())
+                reset = PRR.objects.get(
+                    pin=pin, used=False, expires_at__gt=tz.now(),
+                )
             except PRR.DoesNotExist:
-                return render(request, 'mobile/forgot_password.html', {'step': 'verify', 'identifier': identifier, 'error': 'PIN invalido ou expirado.'})
+                return render(request, 'mobile/forgot_password.html', {
+                    'step': 'verify', 'identifier': identifier,
+                    'error': 'PIN invalido ou expirado.',
+                })
 
             if reset.attempts >= 3:
                 reset.used = True
                 reset.save()
-                return render(request, 'mobile/forgot_password.html', {'step': 'verify', 'identifier': identifier, 'error': 'Muitas tentativas. Solicite um novo PIN.'})
+                return render(request, 'mobile/forgot_password.html', {
+                    'step': 'verify', 'identifier': identifier,
+                    'error': (
+                        'Muitas tentativas. Solicite um novo PIN.'
+                    ),
+                })
 
             user = reset.user
             if user.username != identifier and user.email != identifier:
                 reset.attempts += 1
                 reset.save()
-                return render(request, 'mobile/forgot_password.html', {'step': 'verify', 'identifier': identifier, 'error': 'PIN nao corresponde ao usuario.'})
+                return render(request, 'mobile/forgot_password.html', {
+                    'step': 'verify', 'identifier': identifier,
+                    'error': 'PIN nao corresponde ao usuario.',
+                })
 
             user.set_password(new_password)
             user.save()
             reset.used = True
             reset.save()
 
-            from django.contrib.auth import authenticate, login as auth_login
-            user = authenticate(request, username=user.username, password=new_password)
+            user = authenticate(
+                request, username=user.username, password=new_password,
+            )
             if user is not None:
                 auth_login(request, user)
                 return redirect('dashboard:mobile_home')
@@ -77,20 +107,33 @@ def mobile_forgot_password(request):
                 try:
                     user = UserModel.objects.get(email=identifier)
                 except UserModel.DoesNotExist:
-                    return render(request, 'mobile/forgot_password.html', {'step': 'request', 'error': 'Usuario nao encontrado.'})
+                    return render(request, 'mobile/forgot_password.html', {
+                        'step': 'request',
+                        'error': 'Usuario nao encontrado.',
+                    })
 
             if not user.seller_profile:
-                return render(request, 'mobile/forgot_password.html', {'step': 'request', 'error': 'Recuperacao de senha disponivel apenas para vendedores.'})
+                return render(request, 'mobile/forgot_password.html', {
+                    'step': 'request',
+                    'error': (
+                        'Recuperacao de senha disponivel '
+                        'apenas para vendedores.'
+                    ),
+                })
 
-            from app.apps.notifications.models import PasswordResetRequest as PRR
+            from app.apps.notifications.models import (
+                PasswordResetRequest as PRR,
+            )
             from django.utils.crypto import get_random_string
-            from django.utils import timezone
-            from datetime import timedelta
+            from django.utils import timezone as tz
+            from datetime import timedelta as td
 
             pin = get_random_string(length=6, allowed_chars='0123456789')
-            PRR.objects.create(user=user, pin=pin, expires_at=timezone.now() + timedelta(minutes=10))
+            PRR.objects.create(
+                user=user, pin=pin,
+                expires_at=tz.now() + td(minutes=10),
+            )
 
-            from app.apps.notifications.tasks import notify_seller_credentials
             try:
                 from app.apps.notifications.models import Notification
                 seller = user.seller_profile
@@ -98,59 +141,84 @@ def mobile_forgot_password(request):
                     tenant=seller.tenant, seller=seller,
                     event_type='seller_credentials', channel='whatsapp',
                     recipient=seller.phone,
-                    message_body=f'Seu PIN de recuperacao de senha QueroLink: {pin}. Valido por 10 minutos.',
+                    message_body=(
+                        f'Seu PIN de recuperacao de senha QueroLink: '
+                        f'{pin}. Valido por 10 minutos.'
+                    ),
                 )
             except Exception:
                 pass
 
-            return render(request, 'mobile/forgot_password.html', {'step': 'verify', 'identifier': identifier, 'message': 'Um PIN de 6 digitos foi enviado via WhatsApp.'})
+            return render(request, 'mobile/forgot_password.html', {
+                'step': 'verify', 'identifier': identifier,
+                'message': (
+                    'Um PIN de 6 digitos foi enviado via WhatsApp.'
+                ),
+            })
 
-    return render(request, 'mobile/forgot_password.html', {'step': 'request'})
+    return render(
+        request, 'mobile/forgot_password.html', {'step': 'request'},
+    )
 
 
 @login_required
 def mobile_home(request):
     seller = _get_seller_profile(request)
     if not seller:
-        return render(request, 'mobile/home.html', {'error': 'Perfil de vendedor nao encontrado.'})
+        return render(request, 'mobile/home.html', {
+            'error': 'Perfil de vendedor nao encontrado.',
+        })
 
     today = timezone.localdate()
-    today_sales = Sale.objects.filter(seller=seller, sale_date=today)
-    today_total = sum(s.amount for s in today_sales)
-    today_count = today_sales.count()
+    today_manual = Sale.objects.filter(
+        seller=seller, origin=Sale.Origin.MANUAL, sale_date=today,
+    ).first()
+    today_total = today_manual.amount if today_manual else 0
+    has_entry_today = today_manual is not None
 
     month_total = Sale.objects.filter(
         seller=seller,
+        origin=Sale.Origin.MANUAL,
         sale_date__year=today.year,
         sale_date__month=today.month,
     ).aggregate(total=Sum('amount'))['total'] or 0
 
-    month_count = Sale.objects.filter(
+    month_link_total = Sale.objects.filter(
         seller=seller,
+        origin=Sale.Origin.LINK,
         sale_date__year=today.year,
         sale_date__month=today.month,
-    ).count()
-
-    from app.apps.commissions.models import SellerCommission, CommissionPeriod
-    comissao_a_receber = SellerCommission.objects.filter(
-        seller=seller,
-    ).exclude(
-        period__status=CommissionPeriod.Status.PAGA,
-        approval_status=SellerCommission.ApprovalStatus.REJEITADO,
-    ).aggregate(total=Sum('commission_amount'))['total'] or 0
-
-    total_vendido = Sale.objects.filter(
-        seller=seller,
     ).aggregate(total=Sum('amount'))['total'] or 0
+
+    comissao_estimada = SellerCommission.objects.filter(
+        seller=seller,
+        period__month=today.month,
+        period__year=today.year,
+    ).first()
+    comissao_estimada_valor = (
+        comissao_estimada.commission_amount if comissao_estimada else 0
+    )
+
+    periodo_status = (
+        comissao_estimada.period.status if comissao_estimada else None
+    )
+    periodo_fechado = periodo_status in (
+        CommissionPeriod.Status.FECHADA,
+        CommissionPeriod.Status.PAGA,
+        CommissionPeriod.Status.AJUSTADA,
+        CommissionPeriod.Status.CANCELADA,
+    )
 
     return render(request, 'mobile/home.html', {
         'seller': seller,
         'today_total': today_total,
-        'today_count': today_count,
+        'has_entry_today': has_entry_today,
         'month_total': month_total,
-        'month_count': month_count,
-        'comissao_a_receber': comissao_a_receber,
-        'total_vendido': total_vendido,
+        'month_link_total': month_link_total,
+        'comissao_estimada': comissao_estimada_valor,
+        'comissao_valor': comissao_estimada,
+        'periodo_status': periodo_status,
+        'periodo_fechado': periodo_fechado,
     })
 
 
@@ -158,10 +226,13 @@ def mobile_home(request):
 def mobile_lancar_venda(request):
     seller = _get_seller_profile(request)
     if not seller:
-        return render(request, 'mobile/lancar_venda.html', {'error': 'Perfil de vendedor nao encontrado.'})
+        return render(request, 'mobile/lancar_venda.html', {
+            'error': 'Perfil de vendedor nao encontrado.',
+        })
 
     success = None
     error = None
+    existing_sale = None
 
     if request.method == 'POST':
         try:
@@ -172,25 +243,104 @@ def mobile_lancar_venda(request):
             if amount_cents <= 0:
                 raise ValueError('Valor deve ser maior que zero.')
 
-            sale_date = date.fromisoformat(sale_date_str) if sale_date_str else timezone.localdate()
+            sale_date = (
+                date.fromisoformat(sale_date_str)
+                if sale_date_str else timezone.localdate()
+            )
 
-            Sale.objects.create(
+            today = timezone.localdate()
+            if sale_date > today:
+                raise ValueError(
+                    'Nao e possivel lancar vendas em data futura.',
+                )
+
+            if (
+                sale_date.year < today.year
+                or (
+                    sale_date.year == today.year
+                    and sale_date.month < today.month
+                )
+            ):
+                raise ValueError(
+                    'Nao e possivel lancar ou editar vendas de meses '
+                    'anteriores. Entre em contato com seu gestor.',
+                )
+
+            blocked_statuses = [
+                CommissionPeriod.Status.FECHADA,
+                CommissionPeriod.Status.PAGA,
+                CommissionPeriod.Status.AJUSTADA,
+                CommissionPeriod.Status.CANCELADA,
+            ]
+            periodo_bloqueado = CommissionPeriod.objects.filter(
                 tenant=seller.tenant,
+                month=sale_date.month,
+                year=sale_date.year,
+                status__in=blocked_statuses,
+            ).exists()
+
+            if periodo_bloqueado:
+                raise ValueError(
+                    'Este periodo ja foi fechado. '
+                    'Nao e possivel lancar ou editar vendas para este mes. '
+                    'Entre em contato com seu gestor se precisar de um '
+                    'ajuste.',
+                )
+
+            existing = Sale.objects.filter(
                 seller=seller,
                 origin=Sale.Origin.MANUAL,
-                amount=amount_cents,
                 sale_date=sale_date,
-                notes=notes,
-                created_by=request.user,
-            )
+            ).first()
+
+            if existing:
+                existing.amount = amount_cents
+                existing.notes = notes
+                existing.updated_by = request.user
+                existing.save()
+                log_action(
+                    request, 'sale.updated', instance=existing,
+                    changes={
+                        'sale_date': str(sale_date),
+                        'amount': amount_cents,
+                    },
+                )
+            else:
+                sale = Sale.objects.create(
+                    tenant=seller.tenant,
+                    seller=seller,
+                    origin=Sale.Origin.MANUAL,
+                    amount=amount_cents,
+                    sale_date=sale_date,
+                    notes=notes,
+                    created_by=request.user,
+                )
+                log_action(
+                    request, 'sale.created', instance=sale,
+                )
+
             success = True
         except (ValueError, Exception) as e:
             error = str(e)
+
+    if request.method == 'GET':
+        sale_date_str = request.GET.get('date', '')
+        if sale_date_str:
+            try:
+                query_date = date.fromisoformat(sale_date_str)
+                existing_sale = Sale.objects.filter(
+                    seller=seller,
+                    origin=Sale.Origin.MANUAL,
+                    sale_date=query_date,
+                ).first()
+            except (ValueError, Exception):
+                pass
 
     return render(request, 'mobile/lancar_venda.html', {
         'seller': seller,
         'success': success,
         'error': error,
+        'existing_sale': existing_sale,
     })
 
 
@@ -198,9 +348,13 @@ def mobile_lancar_venda(request):
 def mobile_minhas_vendas(request):
     seller = _get_seller_profile(request)
     if not seller:
-        return render(request, 'mobile/minhas_vendas.html', {'error': 'Perfil de vendedor nao encontrado.'})
+        return render(request, 'mobile/minhas_vendas.html', {
+            'error': 'Perfil de vendedor nao encontrado.',
+        })
 
-    sales = Sale.objects.filter(seller=seller).order_by('-sale_date', '-created_at')
+    sales = Sale.objects.filter(seller=seller).order_by(
+        '-sale_date', '-created_at',
+    )
 
     return render(request, 'mobile/minhas_vendas.html', {
         'seller': seller,
@@ -212,11 +366,14 @@ def mobile_minhas_vendas(request):
 def mobile_meu_desempenho(request):
     seller = _get_seller_profile(request)
     if not seller:
-        return render(request, 'mobile/meu_desempenho.html', {'error': 'Perfil de vendedor nao encontrado.'})
+        return render(request, 'mobile/meu_desempenho.html', {
+            'error': 'Perfil de vendedor nao encontrado.',
+        })
 
     today = timezone.localdate()
     month_total = Sale.objects.filter(
         seller=seller,
+        origin=Sale.Origin.MANUAL,
         sale_date__year=today.year,
         sale_date__month=today.month,
     ).aggregate(total=Sum('amount'))['total'] or 0
@@ -248,8 +405,10 @@ def mobile_links(request):
     from app.apps.orders.models import Order
     from app.apps.payments.models import Payment
     orders = Order.objects.filter(
-        seller=seller, tenant=seller.tenant
-    ).select_related('seller').prefetch_related('payments').order_by('-created_at')[:50]
+        seller=seller, tenant=seller.tenant,
+    ).select_related('seller').prefetch_related(
+        'payments',
+    ).order_by('-created_at')[:50]
     orders_data = []
     for o in orders:
         try:
@@ -269,4 +428,6 @@ def mobile_links(request):
             'refusal_reason': refusal,
             'created_at': o.created_at.isoformat(),
         })
-    return render(request, 'mobile/links.html', {'seller': seller, 'orders_json': orders_data})
+    return render(request, 'mobile/links.html', {
+        'seller': seller, 'orders_json': orders_data,
+    })

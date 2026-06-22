@@ -4,7 +4,7 @@
 <div x-data="fechamentoPage()" x-init="load()">
     <div class="flex items-center justify-between mb-6">
         <h1 class="font-display text-[18px] font-semibold text-gray-900">Fechamento de Comissoes</h1>
-        {% include 'components/_button.html' with variant='primary' label='Novo Período' icon_svg='<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>' onclick='createPeriod()' %}
+        {% include 'components/_button.html' with variant='primary' label='Novo Periodo' icon_svg='<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>' onclick='createPeriod()' %}
     </div>
 
     <template x-for="p in periods" :key="p.uuid">
@@ -14,20 +14,19 @@
                     <h3 class="font-semibold text-[18px]" x-text="String(p.month).padStart(2,'0')+'/'+p.year"></h3>
                     <span x-show="p.status==='ABERTA'" class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-600">ABERTA</span>
                     <span x-show="p.is_current_month && p.status==='ABERTA'" class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-warning-50 text-warning-700">Mes em andamento</span>
-                    <span x-show="p.status==='EM_CONFERENCIA'" class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-warning-50 text-warning-700">EM CONFERÊNCIA</span>
-                    <span x-show="p.status==='ENVIADA_FINANCEIRO'" class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-brand-50 text-brand-700">ENVIADA</span>
-                    <span x-show="p.status==='APROVADA'" class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-success-50 text-success-700">APROVADA</span>
+                    <span x-show="p.status==='FECHADA'" class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-warning-50 text-warning-700">FECHADA</span>
                     <span x-show="p.status==='PAGA'" class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-success-50 text-success-700">PAGA</span>
+                    <span x-show="p.status==='AJUSTADA'" class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-amber-50 text-amber-700">AJUSTADA</span>
+                    <span x-show="p.status==='CANCELADA'" class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-danger-50 text-danger-700">CANCELADA</span>
                 </div>
                 <div class="flex gap-2">
-                    <button @click="closePeriod(p)" x-show="p.status==='ABERTA'" class="bg-brand-500 hover:bg-brand-600 text-white font-medium py-2 px-4 rounded-xl transition tap-target text-[15px]">Fechar Mês</button>
-                    <button @click="sendPeriod(p)" x-show="p.status==='EM_CONFERENCIA'" class="bg-brand-500 hover:bg-brand-600 text-white font-medium py-2 px-4 rounded-xl transition tap-target text-[15px]">Enviar ao Financeiro</button>
+                    <button @click="closePeriod(p)" x-show="p.status==='ABERTA'" class="bg-brand-500 hover:bg-brand-600 text-white font-medium py-2 px-4 rounded-xl transition tap-target text-[15px]">Fechar Mes</button>
                 </div>
             </div>
 
             <table class="w-full text-left text-[14px]" x-show="p.seller_commissions&&p.seller_commissions.length">
                 <thead>
-                    <tr><th class="px-4 py-3 font-semibold text-gray-500 border-b border-gray-200 bg-gray-50">Vendedor</th><th class="px-4 py-3 font-semibold text-gray-500 border-b border-gray-200 bg-gray-50">Total Vendido</th><th class="px-4 py-3 font-semibold text-gray-500 border-b border-gray-200 bg-gray-50">Taxa</th><th class="px-4 py-3 font-semibold text-gray-500 border-b border-gray-200 bg-gray-50">Comissão</th></tr>
+                    <tr><th class="px-4 py-3 font-semibold text-gray-500 border-b border-gray-200 bg-gray-50">Vendedor</th><th class="px-4 py-3 font-semibold text-gray-500 border-b border-gray-200 bg-gray-50">Total Vendido</th><th class="px-4 py-3 font-semibold text-gray-500 border-b border-gray-200 bg-gray-50">Taxa</th><th class="px-4 py-3 font-semibold text-gray-500 border-b border-gray-200 bg-gray-50">Comissao</th></tr>
                 </thead>
                 <tbody>
                     <template x-for="sc in p.seller_commissions" :key="sc.id">
@@ -40,10 +39,10 @@
                     </template>
                 </tbody>
             </table>
-            <p x-show="!p.seller_commissions||!p.seller_commissions.length" class="text-[13px] text-gray-500 py-4">Nenhum vendedor neste período.</p>
+            <p x-show="!p.seller_commissions||!p.seller_commissions.length" class="text-[13px] text-gray-500 py-4">Nenhum vendedor neste periodo.</p>
         </div>
     </template>
-    <div x-show="!periods.length" class="text-center py-12 text-gray-500">Nenhum período de comissão encontrado.</div>
+    <div x-show="!periods.length" class="text-center py-12 text-gray-500">Nenhum periodo de comissao encontrado.</div>
 </div>
 
 <script>
@@ -61,6 +60,7 @@ function fechamentoPage() {
     return {
         periods: [],
         async load() { var r = await fetch('/api/commissions/periods/'); this.periods = await r.json(); },
+        formatMoneyBRL(cents) { return 'R$ ' + (cents / 100).toFixed(2).replace('.', ','); },
         async createPeriod() {
             var now = new Date(); var m = now.getMonth()+1;
             var r = await fetch('/api/commissions/periods/', { method:'POST', headers:{'Content-Type':'application/json', 'X-CSRFToken': getCSRFToken()}, body:JSON.stringify({month:m, year:now.getFullYear()}) });
@@ -76,12 +76,6 @@ function fechamentoPage() {
             var r = await fetch(`/api/commissions/periods/${p.uuid}/close/`, { method:'POST', headers:{'X-CSRFToken': getCSRFToken()} });
             if (r.ok) this.load(); else { var d = await r.json(); alert(d.error||'Erro'); }
         },
-        async sendPeriod(p) {
-            if (!confirm('Enviar para o financeiro?')) return;
-            var r = await fetch(`/api/commissions/periods/${p.uuid}/send/`, { method:'POST', headers:{'X-CSRFToken': getCSRFToken()} });
-            if (r.ok) this.load(); else { var d = await r.json(); alert(d.error||'Erro'); }
-        },
-
     }
 }
 </script>

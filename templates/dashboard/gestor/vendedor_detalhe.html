@@ -96,9 +96,10 @@
                     <span class="text-[14px] font-medium" x-text="String(c.period_month).padStart(2,'0')+'/'+c.period_year"></span>
                     <span class="text-xs px-2 py-0.5 rounded-full font-medium"
                           :class="{'bg-gray-100 text-gray-600': c.period_status==='ABERTA',
-                                   'bg-warning-50 text-warning-700': c.period_status==='EM_CONFERENCIA',
-                                   'bg-brand-50 text-brand-700': c.period_status==='ENVIADA_FINANCEIRO',
-                                   'bg-success-50 text-success-700': c.period_status==='APROVADA' || c.period_status==='PAGA'}"
+                                   'bg-warning-50 text-warning-700': c.period_status==='FECHADA',
+                                   'bg-amber-50 text-amber-700': c.period_status==='AJUSTADA',
+                                   'bg-danger-50 text-danger-700': c.period_status==='CANCELADA',
+                                   'bg-success-50 text-success-700': c.period_status==='PAGA'}"
                           x-text="c.period_status.replace(/_/g,' ')"></span>
                     <span class="text-[13px] text-gray-500" x-text="'Vendas: R$ '+formatMoneyBRL(c.total_sold_amount)"></span>
                     <span class="text-[14px] font-semibold text-success-700" x-text="formatMoneyBRL(c.commission_amount)"></span>

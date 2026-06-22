@@ -2,7 +2,7 @@
 <html lang="pt-br">
 <head>
     <meta charset="UTF-8">
-    <title>{{ seller.name }} — Relatorio</title>
+    <title>{{ seller.name }} — Relatorio de Comissao</title>
     <style>
         @page { size: A4; margin: 2cm; }
         body { font-family: 'Public Sans', system-ui, sans-serif; color: #1e293b; font-size: 11pt; line-height: 1.5; }
@@ -10,11 +10,11 @@
         .subtitle { font-size: 10pt; color: #64748b; margin-bottom: 16pt; }
         .info { margin-bottom: 20pt; padding: 12pt; background: #f8fafc; border-radius: 8pt; font-size: 10pt; }
         .info strong { color: #4361ee; }
+        .info-box { margin-bottom: 16pt; padding: 10pt; background: #eff6ff; border-left: 4pt solid #4361ee; border-radius: 4pt; font-size: 10pt; }
         table { width: 100%; border-collapse: collapse; margin-top: 12pt; }
         th { background: #4361ee; color: white; font-weight: 600; padding: 8pt 10pt; text-align: left; font-size: 10pt; }
         td { padding: 6pt 10pt; border-bottom: 1pt solid #e2e8f0; font-size: 10pt; }
-        .total-row td { font-weight: 700; border-top: 2pt solid #1e293b; }
-        .total-row { border-top: 2pt solid #1e293b; }
+        tr.total-row td { font-weight: 700; border-top: 2pt solid #1e293b; background: #f8fafc; }
         .footer { margin-top: 30pt; padding-top: 12pt; border-top: 1pt solid #e2e8f0; font-size: 9pt; color: #94a3b8; text-align: center; }
     </style>
 </head>
@@ -24,27 +24,41 @@
 
     <div class="info">
         <p><strong>Periodo:</strong> {{ start|date:"d/m/Y" }} a {{ end|date:"d/m/Y" }}</p>
-        <p><strong>Total vendido:</strong> R$ {{ total|floatformat:2 }}</p>
-        <p><strong>Total de vendas:</strong> {{ sales|length }} registro{{ sales|length|pluralize }}</p>
+        <p><strong>Total vendido (lancamentos manuais):</strong> R$ {{ total|floatformat:2 }}</p>
+        <p><strong>Total de lancamentos:</strong> {{ sales|length }} registro{{ sales|length|pluralize }}</p>
+        {% if commission %}
+        <p><strong>Taxa de comissao:</strong> {{ commission.commission_rate|floatformat:4|floatformat:"-4" }}%</p>
+        <p><strong>Comissao calculada:</strong> R$ {{ commission.commission_amount|floatformat:2 }}</p>
+        <p><strong>Status:</strong> {{ commission.period.get_status_display }}</p>
+        {% if commission.closed_at %}
+        <p><strong>Fechamento:</strong> {{ commission.closed_at|date:"d/m/Y H:i" }}</p>
+        {% endif %}
+        {% if commission.paid_at %}
+        <p><strong>Pagamento:</strong> {{ commission.paid_at|date:"d/m/Y" }}{% if commission.paid_amount %} — R$ {{ commission.paid_amount|floatformat:2 }}{% endif %}</p>
+        {% endif %}
+        {% endif %}
+    </div>
+
+    <div class="info-box">
+        <strong>Atencao:</strong> Este relatorio considera apenas os lancamentos manuais diarios
+        informados pelo vendedor. Vendas via link de pagamento nao entram no calculo da comissao.
     </div>
 
     <table>
         <thead>
-            <tr><th>Data</th><th>Valor</th><th>Origem</th><th>Observacao</th></tr>
+            <tr><th>Data</th><th>Valor</th><th>Observacao</th></tr>
         </thead>
         <tbody>
             {% for s in sales %}
             <tr>
                 <td>{{ s.sale_date|date:"d/m/Y" }}</td>
                 <td>R$ {{ s.amount|floatformat:2 }}</td>
-                <td>{{ s.get_origin_display }}</td>
                 <td>{{ s.notes|default:"—" }}</td>
             </tr>
             {% endfor %}
             <tr class="total-row">
                 <td><strong>TOTAL</strong></td>
                 <td><strong>R$ {{ total|floatformat:2 }}</strong></td>
-                <td></td>
                 <td></td>
             </tr>
         </tbody>

@@ -26,8 +26,16 @@ def gestor_home(request):
         return redirect('dashboard:home')
 
     hoje = timezone.localdate()
-    total_mes = Sale.objects.filter(
+    total_mes_manual = Sale.objects.filter(
         tenant=tenant,
+        origin=Sale.Origin.MANUAL,
+        sale_date__year=hoje.year,
+        sale_date__month=hoje.month,
+    ).aggregate(total=Sum('amount'))['total'] or 0
+
+    total_mes_link = Sale.objects.filter(
+        tenant=tenant,
+        origin=Sale.Origin.LINK,
         sale_date__year=hoje.year,
         sale_date__month=hoje.month,
     ).aggregate(total=Sum('amount'))['total'] or 0
@@ -38,7 +46,9 @@ def gestor_home(request):
         year=hoje.year,
     ).first()
 
-    vendedores_ativos = Seller.objects.filter(tenant=tenant, is_active=True).count()
+    vendedores_ativos = Seller.objects.filter(
+        tenant=tenant, is_active=True,
+    ).count()
 
     config_ok = tenant.pagarme_configured and tenant.whatsapp_configured
 
@@ -47,17 +57,33 @@ def gestor_home(request):
         c = val % 100
         return f'{r:,}.{c:02d}'.replace(',', '.')
 
-    total_mes_fmt = _fmt(total_mes)
+    total_mes_manual_fmt = _fmt(total_mes_manual)
+    total_mes_link_fmt = _fmt(total_mes_link)
 
     from app.apps.orders.models import Order
     total_orders = Order.objects.filter(tenant=tenant).count()
-    paid_orders_count = Order.objects.filter(tenant=tenant, status='COMPLETED').count()
+    paid_orders_count = Order.objects.filter(
+        tenant=tenant, status='COMPLETED',
+    ).count()
+
+    if competencia:
+        comissao_estimada = sum(
+            sc.commission_amount
+            for sc in competencia.seller_commissions.all()
+        )
+    else:
+        comissao_estimada = 0
+    comissao_estimada_fmt = _fmt(comissao_estimada)
 
     public_url = f"https://{settings.SERVICE_FQDN_WEB}/loja/{tenant.slug}/"
 
     return render(request, 'dashboard/gestor/home.html', {
-        'total_mes': total_mes,
-        'total_mes_fmt': total_mes_fmt,
+        'total_mes': total_mes_manual,
+        'total_mes_fmt': total_mes_manual_fmt,
+        'total_mes_link': total_mes_link,
+        'total_mes_link_fmt': total_mes_link_fmt,
+        'comissao_estimada': comissao_estimada,
+        'comissao_estimada_fmt': comissao_estimada_fmt,
         'competencia': competencia,
         'vendedores_ativos': vendedores_ativos,
         'config_ok': config_ok,
@@ -78,9 +104,13 @@ def gestor_configuracoes(request):
 
     if request.method == 'POST':
         pagarme_api_key = request.POST.get('pagarme_api_key', '').strip()
-        whatsapp_instance_id = request.POST.get('whatsapp_instance_id', '').strip()
+        whatsapp_instance_id = request.POST.get(
+            'whatsapp_instance_id', '',
+        ).strip()
         whatsapp_token = request.POST.get('whatsapp_token', '').strip()
-        commission_rate = request.POST.get('default_commission_rate', '').strip()
+        commission_rate = request.POST.get(
+            'default_commission_rate', '',
+        ).strip()
 
         if pagarme_api_key:
             tenant.pagarme_api_key = pagarme_api_key
@@ -90,12 +120,15 @@ def gestor_configuracoes(request):
             tenant.whatsapp_token = whatsapp_token
         if commission_rate:
             try:
-                tenant.default_commission_rate = float(commission_rate.replace(',', '.'))
+                tenant.default_commission_rate = float(
+                    commission_rate.replace(',', '.'),
+                )
             except ValueError:
                 messages.error(request, 'Taxa de comissao invalida.')
-                return render(request, 'dashboard/gestor/configuracoes.html', {
-                    'tenant': tenant,
-                })
+                return render(
+                    request, 'dashboard/gestor/configuracoes.html',
+                    {'tenant': tenant},
+                )
 
         tenant.save()
         messages.success(request, 'Configuracoes salvas com sucesso.')
@@ -152,14 +185,18 @@ def gestor_fechamento(request):
 
 @login_required
 def financeiro_fila(request):
-    if not _check_role(request, User.Role.FINANCEIRO, User.Role.ADMIN):
+    if not _check_role(
+        request, User.Role.FINANCEIRO, User.Role.ADMIN, User.Role.MANAGER,
+    ):
         return redirect('dashboard:home')
     return render(request, 'dashboard/financeiro/fila_aprovacao.html')
 
 
 @login_required
 def financeiro_historico(request):
-    if not _check_role(request, User.Role.FINANCEIRO, User.Role.ADMIN):
+    if not _check_role(
+        request, User.Role.FINANCEIRO, User.Role.ADMIN, User.Role.MANAGER,
+    ):
         return redirect('dashboard:home')
     return render(request, 'dashboard/financeiro/historico_pagamentos.html')
 
@@ -176,7 +213,9 @@ def gestor_links(request):
     from app.apps.orders.models import Order
 
     seller_uuid = request.GET.get('seller')
-    orders = Order.objects.filter(tenant=tenant).select_related('seller').order_by('-created_at')[:100]
+    orders = Order.objects.filter(
+        tenant=tenant,
+    ).select_related('seller').order_by('-created_at')[:100]
     if seller_uuid:
         orders = orders.filter(seller__uuid=seller_uuid)
 
@@ -196,7 +235,9 @@ def gestor_links(request):
         })
 
     from app.apps.sellers.models import Seller as SellerModel
-    sellers = list(SellerModel.objects.filter(tenant=tenant, is_active=True).values('uuid', 'name'))
+    sellers = list(SellerModel.objects.filter(
+        tenant=tenant, is_active=True,
+    ).values('uuid', 'name'))
 
     return render(request, 'dashboard/gestor/links.html', {
         'orders_json': orders_data,
