@@ -148,9 +148,27 @@ class CommissionPeriodViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
+        seller_ids = request.data.get('seller_commission_ids', None)
+        commissions = period.seller_commissions.select_related('seller').all()
+
+        if seller_ids:
+            commissions = [sc for sc in commissions if str(sc.id) in seller_ids]
+            if not commissions:
+                return Response(
+                    {'error': 'Nenhuma comissao valida selecionada.'},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+        calculations = []
         with transaction.atomic():
-            for sc in period.seller_commissions.select_related('seller').all():
+            for sc in commissions:
                 sc.freeze(request.user, commit=True)
+                calculations.append({
+                    'seller_name': sc.seller.name,
+                    'total_sold': sc.total_sold_amount,
+                    'commission_rate': float(sc.commission_rate),
+                    'commission_amount': sc.commission_amount,
+                })
 
             period.status = CommissionPeriod.Status.FECHADA
             period.closed_by = request.user
@@ -161,10 +179,16 @@ class CommissionPeriodViewSet(viewsets.ModelViewSet):
 
         log_action(
             request, 'commission_period.closed', instance=period,
-            changes={'month': period.month, 'year': period.year},
+            changes={
+                'month': period.month, 'year': period.year,
+                'commissions_closed': len(commissions),
+            },
         )
-        serializer = self.get_serializer(period)
-        return Response(serializer.data)
+        return Response({
+            'status': CommissionPeriod.Status.FECHADA,
+            'closed_at': period.closed_at.isoformat(),
+            'commissions': calculations,
+        })
 
     @action(
         detail=True, methods=['post'],

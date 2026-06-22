@@ -19,18 +19,26 @@
                     <span x-show="p.status==='AJUSTADA'" class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-amber-50 text-amber-700">AJUSTADA</span>
                     <span x-show="p.status==='CANCELADA'" class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-danger-50 text-danger-700">CANCELADA</span>
                 </div>
-                <div class="flex gap-2">
-                    <button @click="closePeriod(p)" x-show="p.status==='ABERTA'" class="bg-brand-500 hover:bg-brand-600 text-white font-medium py-2 px-4 rounded-xl transition tap-target text-[15px]">Fechar Mes</button>
-                </div>
             </div>
 
             <table class="w-full text-left text-[14px]" x-show="p.seller_commissions&&p.seller_commissions.length">
                 <thead>
-                    <tr><th class="px-4 py-3 font-semibold text-gray-500 border-b border-gray-200 bg-gray-50">Vendedor</th><th class="px-4 py-3 font-semibold text-gray-500 border-b border-gray-200 bg-gray-50">Total Vendido</th><th class="px-4 py-3 font-semibold text-gray-500 border-b border-gray-200 bg-gray-50">Taxa</th><th class="px-4 py-3 font-semibold text-gray-500 border-b border-gray-200 bg-gray-50">Comissao</th></tr>
+                    <tr>
+                        <th class="px-4 py-3 font-semibold text-gray-500 border-b border-gray-200 bg-gray-50 w-10">
+                            <input type="checkbox" @change="toggleAll(p)" :checked="isAllSelected(p)" x-show="p.status==='ABERTA'">
+                        </th>
+                        <th class="px-4 py-3 font-semibold text-gray-500 border-b border-gray-200 bg-gray-50">Vendedor</th>
+                        <th class="px-4 py-3 font-semibold text-gray-500 border-b border-gray-200 bg-gray-50">Total Vendido</th>
+                        <th class="px-4 py-3 font-semibold text-gray-500 border-b border-gray-200 bg-gray-50">Taxa</th>
+                        <th class="px-4 py-3 font-semibold text-gray-500 border-b border-gray-200 bg-gray-50">Comissao</th>
+                    </tr>
                 </thead>
                 <tbody>
                     <template x-for="sc in p.seller_commissions" :key="sc.id">
                         <tr class="hover:bg-gray-50">
+                            <td class="px-4 py-3 border-b border-gray-100">
+                                <input type="checkbox" @change="toggle(p, sc)" :checked="isSelected(p, sc)" x-show="p.status==='ABERTA'">
+                            </td>
                             <td class="px-4 py-3 border-b border-gray-100 font-medium" x-text="sc.seller_name"></td>
                             <td class="px-4 py-3 border-b border-gray-100" x-text="formatMoneyBRL(sc.total_sold_amount)"></td>
                             <td class="px-4 py-3 border-b border-gray-100" x-text="(parseFloat(sc.commission_rate)*100).toFixed(2)+'%'"></td>
@@ -39,6 +47,19 @@
                     </template>
                 </tbody>
             </table>
+
+            <div x-show="p.status==='ABERTA' && p.seller_commissions && p.seller_commissions.length" class="flex items-center justify-between mt-4 pt-4 border-t border-gray-100">
+                <div>
+                    <span class="text-[13px] text-gray-500">Selecionados:</span>
+                    <span class="text-[14px] font-semibold text-gray-900 ml-1" x-text="selectedCount(p)"></span>
+                    <span class="text-[13px] text-gray-500 ml-4">Total comissao:</span>
+                    <span class="text-[14px] font-semibold text-brand-500 ml-1" x-text="selectedTotal(p)"></span>
+                </div>
+                <button @click="closeSelected(p)" class="bg-brand-500 hover:bg-brand-600 text-white font-medium py-2 px-4 rounded-xl transition tap-target text-[15px]" x-show="selectedCount(p) > 0">
+                    Fechar Selecionados
+                </button>
+            </div>
+
             <p x-show="!p.seller_commissions||!p.seller_commissions.length" class="text-[13px] text-gray-500 py-4">Nenhum vendedor neste periodo.</p>
         </div>
     </template>
@@ -60,21 +81,49 @@ function fechamentoPage() {
     return {
         periods: [],
         async load() { var r = await fetch('/api/commissions/periods/'); this.periods = await r.json(); },
-        formatMoneyBRL(cents) { return 'R$ ' + (cents / 100).toFixed(2).replace('.', ','); },
-        async createPeriod() {
+        createPeriod() {
             var now = new Date(); var m = now.getMonth()+1;
-            var r = await fetch('/api/commissions/periods/', { method:'POST', headers:{'Content-Type':'application/json', 'X-CSRFToken': getCSRFToken()}, body:JSON.stringify({month:m, year:now.getFullYear()}) });
-            if (r.ok) this.load(); else alert('Erro ao criar periodo');
+            fetch('/api/commissions/periods/', { method:'POST', headers:{'Content-Type':'application/json', 'X-CSRFToken': getCSRFToken()}, body:JSON.stringify({month:m, year:now.getFullYear()}) })
+                .then(r => { if (r.ok) this.load(); else alert('Erro ao criar periodo'); });
         },
-        async closePeriod(p) {
+        isAllSelected(p) {
+            if (!p._selected) return false;
+            return (p.seller_commissions||[]).every(sc => p._selected.has(sc.id));
+        },
+        isSelected(p, sc) { return p._selected ? p._selected.has(sc.id) : false; },
+        toggleAll(p) {
+            if (!p._selected) p._selected = new Set();
+            if (this.isAllSelected(p)) { p._selected.clear(); return; }
+            (p.seller_commissions||[]).forEach(sc => p._selected.add(sc.id));
+        },
+        toggle(p, sc) {
+            if (!p._selected) p._selected = new Set();
+            p._selected.has(sc.id) ? p._selected.delete(sc.id) : p._selected.add(sc.id);
+        },
+        selectedCount(p) { return p._selected ? p._selected.size : 0; },
+        selectedTotal(p) {
+            if (!p._selected) return formatMoneyBRL(0);
+            var total = (p.seller_commissions||[])
+                .filter(sc => p._selected.has(sc.id))
+                .reduce((a, c) => a + (c.commission_amount || 0), 0);
+            return formatMoneyBRL(total);
+        },
+        async closeSelected(p) {
+            var ids = p._selected ? Array.from(p._selected) : [];
+            if (!ids.length) return;
             if (p.is_current_month) {
-                var msg = 'ATENCAO: o mes de ' + String(p.month).padStart(2,'0') + '/' + p.year + ' ainda nao terminou. Fechar agora vai considerar apenas as vendas ja lancadas ate hoje — vendas lancadas depois deste fechamento NAO entrarao nesta comissao.\\n\\nTem certeza que quer fechar antes do fim do mes?';
+                var msg = 'ATENCAO: ' + ids.length + ' vendedor(es) selecionado(s). As vendas lancadas a partir de agora NAO entrarao nesta comissao para estes vendedores.\\n\\nTem certeza?';
                 if (!confirm(msg)) return;
             } else {
-                if (!confirm('Fechar a competencia?')) return;
+                if (!confirm('Fechar comissao de ' + ids.length + ' vendedor(es)?')) return;
             }
-            var r = await fetch(`/api/commissions/periods/${p.uuid}/close/`, { method:'POST', headers:{'X-CSRFToken': getCSRFToken()} });
-            if (r.ok) this.load(); else { var d = await r.json(); alert(d.error||'Erro'); }
+            var r = await fetch('/api/commissions/periods/' + p.uuid + '/close/', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json', 'X-CSRFToken': getCSRFToken()},
+                body: JSON.stringify({seller_commission_ids: ids})
+            });
+            if (r.ok) { this.load(); }
+            else { var d = await r.json(); alert(d.error || 'Erro'); }
         },
     }
 }

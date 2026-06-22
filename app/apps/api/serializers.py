@@ -256,10 +256,16 @@ class CommissionPeriodSerializer(serializers.ModelSerializer):
         ]
 
     def get_seller_commissions(self, obj):
-        return SellerCommissionReadSerializer(
-            obj.seller_commissions.select_related('seller').all(),
-            many=True,
-        ).data
+        commissions = obj.seller_commissions.select_related('seller').all()
+        if obj.status == CommissionPeriod.Status.ABERTA:
+            import copy
+            result = []
+            for sc in commissions:
+                temp = copy.copy(sc)
+                temp.recalculate(commit=False)
+                result.append(temp)
+            return SellerCommissionReadSerializer(result, many=True).data
+        return SellerCommissionReadSerializer(commissions, many=True).data
 
     def get_is_current_month(self, obj):
         hoje = timezone.localdate()
