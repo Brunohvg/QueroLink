@@ -1,3 +1,4 @@
+{% load currency_filters %}
 {% extends 'mobile/base_mobile.html' %}
 {% block title %}Inicio — QueroLink{% endblock %}
 {% block content %}
@@ -32,25 +33,27 @@
 
     <div class="surface-hero">
         <p class="text-[13px] font-semibold text-gray-500 uppercase tracking-wide mb-2">Total hoje</p>
-        <p class="font-display text-[32px] font-semibold text-brand-500 leading-none" x-text="'R$ ' + ({{ today_total }} / 100).toFixed(2).replace('.', ',')"></p>
-        <p class="text-[14px] text-gray-500 mt-2" x-text="'{{ has_entry_today|yesno:"1,0" }}' === '1' ? 'Lancamento registrado' : 'Nenhum lancamento hoje'"></p>
+        <p class="font-display text-[32px] font-semibold text-brand-500 leading-none">{{ today_total|brl }}</p>
+        <p class="text-[14px] text-gray-500 mt-2">
+            {% if has_entry_today %}Lancamento registrado{% else %}Nenhum lancamento hoje{% endif %}
+        </p>
     </div>
 
     <div class="grid grid-cols-2 gap-3">
         <div class="surface-card">
             <p class="text-[13px] text-gray-500 mb-1">Comissao estimada</p>
-            <p class="font-display text-[18px] sm:text-[24px] font-semibold text-success-700 leading-tight" x-text="'R$ ' + ({{ comissao_estimada }} / 100).toFixed(2).replace('.', ',')"></p>
+            <p class="font-display text-[18px] sm:text-[24px] font-semibold text-success-700 leading-tight">{{ comissao_estimada|brl }}</p>
         </div>
         <div class="surface-card">
             <p class="text-[13px] text-gray-500 mb-1">Total vendido no mes</p>
-            <p class="font-display text-[18px] sm:text-[24px] font-semibold text-gray-900 leading-tight" x-text="'R$ ' + ({{ month_total }} / 100).toFixed(2).replace('.', ',')"></p>
+            <p class="font-display text-[18px] sm:text-[24px] font-semibold text-gray-900 leading-tight">{{ month_total|brl }}</p>
         </div>
     </div>
 
     <div class="surface-card">
         <div class="flex items-center justify-between">
             <span class="text-[14px] text-gray-500">Vendas via link no mes</span>
-            <span class="text-[15px] font-semibold text-gray-900" x-text="'R$ ' + ({{ month_link_total }} / 100).toFixed(2).replace('.', ',')"></span>
+            <span class="text-[15px] font-semibold text-gray-900">{{ month_link_total|brl }}</span>
         </div>
     </div>
 
@@ -115,16 +118,6 @@
 </div>
 
 <script>
-function getCSRFToken() {
-    var name = 'csrftoken';
-    var cookies = document.cookie.split(';');
-    for (var i = 0; i < cookies.length; i++) {
-        var c = cookies[i].trim();
-        if (c.indexOf(name + '=') === 0) return c.substring(name.length + 1);
-    }
-    return '';
-}
-
 function sellerHomePage() {
     return {
         showLinkForm: false,

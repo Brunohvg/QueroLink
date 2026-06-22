@@ -74,19 +74,9 @@
 </div>
 
 <script>
-function getCSRFToken() {
-    var name = 'csrftoken';
-    var cookies = document.cookie.split(';');
-    for (var i = 0; i < cookies.length; i++) {
-        var c = cookies[i].trim();
-        if (c.indexOf(name + '=') === 0) return c.substring(name.length + 1);
-    }
-    return '';
-}
-
 function sellerLinksPage() {
     return {
-        orders: {{ orders_json|safe }},
+        orders: {% if orders_json %}{{ orders_json|safe }}{% else %}[]{% endif %},
         showForm: false,
         creating: false,
         formError: '',
