@@ -40,9 +40,7 @@
                         {% if sale.origin == 'LINK' %}bg-brand-50 text-brand-600{% else %}bg-success-50 text-success-700{% endif %}">
                         {{ sale.get_origin_display }}
                     </span>
-                    <p class="font-semibold text-gray-900 text-[14px] mt-1">
-                        R$ {{ sale.amount|stringformat:"d"|slice:":-2" }},{{ sale.amount|stringformat:"d"|slice:"-2:" }}
-                    </p>
+                    <p class="font-semibold text-gray-900 text-[14px] mt-1" x-text="formatMoneyBRL({{ sale.amount }})"></p>
                     {% if sale.notes %}
                     <p class="text-xs text-gray-400 truncate mt-0.5">{{ sale.notes }}</p>
                     {% endif %}

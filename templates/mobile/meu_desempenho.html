@@ -1,7 +1,7 @@
 {% extends 'mobile/base_mobile.html' %}
 {% block title %}Meu Desempenho — QueroLink{% endblock %}
 {% block content %}
-<div class="space-y-4">
+<div class="space-y-4" x-data="desempenhoPage()">
     <h1 class="font-display text-[18px] font-semibold text-gray-900">Meu Desempenho</h1>
 
     {% if error %}
@@ -10,9 +10,7 @@
 
     <div class="surface-hero">
         <p class="text-[13px] font-semibold text-gray-500 uppercase tracking-wide mb-2">Total vendido em {{ current_month }}</p>
-        <p class="font-display text-[32px] font-semibold text-brand-500 leading-none">
-            R$ {{ month_total|stringformat:"d"|slice:":-2" }},{{ month_total|stringformat:"d"|slice:"-2:" }}
-        </p>
+        <p class="font-display text-[32px] font-semibold text-brand-500 leading-none" x-text="formatMoneyBRL({{ month_total }})"></p>
     </div>
 
     <h2 class="font-display text-[18px] font-semibold text-gray-900 mt-6">Comissoes</h2>
@@ -30,19 +28,15 @@
             <div class="grid grid-cols-3 gap-2 text-center">
                 <div class="overflow-hidden">
                     <p class="text-[12px] sm:text-[13px] text-gray-500">Vendas</p>
-                    <p class="text-[13px] sm:text-[14px] font-semibold text-gray-900 truncate">
-                        R$ {{ sc.total_sold_amount|stringformat:"d"|slice:":-2" }},{{ sc.total_sold_amount|stringformat:"d"|slice:"-2:" }}
-                    </p>
+                    <p class="text-[13px] sm:text-[14px] font-semibold text-gray-900 truncate" x-text="formatMoneyBRL({{ sc.total_sold_amount }})"></p>
                 </div>
                 <div class="overflow-hidden">
                     <p class="text-[12px] sm:text-[13px] text-gray-500">Taxa</p>
-                    <p class="text-[13px] sm:text-[14px] font-semibold text-gray-900 truncate">{% widthratio sc.commission_rate 1 100 %},00%</p>
+                    <p class="text-[13px] sm:text-[14px] font-semibold text-gray-900 truncate">{% widthratio sc.commission_rate 1 100 as rate_pct %}{{ rate_pct|floatformat:2 }}%</p>
                 </div>
                 <div class="overflow-hidden">
                     <p class="text-[12px] sm:text-[13px] text-gray-500">Comissao</p>
-                    <p class="text-[13px] sm:text-[14px] font-semibold text-success-700 truncate">
-                        R$ {{ sc.commission_amount|stringformat:"d"|slice:":-2" }},{{ sc.commission_amount|stringformat:"d"|slice:"-2:" }}
-                    </p>
+                    <p class="text-[13px] sm:text-[14px] font-semibold text-success-700 truncate" x-text="formatMoneyBRL({{ sc.commission_amount }})"></p>
                 </div>
             </div>
         </div>
@@ -55,4 +49,10 @@
     {% endif %}
     {% endif %}
 </div>
+
+<script>
+function desempenhoPage() {
+    return {}
+}
+</script>
 {% endblock %}

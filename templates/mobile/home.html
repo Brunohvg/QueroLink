@@ -17,41 +17,50 @@
     <div class="bg-danger-50 border border-danger-500/20 text-danger-700 px-4 py-3 rounded-xl text-sm">{{ error }}</div>
     {% else %}
 
-    {% with value_text=today_total|stringformat:"d" %}
+    {% if periodo_fechado %}
+    <div class="bg-warning-50 border border-warning-500/20 text-warning-700 px-4 py-3 rounded-xl text-sm">
+        Periodo fechado. Consulte seu gestor para ajustes.
+    </div>
+    {% endif %}
+
+    {% if not has_entry_today and not periodo_fechado %}
+    <div class="bg-warning-50 border border-warning-500/20 text-warning-700 px-4 py-3 rounded-xl text-sm flex items-center gap-2">
+        <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"></path></svg>
+        Voce ainda nao lancou o valor de hoje.
+    </div>
+    {% endif %}
+
     <div class="surface-hero">
         <p class="text-[13px] font-semibold text-gray-500 uppercase tracking-wide mb-2">Total hoje</p>
-        <p class="font-display text-[32px] font-semibold text-brand-500 leading-none">R$ {{ value_text|slice:":-2" }},{{ value_text|slice:"-2:" }}</p>
-        <p class="text-[14px] text-gray-500 mt-2">{{ today_count }} venda{{ today_count|pluralize:'s' }} hoje</p>
+        <p class="font-display text-[32px] font-semibold text-brand-500 leading-none" x-text="'R$ ' + ({{ today_total }} / 100).toFixed(2).replace('.', ',')"></p>
+        <p class="text-[14px] text-gray-500 mt-2" x-text="'{{ has_entry_today|yesno:"1,0" }}' === '1' ? 'Lancamento registrado' : 'Nenhum lancamento hoje'"></p>
     </div>
-    {% endwith %}
 
-    {% with valor_total=total_vendido|stringformat:"d" valor_comissao=comissao_a_receber|stringformat:"d" %}
     <div class="grid grid-cols-2 gap-3">
         <div class="surface-card">
-            <p class="text-[13px] text-gray-500 mb-1">Comissao a receber</p>
-            <p class="font-display text-[18px] sm:text-[24px] font-semibold text-success-700 leading-tight">
-                R$ {{ valor_comissao|slice:":-2" }},{{ valor_comissao|slice:"-2:" }}
-            </p>
+            <p class="text-[13px] text-gray-500 mb-1">Comissao estimada</p>
+            <p class="font-display text-[18px] sm:text-[24px] font-semibold text-success-700 leading-tight" x-text="'R$ ' + ({{ comissao_estimada }} / 100).toFixed(2).replace('.', ',')"></p>
         </div>
         <div class="surface-card">
-            <p class="text-[13px] text-gray-500 mb-1">Total vendido</p>
-            <p class="font-display text-[18px] sm:text-[24px] font-semibold text-gray-900 leading-tight">
-                R$ {{ valor_total|slice:":-2" }},{{ valor_total|slice:"-2:" }}
-            </p>
+            <p class="text-[13px] text-gray-500 mb-1">Total vendido no mes</p>
+            <p class="font-display text-[18px] sm:text-[24px] font-semibold text-gray-900 leading-tight" x-text="'R$ ' + ({{ month_total }} / 100).toFixed(2).replace('.', ',')"></p>
         </div>
     </div>
-    {% endwith %}
 
     <div class="surface-card">
         <div class="flex items-center justify-between">
-            <span class="text-[14px] text-gray-500">Vendas no mes</span>
-            <span class="text-[15px] font-semibold text-gray-900">{{ month_count }}</span>
+            <span class="text-[14px] text-gray-500">Vendas via link no mes</span>
+            <span class="text-[15px] font-semibold text-gray-900" x-text="'R$ ' + ({{ month_link_total }} / 100).toFixed(2).replace('.', ',')"></span>
         </div>
     </div>
 
-    <!-- Quick Link Form -->
-    <div x-show="showLinkForm" class="surface-card space-y-3" @click.away="showLinkForm=false">
-        <p class="text-[14px] font-semibold text-gray-900">Gerar Link de Pagamento</p>
+    <div x-show="showLinkForm" class="surface-card space-y-3">
+        <div class="flex items-center justify-between">
+            <p class="text-[14px] font-semibold text-gray-900">Gerar Link de Pagamento</p>
+            <button @click="showLinkForm=false; linkError=''; linkSuccess=''" class="tap-target flex items-center justify-center w-10 h-10 text-gray-400 hover:text-gray-600" aria-label="Fechar">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+            </button>
+        </div>
         <div>
             <label class="block text-[13px] text-gray-500 mb-1">Nome do cliente</label>
             <input type="text" x-model="linkForm.customer" class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-500" placeholder="Nome do cliente" style="font-size:16px!important">
@@ -86,7 +95,7 @@
     </a>
 
     <button @click="showLinkForm=!showLinkForm"
-       class="flex items-center justify-center gap-2 w-full bg-brand-500 hover:bg-brand-600 text-white font-medium py-4 rounded-xl transition shadow-lg tap-target">
+       class="flex items-center justify-center gap-2 w-full border border-brand-500 text-brand-500 hover:bg-brand-50 font-medium py-4 rounded-xl transition tap-target">
         <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"></path></svg>
         <span class="text-[15px]">Gerar Link de Pagamento</span>
     </button>
