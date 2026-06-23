@@ -256,6 +256,8 @@ class CommissionPeriodSerializer(serializers.ModelSerializer):
         ]
 
     def get_seller_commissions(self, obj):
+        from app.apps.commissions.services import get_manual_sales_total, get_commission_rate
+
         commissions = obj.seller_commissions.select_related('seller').all()
         if obj.status == CommissionPeriod.Status.ABERTA:
             import copy
@@ -265,7 +267,21 @@ class CommissionPeriodSerializer(serializers.ModelSerializer):
                 temp.recalculate(commit=False)
                 result.append(temp)
             return SellerCommissionReadSerializer(result, many=True).data
-        return SellerCommissionReadSerializer(commissions, many=True).data
+
+        import copy
+        result = []
+        for sc in commissions:
+            has_stale_data = (
+                sc.total_sold_amount == 0 and sc.commission_amount == 0
+                and get_manual_sales_total(sc.seller, obj.month, obj.year) > 0
+            )
+            if has_stale_data:
+                temp = copy.copy(sc)
+                temp.recalculate(commit=False)
+                result.append(temp)
+            else:
+                result.append(sc)
+        return SellerCommissionReadSerializer(result, many=True).data
 
     def get_is_current_month(self, obj):
         hoje = timezone.localdate()

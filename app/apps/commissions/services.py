@@ -222,6 +222,49 @@ def create_commission_adjustment(seller_commission, new_amount, reason, user):
     return adjustment
 
 
+def get_links_data(tenant, month=None, year=None):
+    from app.apps.orders.models import Order
+    from app.apps.payments.models import Payment
+    from django.db.models import Sum as _Sum
+
+    hoje = timezone.localdate()
+    if month is None:
+        month = hoje.month
+    if year is None:
+        year = hoje.year
+
+    start = date(year, month, 1)
+    import calendar as _cal
+    last_day = _cal.monthrange(year, month)[1]
+    end = date(year, month, last_day)
+
+    orders = Order.objects.filter(
+        tenant=tenant,
+        created_at__date__gte=start,
+        created_at__date__lte=end,
+    )
+    total_gerados = orders.count()
+    valor_gerado = orders.aggregate(t=_Sum('total_amount'))['t'] or 0
+
+    orders_pagos = orders.filter(status='COMPLETED')
+    total_pagos = orders_pagos.count()
+    valor_pago = orders_pagos.aggregate(t=_Sum('total_amount'))['t'] or 0
+
+    orders_pendentes = orders.filter(status='PENDING').count()
+    orders_recusados = orders.filter(
+        status__in=['CANCELED', 'EXPIRED', 'SUSPENDED'],
+    ).count()
+
+    return {
+        'links_gerados': total_gerados,
+        'links_pagos': total_pagos,
+        'links_pendentes': orders_pendentes,
+        'links_recusados': orders_recusados,
+        'valor_gerado_links': valor_gerado,
+        'valor_pago_links': valor_pago,
+    }
+
+
 def get_dashboard_data(tenant, month=None, year=None):
     import calendar as _calendar
     hoje = timezone.localdate()
@@ -253,6 +296,7 @@ def get_dashboard_data(tenant, month=None, year=None):
     commission_fechada = 0
     commission_paga = 0
     period_status = None
+    has_inconsistency = False
 
     if period:
         period_status = period.status
@@ -266,10 +310,24 @@ def get_dashboard_data(tenant, month=None, year=None):
             commission_fechada = SellerCommission.objects.filter(
                 period=period,
             ).aggregate(t=Sum('commission_amount'))['t'] or 0
+            if commission_fechada == 0 and total_vendido > 0:
+                for sc in SellerCommission.objects.filter(period=period):
+                    est, _ = calculate_estimated_commission(
+                        sc.seller, month, year,
+                    )
+                    commission_fechada += est
+                has_inconsistency = True
         elif period.status == CommissionPeriod.Status.PAGA:
             commission_paga = SellerCommission.objects.filter(
                 period=period,
             ).aggregate(t=Sum('paid_amount'))['t'] or 0
+            if commission_paga == 0 and total_vendido > 0:
+                for sc in SellerCommission.objects.filter(period=period):
+                    est, _ = calculate_estimated_commission(
+                        sc.seller, month, year,
+                    )
+                    commission_paga += est
+                has_inconsistency = True
         else:
             commission_fechada = SellerCommission.objects.filter(
                 period=period,
@@ -294,11 +352,7 @@ def get_dashboard_data(tenant, month=None, year=None):
         sales__sale_date=hoje,
     ).count()
 
-    from app.apps.orders.models import Order
-    links_gerados = Order.objects.filter(tenant=tenant).count()
-    links_pagos = Order.objects.filter(
-        tenant=tenant, status='COMPLETED',
-    ).count()
+    links_data = get_links_data(tenant, month=month, year=year)
 
     top5_mes = Sale.objects.filter(
         tenant=tenant,
@@ -329,12 +383,17 @@ def get_dashboard_data(tenant, month=None, year=None):
         'commission_fechada': commission_fechada,
         'commission_paga': commission_paga,
         'period_status': period_status,
+        'has_inconsistency': has_inconsistency,
         'vendedores_ativos': vendedores_ativos,
         'vendedores_total': vendedores_total,
         'vendedores_com_venda': sellers_with_sales,
         'vendedores_sem_lancamento_hoje': sellers_no_sale_today,
-        'links_gerados': links_gerados,
-        'links_pagos': links_pagos,
+        'links_gerados': links_data['links_gerados'],
+        'links_pagos': links_data['links_pagos'],
+        'links_pendentes': links_data['links_pendentes'],
+        'links_recusados': links_data['links_recusados'],
+        'valor_gerado_links': links_data['valor_gerado_links'],
+        'valor_pago_links': links_data['valor_pago_links'],
         'top5_mes': list(top5_mes),
         'sellers_inativos': sellers_inativos,
     }

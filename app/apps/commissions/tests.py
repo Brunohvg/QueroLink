@@ -457,6 +457,118 @@ class TestSellerCommissionRecalculate(BaseTest):
         self.assertEqual(sc.total_sold_amount, 50000)
 
 
+class TestDashboardWithStaleData(BaseTest):
+    def test_dashboard_shows_commission_for_paga_with_stale_data(self):
+        """Dashboard must show commission even if PAGA period has 0 paid_amount"""
+        self._create_manual_sale(self.seller, 8503050, 15)
+        period = self._create_period()
+        sync_period_seller_commissions(period)
+        freeze_period(period, self.manager)
+        mark_period_paid(period, self.manager, {'payment_method': 'pix'})
+
+        sc = SellerCommission.objects.get(period=period, seller=self.seller)
+        sc.paid_amount = 0
+        sc.total_sold_amount = 0
+        sc.commission_amount = 0
+        sc.save(update_fields=['paid_amount', 'total_sold_amount', 'commission_amount'])
+
+        data = get_dashboard_data(self.tenant, month=6, year=2026)
+        self.assertGreater(data['total_vendido'], 0)
+        self.assertGreater(data['commission_paga'], 0)
+        self.assertTrue(data['has_inconsistency'])
+
+    def test_dashboard_shows_commission_for_fechada_with_stale_data(self):
+        """Dashboard must show commission even if FECHADA period has 0 values"""
+        self._create_manual_sale(self.seller, 8503050, 15)
+        period = self._create_period()
+        sync_period_seller_commissions(period)
+        freeze_period(period, self.manager)
+
+        sc = SellerCommission.objects.get(period=period, seller=self.seller)
+        sc.total_sold_amount = 0
+        sc.commission_amount = 0
+        sc.save(update_fields=['total_sold_amount', 'commission_amount'])
+
+        data = get_dashboard_data(self.tenant, month=6, year=2026)
+        self.assertGreater(data['total_vendido'], 0)
+        self.assertGreater(data['commission_fechada'], 0)
+        self.assertTrue(data['has_inconsistency'])
+
+
+class TestGetLinksData(BaseTest):
+    def test_get_links_data_empty(self):
+        from app.apps.commissions.services import get_links_data
+        data = get_links_data(self.tenant, month=6, year=2026)
+        self.assertEqual(data['links_gerados'], 0)
+        self.assertEqual(data['links_pagos'], 0)
+
+    def test_get_links_data_with_orders(self):
+        from app.apps.commissions.services import get_links_data
+        from app.apps.orders.models import Order
+        Order.objects.create(
+            tenant=self.tenant,
+            seller=self.seller,
+            customer_name='Test',
+            total_amount=10000,
+            status='PENDING',
+        )
+        data = get_links_data(self.tenant, month=6, year=2026)
+        self.assertEqual(data['links_gerados'], 1)
+        self.assertEqual(data['links_pendentes'], 1)
+        self.assertEqual(data['valor_gerado_links'], 10000)
+
+
+class TestSerializerStaleData(BaseTest):
+    def test_serializer_shows_values_for_stale_paga(self):
+        from app.apps.api.serializers import CommissionPeriodSerializer
+
+        self._create_manual_sale(self.seller, 8503050, 15)
+        period = self._create_period()
+        sync_period_seller_commissions(period)
+        freeze_period(period, self.manager)
+        mark_period_paid(period, self.manager, {'payment_method': 'pix'})
+
+        sc = SellerCommission.objects.get(period=period, seller=self.seller)
+        sc.total_sold_amount = 0
+        sc.commission_amount = 0
+        sc.save(update_fields=['total_sold_amount', 'commission_amount'])
+
+        serializer = CommissionPeriodSerializer(period)
+        data = serializer.data
+        self.assertEqual(len(data['seller_commissions']), 1)
+        sc_data = data['seller_commissions'][0]
+        self.assertGreater(sc_data['total_sold_amount'], 0)
+        self.assertGreater(sc_data['commission_amount'], 0)
+
+
+class TestMobileBlocking(BaseTest):
+    def test_mobile_blocks_launch_when_period_fechada(self):
+        """Seller cannot launch sale when period is FECHADA via mobile"""
+        self._create_manual_sale(self.seller, 8503050, 15)
+        period = self._create_period()
+        sync_period_seller_commissions(period)
+        freeze_period(period, self.manager)
+
+        from django.core.exceptions import ValidationError
+        from datetime import timedelta
+
+        today = timezone.localdate()
+        blocked = CommissionPeriod.is_locked_for(self.tenant, today)
+        self.assertTrue(blocked)
+
+    def test_mobile_blocks_launch_when_period_paga(self):
+        """Seller cannot launch sale when period is PAGA via mobile"""
+        self._create_manual_sale(self.seller, 8503050, 15)
+        period = self._create_period()
+        sync_period_seller_commissions(period)
+        freeze_period(period, self.manager)
+        mark_period_paid(period, self.manager, {'payment_method': 'pix'})
+
+        today = timezone.localdate()
+        blocked = CommissionPeriod.is_locked_for(self.tenant, today)
+        self.assertTrue(blocked)
+
+
 class TestValidationAndBlocking(BaseTest):
     def test_seller_cannot_create_sale_in_future(self):
         from django.core.exceptions import ValidationError as DjangoValidationError
