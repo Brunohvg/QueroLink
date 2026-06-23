@@ -206,33 +206,34 @@ def mobile_home(request):
         if period:
             sync_period_seller_commissions(period)
 
-        if period and period.status == CommissionPeriod.Status.ABERTA:
-            comissao_estimada_valor, month_total = calculate_estimated_commission(
-                seller, today.month, today.year,
-            )
-        else:
-            sc = SellerCommission.objects.filter(
-                seller=seller,
-                period__month=today.month,
-                period__year=today.year,
-            ).first()
-            comissao_estimada_valor = sc.commission_amount if sc else 0
-
-        periodo_status = period.status if period else None
-        periodo_fechado = periodo_status in (
-            CommissionPeriod.Status.FECHADA,
-            CommissionPeriod.Status.PAGA,
-            CommissionPeriod.Status.PARCIALMENTE_FECHADA,
-            CommissionPeriod.Status.PARCIALMENTE_PAGA,
-            CommissionPeriod.Status.CANCELADA,
-        )
-
         sc = SellerCommission.objects.filter(
             seller=seller,
             period__month=today.month,
             period__year=today.year,
         ).first()
-        is_editable = sc.is_editable if sc else not periodo_fechado
+
+        sc_status = sc.status if sc else None
+        is_editable = sc.is_editable if sc else True
+
+        if sc_status in (SellerCommission.Status.ABERTA, SellerCommission.Status.REABERTA):
+            comissao_valor, month_total = calculate_estimated_commission(
+                seller, today.month, today.year,
+            )
+            comissao_label = 'Estimada'
+        elif sc_status == SellerCommission.Status.FECHADA:
+            comissao_valor = sc.frozen_commission_amount or sc.commission_amount
+            comissao_label = 'Fechada'
+        elif sc_status == SellerCommission.Status.PAGA:
+            comissao_valor = sc.paid_amount or sc.frozen_commission_amount or sc.commission_amount
+            comissao_label = 'Paga'
+        elif sc_status == SellerCommission.Status.AJUSTADA:
+            comissao_valor = sc.commission_amount
+            comissao_label = 'Ajustada'
+        else:
+            comissao_valor = sc.commission_amount if sc else 0
+            comissao_label = ''
+
+        periodo_status = period.status if period else None
 
         return render(request, 'mobile/home.html', {
             'seller': seller,
@@ -240,11 +241,11 @@ def mobile_home(request):
             'has_entry_today': has_entry_today,
             'month_total': month_total,
             'month_link_total': month_link_total,
-            'comissao_estimada': comissao_estimada_valor,
-            'comissao_valor': comissao_estimada_valor,
+            'comissao_estimada': comissao_valor,
+            'comissao_label': comissao_label,
             'periodo_status': periodo_status,
-            'periodo_fechado': periodo_fechado,
             'is_editable': is_editable,
+            'seller_commission_status': sc_status,
         })
     except Exception as e:
         return render(request, 'mobile/home.html', {
@@ -263,6 +264,8 @@ def mobile_lancar_venda(request):
     success = None
     error = None
     existing_sale = None
+    last_amount = 0
+    was_update = False
 
     if request.method == 'POST':
         try:
@@ -334,8 +337,12 @@ def mobile_lancar_venda(request):
                 )
 
             success = True
+            last_amount = amount_cents
+            was_update = existing is not None
         except (ValueError, Exception) as e:
             error = str(e)
+            last_amount = 0
+            was_update = False
 
     if request.method == 'GET':
         sale_date_str = request.GET.get('date', '')
@@ -355,6 +362,8 @@ def mobile_lancar_venda(request):
         'success': success,
         'error': error,
         'existing_sale': existing_sale,
+        'last_amount': last_amount if success else 0,
+        'was_update': was_update if success else False,
     })
 
 

@@ -10,32 +10,23 @@
             <div class="flex items-center justify-between mb-3">
                 <div>
                     <h3 class="font-semibold text-[16px]" x-text="String(group.period.month).padStart(2,'0')+'/'+group.period.year"></h3>
-                    <p class="text-[12px] text-gray-500">
-                        <span x-text="group.commissions.length + ' vendedor(es) fechado(s)'"></span>
-                        <span class="ml-3">Total comissao: <strong class="text-brand-500" x-text="formatMoneyBRL(group.commissions.reduce((a,c)=>a+(c.commission_amount||0),0))"></strong></span>
-                    </p>
-                </div>
-                <div class="flex gap-2">
-                    <button @click="selectAll(group)" class="text-[13px] text-brand-500 hover:underline">Selecionar</button>
+                    <p class="text-[12px] text-gray-500"><span x-text="group.commissions.length + ' vendedor(es)'"></span> — Total comissao: <strong class="text-brand-500" x-text="formatMoneyBRL(group.commissions.reduce((a,c)=>a+(c.commission_amount||0),0))"></strong></p>
                 </div>
             </div>
-
             <table class="w-full text-left text-[13px]">
-                <thead><tr><th class="px-3 py-2 font-semibold text-gray-500 border-b bg-gray-50 w-8"><input type="checkbox" @change="toggleAllGroup(group)" :checked="allSelected(group)"></th><th class="px-3 py-2 font-semibold text-gray-500 border-b bg-gray-50">Vendedor</th><th class="px-3 py-2 font-semibold text-gray-500 border-b bg-gray-50">Total Vendido</th><th class="px-3 py-2 font-semibold text-gray-500 border-b bg-gray-50">Comissao</th><th class="px-3 py-2 font-semibold text-gray-500 border-b bg-gray-50">Fechado em</th><th class="px-3 py-2 font-semibold text-gray-500 border-b bg-gray-50">Responsavel</th></tr></thead>
+                <thead><tr><th class="px-3 py-2 font-semibold text-gray-500 border-b bg-gray-50 w-8"><input type="checkbox" @change="toggleAllGroup(group)" :checked="allSelected(group)"></th><th class="px-3 py-2 font-semibold text-gray-500 border-b bg-gray-50">Vendedor</th><th class="px-3 py-2 font-semibold text-gray-500 border-b bg-gray-50">Total Vendido</th><th class="px-3 py-2 font-semibold text-gray-500 border-b bg-gray-50">Comissao</th><th class="px-3 py-2 font-semibold text-gray-500 border-b bg-gray-50">Fechado em</th></tr></thead>
                 <tbody>
                     <template x-for="sc in group.commissions" :key="sc.id">
                         <tr class="hover:bg-gray-50">
-                            <td class="px-3 py-2 border-b"><input type="checkbox" :checked="isSelected(sc)" @change="toggle(sc)"></td>
+                            <td class="px-3 py-2 border-b"><input type="checkbox" :checked="isSelected(sc)" @change="toggle(group, sc)"></td>
                             <td class="px-3 py-2 border-b font-medium" x-text="sc.seller_name"></td>
                             <td class="px-3 py-2 border-b" x-text="formatMoneyBRL(sc.total_sold_amount)"></td>
                             <td class="px-3 py-2 border-b font-semibold text-brand-500" x-text="formatMoneyBRL(sc.commission_amount)"></td>
                             <td class="px-3 py-2 border-b text-gray-500" x-text="sc.closed_at ? new Date(sc.closed_at).toLocaleDateString('pt-BR') : '—'"></td>
-                            <td class="px-3 py-2 border-b text-gray-500">—</td>
                         </tr>
                     </template>
                 </tbody>
             </table>
-            <div x-show="!group.commissions.length" class="text-[13px] text-gray-500 py-3">Nenhum vendedor fechado nesta competencia.</div>
         </div>
     </template>
     <div x-show="!periodGroups.length" class="text-center py-12 text-gray-500">Nenhuma comissao aguardando pagamento.</div>
@@ -69,8 +60,8 @@
     <div x-show="showReopen" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40" @click.self="showReopen=false">
         <div class="bg-white rounded-2xl shadow-xl p-6 w-full max-w-md mx-4">
             <h3 class="text-[18px] font-semibold mb-3">Reverter Comissoes</h3>
-            <p class="text-[13px] text-gray-500 mb-2"><span x-text="selected.size"></span> vendedor(es) selecionado(s).</p>
-            <p class="text-[13px] text-danger-500 mb-4">A reversao vai reabrir as comissoes. Esta acao sera registrada.</p>
+            <p class="text-[13px] text-gray-500 mb-2"><span x-text="selected.size"></span> vendedor(es).</p>
+            <p class="text-[12px] text-gray-500 mb-4">A reversao vai reabrir as comissoes. Esta acao sera registrada.</p>
             <div class="mb-4"><label class="block text-[13px] text-gray-500 mb-1">Motivo *</label><textarea x-model="reopenReason" class="w-full px-4 py-3 border rounded-xl focus:ring-2 focus:ring-brand-500 text-[14px]" rows="3" placeholder="Motivo obrigatorio"></textarea></div>
             <div class="flex gap-3 justify-end">
                 <button @click="showReopen=false" class="bg-white border border-gray-300 text-gray-700 font-medium py-2 px-4 rounded-xl transition text-[14px]">Cancelar</button>
@@ -93,7 +84,7 @@ function getCSRFToken() {
 
 function filaPage() {
     return {
-        periodGroups: [], selected: new Set(), showPay: false, payDate: '', payMethod: '', payNotes: '',
+        periodGroups: [], selected: new Map(), showPay: false, payDate: '', payMethod: '', payNotes: '',
         showReopen: false, reopenReason: '',
         async load() {
             var fechadas = await fetch('/api/manager/commissions/FECHADA/').then(r => r.json());
@@ -103,46 +94,86 @@ function filaPage() {
                 period: p,
                 commissions: (p.seller_commissions || []).filter(sc => sc.status === 'FECHADA')
             })).filter(g => g.commissions.length > 0);
-            this.selected.clear();
-        },
-        toggleAllGroup(group) {
-            var all = this.allSelected(group);
-            group.commissions.forEach(sc => all ? this.selected.delete(sc.id) : this.selected.add(sc.id));
-        },
-        allSelected(group) {
-            return group.commissions.every(sc => this.selected.has(sc.id));
+            this.selected = new Map();
         },
         isSelected(sc) { return this.selected.has(sc.id); },
-        toggle(sc) { this.selected.has(sc.id) ? this.selected.delete(sc.id) : this.selected.add(sc.id); },
-        selectAll(group) { group.commissions.forEach(sc => this.selected.add(sc.id)); },
+        toggle(group, sc) {
+            if (this.selected.has(sc.id)) { this.selected.delete(sc.id); return; }
+            if (this.selected.size > 0) {
+                var firstId = this.selected.keys().next().value;
+                var firstPeriod = this.getPeriodForCommission(firstId);
+                if (firstPeriod && firstPeriod.uuid !== group.period.uuid) {
+                    alert('Selecione vendedores de apenas uma competencia por vez.'); return;
+                }
+            }
+            this.selected.set(sc.id, {seller: sc, period: group.period});
+        },
+        getPeriodForCommission(scId) {
+            for (var g of this.periodGroups) {
+                if (g.commissions.some(sc => sc.id === scId)) return g.period;
+            }
+            return null;
+        },
+        toggleAllGroup(group) {
+            if (group.commissions.every(sc => this.selected.has(sc.id))) {
+                group.commissions.forEach(sc => this.selected.delete(sc.id));
+            } else {
+                if (this.selected.size > 0) {
+                    var firstId = this.selected.keys().next().value;
+                    var firstPeriod = this.getPeriodForCommission(firstId);
+                    if (firstPeriod && firstPeriod.uuid !== group.period.uuid) {
+                        alert('Selecione vendedores de apenas uma competencia por vez.'); return;
+                    }
+                }
+                group.commissions.forEach(sc => this.selected.set(sc.id, {seller: sc, period: group.period}));
+            }
+        },
+        allSelected(group) { return group.commissions.length > 0 && group.commissions.every(sc => this.selected.has(sc.id)); },
         selectedTotal() {
-            var ids = Array.from(this.selected);
             var total = 0;
-            this.periodGroups.forEach(g => g.commissions.forEach(sc => { if (ids.includes(sc.id)) total += sc.commission_amount || 0; }));
+            this.selected.forEach(v => total += v.seller.commission_amount || 0);
             return total;
         },
-        openPayModal() { this.payDate = ''; this.payMethod = ''; this.payNotes = ''; this.showPay = true; },
+        getUniquePeriod() {
+            var periods = new Set();
+            this.selected.forEach(v => periods.add(v.period.uuid));
+            if (periods.size !== 1) { alert('Selecione vendedores de apenas uma competencia.'); return null; }
+            return this.selected.values().next().value.period;
+        },
+        openPayModal() {
+            if (!this.getUniquePeriod()) return;
+            this.payDate = ''; this.payMethod = ''; this.payNotes = ''; this.showPay = true;
+        },
         async doPay() {
-            var ids = Array.from(this.selected);
-            var r = await fetch('/api/commissions/periods/' + this.periodGroups[0].period.uuid + '/pay_sellers/', {
+            var period = this.getUniquePeriod();
+            if (!period) return;
+            var ids = [];
+            this.selected.forEach(v => ids.push(v.seller.id));
+            var r = await fetch('/api/commissions/periods/' + period.uuid + '/pay_sellers/', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json', 'X-CSRFToken': getCSRFToken()},
                 body: JSON.stringify({seller_commission_ids: ids, payment_date: this.payDate, payment_method: this.payMethod, payment_notes: this.payNotes})
             });
             if (r.ok) { this.showPay = false; this.load(); }
-            else { var d = await r.json(); alert(d.error || 'Erro'); }
+            else { var d = await r.json(); alert(d.error || d.detail || 'Erro ao pagar'); }
         },
-        openReopenModal() { this.reopenReason = ''; this.showReopen = true; },
+        openReopenModal() {
+            if (!this.getUniquePeriod()) return;
+            this.reopenReason = ''; this.showReopen = true;
+        },
         async doReopen() {
             if (!this.reopenReason.trim()) return;
-            var ids = Array.from(this.selected);
-            var r = await fetch('/api/commissions/periods/' + this.periodGroups[0].period.uuid + '/reopen_sellers/', {
+            var period = this.getUniquePeriod();
+            if (!period) return;
+            var ids = [];
+            this.selected.forEach(v => ids.push(v.seller.id));
+            var r = await fetch('/api/commissions/periods/' + period.uuid + '/reopen_sellers/', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json', 'X-CSRFToken': getCSRFToken()},
                 body: JSON.stringify({seller_commission_ids: ids, reason: this.reopenReason})
             });
             if (r.ok) { this.showReopen = false; this.load(); }
-            else { var d = await r.json(); alert(d.error || 'Erro'); }
+            else { var d = await r.json(); alert(d.error || d.detail || 'Erro ao reverter'); }
         }
     }
 }

@@ -19,7 +19,7 @@
     {% if not is_editable %}
     <div class="bg-warning-50 border border-warning-500/20 text-warning-700 px-4 py-3 rounded-xl text-sm flex items-center gap-2">
         <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"></path></svg>
-        Sua comissao deste mes foi fechada ou paga. Para ajustes, fale com o gestor.
+        {% if seller_commission_status == 'PAGA' %}Sua comissao deste mes foi paga.{% elif seller_commission_status == 'FECHADA' %}Sua comissao deste mes foi fechada.{% else %}Sua comissao esta bloqueada.{% endif %} Para ajustes, fale com o gestor.
     </div>
     {% endif %}
 
@@ -40,8 +40,8 @@
 
     <div class="grid grid-cols-2 gap-3">
         <div class="surface-card">
-            <p class="text-[13px] text-gray-500 mb-1">Comissao</p>
-            <p class="font-display text-[18px] font-semibold text-success-700 leading-tight">R$ {% widthratio comissao_estimada 100 1 %},{{ comissao_estimada|stringformat:"02d"|slice:"-2:" }}</p>
+            <p class="text-[13px] text-gray-500 mb-1">Comissao {% if comissao_label %}<span class="text-[11px] text-gray-400">({{ comissao_label }})</span>{% endif %}</p>
+            <p class="font-display text-[18px] font-semibold text-success-700 leading-tight">R$ {% if comissao_estimada > 0 %}{% widthratio comissao_estimada 100 1 %},{{ comissao_estimada|stringformat:"02d"|slice:"-2:" }}{% else %}0,00{% endif %}</p>
         </div>
         <div class="surface-card">
             <p class="text-[13px] text-gray-500 mb-1">Total no mes</p>

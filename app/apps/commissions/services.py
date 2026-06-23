@@ -222,6 +222,11 @@ def close_seller_commissions(period, seller_commission_ids, user):
     )
     if not commissions.exists():
         raise ValueError('Nenhuma comissao valida para fechar.')
+    if commissions.count() != len(seller_commission_ids):
+        raise ValueError(
+            'Apenas vendedores com comissao ABERTA ou REABERTA '
+            'podem ser fechados.'
+        )
 
     calculations = []
     with transaction.atomic():
@@ -250,6 +255,11 @@ def reopen_seller_commissions(period, seller_commission_ids, user, reason):
     )
     if not commissions.exists():
         raise ValueError('Nenhuma comissao fechada valida para reverter.')
+    if commissions.count() != len(seller_commission_ids):
+        raise ValueError(
+            'Apenas vendedores FECHADOS e ainda nao pagos '
+            'podem ser revertidos.'
+        )
 
     with transaction.atomic():
         for sc in commissions:
@@ -272,6 +282,11 @@ def pay_seller_commissions(period, seller_commission_ids, user, payment_data):
     )
     if not commissions.exists():
         raise ValueError('Nenhuma comissao fechada valida para pagar.')
+    if commissions.count() != len(seller_commission_ids):
+        raise ValueError(
+            'Apenas vendedores com comissao FECHADA '
+            'podem ser enviados para pagamento.'
+        )
 
     payment_date = payment_data.get('payment_date')
     if payment_date:
@@ -570,7 +585,7 @@ def update_period(period, data, user):
 
     changed_fields = []
     if 'expected_working_days' in data:
-        new_days = data['expected_working_days']
+        new_days = int(data['expected_working_days'])
         if new_days != period.expected_working_days:
             period.expected_working_days = new_days
             changed_fields.append('expected_working_days')
@@ -579,16 +594,20 @@ def update_period(period, data, user):
         period.notes = data['notes']
         changed_fields.append('notes')
 
-    if 'month' in data or 'year' in data:
+    month_changed = 'month' in data and int(data['month']) != period.month
+    year_changed = 'year' in data and int(data['year']) != period.year
+
+    if month_changed or year_changed:
         can_edit, msg = can_edit_period_dates(period)
         if not can_edit:
             raise ValueError(msg)
-        if 'month' in data:
-            period.month = int(data['month'])
-            changed_fields.append('month')
-        if 'year' in data:
-            period.year = int(data['year'])
-            changed_fields.append('year')
+
+    if month_changed:
+        period.month = int(data['month'])
+        changed_fields.append('month')
+    if year_changed:
+        period.year = int(data['year'])
+        changed_fields.append('year')
 
     if not changed_fields:
         return period, changed_fields
