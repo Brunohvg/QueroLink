@@ -25,6 +25,7 @@ urlpatterns = [
     path('manager/seller/<uuid:seller_id>/xlsx/', views.SellerReportExcelView.as_view(), name='api-seller-report-xlsx'),
     path('manager/seller/<uuid:seller_id>/pdf/', views.SellerReportPdfView.as_view(), name='api-seller-report-pdf'),
     path('manager/commissions/<str:status>/', views.CommissionPeriodsByStatusView.as_view(), name='api-commissions-by-status'),
+    path('financial/payment-queue/', views.PaymentQueueView.as_view(), name='api-payment-queue'),
     path('financial/commissions/<uuid:pk>/csv/', views.CommissionPeriodCsvView.as_view(), name='api-commission-csv'),
 
     path('schema/', SpectacularAPIView.as_view(), name='api-schema'),

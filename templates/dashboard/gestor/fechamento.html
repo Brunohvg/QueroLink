@@ -59,7 +59,7 @@
             <table class="w-full text-left text-[13px]" x-show="p.seller_commissions&&p.seller_commissions.length">
                 <thead>
                     <tr>
-                        <th class="px-3 py-2 font-semibold text-gray-500 border-b bg-gray-50 w-8"><input type="checkbox" @change="toggleAll(p)" :checked="allSelected(p) && p.seller_commissions.length > 0"></th>
+                        <th class="px-3 py-2 font-semibold text-gray-500 border-b bg-gray-50 w-8"></th>
                         <th class="px-3 py-2 font-semibold text-gray-500 border-b bg-gray-50">Vendedor</th>
                         <th class="px-3 py-2 font-semibold text-gray-500 border-b bg-gray-50">Dias</th>
                         <th class="px-3 py-2 font-semibold text-gray-500 border-b bg-gray-50">Faltam</th>
@@ -93,7 +93,9 @@
                 <p class="text-[13px] text-gray-600"><span x-text="selectedCount(p)"></span> selecionado(s) — Comissao: <strong class="text-brand-600" x-text="selectedTotal(p)"></strong></p>
                 <div class="flex gap-2">
                     <button @click="closeSelected(p)" class="bg-brand-500 hover:bg-brand-600 text-white font-medium py-1.5 px-3 rounded-xl transition tap-target text-[13px]">Fechar selecionados</button>
+                    {% if request.user.role == 'ADMIN' or request.user.role == 'FINANCEIRO' %}
                     <button @click="confirmMarkPaid(p)" class="bg-success-500 hover:bg-success-700 text-white font-medium py-1.5 px-3 rounded-xl transition tap-target text-[13px]">Pagar selecionados</button>
+                    {% endif %}
                     <button @click="openReopenModal(p)" class="bg-warning-500 hover:bg-warning-700 text-white font-medium py-1.5 px-3 rounded-xl transition tap-target text-[13px]">Reverter selecionados</button>
                 </div>
             </div>

@@ -10,7 +10,7 @@
             <div class="flex items-center justify-between mb-3">
                 <div>
                     <h3 class="font-semibold text-[16px]" x-text="String(group.period.month).padStart(2,'0')+'/'+group.period.year"></h3>
-                    <p class="text-[12px] text-gray-500"><span x-text="group.commissions.length + ' vendedor(es)'"></span> — Total comissao: <strong class="text-brand-500" x-text="formatMoneyBRL(group.commissions.reduce((a,c)=>a+(c.commission_amount||0),0))"></strong></p>
+                    <p class="text-[12px] text-gray-500"><span x-text="group.commissions.length + ' vendedor(es)'"></span> — <span class="text-xs px-1.5 py-0.5 rounded-full" :class="{'bg-indigo-100 text-indigo-700': group.period.status==='PARCIALMENTE_PAGA', 'bg-warning-50 text-warning-700': group.period.status==='FECHADA', 'bg-amber-100 text-amber-700': group.period.status==='PARCIALMENTE_FECHADA'}" x-text="group.period.status"></span> — Total comissao: <strong class="text-brand-500" x-text="formatMoneyBRL(group.commissions.reduce((a,c)=>a+(c.commission_amount||0),0))"></strong></p>
                 </div>
             </div>
             <table class="w-full text-left text-[13px]">
@@ -87,13 +87,9 @@ function filaPage() {
         periodGroups: [], selected: new Map(), showPay: false, payDate: '', payMethod: '', payNotes: '',
         showReopen: false, reopenReason: '',
         async load() {
-            var fechadas = await fetch('/api/manager/commissions/FECHADA/').then(r => r.json());
-            var parcial = await fetch('/api/manager/commissions/PARCIALMENTE_FECHADA/').then(r => r.json());
-            var allPeriods = [...fechadas, ...parcial];
-            this.periodGroups = allPeriods.map(p => ({
-                period: p,
-                commissions: (p.seller_commissions || []).filter(sc => sc.status === 'FECHADA')
-            })).filter(g => g.commissions.length > 0);
+            var r = await fetch('/api/financial/payment-queue/');
+            var data = await r.json();
+            this.periodGroups = data;
             this.selected = new Map();
         },
         isSelected(sc) { return this.selected.has(sc.id); },
@@ -139,6 +135,10 @@ function filaPage() {
             this.selected.forEach(v => periods.add(v.period.uuid));
             if (periods.size !== 1) { alert('Selecione vendedores de apenas uma competencia.'); return null; }
             return this.selected.values().next().value.period;
+        },
+        getCurrentPeriodUuid() {
+            var p = this.getUniquePeriod();
+            return p ? p.uuid : null;
         },
         openPayModal() {
             if (!this.getUniquePeriod()) return;

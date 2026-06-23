@@ -313,6 +313,42 @@ class CommissionPeriodViewSet(viewsets.ModelViewSet):
         return Response(self.get_serializer(period).data)
 
 
+class PaymentQueueView(generics.GenericAPIView):
+    permission_classes = [IsAuthenticated, IsFinancialOrAdmin | IsManagerOrAdmin]
+
+    def get(self, request):
+        tenant = request.user.tenant
+        periods = CommissionPeriod.objects.filter(
+            tenant=tenant,
+        ).exclude(
+            status=CommissionPeriod.Status.CANCELADA,
+        ).prefetch_related(
+            'seller_commissions__seller',
+        ).order_by('-year', '-month')
+
+        result = []
+        for period in periods:
+            fechadas = [
+                sc for sc in period.seller_commissions.all()
+                if sc.status == SellerCommission.Status.FECHADA
+            ]
+            if not fechadas:
+                continue
+
+            from .serializers import SellerCommissionReadSerializer
+            result.append({
+                'period': {
+                    'uuid': str(period.uuid),
+                    'month': period.month,
+                    'year': period.year,
+                    'status': period.status,
+                },
+                'commissions': SellerCommissionReadSerializer(fechadas, many=True).data,
+            })
+
+        return Response(result)
+
+
 class JWTLoginView(TokenObtainPairView):
     @method_decorator(ratelimit(key='ip', rate='5/m', method='POST', block=True))
     @method_decorator(

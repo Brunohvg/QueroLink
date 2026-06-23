@@ -664,3 +664,85 @@ class TestCancelPeriod(BaseTest):
         pay_seller_commissions(period, [sc.id], self.financeiro, {'payment_method': 'pix'})
         with self.assertRaises(ValueError):
             cancel_period(period, 'Nao deve', self.manager)
+
+
+class TestPaymentQueue(BaseTest):
+    def setUp(self):
+        super().setUp()
+        self.financeiro = User.objects.create_user(
+            username='financeiro_fila', password='test123',
+            role=User.Role.FINANCEIRO, tenant=self.tenant,
+        )
+        self._create_manual_sale(self.seller, 100000, 15)
+        self._create_manual_sale(self.seller2, 50000, 16)
+        self.period = self._create_period()
+        sync_period_seller_commissions(self.period)
+
+        sc1 = SellerCommission.objects.get(period=self.period, seller=self.seller)
+        sc2 = SellerCommission.objects.get(period=self.period, seller=self.seller2)
+
+        close_seller_commissions(self.period, [sc1.id], self.manager)
+        close_seller_commissions(self.period, [sc2.id], self.manager)
+        pay_seller_commissions(self.period, [sc2.id], self.financeiro, {'payment_method': 'pix'})
+
+        self.period.refresh_from_db()
+
+    def test_queue_shows_fechada_only(self):
+        fechadas = SellerCommission.objects.filter(
+            period=self.period, status=SellerCommission.Status.FECHADA,
+        )
+        pagas = SellerCommission.objects.filter(
+            period=self.period, status=SellerCommission.Status.PAGA,
+        )
+        self.assertEqual(fechadas.count(), 1)
+        self.assertEqual(pagas.count(), 1)
+
+    def test_period_is_parcialmente_paga(self):
+        from app.apps.commissions.services import recalculate_period_status
+        status = recalculate_period_status(self.period)
+        self.assertEqual(status, CommissionPeriod.Status.PARCIALMENTE_PAGA)
+
+    def test_queue_excludes_paid_sellers(self):
+        fechadas = SellerCommission.objects.filter(
+            period=self.period, status=SellerCommission.Status.FECHADA,
+        )
+        for sc in fechadas:
+            self.assertNotEqual(sc.status, SellerCommission.Status.PAGA)
+
+    def test_pay_remaining_seller_makes_period_paga(self):
+        fechadas = SellerCommission.objects.filter(
+            period=self.period, status=SellerCommission.Status.FECHADA,
+        )
+        pay_seller_commissions(
+            self.period, list(fechadas.values_list('id', flat=True)),
+            self.financeiro, {'payment_method': 'pix'},
+        )
+        from app.apps.commissions.services import recalculate_period_status
+        status = recalculate_period_status(self.period)
+        self.assertEqual(status, CommissionPeriod.Status.PAGA)
+
+
+class TestDashboardCommissionSeparation(BaseTest):
+    def setUp(self):
+        super().setUp()
+        self.financeiro = User.objects.create_user(
+            username='financeiro_dash', password='test123',
+            role=User.Role.FINANCEIRO, tenant=self.tenant,
+        )
+
+    def test_dashboard_separates_commissions(self):
+        self._create_manual_sale(self.seller, 8503050, 15)
+        self._create_manual_sale(self.seller2, 420000, 16)
+        period = self._create_period()
+        sync_period_seller_commissions(period)
+
+        sc1 = SellerCommission.objects.get(period=period, seller=self.seller)
+        sc2 = SellerCommission.objects.get(period=period, seller=self.seller2)
+
+        close_seller_commissions(period, [sc1.id], self.manager)
+        pay_seller_commissions(period, [sc1.id], self.financeiro, {'payment_method': 'pix'})
+
+        data = get_dashboard_data(self.tenant, month=6, year=2026)
+        self.assertGreater(data['commission_paga'], 0)
+        self.assertGreater(data['commission_aberta'], 0)
+        self.assertEqual(data['commission_fechada'], 0)
