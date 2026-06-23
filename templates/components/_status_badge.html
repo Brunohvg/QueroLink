@@ -1,16 +1,29 @@
 {% comment %}
-Usage: include components/_status_badge.html with status='FECHADA'
-CommissionPeriod status: ABERTA | FECHADA | PAGA | AJUSTADA | CANCELADA
-Also works for: ativo/inativo (is_active)
+Usage: {% include 'components/_status_badge.html' with status='ABERTA' %}
+Period statuses: ABERTA, PARCIALMENTE_FECHADA, FECHADA, PARCIALMENTE_PAGA, PAGA, AJUSTADA, CANCELADA
+Seller financial statuses: ABERTA, FECHADA, PAGA, AJUSTADA, REABERTA, CANCELADA
+Operational statuses: PRONTO, PENDENTE, SEM_LANCAMENTO
 {% endcomment %}
-<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium
-    {% if status == 'ABERTA' or status == 'PENDING' or status == False %}bg-gray-100 text-gray-600
-    {% elif status == 'FECHADA' %}bg-warning-50 text-warning-700
-    {% elif status == 'AJUSTADA' %}bg-amber-50 text-amber-700
-    {% elif status == 'CANCELADA' %}bg-danger-50 text-danger-700
-    {% elif status == 'PAGA' or status == 'COMPLETED' or status == 'PAID' or status == True %}bg-success-50 text-success-700 font-semibold
-    {% elif status == 'SENT' %}bg-brand-50 text-brand-600
-    {% elif status == 'FAILED' or status == 'CANCELED' %}bg-danger-50 text-danger-700
-    {% else %}bg-gray-100 text-gray-600{% endif %}">
-    {% if label %}{{ label }}{% else %}{{ status }}{% endif %}
-</span>
+{% if status == 'ABERTA' or status == 'REABERTA' %}
+<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-600">{{ status }}</span>
+{% elif status == 'PARCIALMENTE_FECHADA' %}
+<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-700">PARCIALMENTE FECHADA</span>
+{% elif status == 'FECHADA' %}
+<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-warning-50 text-warning-700">FECHADA</span>
+{% elif status == 'PARCIALMENTE_PAGA' %}
+<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-indigo-100 text-indigo-700">PARCIALMENTE PAGA</span>
+{% elif status == 'PAGA' %}
+<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-success-50 text-success-700">PAGA</span>
+{% elif status == 'AJUSTADA' %}
+<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-amber-50 text-amber-700">AJUSTADA</span>
+{% elif status == 'CANCELADA' %}
+<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-danger-50 text-danger-700">CANCELADA</span>
+{% elif status == 'PRONTO' %}
+<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-success-50 text-success-700">PRONTO</span>
+{% elif status == 'PENDENTE' %}
+<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-warning-50 text-warning-700">PENDENTE</span>
+{% elif status == 'SEM_LANCAMENTO' %}
+<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-500">SEM LANCAMENTO</span>
+{% else %}
+<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-600">{{ status|default:'—' }}</span>
+{% endif %}

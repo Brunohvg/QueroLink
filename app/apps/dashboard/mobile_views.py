@@ -227,6 +227,13 @@ def mobile_home(request):
         CommissionPeriod.Status.CANCELADA,
     )
 
+    sc = SellerCommission.objects.filter(
+        seller=seller,
+        period__month=today.month,
+        period__year=today.year,
+    ).first()
+    is_editable = sc.is_editable if sc else not periodo_fechado
+
     return render(request, 'mobile/home.html', {
         'seller': seller,
         'today_total': today_total,
@@ -237,6 +244,7 @@ def mobile_home(request):
         'comissao_valor': comissao_estimada_valor,
         'periodo_status': periodo_status,
         'periodo_fechado': periodo_fechado,
+        'is_editable': is_editable,
     })
 
 
@@ -284,26 +292,10 @@ def mobile_lancar_venda(request):
                     'anteriores. Entre em contato com seu gestor.',
                 )
 
-            blocked_statuses = [
-                CommissionPeriod.Status.FECHADA,
-                CommissionPeriod.Status.PAGA,
-                CommissionPeriod.Status.AJUSTADA,
-                CommissionPeriod.Status.CANCELADA,
-            ]
-            periodo_bloqueado = CommissionPeriod.objects.filter(
-                tenant=seller.tenant,
-                month=sale_date.month,
-                year=sale_date.year,
-                status__in=blocked_statuses,
-            ).exists()
-
-            if periodo_bloqueado:
-                raise ValueError(
-                    'Este periodo ja foi fechado. '
-                    'Nao e possivel lancar ou editar vendas para este mes. '
-                    'Entre em contato com seu gestor se precisar de um '
-                    'ajuste.',
-                )
+            from app.apps.commissions.services import validate_sale_can_be_changed
+            can_change, error_msg = validate_sale_can_be_changed(seller, sale_date, request.user)
+            if not can_change:
+                raise ValueError(error_msg)
 
             existing = Sale.objects.filter(
                 seller=seller,

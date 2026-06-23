@@ -142,27 +142,10 @@ class SaleCreateSerializer(serializers.ModelSerializer):
                         ),
                     })
 
-            blocked_statuses = [
-                CommissionPeriod.Status.FECHADA,
-                CommissionPeriod.Status.PAGA,
-                CommissionPeriod.Status.AJUSTADA,
-                CommissionPeriod.Status.CANCELADA,
-            ]
-            period_blocked = CommissionPeriod.objects.filter(
-                tenant=user.tenant,
-                month=sale_date.month,
-                year=sale_date.year,
-                status__in=blocked_statuses,
-            ).exists()
-
-            if period_blocked and user.role == User.Role.SELLER:
-                raise serializers.ValidationError({
-                    'sale_date': (
-                        'Este periodo ja foi fechado. '
-                        'Nao e possivel lancar ou editar vendas para este mes. '
-                        'Entre em contato com seu gestor se precisar de um ajuste.'
-                    ),
-                })
+            from app.apps.commissions.services import validate_sale_can_be_changed
+            can_change, error_msg = validate_sale_can_be_changed(seller, sale_date, user)
+            if not can_change:
+                raise serializers.ValidationError({'sale_date': error_msg})
 
             existing = Sale.objects.filter(
                 seller=seller,
@@ -217,24 +200,24 @@ class SellerCommissionReadSerializer(serializers.ModelSerializer):
         source='period.status', read_only=True,
     )
     adjustments = CommissionAdjustmentSerializer(many=True, read_only=True)
+    is_editable = serializers.BooleanField(read_only=True)
 
     class Meta:
         model = SellerCommission
         fields = [
             'id', 'seller_uuid', 'seller_name',
+            'status', 'operational_status',
             'total_sold_amount', 'commission_rate', 'commission_amount',
+            'expected_working_days', 'submitted_days_count', 'missing_days_count',
+            'frozen_total_sold_amount', 'frozen_commission_rate',
+            'frozen_commission_amount',
             'period_status',
-            'payment_date', 'paid_at', 'paid_amount',
+            'closed_at', 'reopened_at', 'reopen_reason',
+            'paid_at', 'paid_amount', 'payment_date',
             'payment_method', 'payment_notes',
-            'closed_at', 'adjustments',
+            'adjustments', 'is_editable',
         ]
-        read_only_fields = [
-            'id', 'seller_uuid', 'seller_name', 'total_sold_amount',
-            'commission_rate', 'commission_amount', 'period_status',
-            'payment_date', 'paid_at', 'paid_amount',
-            'payment_method', 'payment_notes',
-            'closed_at', 'adjustments',
-        ]
+        read_only_fields = fields
 
 
 class CommissionPeriodSerializer(serializers.ModelSerializer):
@@ -245,6 +228,7 @@ class CommissionPeriodSerializer(serializers.ModelSerializer):
         model = CommissionPeriod
         fields = [
             'uuid', 'tenant', 'month', 'year', 'status',
+            'expected_working_days', 'notes',
             'closed_at', 'paid_at', 'adjusted_at',
             'adjustment_reason', 'cancelled_at', 'cancel_reason',
             'created_at', 'seller_commissions', 'is_current_month',
@@ -256,26 +240,11 @@ class CommissionPeriodSerializer(serializers.ModelSerializer):
         ]
 
     def get_seller_commissions(self, obj):
-        from app.apps.commissions.services import get_manual_sales_total, get_commission_rate
-
         commissions = obj.seller_commissions.select_related('seller').all()
-        if obj.status == CommissionPeriod.Status.ABERTA:
-            import copy
-            result = []
-            for sc in commissions:
-                temp = copy.copy(sc)
-                temp.recalculate(commit=False)
-                result.append(temp)
-            return SellerCommissionReadSerializer(result, many=True).data
-
         import copy
         result = []
         for sc in commissions:
-            has_stale_data = (
-                sc.total_sold_amount == 0 and sc.commission_amount == 0
-                and get_manual_sales_total(sc.seller, obj.month, obj.year) > 0
-            )
-            if has_stale_data:
+            if sc.is_editable:
                 temp = copy.copy(sc)
                 temp.recalculate(commit=False)
                 result.append(temp)
@@ -291,7 +260,11 @@ class CommissionPeriodSerializer(serializers.ModelSerializer):
 class CommissionPeriodCreateSerializer(serializers.ModelSerializer):
     class Meta:
         model = CommissionPeriod
-        fields = ['month', 'year']
+        fields = ['month', 'year', 'expected_working_days', 'notes']
+        extra_kwargs = {
+            'expected_working_days': {'required': False},
+            'notes': {'required': False},
+        }
 
     def validate_month(self, value):
         if value < 1 or value > 12:
@@ -302,6 +275,20 @@ class CommissionPeriodCreateSerializer(serializers.ModelSerializer):
         if value < 2000 or value > 2100:
             raise serializers.ValidationError('Ano invalido.')
         return value
+
+    def validate(self, attrs):
+        request = self.context.get('request')
+        tenant = request.user.tenant
+        month = attrs.get('month')
+        year = attrs.get('year')
+        if CommissionPeriod.objects.filter(
+            tenant=tenant, month=month, year=year,
+        ).exists():
+            raise serializers.ValidationError(
+                f'A competencia {month:02d}/{year} ja existe. '
+                'Use Atualizar valores para sincronizar os dados.'
+            )
+        return attrs
 
 
 def slugify(value):

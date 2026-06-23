@@ -4,7 +4,7 @@ from decimal import Decimal
 
 from django.utils import timezone
 from django.db import transaction
-from django.db.models import Sum
+from django.db.models import Sum, Q
 
 from app.apps.sales.models import Sale
 from app.apps.sellers.models import Seller
@@ -57,6 +57,24 @@ def calculate_estimated_commission(seller, month, year):
     return commission, total
 
 
+def get_or_create_period(tenant, month, year, expected_working_days=None):
+    period, created = CommissionPeriod.objects.get_or_create(
+        tenant=tenant,
+        month=month,
+        year=year,
+        defaults={
+            'expected_working_days': expected_working_days or 22,
+            'status': CommissionPeriod.Status.ABERTA,
+        },
+    )
+    if created and expected_working_days:
+        period.expected_working_days = expected_working_days
+        period.save(update_fields=['expected_working_days'])
+    if created:
+        sync_period_seller_commissions(period)
+    return period, created
+
+
 def sync_period_seller_commissions(period):
     tenant = period.tenant
     sellers = Seller.objects.filter(tenant=tenant, is_active=True)
@@ -75,136 +93,206 @@ def sync_period_seller_commissions(period):
             seller=seller,
             defaults={
                 'commission_rate': get_commission_rate(seller),
+                'expected_working_days': period.expected_working_days or 22,
             },
         )
         if created:
             created_count += 1
-
-    if period.status == CommissionPeriod.Status.ABERTA:
-        for sc in SellerCommission.objects.filter(period=period):
+        if sc.is_editable:
             sc.recalculate(commit=True)
 
     return created_count
 
 
-def freeze_period(period, user):
-    if period.status != CommissionPeriod.Status.ABERTA:
-        raise ValueError(
-            f'Nao e possivel fechar competencia com status {period.status}.'
-        )
+def get_seller_commission(period, seller):
+    sc, _ = SellerCommission.objects.get_or_create(
+        period=period,
+        seller=seller,
+        defaults={
+            'commission_rate': get_commission_rate(seller),
+            'expected_working_days': period.expected_working_days or 22,
+        },
+    )
+    if sc.is_editable:
+        sc.recalculate(commit=True)
+    return sc
 
-    sync_period_seller_commissions(period)
 
-    commissions = period.seller_commissions.select_related('seller').all()
+def calculate_seller_working_days(period, seller):
+    sales_dates = Sale.objects.filter(
+        seller=seller,
+        origin=Sale.Origin.MANUAL,
+        sale_date__year=period.year,
+        sale_date__month=period.month,
+    ).dates('sale_date', 'day')
+    count = sales_dates.count()
+    expected = period.expected_working_days or 22
+    missing = max(0, expected - count)
+    return count, expected, missing
+
+
+def calculate_period_summary(period):
+    commissions = SellerCommission.objects.filter(period=period)
+    total_vendido = 0
+    aberta = 0
+    fechada = 0
+    paga = 0
+    prontos = 0
+    pendentes = 0
+    sem_lancamento = 0
+    abertos_count = 0
+    fechados_count = 0
+    pagos_count = 0
+
+    for sc in commissions:
+        if sc.is_editable:
+            sc.recalculate(commit=False)
+        total_vendido += sc.total_sold_amount
+        s = sc.status
+        if s == SellerCommission.Status.ABERTA or s == SellerCommission.Status.REABERTA:
+            aberta += sc.commission_amount
+            abertos_count += 1
+        elif s == SellerCommission.Status.FECHADA:
+            val = sc.frozen_commission_amount or sc.commission_amount
+            fechada += val
+            fechados_count += 1
+        elif s == SellerCommission.Status.PAGA:
+            val = sc.paid_amount or sc.frozen_commission_amount or sc.commission_amount
+            paga += val
+            pagos_count += 1
+
+        op = sc.operational_status
+        if op == SellerCommission.OperationalStatus.PRONTO:
+            prontos += 1
+        elif op == SellerCommission.OperationalStatus.PENDENTE:
+            pendentes += 1
+        else:
+            sem_lancamento += 1
+
+    return {
+        'total_vendido': total_vendido,
+        'commission_aberta': aberta,
+        'commission_fechada': fechada,
+        'commission_paga': paga,
+        'vendedores_abertos': abertos_count,
+        'vendedores_fechados': fechados_count,
+        'vendedores_pagos': pagos_count,
+        'vendedores_prontos': prontos,
+        'vendedores_pendentes': pendentes,
+        'vendedores_sem_lancamento': sem_lancamento,
+        'total_vendedores': commissions.count(),
+    }
+
+
+def recalculate_period_status(period):
+    summary = calculate_period_summary(period)
+    total = summary['total_vendedores']
+    if total == 0:
+        new_status = CommissionPeriod.Status.ABERTA
+    elif summary['vendedores_pagos'] == total:
+        new_status = CommissionPeriod.Status.PAGA
+    elif summary['vendedores_fechados'] + summary['vendedores_pagos'] == total:
+        if summary['vendedores_pagos'] > 0 and summary['vendedores_fechados'] == 0:
+            new_status = CommissionPeriod.Status.PAGA
+        elif summary['vendedores_pagos'] > 0:
+            new_status = CommissionPeriod.Status.PARCIALMENTE_PAGA
+        else:
+            new_status = CommissionPeriod.Status.FECHADA
+    elif summary['vendedores_fechados'] > 0 or summary['vendedores_pagos'] > 0:
+        if summary['vendedores_pagos'] > 0:
+            new_status = CommissionPeriod.Status.PARCIALMENTE_PAGA
+        else:
+            new_status = CommissionPeriod.Status.PARCIALMENTE_FECHADA
+    else:
+        new_status = CommissionPeriod.Status.ABERTA
+
+    period.status = new_status
+    period.save(update_fields=['status', 'updated_at'])
+    return new_status
+
+
+def close_seller_commissions(period, seller_commission_ids, user):
+    commissions = SellerCommission.objects.filter(
+        id__in=seller_commission_ids,
+        period=period,
+        status__in=[
+            SellerCommission.Status.ABERTA,
+            SellerCommission.Status.REABERTA,
+        ],
+    )
+    if not commissions.exists():
+        raise ValueError('Nenhuma comissao valida para fechar.')
+
     calculations = []
     with transaction.atomic():
         for sc in commissions:
             sc.freeze(user, commit=True)
             calculations.append({
+                'id': sc.id,
                 'seller_name': sc.seller.name,
                 'total_sold': sc.total_sold_amount,
                 'commission_rate': float(sc.commission_rate),
                 'commission_amount': sc.commission_amount,
             })
-
-        period.status = CommissionPeriod.Status.FECHADA
-        period.closed_by = user
-        period.closed_at = timezone.now()
-        period.save(update_fields=[
-            'status', 'closed_by', 'closed_at', 'updated_at',
-        ])
+        recalculate_period_status(period)
 
     return calculations
 
 
-def mark_period_paid(period, user, payment_data):
-    if period.status != CommissionPeriod.Status.FECHADA:
-        raise ValueError(
-            f'Nao e possivel marcar como paga competencia '
-            f'com status {period.status}. O status deve ser FECHADA.'
-        )
-
-    if not period.seller_commissions.exists():
-        raise ValueError(
-            'Nao e possivel marcar como paga uma competencia '
-            'sem vendedores/comissoes.'
-        )
-
-    payment_date = payment_data.get('payment_date')
-    payment_method = payment_data.get('payment_method', '').strip()
-    payment_notes = payment_data.get('payment_notes', '').strip()
-
-    if payment_date:
-        payment_date = date.fromisoformat(payment_date)
-    else:
-        payment_date = timezone.localdate()
-
-    with transaction.atomic():
-        for sc in period.seller_commissions.all():
-            sc.paid_by = user
-            sc.paid_at = timezone.now()
-            sc.payment_date = payment_date
-            sc.paid_amount = sc.commission_amount
-            sc.payment_method = payment_method or None
-            sc.payment_notes = payment_notes or None
-            sc.save(update_fields=[
-                'paid_by', 'paid_at', 'payment_date',
-                'paid_amount', 'payment_method', 'payment_notes',
-            ])
-
-        period.status = CommissionPeriod.Status.PAGA
-        period.paid_by = user
-        period.paid_at = timezone.now()
-        period.save(update_fields=[
-            'status', 'paid_by', 'paid_at', 'updated_at',
-        ])
-
-    from app.apps.notifications.tasks import notify_commission_paid
-    for sc in period.seller_commissions.select_related('seller').all():
-        try:
-            notify_commission_paid(sc)
-        except Exception:
-            pass
-
-    return period
-
-
-def reopen_period(period, user, reason):
-    if period.status != CommissionPeriod.Status.FECHADA:
-        raise ValueError(
-            f'Nao e possivel reverter competencia com status {period.status}. '
-            'Apenas competencias FECHADA podem ser revertidas.'
-        )
-
-    if period.paid_at or any(
-        sc.paid_at for sc in period.seller_commissions.all()
-    ):
-        raise ValueError(
-            'Nao e possivel reverter uma competencia que ja foi paga. '
-            'Crie um ajuste administrativo.'
-        )
-
+def reopen_seller_commissions(period, seller_commission_ids, user, reason):
     if not reason or not reason.strip():
         raise ValueError('E necessario informar o motivo da reversao.')
 
+    commissions = SellerCommission.objects.filter(
+        id__in=seller_commission_ids,
+        period=period,
+        status=SellerCommission.Status.FECHADA,
+    )
+    if not commissions.exists():
+        raise ValueError('Nenhuma comissao fechada valida para reverter.')
+
     with transaction.atomic():
-        for sc in period.seller_commissions.all():
-            sc.closed_at = None
-            sc.closed_by = None
-            sc.save(update_fields=['closed_at', 'closed_by'])
+        for sc in commissions:
+            if sc.is_paid:
+                raise ValueError(
+                    f'Comissao de {sc.seller.name} ja foi paga '
+                    'e nao pode ser revertida.'
+                )
+            sc.reopen(user, reason, commit=True)
+        recalculate_period_status(period)
 
-        period.status = CommissionPeriod.Status.ABERTA
-        period.closed_at = None
-        period.closed_by = None
-        period.save(update_fields=[
-            'status', 'closed_at', 'closed_by', 'updated_at',
-        ])
+    return list(commissions)
 
-    return period
+
+def pay_seller_commissions(period, seller_commission_ids, user, payment_data):
+    commissions = SellerCommission.objects.filter(
+        id__in=seller_commission_ids,
+        period=period,
+        status=SellerCommission.Status.FECHADA,
+    )
+    if not commissions.exists():
+        raise ValueError('Nenhuma comissao fechada valida para pagar.')
+
+    payment_date = payment_data.get('payment_date')
+    if payment_date:
+        payment_date = date.fromisoformat(payment_date)
+    else:
+        payment_date = None
+
+    with transaction.atomic():
+        for sc in commissions:
+            sc.mark_paid(user, {
+                'payment_date': payment_date or timezone.localdate(),
+                'payment_method': payment_data.get('payment_method', ''),
+                'payment_notes': payment_data.get('payment_notes', ''),
+            }, commit=True)
+        recalculate_period_status(period)
+
+    return list(commissions)
 
 
 def create_commission_adjustment(seller_commission, new_amount, reason, user):
-    previous_amount = seller_commission.commission_amount
+    previous_amount = seller_commission.frozen_commission_amount or seller_commission.commission_amount
     difference = new_amount - previous_amount
 
     adjustment = CommissionAdjustment.objects.create(
@@ -217,14 +305,14 @@ def create_commission_adjustment(seller_commission, new_amount, reason, user):
     )
 
     seller_commission.commission_amount = new_amount
-    seller_commission.save(update_fields=['commission_amount'])
+    seller_commission.status = SellerCommission.Status.AJUSTADA
+    seller_commission.save(update_fields=['commission_amount', 'status'])
 
     return adjustment
 
 
 def get_links_data(tenant, month=None, year=None):
     from app.apps.orders.models import Order
-    from app.apps.payments.models import Payment
     from django.db.models import Sum as _Sum
 
     hoje = timezone.localdate()
@@ -234,8 +322,7 @@ def get_links_data(tenant, month=None, year=None):
         year = hoje.year
 
     start = date(year, month, 1)
-    import calendar as _cal
-    last_day = _cal.monthrange(year, month)[1]
+    last_day = calendar.monthrange(year, month)[1]
     end = date(year, month, last_day)
 
     orders = Order.objects.filter(
@@ -266,7 +353,6 @@ def get_links_data(tenant, month=None, year=None):
 
 
 def get_dashboard_data(tenant, month=None, year=None):
-    import calendar as _calendar
     hoje = timezone.localdate()
 
     if month is None:
@@ -275,7 +361,7 @@ def get_dashboard_data(tenant, month=None, year=None):
         year = hoje.year
 
     start = date(year, month, 1)
-    last_day = _calendar.monthrange(year, month)[1]
+    last_day = calendar.monthrange(year, month)[1]
     end = date(year, month, last_day)
 
     total_vendido = Sale.objects.filter(
@@ -292,46 +378,22 @@ def get_dashboard_data(tenant, month=None, year=None):
     if period:
         sync_period_seller_commissions(period)
 
-    commission_estimada = 0
-    commission_fechada = 0
-    commission_paga = 0
-    period_status = None
-    has_inconsistency = False
-
     if period:
+        summary = calculate_period_summary(period)
         period_status = period.status
-        if period.status == CommissionPeriod.Status.ABERTA:
-            for sc in SellerCommission.objects.filter(period=period):
-                est, _ = calculate_estimated_commission(
-                    sc.seller, month, year,
-                )
-                commission_estimada += est
-        elif period.status == CommissionPeriod.Status.FECHADA:
-            commission_fechada = SellerCommission.objects.filter(
-                period=period,
-            ).aggregate(t=Sum('commission_amount'))['t'] or 0
-            if commission_fechada == 0 and total_vendido > 0:
-                for sc in SellerCommission.objects.filter(period=period):
-                    est, _ = calculate_estimated_commission(
-                        sc.seller, month, year,
-                    )
-                    commission_fechada += est
-                has_inconsistency = True
-        elif period.status == CommissionPeriod.Status.PAGA:
-            commission_paga = SellerCommission.objects.filter(
-                period=period,
-            ).aggregate(t=Sum('paid_amount'))['t'] or 0
-            if commission_paga == 0 and total_vendido > 0:
-                for sc in SellerCommission.objects.filter(period=period):
-                    est, _ = calculate_estimated_commission(
-                        sc.seller, month, year,
-                    )
-                    commission_paga += est
-                has_inconsistency = True
-        else:
-            commission_fechada = SellerCommission.objects.filter(
-                period=period,
-            ).aggregate(t=Sum('commission_amount'))['t'] or 0
+    else:
+        summary = {
+            'commission_aberta': 0,
+            'commission_fechada': 0,
+            'commission_paga': 0,
+            'vendedores_abertos': 0,
+            'vendedores_fechados': 0,
+            'vendedores_pagos': 0,
+            'vendedores_prontos': 0,
+            'vendedores_pendentes': 0,
+            'vendedores_sem_lancamento': 0,
+        }
+        period_status = None
 
     vendedores_ativos = Seller.objects.filter(
         tenant=tenant, is_active=True,
@@ -379,15 +441,21 @@ def get_dashboard_data(tenant, month=None, year=None):
             'year': year,
         },
         'total_vendido': total_vendido,
-        'commission_estimada': commission_estimada,
-        'commission_fechada': commission_fechada,
-        'commission_paga': commission_paga,
+        'commission_aberta': summary['commission_aberta'],
+        'commission_fechada': summary['commission_fechada'],
+        'commission_paga': summary['commission_paga'],
         'period_status': period_status,
-        'has_inconsistency': has_inconsistency,
+        'has_inconsistency': False,
         'vendedores_ativos': vendedores_ativos,
         'vendedores_total': vendedores_total,
         'vendedores_com_venda': sellers_with_sales,
         'vendedores_sem_lancamento_hoje': sellers_no_sale_today,
+        'vendedores_abertos': summary['vendedores_abertos'],
+        'vendedores_fechados': summary['vendedores_fechados'],
+        'vendedores_pagos': summary['vendedores_pagos'],
+        'vendedores_prontos': summary['vendedores_prontos'],
+        'vendedores_pendentes': summary['vendedores_pendentes'],
+        'vendedores_sem_lancamento_periodo': summary['vendedores_sem_lancamento'],
         'links_gerados': links_data['links_gerados'],
         'links_pagos': links_data['links_pagos'],
         'links_pendentes': links_data['links_pendentes'],
@@ -397,3 +465,26 @@ def get_dashboard_data(tenant, month=None, year=None):
         'top5_mes': list(top5_mes),
         'sellers_inativos': sellers_inativos,
     }
+
+
+def validate_sale_can_be_changed(seller, sale_date, user):
+    period = CommissionPeriod.objects.filter(
+        tenant=seller.tenant,
+        month=sale_date.month,
+        year=sale_date.year,
+    ).first()
+    if not period:
+        return True, None
+
+    sc = SellerCommission.objects.filter(
+        period=period, seller=seller,
+    ).first()
+    if not sc:
+        return True, None
+
+    if not sc.is_editable:
+        return False, (
+            f'A comissao de {seller.name} ja foi fechada '
+            f'ou paga nesta competencia.'
+        )
+    return True, None

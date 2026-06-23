@@ -2,95 +2,79 @@
 {% block title %}Fila de Pagamento — QueroLink{% endblock %}
 {% block content %}
 <div x-data="filaPage()" x-init="load()">
-    <h1 class="font-display text-[18px] font-semibold text-gray-900 mb-6">Fila de Pagamento</h1>
-    <p class="text-[13px] text-gray-500 mb-4">Competencias fechadas aguardando pagamento.</p>
+    <h1 class="font-display text-[18px] font-semibold text-gray-900 mb-1">Fila de Pagamento</h1>
+    <p class="text-[13px] text-gray-500 mb-6">Comissoes individuais com status FECHADA aguardando pagamento.</p>
 
-    <template x-for="p in periods" :key="p.uuid">
+    <template x-for="group in periodGroups" :key="group.period.uuid">
         <div class="surface-card mb-4">
-            <div class="flex items-center justify-between mb-4">
+            <div class="flex items-center justify-between mb-3">
                 <div>
-                    <h3 class="font-semibold text-[18px]" x-text="String(p.month).padStart(2,'0')+'/'+p.year"></h3>
-                    <p class="text-[13px] text-gray-500" x-text="'Fechado em '+new Date(p.closed_at).toLocaleString('pt-BR')" x-show="p.closed_at"></p>
-                    <p class="text-[13px] text-gray-500">
-                        <span x-text="(p.seller_commissions||[]).length + ' vendedor(es)'"></span>
-                        <span class="ml-2">Total vendido: <strong x-text="formatMoneyBRL((p.seller_commissions||[]).reduce((a,c)=>a+(c.total_sold_amount||0),0))"></strong></span>
-                        <span class="ml-2">Comissao total: <strong class="text-brand-500" x-text="formatMoneyBRL((p.seller_commissions||[]).reduce((a,c)=>a+(c.commission_amount||0),0))"></strong></span>
+                    <h3 class="font-semibold text-[16px]" x-text="String(group.period.month).padStart(2,'0')+'/'+group.period.year"></h3>
+                    <p class="text-[12px] text-gray-500">
+                        <span x-text="group.commissions.length + ' vendedor(es) fechado(s)'"></span>
+                        <span class="ml-3">Total comissao: <strong class="text-brand-500" x-text="formatMoneyBRL(group.commissions.reduce((a,c)=>a+(c.commission_amount||0),0))"></strong></span>
                     </p>
                 </div>
                 <div class="flex gap-2">
-                    <button @click="markPaid(p)" class="bg-success-500 hover:bg-success-700 text-white font-medium py-2 px-4 rounded-xl transition tap-target text-[15px] shadow-md">Marcar como Pago</button>
-                    <button @click="openReopenModal(p)" class="bg-warning-500 hover:bg-warning-700 text-white font-medium py-2 px-4 rounded-xl transition tap-target text-[15px]">Reverter</button>
-                    <a :href="'/api/financial/commissions/'+p.uuid+'/csv/'" class="bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium py-2 px-4 rounded-xl transition tap-target text-[15px]">CSV</a>
+                    <button @click="selectAll(group)" class="text-[13px] text-brand-500 hover:underline">Selecionar</button>
                 </div>
             </div>
 
-            <div x-show="expanded===p.uuid" class="mb-4">
-                <table class="w-full text-left text-[14px]">
-                    <thead><tr><th class="px-4 py-3 font-semibold text-gray-500 border-b border-gray-200 bg-gray-50">Vendedor</th><th class="px-4 py-3 font-semibold text-gray-500 border-b border-gray-200 bg-gray-50">Total Vendido</th><th class="px-4 py-3 font-semibold text-gray-500 border-b border-gray-200 bg-gray-50">Taxa</th><th class="px-4 py-3 font-semibold text-gray-500 border-b border-gray-200 bg-gray-50">Comissao</th></tr></thead>
-                    <tbody>
-                        <template x-for="sc in p.seller_commissions" :key="sc.id">
-                            <tr class="hover:bg-gray-50">
-                                <td class="px-4 py-3 border-b border-gray-100 font-medium" x-text="sc.seller_name"></td>
-                                <td class="px-4 py-3 border-b border-gray-100" x-text="formatMoneyBRL(sc.total_sold_amount)"></td>
-                                <td class="px-4 py-3 border-b border-gray-100" x-text="(parseFloat(sc.commission_rate)*100).toFixed(2)+'%'"></td>
-                                <td class="px-4 py-3 border-b border-gray-100 font-semibold text-brand-500" x-text="formatMoneyBRL(sc.commission_amount)"></td>
-                            </tr>
-                        </template>
-                    </tbody>
-                </table>
-            </div>
-            <button @click="expanded=expanded===p.uuid?null:p.uuid" class="text-[13px] text-brand-500 hover:underline" x-text="expanded===p.uuid?'Recolher':'Ver detalhes'"></button>
+            <table class="w-full text-left text-[13px]">
+                <thead><tr><th class="px-3 py-2 font-semibold text-gray-500 border-b bg-gray-50 w-8"><input type="checkbox" @change="toggleAllGroup(group)" :checked="allSelected(group)"></th><th class="px-3 py-2 font-semibold text-gray-500 border-b bg-gray-50">Vendedor</th><th class="px-3 py-2 font-semibold text-gray-500 border-b bg-gray-50">Total Vendido</th><th class="px-3 py-2 font-semibold text-gray-500 border-b bg-gray-50">Comissao</th><th class="px-3 py-2 font-semibold text-gray-500 border-b bg-gray-50">Fechado em</th><th class="px-3 py-2 font-semibold text-gray-500 border-b bg-gray-50">Responsavel</th></tr></thead>
+                <tbody>
+                    <template x-for="sc in group.commissions" :key="sc.id">
+                        <tr class="hover:bg-gray-50">
+                            <td class="px-3 py-2 border-b"><input type="checkbox" :checked="isSelected(sc)" @change="toggle(sc)"></td>
+                            <td class="px-3 py-2 border-b font-medium" x-text="sc.seller_name"></td>
+                            <td class="px-3 py-2 border-b" x-text="formatMoneyBRL(sc.total_sold_amount)"></td>
+                            <td class="px-3 py-2 border-b font-semibold text-brand-500" x-text="formatMoneyBRL(sc.commission_amount)"></td>
+                            <td class="px-3 py-2 border-b text-gray-500" x-text="sc.closed_at ? new Date(sc.closed_at).toLocaleDateString('pt-BR') : '—'"></td>
+                            <td class="px-3 py-2 border-b text-gray-500">—</td>
+                        </tr>
+                    </template>
+                </tbody>
+            </table>
+            <div x-show="!group.commissions.length" class="text-[13px] text-gray-500 py-3">Nenhum vendedor fechado nesta competencia.</div>
         </div>
     </template>
-    <div x-show="!periods.length" class="text-center py-12 text-gray-500">Nenhuma competencia aguardando pagamento.</div>
+    <div x-show="!periodGroups.length" class="text-center py-12 text-gray-500">Nenhuma comissao aguardando pagamento.</div>
 
-    <!-- Pay Modal -->
-    <div x-show="showPay" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40" @click.self="showPay=false">
-        <div class="bg-white rounded-2xl shadow-xl p-6 w-full max-w-md mx-4">
-            <h3 class="text-[18px] font-semibold mb-3">Marcar como Paga</h3>
-            <p class="text-[13px] text-gray-500 mb-2">Competencia: <strong x-text="payPeriod ? String(payPeriod.month).padStart(2,'0')+'/'+payPeriod.year : ''"></strong></p>
-            <p class="text-[13px] text-gray-500 mb-4">
-                Total a pagar: <strong class="text-brand-500" x-text="payPeriod ? formatMoneyBRL((payPeriod.seller_commissions||[]).reduce((a,c)=>a+(c.commission_amount||0),0)) : 'R$ 0,00'"></strong>
-            </p>
-            <div class="mb-4">
-                <label class="block text-[13px] font-medium text-gray-700 mb-1">Data do pagamento</label>
-                <input type="date" x-model="payDate" class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-500">
-            </div>
-            <div class="mb-4">
-                <label class="block text-[13px] font-medium text-gray-700 mb-1">Forma de pagamento</label>
-                <select x-model="payMethod" class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-500">
-                    <option value="">Selecione...</option>
-                    <option value="pix">PIX</option>
-                    <option value="ted">TED</option>
-                    <option value="doc">DOC</option>
-                    <option value="dinheiro">Dinheiro</option>
-                    <option value="outro">Outro</option>
-                </select>
-            </div>
-            <div class="mb-4">
-                <label class="block text-[13px] font-medium text-gray-700 mb-1">Observacao</label>
-                <textarea x-model="payNotes" class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-500" rows="2"></textarea>
-            </div>
-            <div class="flex gap-3 justify-end">
-                <button @click="showPay=false" class="bg-white border border-gray-300 text-gray-700 font-medium py-2 px-4 rounded-xl transition">Cancelar</button>
-                <button @click="doMarkPaid()" class="bg-success-500 hover:bg-success-700 text-white font-medium py-2 px-4 rounded-xl transition">Confirmar Pagamento</button>
+    <div x-show="selected.size > 0" class="fixed bottom-0 left-0 right-0 z-40 bg-white border-t border-gray-200 shadow-lg p-4">
+        <div class="max-w-5xl mx-auto flex items-center justify-between flex-wrap gap-3">
+            <p class="text-[14px] font-medium"><span x-text="selected.size"></span> selecionado(s) — Total: <strong class="text-brand-500" x-text="formatMoneyBRL(selectedTotal())"></strong></p>
+            <div class="flex gap-2">
+                <button @click="openPayModal()" class="bg-success-500 hover:bg-success-700 text-white font-medium py-2 px-4 rounded-xl transition text-[14px]">Pagar selecionados</button>
+                <button @click="openReopenModal()" class="bg-warning-500 hover:bg-warning-700 text-white font-medium py-2 px-4 rounded-xl transition text-[14px]">Reverter selecionados</button>
+                <button @click="selected.clear(); load()" class="bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium py-2 px-4 rounded-xl transition text-[14px]">Limpar</button>
             </div>
         </div>
     </div>
 
-    <!-- Reopen Modal -->
+    <div x-show="showPay" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40" @click.self="showPay=false">
+        <div class="bg-white rounded-2xl shadow-xl p-6 w-full max-w-md mx-4">
+            <h3 class="text-[18px] font-semibold mb-3">Pagar Comissoes</h3>
+            <p class="text-[13px] text-gray-500 mb-2"><span x-text="selected.size"></span> vendedor(es) — Total: <strong x-text="formatMoneyBRL(selectedTotal())"></strong></p>
+            <p class="text-[12px] text-danger-500 mb-4">Confirme apenas se o pagamento ja foi realizado.</p>
+            <div class="mb-3"><label class="block text-[13px] text-gray-500 mb-1">Data</label><input type="date" x-model="payDate" class="w-full px-4 py-3 border rounded-xl focus:ring-2 focus:ring-brand-500 text-[14px]"></div>
+            <div class="mb-3"><label class="block text-[13px] text-gray-500 mb-1">Forma</label><select x-model="payMethod" class="w-full px-4 py-3 border rounded-xl focus:ring-2 focus:ring-brand-500 text-[14px]"><option value="">Selecione</option><option value="pix">PIX</option><option value="ted">TED</option><option value="dinheiro">Dinheiro</option><option value="outro">Outro</option></select></div>
+            <div class="mb-4"><label class="block text-[13px] text-gray-500 mb-1">Observacao</label><textarea x-model="payNotes" class="w-full px-4 py-3 border rounded-xl focus:ring-2 focus:ring-brand-500 text-[14px]" rows="2"></textarea></div>
+            <div class="flex gap-3 justify-end">
+                <button @click="showPay=false" class="bg-white border border-gray-300 text-gray-700 font-medium py-2 px-4 rounded-xl transition text-[14px]">Cancelar</button>
+                <button @click="doPay()" class="bg-success-500 hover:bg-success-700 text-white font-medium py-2 px-4 rounded-xl transition text-[14px]">Confirmar Pagamento</button>
+            </div>
+        </div>
+    </div>
+
     <div x-show="showReopen" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40" @click.self="showReopen=false">
         <div class="bg-white rounded-2xl shadow-xl p-6 w-full max-w-md mx-4">
-            <h3 class="text-[18px] font-semibold mb-3">Reverter Fechamento</h3>
-            <p class="text-[13px] text-gray-500 mb-2">Competencia voltara ao status ABERTA.</p>
-            <p class="text-[13px] text-danger-500 mb-4">Acao irreversivel. Os valores serao recalculados.</p>
-            <div class="mb-4">
-                <label class="block text-[13px] font-medium text-gray-700 mb-1">Motivo da reversao *</label>
-                <textarea x-model="reopenReason" class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-500" rows="3" placeholder="Descreva o motivo"></textarea>
-            </div>
+            <h3 class="text-[18px] font-semibold mb-3">Reverter Comissoes</h3>
+            <p class="text-[13px] text-gray-500 mb-2"><span x-text="selected.size"></span> vendedor(es) selecionado(s).</p>
+            <p class="text-[13px] text-danger-500 mb-4">A reversao vai reabrir as comissoes. Esta acao sera registrada.</p>
+            <div class="mb-4"><label class="block text-[13px] text-gray-500 mb-1">Motivo *</label><textarea x-model="reopenReason" class="w-full px-4 py-3 border rounded-xl focus:ring-2 focus:ring-brand-500 text-[14px]" rows="3" placeholder="Motivo obrigatorio"></textarea></div>
             <div class="flex gap-3 justify-end">
-                <button @click="showReopen=false" class="bg-white border border-gray-300 text-gray-700 font-medium py-2 px-4 rounded-xl transition">Cancelar</button>
-                <button @click="doReopen()" class="bg-warning-500 hover:bg-warning-700 text-white font-medium py-2 px-4 rounded-xl transition">Confirmar Reversao</button>
+                <button @click="showReopen=false" class="bg-white border border-gray-300 text-gray-700 font-medium py-2 px-4 rounded-xl transition text-[14px]">Cancelar</button>
+                <button @click="doReopen()" class="bg-warning-500 hover:bg-warning-700 text-white font-medium py-2 px-4 rounded-xl transition text-[14px]" :disabled="!reopenReason.trim()">Confirmar Reversao</button>
             </div>
         </div>
     </div>
@@ -109,37 +93,57 @@ function getCSRFToken() {
 
 function filaPage() {
     return {
-        periods: [], expanded: null, showPay: false, payPeriod: null, payDate: '', payMethod: '', payNotes: '',
-        showReopen: false, reopenPeriod: null, reopenReason: '',
+        periodGroups: [], selected: new Set(), showPay: false, payDate: '', payMethod: '', payNotes: '',
+        showReopen: false, reopenReason: '',
         async load() {
-            var r = await fetch('/api/manager/commissions/FECHADA/');
-            this.periods = await r.json();
+            var fechadas = await fetch('/api/manager/commissions/FECHADA/').then(r => r.json());
+            var parcial = await fetch('/api/manager/commissions/PARCIALMENTE_FECHADA/').then(r => r.json());
+            var allPeriods = [...fechadas, ...parcial];
+            this.periodGroups = allPeriods.map(p => ({
+                period: p,
+                commissions: (p.seller_commissions || []).filter(sc => sc.status === 'FECHADA')
+            })).filter(g => g.commissions.length > 0);
+            this.selected.clear();
         },
-        markPaid(p) { this.payPeriod = p; this.payDate = ''; this.payMethod = ''; this.payNotes = ''; this.showPay = true; },
-        async doMarkPaid() {
-            var body = {};
-            if (this.payDate) body.payment_date = this.payDate;
-            if (this.payMethod) body.payment_method = this.payMethod;
-            if (this.payNotes) body.payment_notes = this.payNotes;
-            var r = await fetch('/api/commissions/periods/' + this.payPeriod.uuid + '/mark_paid/', {
+        toggleAllGroup(group) {
+            var all = this.allSelected(group);
+            group.commissions.forEach(sc => all ? this.selected.delete(sc.id) : this.selected.add(sc.id));
+        },
+        allSelected(group) {
+            return group.commissions.every(sc => this.selected.has(sc.id));
+        },
+        isSelected(sc) { return this.selected.has(sc.id); },
+        toggle(sc) { this.selected.has(sc.id) ? this.selected.delete(sc.id) : this.selected.add(sc.id); },
+        selectAll(group) { group.commissions.forEach(sc => this.selected.add(sc.id)); },
+        selectedTotal() {
+            var ids = Array.from(this.selected);
+            var total = 0;
+            this.periodGroups.forEach(g => g.commissions.forEach(sc => { if (ids.includes(sc.id)) total += sc.commission_amount || 0; }));
+            return total;
+        },
+        openPayModal() { this.payDate = ''; this.payMethod = ''; this.payNotes = ''; this.showPay = true; },
+        async doPay() {
+            var ids = Array.from(this.selected);
+            var r = await fetch('/api/commissions/periods/' + this.periodGroups[0].period.uuid + '/pay_sellers/', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json', 'X-CSRFToken': getCSRFToken()},
-                body: JSON.stringify(body)
+                body: JSON.stringify({seller_commission_ids: ids, payment_date: this.payDate, payment_method: this.payMethod, payment_notes: this.payNotes})
             });
             if (r.ok) { this.showPay = false; this.load(); }
             else { var d = await r.json(); alert(d.error || 'Erro'); }
         },
-        openReopenModal(p) { this.reopenPeriod = p; this.reopenReason = ''; this.showReopen = true; },
+        openReopenModal() { this.reopenReason = ''; this.showReopen = true; },
         async doReopen() {
-            if (!this.reopenReason.trim()) { alert('Informe o motivo da reversao.'); return; }
-            var r = await fetch('/api/commissions/periods/' + this.reopenPeriod.uuid + '/reopen/', {
+            if (!this.reopenReason.trim()) return;
+            var ids = Array.from(this.selected);
+            var r = await fetch('/api/commissions/periods/' + this.periodGroups[0].period.uuid + '/reopen_sellers/', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json', 'X-CSRFToken': getCSRFToken()},
-                body: JSON.stringify({reason: this.reopenReason})
+                body: JSON.stringify({seller_commission_ids: ids, reason: this.reopenReason})
             });
             if (r.ok) { this.showReopen = false; this.load(); }
             else { var d = await r.json(); alert(d.error || 'Erro'); }
-        },
+        }
     }
 }
 </script>

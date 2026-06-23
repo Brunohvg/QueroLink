@@ -4,98 +4,82 @@
 <div x-data="vendedoresPage()" x-init="loadSellers()">
     <div class="flex items-center justify-between mb-6">
         <h1 class="font-display text-[18px] font-semibold text-gray-900">Vendedores</h1>
-        {% include 'components/_button.html' with variant='primary' label='Novo Vendedor' icon_svg='<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>' onclick='openCreateModal()' %}
+        <button @click="openCreateModal()" class="bg-brand-500 hover:bg-brand-600 text-white font-medium py-2 px-4 rounded-xl transition tap-target text-[14px] flex items-center gap-1">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
+            Novo Vendedor
+        </button>
     </div>
 
+    <div class="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
+        <div class="surface-card"><p class="text-[11px] font-semibold text-gray-500 uppercase">Total</p><p class="text-[22px] font-semibold text-gray-900" x-text="stats.total"></p></div>
+        <div class="surface-card"><p class="text-[11px] font-semibold text-gray-500 uppercase">Ativos</p><p class="text-[22px] font-semibold text-success-700" x-text="stats.ativos"></p></div>
+        <div class="surface-card"><p class="text-[11px] font-semibold text-gray-500 uppercase">Com venda mes</p><p class="text-[22px] font-semibold text-brand-500" x-text="stats.comVendaNoMes"></p></div>
+        <div class="surface-card"><p class="text-[11px] font-semibold text-gray-500 uppercase">Prontos</p><p class="text-[22px] font-semibold text-success-700" x-text="stats.prontos"></p></div>
+        <div class="surface-card"><p class="text-[11px] font-semibold text-gray-500 uppercase">Pendentes</p><p class="text-[22px] font-semibold text-warning-700" x-text="stats.pendentes"></p></div>
+    </div>
     <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-        <div class="surface-card">
-            <p class="text-[12px] font-semibold text-gray-500 uppercase tracking-wide">Total</p>
-            <p class="text-[24px] font-semibold text-gray-900" x-text="stats.total"></p>
-        </div>
-        <div class="surface-card">
-            <p class="text-[12px] font-semibold text-gray-500 uppercase tracking-wide">Ativos</p>
-            <p class="text-[24px] font-semibold text-success-700" x-text="stats.ativos"></p>
-        </div>
-        <div class="surface-card">
-            <p class="text-[12px] font-semibold text-gray-500 uppercase tracking-wide">Com venda no mes</p>
-            <p class="text-[24px] font-semibold text-brand-500" x-text="stats.comVendaNoMes"></p>
-        </div>
-        <div class="surface-card">
-            <p class="text-[12px] font-semibold text-gray-500 uppercase tracking-wide">Sem lancamento hoje</p>
-            <p class="text-[24px] font-semibold text-warning-700" x-text="stats.semLancamentoHoje"></p>
-        </div>
+        <div class="surface-card"><p class="text-[11px] font-semibold text-gray-500 uppercase">Sem lanc. periodo</p><p class="text-[22px] font-semibold text-gray-500" x-text="stats.semLancamento"></p></div>
+        <div class="surface-card"><p class="text-[11px] font-semibold text-gray-500 uppercase">Sem lanc. hoje</p><p class="text-[22px] font-semibold text-gray-500" x-text="stats.semLancamentoHoje"></p></div>
+        <div class="surface-card"><p class="text-[11px] font-semibold text-gray-500 uppercase">Comissao aberta</p><p class="text-[22px] font-semibold text-brand-500" x-text="formatMoneyBRL(stats.comissaoAberta)"></p></div>
+        <div class="surface-card"><p class="text-[11px] font-semibold text-gray-500 uppercase">Comissao paga</p><p class="text-[22px] font-semibold text-success-700" x-text="formatMoneyBRL(stats.comissaoPaga)"></p></div>
     </div>
 
-    <div class="surface-card">
-        <table class="w-full text-left text-[14px]">
+    <div class="surface-card overflow-x-auto">
+        <table class="w-full text-left text-[13px]">
             <thead>
-                <tr><th class="px-4 py-3 font-semibold text-gray-500 border-b border-gray-200 bg-gray-50">Nome</th><th class="px-4 py-3 font-semibold text-gray-500 border-b border-gray-200 bg-gray-50">Telefone</th><th class="px-4 py-3 font-semibold text-gray-500 border-b border-gray-200 bg-gray-50">Total mes</th><th class="px-4 py-3 font-semibold text-gray-500 border-b border-gray-200 bg-gray-50">Comissao</th><th class="px-4 py-3 font-semibold text-gray-500 border-b border-gray-200 bg-gray-50">Ultimo lanc.</th><th class="px-4 py-3 font-semibold text-gray-500 border-b border-gray-200 bg-gray-50">Status</th><th class="px-4 py-3 font-semibold text-gray-500 border-b border-gray-200 bg-gray-50 text-right">Acoes</th></tr>
+                <tr><th class="px-3 py-2 font-semibold text-gray-500 border-b bg-gray-50">Vendedor</th><th class="px-3 py-2 font-semibold text-gray-500 border-b bg-gray-50">Dias</th><th class="px-3 py-2 font-semibold text-gray-500 border-b bg-gray-50">Operac.</th><th class="px-3 py-2 font-semibold text-gray-500 border-b bg-gray-50">Total mes</th><th class="px-3 py-2 font-semibold text-gray-500 border-b bg-gray-50">Comissao</th><th class="px-3 py-2 font-semibold text-gray-500 border-b bg-gray-50">Status</th><th class="px-3 py-2 font-semibold text-gray-500 border-b bg-gray-50">Ult. lanc.</th><th class="px-3 py-2 font-semibold text-gray-500 border-b bg-gray-50 text-right">Acoes</th></tr>
             </thead>
             <tbody>
                 <template x-for="s in sellers" :key="s.uuid">
                     <tr class="hover:bg-gray-50">
-                        <td class="px-4 py-3 border-b border-gray-100 font-medium">
-                            <a :href="'/dashboard/gestor/vendedores/' + s.uuid + '/'" class="text-brand-500 hover:underline" x-text="s.name"></a>
-                        </td>
-                        <td class="px-4 py-3 border-b border-gray-100 text-gray-500" x-text="s.phone"></td>
-                        <td class="px-4 py-3 border-b border-gray-100 font-semibold" x-text="formatMoneyBRL(s.month_total || 0)"></td>
-                        <td class="px-4 py-3 border-b border-gray-100 font-semibold text-brand-500" x-text="formatMoneyBRL(s.commission_estimated || 0)"></td>
-                        <td class="px-4 py-3 border-b border-gray-100 text-gray-500">
-                            <span x-text="s.last_sale_date || '—'"></span>
-                            <span x-show="s.has_sale_today" class="ml-1 inline-flex items-center px-1.5 py-0.5 rounded-full text-xs font-medium bg-success-50 text-success-700">Hoje</span>
-                            <span x-show="!s.has_sale_today && s.is_active" class="ml-1 inline-flex items-center px-1.5 py-0.5 rounded-full text-xs font-medium bg-warning-50 text-warning-700">Sem lanc.</span>
-                        </td>
-                        <td class="px-4 py-3 border-b border-gray-100">
-                            <span x-show="s.is_active" class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-success-50 text-success-700">Ativo</span>
-                            <span x-show="!s.is_active" class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-600">Inativo</span>
-                        </td>
-                        <td class="px-4 py-3 border-b border-gray-100 text-right">
-                            <div class="flex items-center justify-end gap-1">
-                                <a :href="'/dashboard/gestor/vendedores/' + s.uuid + '/'" class="p-2 text-gray-400 hover:text-brand-500 rounded-lg hover:bg-gray-50 tap-target" title="Ver detalhes">
-                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path></svg>
-                                </a>
-                                <button @click="openEditModal(s)" class="p-2 text-gray-400 hover:text-brand-500 rounded-lg hover:bg-gray-50 tap-target" title="Editar"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path></svg></button>
-                                <button @click="toggleActive(s)" class="p-2 text-gray-400 hover:text-warning-500 rounded-lg hover:bg-gray-50 tap-target" :title="s.is_active?'Desativar':'Ativar'"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path></svg></button>
-                                <button @click="resetPassword(s)" class="p-2 text-gray-400 hover:text-brand-500 rounded-lg hover:bg-gray-50 tap-target" title="Resetar senha"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"></path></svg></button>
+                        <td class="px-3 py-2 border-b font-medium"><a :href="'/dashboard/gestor/vendedores/' + s.uuid + '/'" class="text-brand-500 hover:underline" x-text="s.name"></a></td>
+                        <td class="px-3 py-2 border-b text-gray-600" x-text="(s.submitted_days || 0) + '/' + (s.expected_days || 22)"></td>
+                        <td class="px-3 py-2 border-b"><span class="text-xs px-1.5 py-0.5 rounded-full" :class="{'bg-success-50 text-success-700': s.operational_status==='PRONTO', 'bg-warning-50 text-warning-700': s.operational_status==='PENDENTE', 'bg-gray-100 text-gray-600': s.operational_status==='SEM_LANCAMENTO'}" x-text="s.operational_status || '—'"></span></td>
+                        <td class="px-3 py-2 border-b font-semibold" x-text="formatMoneyBRL(s.month_total || 0)"></td>
+                        <td class="px-3 py-2 border-b font-semibold text-brand-500" x-text="formatMoneyBRL(s.commission_amount || 0)"></td>
+                        <td class="px-3 py-2 border-b"><span class="text-xs px-1.5 py-0.5 rounded-full" :class="{'bg-success-50 text-success-700': s.financial_status==='PAGA', 'bg-warning-50 text-warning-700': s.financial_status==='FECHADA', 'bg-amber-50 text-amber-700': s.financial_status==='AJUSTADA', 'bg-gray-100 text-gray-600': s.financial_status==='ABERTA'}" x-text="s.financial_status || 'ABERTA'"></span></td>
+                        <td class="px-3 py-2 border-b text-gray-500"><span x-text="s.last_sale_date || '—'"></span><span x-show="s.has_sale_today" class="ml-1 text-success-700 text-xs">Hoje</span></td>
+                        <td class="px-3 py-2 border-b text-right">
+                            <div class="flex justify-end gap-1">
+                                <a :href="'/dashboard/gestor/vendedores/' + s.uuid + '/'" class="p-1.5 text-gray-400 hover:text-brand-500 rounded-lg hover:bg-gray-50" title="Ver detalhes"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path></svg></a>
+                                <button @click="openEditModal(s)" class="p-1.5 text-gray-400 hover:text-brand-500 rounded-lg hover:bg-gray-50" title="Editar"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path></svg></button>
+                                <button @click="toggleActive(s)" class="p-1.5 text-gray-400 hover:text-warning-500 rounded-lg hover:bg-gray-50" title="Ativar/Desativar"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path></svg></button>
+                                <button @click="resetPassword(s)" class="p-1.5 text-gray-400 hover:text-brand-500 rounded-lg hover:bg-gray-50" title="Resetar senha"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"></path></svg></button>
                             </div>
                         </td>
                     </tr>
                 </template>
-                <tr x-show="!sellers.length"><td colspan="7" class="text-center py-8 text-gray-500">Nenhum vendedor cadastrado.</td></tr>
+                <tr x-show="!sellers.length"><td colspan="8" class="text-center py-8 text-gray-500">Nenhum vendedor encontrado.</td></tr>
             </tbody>
         </table>
     </div>
 
-    <!-- Create/Edit Modal -->
     <div x-show="showModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40" @click.self="showModal=false">
         <div class="bg-white rounded-2xl shadow-xl p-6 w-full max-w-md mx-4">
             <h2 class="text-[18px] font-semibold mb-4" x-text="editing?'Editar Vendedor':'Novo Vendedor'"></h2>
             <form @submit.prevent="editing?updateSeller():createSeller()" class="space-y-4">
-                <div><label class="block text-[13px] text-gray-500 mb-1">Nome</label><input type="text" x-model="form.name" required class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-500" placeholder="Nome completo"></div>
-                <div><label class="block text-[13px] text-gray-500 mb-1">Telefone</label><input type="text" x-model="form.phone" required class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-500" placeholder="(31) 99999-9999"></div>
-                <div x-show="editing"><label class="block text-[13px] text-gray-500 mb-1">Taxa de Comissao (%)</label><input type="number" x-model="form.commission_rate" step="0.01" min="0" max="100" class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-500"></div>
+                <div><label class="block text-[13px] text-gray-500 mb-1">Nome</label><input type="text" x-model="form.name" required class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-500"></div>
+                <div><label class="block text-[13px] text-gray-500 mb-1">Telefone</label><input type="text" x-model="form.phone" required class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-500"></div>
+                <div x-show="editing"><label class="block text-[13px] text-gray-500 mb-1">Taxa (%)</label><input type="number" x-model="form.commission_rate" step="0.01" min="0" max="100" class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-500"></div>
                 <div class="flex gap-3 justify-end">
-                    <button type="button" @click="showModal=false" class="bg-white border border-gray-300 text-gray-700 font-medium py-3 px-6 rounded-xl transition tap-target text-[15px]">Cancelar</button>
-                    <button type="submit" class="bg-brand-500 hover:bg-brand-600 text-white font-medium py-3 px-6 rounded-xl transition tap-target text-[15px]" x-text="editing?'Salvar':'Criar Vendedor'"></button>
+                    <button type="button" @click="showModal=false" class="bg-white border border-gray-300 text-gray-700 font-medium py-2 px-4 rounded-xl transition text-[14px]">Cancelar</button>
+                    <button type="submit" class="bg-brand-500 hover:bg-brand-600 text-white font-medium py-2 px-4 rounded-xl transition text-[14px]" x-text="editing?'Salvar':'Criar'"></button>
                 </div>
             </form>
         </div>
     </div>
 
-    <!-- Password Result Modal -->
     <div x-show="showPasswordModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40" @click.self="showPasswordModal=false">
         <div class="bg-white rounded-2xl shadow-xl p-6 w-full max-w-md mx-4 text-center">
-            <div class="w-14 h-14 bg-success-50 rounded-full flex items-center justify-center mx-auto mb-3 ring-2 ring-success-500">
-                <svg class="w-7 h-7 text-success-700" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
-            </div>
-            <h3 class="text-[18px] font-semibold mb-1" x-text="passwordAction=='create'?'Vendedor criado!':'Senha resetada!'"></h3>
-            <p class="text-[13px] text-gray-500 mb-4">A nova senha foi enviada por WhatsApp ao vendedor.</p>
-            <div class="bg-gray-50 rounded-xl p-3 mb-4 space-y-1 text-[14px]">
+            <div class="w-12 h-12 bg-success-50 rounded-full flex items-center justify-center mx-auto mb-3"><svg class="w-6 h-6 text-success-700" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg></div>
+            <h3 class="text-[16px] font-semibold mb-1" x-text="passwordAction=='create'?'Criado!':'Senha resetada!'"></h3>
+            <p class="text-[12px] text-gray-500 mb-3">A senha foi enviada por WhatsApp.</p>
+            <div class="bg-gray-50 rounded-xl p-3 mb-3 text-[13px]">
                 <p><span class="text-gray-500">Usuario:</span> <strong x-text="passwordResult.username"></strong></p>
                 <p><span class="text-gray-500">Senha:</span> <code class="bg-white px-2 py-0.5 rounded text-brand-500 font-mono" x-text="passwordResult.password"></code></p>
             </div>
-            <p class="text-xs text-danger-500 mb-4">Guarde esta senha. Ela nao sera exibida novamente.</p>
-            <button @click="showPasswordModal=false" class="w-full bg-brand-500 hover:bg-brand-600 text-white font-medium py-3 px-6 rounded-xl transition tap-target text-[15px]">Entendi</button>
+            <p class="text-xs text-danger-500 mb-3">Guarde esta senha.</p>
+            <button @click="showPasswordModal=false" class="w-full bg-brand-500 text-white font-medium py-2 px-4 rounded-xl transition text-[14px]">Entendi</button>
         </div>
     </div>
 </div>
@@ -115,7 +99,7 @@ function vendedoresPage() {
     return {
         sellers: [], showModal: false, editing: false, showPasswordModal: false, passwordResult: {}, passwordAction: '',
         form: { name: '', phone: '', commission_rate: '1.00' },
-        stats: { total: 0, ativos: 0, comVendaNoMes: 0, semLancamentoHoje: 0 },
+        stats: { total: 0, ativos: 0, comVendaNoMes: 0, semLancamento: 0, semLancamentoHoje: 0, prontos: 0, pendentes: 0, comissaoAberta: 0, comissaoPaga: 0 },
         async loadSellers() {
             var r = await fetch('/api/sellers/');
             var list = await r.json();
@@ -124,19 +108,22 @@ function vendedoresPage() {
             var ano = hoje.getFullYear();
 
             var enriched = await Promise.all(list.map(async (s) => {
-                var detail = { month_total: 0, commission_estimated: 0, last_sale_date: null, has_sale_today: false };
+                var detail = { month_total: 0, commission_amount: 0, submitted_days: 0, expected_days: 22, operational_status: 'SEM_LANCAMENTO', financial_status: 'ABERTA', last_sale_date: null, has_sale_today: false };
                 try {
                     var d = await fetch('/api/manager/seller/' + s.uuid + '/?month=' + mes + '&year=' + ano).then(r => r.json());
                     detail.month_total = d.manual_total || 0;
-
-                    var rate = s.commission_rate || 0.01;
-                    detail.commission_estimated = Math.round(detail.month_total * rate);
-
+                    if (d.commissions && d.commissions.length) {
+                        var c = d.commissions[0];
+                        detail.commission_amount = c.commission_amount || 0;
+                        detail.financial_status = c.period_status || 'ABERTA';
+                        detail.submitted_days = c.submitted_days_count || 0;
+                        detail.expected_days = c.expected_working_days || 22;
+                        detail.operational_status = c.operational_status || 'SEM_LANCAMENTO';
+                    }
                     if (d.manual_sales && d.manual_sales.length) {
-                        var lastSale = d.manual_sales[0];
-                        detail.last_sale_date = new Date(lastSale.sale_date).toLocaleDateString('pt-BR');
-                        var hojeStr = new Date().toISOString().split('T')[0];
-                        detail.has_sale_today = lastSale.sale_date === hojeStr;
+                        var last = d.manual_sales[0];
+                        detail.last_sale_date = new Date(last.sale_date).toLocaleDateString('pt-BR');
+                        detail.has_sale_today = last.sale_date === new Date().toISOString().split('T')[0];
                     }
                 } catch(e) {}
                 return Object.assign({}, s, detail);
@@ -146,7 +133,12 @@ function vendedoresPage() {
             this.stats.total = enriched.length;
             this.stats.ativos = enriched.filter(s => s.is_active).length;
             this.stats.comVendaNoMes = enriched.filter(s => s.month_total > 0).length;
+            this.stats.prontos = enriched.filter(s => s.operational_status === 'PRONTO').length;
+            this.stats.pendentes = enriched.filter(s => s.operational_status === 'PENDENTE').length;
+            this.stats.semLancamento = enriched.filter(s => s.operational_status === 'SEM_LANCAMENTO').length;
             this.stats.semLancamentoHoje = enriched.filter(s => s.is_active && !s.has_sale_today).length;
+            this.stats.comissaoAberta = enriched.reduce((a, s) => s.financial_status === 'ABERTA' ? a + (s.commission_amount || 0) : a, 0);
+            this.stats.comissaoPaga = enriched.reduce((a, s) => s.financial_status === 'PAGA' ? a + (s.commission_amount || 0) : a, 0);
         },
         openCreateModal() { this.editing = false; this.form = { name: '', phone: '', commission_rate: '1.00' }; this.showModal = true; },
         openEditModal(s) { this.editing = true; this.form = { uuid: s.uuid, name: s.name, phone: s.phone, commission_rate: String(parseFloat(s.commission_rate)*100) }; this.showModal = true; },
@@ -154,12 +146,12 @@ function vendedoresPage() {
             var r = await fetch('/api/sellers/', { method:'POST', headers:{'Content-Type':'application/json', 'X-CSRFToken': getCSRFToken()}, body: JSON.stringify({name:this.form.name, phone:this.form.phone}) });
             var d = await r.json();
             if (r.ok) { this.showModal = false; this.passwordResult = d; this.passwordAction = 'create'; this.showPasswordModal = true; this.loadSellers(); }
-            else alert(Object.values(d).flat().join('\\n'));
+            else alert(Object.values(d).flat().join('\n'));
         },
         async updateSeller() {
             var b = { name:this.form.name, phone:this.form.phone, commission_rate: String(parseFloat(this.form.commission_rate)/100) };
             var r = await fetch(`/api/sellers/${this.form.uuid}/`, { method:'PATCH', headers:{'Content-Type':'application/json', 'X-CSRFToken': getCSRFToken()}, body: JSON.stringify(b) });
-            if (r.ok) { this.showModal = false; this.loadSellers(); } else { var d = await r.json(); alert(Object.values(d).flat().join('\\n')); }
+            if (r.ok) { this.showModal = false; this.loadSellers(); } else { var d = await r.json(); alert(Object.values(d).flat().join('\n')); }
         },
         async toggleActive(s) { await fetch(`/api/sellers/${s.uuid}/`, { method:'PATCH', headers:{'Content-Type':'application/json', 'X-CSRFToken': getCSRFToken()}, body:JSON.stringify({is_active:!s.is_active}) }); this.loadSellers(); },
         async resetPassword(s) { var r = await fetch(`/api/sellers/${s.uuid}/reset_password/`, { method:'POST', headers:{'X-CSRFToken': getCSRFToken()} }); var d = await r.json(); if (r.ok) { this.passwordResult = d; this.passwordAction = 'reset'; this.showPasswordModal = true; } },

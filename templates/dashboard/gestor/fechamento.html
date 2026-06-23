@@ -92,12 +92,8 @@
                     <span class="text-[13px] text-gray-500 ml-4">Total comissao:</span>
                     <span class="text-[14px] font-semibold text-brand-500 ml-1" x-text="selectedTotal(p)"></span>
                 </div>
-                <button @click="closeSelected(p)" class="bg-brand-500 hover:bg-brand-600 text-white font-medium py-2 px-4 rounded-xl transition tap-target text-[15px]" x-show="selectedCount(p) > 0">
+                        <button @click="closeSelected(p)" class="bg-brand-500 hover:bg-brand-600 text-white font-medium py-2 px-4 rounded-xl transition tap-target text-[15px]" x-show="selectedCount(p) > 0">
                     Fechar Selecionados
-                </button>
-                <button @click="closeAll(p)" class="bg-brand-500 hover:bg-brand-600 text-white font-medium py-2 px-4 rounded-xl transition tap-target text-[15px] flex items-center gap-1">
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
-                    Fechar competencia
                 </button>
             </div>
 
@@ -140,8 +136,8 @@
     <div x-show="showReopenModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40" @click.self="showReopenModal=false">
         <div class="bg-white rounded-2xl shadow-xl p-6 w-full max-w-md mx-4">
             <h3 class="text-[18px] font-semibold mb-3">Reverter Fechamento</h3>
-            <p class="text-[13px] text-gray-500 mb-2">Tem certeza que deseja reverter o fechamento da competencia <strong x-text="reopenPeriod ? String(reopenPeriod.month).padStart(2,'0')+'/'+reopenPeriod.year : ''"></strong>?</p>
-            <p class="text-[13px] text-danger-500 mb-4">A competencia voltara ao status ABERTA e os valores serao recalculados.</p>
+            <p class="text-[13px] text-gray-500 mb-2">Tem certeza que deseja reverter o fechamento dos vendedores selecionados na competencia <strong x-text="reopenPeriod ? String(reopenPeriod.month).padStart(2,'0')+'/'+reopenPeriod.year : ''"></strong>?</p>
+            <p class="text-[13px] text-danger-500 mb-4">Os vendedores selecionados voltarao ao status REABERTA e os valores serao recalculados.</p>
             <div class="mb-4">
                 <label class="block text-[13px] font-medium text-gray-700 mb-1">Motivo da reversao *</label>
                 <textarea x-model="reopenReason" class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-500" rows="3" placeholder="Descreva o motivo da reversao"></textarea>
@@ -158,8 +154,9 @@
         <div class="bg-white rounded-2xl shadow-xl p-6 w-full max-w-md mx-4">
             <h3 class="text-[18px] font-semibold mb-3">Marcar como Paga</h3>
             <p class="text-[13px] text-gray-500 mb-2">Competencia: <strong x-text="payPeriod ? String(payPeriod.month).padStart(2,'0')+'/'+payPeriod.year : ''"></strong></p>
+            <p class="text-[13px] text-gray-500 mb-1">Vendedores selecionados: <strong x-text="payPeriod && payPeriod._selected ? payPeriod._selected.size : 0"></strong></p>
             <p class="text-[13px] text-gray-500 mb-4">
-                Total a pagar: <strong class="text-brand-500" x-text="payPeriod ? formatMoneyBRL((payPeriod.seller_commissions||[]).reduce((a,c)=>a+(c.commission_amount||0),0)) : 'R$ 0,00'"></strong>
+                Total a pagar: <strong class="text-brand-500" x-text="payPeriod ? selectedTotal(payPeriod) : formatMoneyBRL(0)"></strong>
             </p>
             <div class="mb-4">
                 <label class="block text-[13px] font-medium text-gray-700 mb-1">Data do pagamento</label>
@@ -241,21 +238,20 @@ function fechamentoPage() {
                 .reduce((a, c) => a + (c.commission_amount || 0), 0);
             return formatMoneyBRL(total);
         },
+        getSelectedIds(p) {
+            return p._selected ? Array.from(p._selected) : [];
+        },
         async closeSelected(p) {
-            var ids = p._selected ? Array.from(p._selected) : [];
+            var ids = this.getSelectedIds(p);
             if (!ids.length) return;
             if (!confirm('Fechar comissao de ' + ids.length + ' vendedor(es)?')) return;
-            var r = await fetch('/api/commissions/periods/' + p.uuid + '/close/', {
+            var r = await fetch('/api/commissions/periods/' + p.uuid + '/close_sellers/', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json', 'X-CSRFToken': getCSRFToken()},
                 body: JSON.stringify({seller_commission_ids: ids})
             });
             if (r.ok) { this.load(); }
             else { var d = await r.json(); alert(d.error || 'Erro'); }
-        },
-        async closeAll(p) {
-            this.toggleAll(p);
-            await this.closeSelected(p);
         },
         confirmMarkPaid(p) {
             this.payPeriod = p;
@@ -265,11 +261,13 @@ function fechamentoPage() {
             this.showPayModal = true;
         },
         async doMarkPaid() {
-            var body = {};
+            var ids = this.payPeriod._selected ? Array.from(this.payPeriod._selected) : [];
+            if (!ids.length) { alert('Selecione ao menos um vendedor.'); return; }
+            var body = {seller_commission_ids: ids};
             if (this.payDate) body.payment_date = this.payDate;
             if (this.payMethod) body.payment_method = this.payMethod;
             if (this.payNotes) body.payment_notes = this.payNotes;
-            var r = await fetch('/api/commissions/periods/' + this.payPeriod.uuid + '/mark_paid/', {
+            var r = await fetch('/api/commissions/periods/' + this.payPeriod.uuid + '/pay_sellers/', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json', 'X-CSRFToken': getCSRFToken()},
                 body: JSON.stringify(body)
@@ -284,10 +282,12 @@ function fechamentoPage() {
         },
         async doReopen() {
             if (!this.reopenReason.trim()) return;
-            var r = await fetch('/api/commissions/periods/' + this.reopenPeriod.uuid + '/reopen/', {
+            var ids = this.reopenPeriod._selected ? Array.from(this.reopenPeriod._selected) : [];
+            if (!ids.length) { alert('Selecione ao menos um vendedor.'); return; }
+            var r = await fetch('/api/commissions/periods/' + this.reopenPeriod.uuid + '/reopen_sellers/', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json', 'X-CSRFToken': getCSRFToken()},
-                body: JSON.stringify({reason: this.reopenReason})
+                body: JSON.stringify({seller_commission_ids: ids, reason: this.reopenReason})
             });
             if (r.ok) {
                 this.showReopenModal = false;

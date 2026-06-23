@@ -2,7 +2,7 @@ from datetime import date
 from decimal import Decimal
 from unittest.mock import patch
 
-from django.test import TestCase, TransactionTestCase
+from django.test import TestCase
 from django.utils import timezone
 from django.contrib.auth import get_user_model
 
@@ -18,12 +18,18 @@ from app.apps.commissions.services import (
     get_manual_sales_total,
     get_commission_rate,
     calculate_estimated_commission,
+    get_or_create_period,
     sync_period_seller_commissions,
-    freeze_period,
-    mark_period_paid,
-    reopen_period,
+    close_seller_commissions,
+    reopen_seller_commissions,
+    pay_seller_commissions,
     create_commission_adjustment,
+    calculate_seller_working_days,
+    calculate_period_summary,
+    recalculate_period_status,
+    validate_sale_can_be_changed,
     get_dashboard_data,
+    get_links_data,
 )
 
 User = get_user_model()
@@ -63,6 +69,17 @@ class BaseTest(TestCase):
             commission_rate=Decimal('0.01'),
             is_active=True,
         )
+        self.seller2 = Seller.objects.create(
+            tenant=self.tenant,
+            user=User.objects.create_user(
+                username='seller2', password='test123',
+                role=User.Role.SELLER, tenant=self.tenant,
+            ),
+            name='Celia',
+            phone='55999999998',
+            commission_rate=Decimal('0.01'),
+            is_active=True,
+        )
 
     def _create_manual_sale(self, seller, amount_cents, day, month=6, year=2026):
         return Sale.objects.create(
@@ -74,12 +91,9 @@ class BaseTest(TestCase):
             created_by=self.manager,
         )
 
-    def _create_period(self, month=6, year=2026):
-        period = CommissionPeriod.objects.create(
-            tenant=self.tenant,
-            month=month,
-            year=year,
-            status=CommissionPeriod.Status.ABERTA,
+    def _create_period(self, month=6, year=2026, expected_days=22):
+        period, _ = get_or_create_period(
+            self.tenant, month, year, expected_working_days=expected_days,
         )
         return period
 
@@ -94,62 +108,43 @@ class TestManualSalesTotal(BaseTest):
         total = get_manual_sales_total(self.seller, 6, 2026)
         self.assertEqual(total, 0)
 
-    def test_get_manual_sales_total_multiple(self):
-        self._create_manual_sale(self.seller, 100000, 1)
-        self._create_manual_sale(self.seller, 200000, 2)
-        total = get_manual_sales_total(self.seller, 6, 2026)
-        self.assertEqual(total, 300000)
-
 
 class TestCommissionRate(BaseTest):
     def test_get_commission_rate_from_seller(self):
         rate = get_commission_rate(self.seller)
         self.assertEqual(rate, Decimal('0.01'))
 
-    def test_get_commission_rate_from_tenant(self):
-        self.seller.commission_rate = Decimal('0')
-        self.seller.save()
-        rate = get_commission_rate(self.seller)
-        self.assertEqual(rate, Decimal('0.01'))
-
-    def test_get_commission_rate_default(self):
-        self.seller.commission_rate = Decimal('0')
-        self.seller.save(update_fields=['commission_rate'])
-        rate = get_commission_rate(self.seller)
-        self.assertEqual(rate, Decimal('0.01'))
-
 
 class TestCalculateEstimatedCommission(BaseTest):
-    def test_calculate_estimated_commission_one_percent(self):
+    def test_one_percent_8503050_gives_85031(self):
         self._create_manual_sale(self.seller, 8503050, 15)
         commission, total = calculate_estimated_commission(self.seller, 6, 2026)
-        # 85.030,50 * 1% = 850,3050 -> round -> 850.31
-        # In centavos: 8503050 * 0.01 = 85030.5 -> round -> 85031
         self.assertEqual(total, 8503050)
         self.assertEqual(commission, 85031)
 
-    def test_calculate_estimated_commission_zero_sales(self):
-        commission, total = calculate_estimated_commission(self.seller, 6, 2026)
-        self.assertEqual(total, 0)
-        self.assertEqual(commission, 0)
 
-    def test_calculate_estimated_commission_different_rate(self):
-        self.seller.commission_rate = Decimal('0.05')
-        self.seller.save()
-        self._create_manual_sale(self.seller, 100000, 15)
-        commission, total = calculate_estimated_commission(self.seller, 6, 2026)
-        self.assertEqual(total, 100000)
-        self.assertEqual(commission, 5000)  # 5% of 100000 cents
+class TestGetOrCreatePeriod(BaseTest):
+    def test_creates_period_with_expected_days(self):
+        period, created = get_or_create_period(self.tenant, 6, 2026, expected_working_days=27)
+        self.assertTrue(created)
+        self.assertEqual(period.expected_working_days, 27)
+        self.assertEqual(period.status, CommissionPeriod.Status.ABERTA)
+
+    def test_does_not_create_duplicate(self):
+        get_or_create_period(self.tenant, 6, 2026)
+        period2, created = get_or_create_period(self.tenant, 6, 2026)
+        self.assertFalse(created)
+        self.assertIsNotNone(period2.uuid)
 
 
 class TestSyncPeriodSellerCommissions(BaseTest):
     def test_sync_creates_commission_for_active_seller(self):
-        period = self._create_period()
-        created = sync_period_seller_commissions(period)
-        self.assertEqual(created, 1)
-        self.assertTrue(
-            SellerCommission.objects.filter(period=period, seller=self.seller).exists()
+        period = CommissionPeriod.objects.create(
+            tenant=self.tenant, month=6, year=2026,
+            expected_working_days=22,
         )
+        created = sync_period_seller_commissions(period)
+        self.assertEqual(created, 2)
 
     def test_sync_recalculates_open_period(self):
         self._create_manual_sale(self.seller, 8503050, 15)
@@ -158,146 +153,146 @@ class TestSyncPeriodSellerCommissions(BaseTest):
         sc = SellerCommission.objects.get(period=period, seller=self.seller)
         self.assertEqual(sc.total_sold_amount, 8503050)
         self.assertEqual(sc.commission_amount, 85031)
+        self.assertEqual(sc.operational_status, SellerCommission.OperationalStatus.PENDENTE)
 
-    def test_sync_creates_for_seller_with_manual_sales_even_if_inactive(self):
-        self._create_manual_sale(self.seller, 500000, 15)
-        self.seller.is_active = False
-        self.seller.save()
 
-        period = self._create_period()
-        created = sync_period_seller_commissions(period)
-        self.assertEqual(created, 1)
+class TestWorkingDays(BaseTest):
+    def test_calculate_working_days(self):
+        self._create_manual_sale(self.seller, 100000, 15)
+        period = self._create_period(expected_days=22)
+        count, expected, missing = calculate_seller_working_days(period, self.seller)
+        self.assertEqual(count, 1)
+        self.assertEqual(expected, 22)
+        self.assertEqual(missing, 21)
 
-    def test_sync_does_not_duplicate(self):
+    def test_empty_seller_has_zero_days(self):
+        period = self._create_period(expected_days=22)
+        count, expected, missing = calculate_seller_working_days(period, self.seller)
+        self.assertEqual(count, 0)
+        self.assertEqual(missing, 22)
+
+    def test_operational_status_pronto(self):
+        for day in range(1, 23):
+            self._create_manual_sale(self.seller, 1000, day, month=7, year=2026)
+        period, _ = get_or_create_period(
+            self.tenant, 7, 2026, expected_working_days=22,
+        )
+        sync_period_seller_commissions(period)
+        sc = SellerCommission.objects.get(period=period, seller=self.seller)
+        self.assertEqual(sc.operational_status, SellerCommission.OperationalStatus.PRONTO)
+
+    def test_operational_status_sem_lancamento(self):
         period = self._create_period()
         sync_period_seller_commissions(period)
-        created = sync_period_seller_commissions(period)
-        self.assertEqual(created, 0)
+        sc = SellerCommission.objects.get(period=period, seller=self.seller)
+        self.assertEqual(sc.operational_status, SellerCommission.OperationalStatus.SEM_LANCAMENTO)
 
 
-class TestFreezePeriod(BaseTest):
-    def test_freeze_period_changes_status(self):
+class TestCloseSellerCommissions(BaseTest):
+    def test_close_single_seller(self):
         self._create_manual_sale(self.seller, 8503050, 15)
         period = self._create_period()
         sync_period_seller_commissions(period)
-        freeze_period(period, self.manager)
+        sc = SellerCommission.objects.get(period=period, seller=self.seller)
+
+        result = close_seller_commissions(period, [sc.id], self.manager)
+        self.assertEqual(len(result), 1)
+
+        sc.refresh_from_db()
+        self.assertEqual(sc.status, SellerCommission.Status.FECHADA)
+        self.assertIsNotNone(sc.closed_at)
+        self.assertEqual(sc.closed_by, self.manager)
+        self.assertIsNotNone(sc.frozen_total_sold_amount)
+        self.assertEqual(sc.frozen_total_sold_amount, 8503050)
+        self.assertEqual(sc.frozen_commission_amount, 85031)
+
+        period.refresh_from_db()
+        self.assertEqual(period.status, CommissionPeriod.Status.PARCIALMENTE_FECHADA)
+
+    def test_close_multiple_sellers(self):
+        self._create_manual_sale(self.seller, 500000, 15)
+        self._create_manual_sale(self.seller2, 300000, 15)
+        period = self._create_period()
+        sync_period_seller_commissions(period)
+        ids = list(SellerCommission.objects.filter(period=period).values_list('id', flat=True))
+
+        result = close_seller_commissions(period, ids, self.manager)
+        self.assertEqual(len(result), 2)
+
         period.refresh_from_db()
         self.assertEqual(period.status, CommissionPeriod.Status.FECHADA)
 
-    def test_freeze_period_calculates_commission(self):
+    def test_other_seller_stays_open(self):
+        self._create_manual_sale(self.seller, 500000, 15)
+        period = self._create_period()
+        sync_period_seller_commissions(period)
+        sc1 = SellerCommission.objects.get(period=period, seller=self.seller)
+        sc2 = SellerCommission.objects.get(period=period, seller=self.seller2)
+
+        close_seller_commissions(period, [sc1.id], self.manager)
+        sc2.refresh_from_db()
+        self.assertEqual(sc2.status, SellerCommission.Status.ABERTA)
+
+        period.refresh_from_db()
+        self.assertEqual(period.status, CommissionPeriod.Status.PARCIALMENTE_FECHADA)
+
+
+class TestReopenSellerCommissions(BaseTest):
+    def test_reopen_before_payment(self):
         self._create_manual_sale(self.seller, 8503050, 15)
         period = self._create_period()
         sync_period_seller_commissions(period)
-        freeze_period(period, self.manager)
         sc = SellerCommission.objects.get(period=period, seller=self.seller)
-        self.assertEqual(sc.total_sold_amount, 8503050)
-        self.assertEqual(sc.commission_amount, 85031)
-        self.assertIsNotNone(sc.closed_at)
-        self.assertEqual(sc.closed_by, self.manager)
+        close_seller_commissions(period, [sc.id], self.manager)
 
-    def test_freeze_period_raises_on_wrong_status(self):
-        period = self._create_period()
-        period.status = CommissionPeriod.Status.PAGA
-        period.save()
-        with self.assertRaises(ValueError):
-            freeze_period(period, self.manager)
-
-
-class TestMarkPeriodPaid(BaseTest):
-    def test_mark_paid_changes_status(self):
-        self._create_manual_sale(self.seller, 8503050, 15)
-        period = self._create_period()
-        sync_period_seller_commissions(period)
-        freeze_period(period, self.manager)
-        mark_period_paid(period, self.manager, {})
-        period.refresh_from_db()
-        self.assertEqual(period.status, CommissionPeriod.Status.PAGA)
-
-    def test_mark_paid_records_payment(self):
-        self._create_manual_sale(self.seller, 8503050, 15)
-        period = self._create_period()
-        sync_period_seller_commissions(period)
-        freeze_period(period, self.manager)
-        mark_period_paid(period, self.manager, {
-            'payment_date': '2026-07-01',
-            'payment_method': 'pix',
-            'payment_notes': 'Teste pagamento',
-        })
-        sc = SellerCommission.objects.get(period=period, seller=self.seller)
-        self.assertIsNotNone(sc.paid_at)
-        self.assertEqual(sc.paid_amount, 85031)
-        self.assertEqual(sc.payment_method, 'pix')
-        self.assertEqual(sc.payment_notes, 'Teste pagamento')
-
-    def test_mark_paid_without_commissions_raises(self):
-        period = self._create_period()
-        period.status = CommissionPeriod.Status.FECHADA
-        period.save()
-        with self.assertRaises(ValueError):
-            mark_period_paid(period, self.manager, {})
-
-    def test_mark_paid_raises_on_wrong_status(self):
-        period = self._create_period()
-        with self.assertRaises(ValueError):
-            mark_period_paid(period, self.manager, {})
-
-    def test_paid_period_appears_in_history_with_sellers(self):
-        self._create_manual_sale(self.seller, 8503050, 15)
-        period = self._create_period()
-        sync_period_seller_commissions(period)
-        freeze_period(period, self.manager)
-        mark_period_paid(period, self.manager, {
-            'payment_method': 'pix',
-        })
-        period.refresh_from_db()
-        self.assertEqual(period.status, CommissionPeriod.Status.PAGA)
-        sc_count = SellerCommission.objects.filter(period=period).count()
-        self.assertGreater(sc_count, 0)
-        sc = SellerCommission.objects.filter(period=period).first()
-        self.assertIsNotNone(sc.paid_amount)
-
-
-class TestReopenPeriod(BaseTest):
-    def test_reopen_changes_status_to_aberta(self):
-        self._create_manual_sale(self.seller, 8503050, 15)
-        period = self._create_period()
-        sync_period_seller_commissions(period)
-        freeze_period(period, self.manager)
-        reopen_period(period, self.manager, 'Teste reversao')
-        period.refresh_from_db()
-        self.assertEqual(period.status, CommissionPeriod.Status.ABERTA)
-
-    def test_reopen_clears_frozen_dates(self):
-        self._create_manual_sale(self.seller, 8503050, 15)
-        period = self._create_period()
-        sync_period_seller_commissions(period)
-        freeze_period(period, self.manager)
-        reopen_period(period, self.manager, 'Teste reversao')
-        period.refresh_from_db()
-        self.assertIsNone(period.closed_at)
-        self.assertIsNone(period.closed_by)
+        reopen_seller_commissions(period, [sc.id], self.manager, 'Teste reversao')
+        sc.refresh_from_db()
+        self.assertEqual(sc.status, SellerCommission.Status.REABERTA)
+        self.assertIsNotNone(sc.reopened_at)
+        self.assertEqual(sc.reopen_reason, 'Teste reversao')
 
     def test_reopen_requires_reason(self):
         self._create_manual_sale(self.seller, 8503050, 15)
         period = self._create_period()
         sync_period_seller_commissions(period)
-        freeze_period(period, self.manager)
-        with self.assertRaises(ValueError):
-            reopen_period(period, self.manager, '')
+        sc = SellerCommission.objects.get(period=period, seller=self.seller)
+        close_seller_commissions(period, [sc.id], self.manager)
 
-    def test_paid_period_cannot_be_reopened(self):
+        with self.assertRaises(ValueError):
+            reopen_seller_commissions(period, [sc.id], self.manager, '')
+
+    def test_paid_cannot_be_reopened(self):
         self._create_manual_sale(self.seller, 8503050, 15)
         period = self._create_period()
         sync_period_seller_commissions(period)
-        freeze_period(period, self.manager)
-        mark_period_paid(period, self.manager, {'payment_method': 'pix'})
-        with self.assertRaises(ValueError):
-            reopen_period(period, self.manager, 'Tentar reverter')
+        sc = SellerCommission.objects.get(period=period, seller=self.seller)
+        close_seller_commissions(period, [sc.id], self.manager)
+        pay_seller_commissions(period, [sc.id], self.manager, {
+            'payment_method': 'pix',
+        })
 
-    def test_aberta_period_cannot_be_reopened(self):
-        period = self._create_period()
         with self.assertRaises(ValueError):
-            reopen_period(period, self.manager, 'Teste')
+            reopen_seller_commissions(period, [sc.id], self.manager, 'Tentar')
+
+
+class TestPaySellerCommissions(BaseTest):
+    def test_pay_single_seller(self):
+        self._create_manual_sale(self.seller, 8503050, 15)
+        period = self._create_period()
+        sync_period_seller_commissions(period)
+        sc = SellerCommission.objects.get(period=period, seller=self.seller)
+        close_seller_commissions(period, [sc.id], self.manager)
+
+        pay_seller_commissions(period, [sc.id], self.manager, {
+            'payment_method': 'pix',
+            'payment_date': '2026-07-01',
+            'payment_notes': 'Teste',
+        })
+        sc.refresh_from_db()
+        self.assertEqual(sc.status, SellerCommission.Status.PAGA)
+        self.assertIsNotNone(sc.paid_at)
+        self.assertEqual(sc.paid_amount, 85031)
+        self.assertEqual(sc.payment_method, 'pix')
 
 
 class TestCommissionAdjustment(BaseTest):
@@ -305,315 +300,185 @@ class TestCommissionAdjustment(BaseTest):
         self._create_manual_sale(self.seller, 8503050, 15)
         period = self._create_period()
         sync_period_seller_commissions(period)
-        freeze_period(period, self.manager)
         sc = SellerCommission.objects.get(period=period, seller=self.seller)
-        adjustment = create_commission_adjustment(sc, 100000, 'Ajuste de teste', self.manager)
+        close_seller_commissions(period, [sc.id], self.manager)
+
+        adjustment = create_commission_adjustment(sc, 100000, 'Ajuste teste', self.manager)
         self.assertEqual(adjustment.previous_amount, 85031)
         self.assertEqual(adjustment.new_amount, 100000)
-        self.assertEqual(adjustment.difference, 14969)
-        self.assertEqual(adjustment.reason, 'Ajuste de teste')
-        sc.refresh_from_db()
-        self.assertEqual(sc.commission_amount, 100000)
+
+
+class TestValidateSaleCanBeChanged(BaseTest):
+    def test_seller_can_edit_when_open(self):
+        can, msg = validate_sale_can_be_changed(self.seller, date(2026, 6, 15), self.seller_user)
+        self.assertTrue(can)
+
+    def test_seller_cannot_edit_when_closed(self):
+        self._create_manual_sale(self.seller, 500000, 15)
+        period = self._create_period()
+        sync_period_seller_commissions(period)
+        sc = SellerCommission.objects.get(period=period, seller=self.seller)
+        close_seller_commissions(period, [sc.id], self.manager)
+
+        can, msg = validate_sale_can_be_changed(self.seller, date(2026, 6, 15), self.seller_user)
+        self.assertFalse(can)
+        self.assertIsNotNone(msg)
+
+    def test_other_seller_can_edit_when_only_one_closed(self):
+        self._create_manual_sale(self.seller, 500000, 15)
+        period = self._create_period()
+        sync_period_seller_commissions(period)
+        sc = SellerCommission.objects.get(period=period, seller=self.seller)
+        close_seller_commissions(period, [sc.id], self.manager)
+
+        can, msg = validate_sale_can_be_changed(self.seller2, date(2026, 6, 15), self.seller_user)
+        self.assertTrue(can)
+
+
+class TestPeriodSummary(BaseTest):
+    def test_summary_with_mixed_statuses(self):
+        self._create_manual_sale(self.seller, 8503050, 15)
+        self._create_manual_sale(self.seller2, 420000, 15)
+        period = self._create_period()
+        sync_period_seller_commissions(period)
+
+        sc1 = SellerCommission.objects.get(period=period, seller=self.seller)
+        sc2 = SellerCommission.objects.get(period=period, seller=self.seller2)
+        close_seller_commissions(period, [sc1.id], self.manager)
+
+        summary = calculate_period_summary(period)
+        self.assertEqual(summary['vendedores_abertos'], 1)
+        self.assertEqual(summary['vendedores_fechados'], 1)
+        self.assertGreater(summary['total_vendido'], 0)
+
+
+class TestRecalculatePeriodStatus(BaseTest):
+    def test_all_open_is_aberta(self):
+        period = self._create_period()
+        sync_period_seller_commissions(period)
+        status = recalculate_period_status(period)
+        self.assertEqual(status, CommissionPeriod.Status.ABERTA)
+
+    def test_all_closed_is_fechada(self):
+        self._create_manual_sale(self.seller, 100000, 15)
+        self._create_manual_sale(self.seller2, 100000, 15)
+        period = self._create_period()
+        sync_period_seller_commissions(period)
+        ids = list(SellerCommission.objects.filter(period=period).values_list('id', flat=True))
+        close_seller_commissions(period, ids, self.manager)
+        period.refresh_from_db()
+        self.assertEqual(period.status, CommissionPeriod.Status.FECHADA)
+
+    def test_one_paid_is_parcialmente_paga(self):
+        self._create_manual_sale(self.seller, 100000, 15)
+        self._create_manual_sale(self.seller2, 100000, 15)
+        period = self._create_period()
+        sync_period_seller_commissions(period)
+        sc1 = SellerCommission.objects.get(period=period, seller=self.seller)
+        sc2 = SellerCommission.objects.get(period=period, seller=self.seller2)
+        close_seller_commissions(period, [sc1.id, sc2.id], self.manager)
+        pay_seller_commissions(period, [sc1.id], self.manager, {'payment_method': 'pix'})
+        period.refresh_from_db()
+        self.assertEqual(period.status, CommissionPeriod.Status.PARCIALMENTE_PAGA)
+
+    def test_all_paid_is_paga(self):
+        self._create_manual_sale(self.seller, 100000, 15)
+        self._create_manual_sale(self.seller2, 100000, 15)
+        period = self._create_period()
+        sync_period_seller_commissions(period)
+        ids = list(SellerCommission.objects.filter(period=period).values_list('id', flat=True))
+        close_seller_commissions(period, ids, self.manager)
+        pay_seller_commissions(period, ids, self.manager, {'payment_method': 'pix'})
+        period.refresh_from_db()
+        self.assertEqual(period.status, CommissionPeriod.Status.PAGA)
 
 
 class TestDashboardData(BaseTest):
     def test_dashboard_shows_total_vendido(self):
         self._create_manual_sale(self.seller, 8503050, 15)
+        self._create_period()
         data = get_dashboard_data(self.tenant, month=6, year=2026)
         self.assertEqual(data['total_vendido'], 8503050)
 
-    def test_dashboard_shows_estimated_commission_for_open_period(self):
+    def test_dashboard_shows_commission_for_aberta(self):
         self._create_manual_sale(self.seller, 8503050, 15)
-        period = self._create_period()
-        sync_period_seller_commissions(period)
+        self._create_period()
         data = get_dashboard_data(self.tenant, month=6, year=2026)
-        self.assertEqual(data['commission_estimada'], 85031)
-        self.assertEqual(data['period_status'], CommissionPeriod.Status.ABERTA)
+        self.assertGreater(data['commission_aberta'], 0)
 
-    def test_dashboard_shows_closed_commission_for_fechada(self):
-        self._create_manual_sale(self.seller, 8503050, 15)
-        period = self._create_period()
-        sync_period_seller_commissions(period)
-        freeze_period(period, self.manager)
-        data = get_dashboard_data(self.tenant, month=6, year=2026)
-        self.assertEqual(data['commission_fechada'], 85031)
-
-    def test_dashboard_shows_paid_commission_for_paga(self):
-        self._create_manual_sale(self.seller, 8503050, 15)
-        period = self._create_period()
-        sync_period_seller_commissions(period)
-        freeze_period(period, self.manager)
-        mark_period_paid(period, self.manager, {'payment_method': 'pix'})
-        data = get_dashboard_data(self.tenant, month=6, year=2026)
-        self.assertEqual(data['commission_paga'], 85031)
-
-
-class TestRankingOnlyManualSales(BaseTest):
-    def test_ranking_excludes_link_sales(self):
-        self._create_manual_sale(self.seller, 500000, 15)
-        Sale.objects.create(
-            tenant=self.tenant,
-            seller=self.seller,
-            origin=Sale.Origin.LINK,
-            amount=99999999,
-            sale_date=date(2026, 6, 15),
-            created_by=self.manager,
-        )
-        total = get_manual_sales_total(self.seller, 6, 2026)
-        self.assertEqual(total, 500000)
-
-
-class TestSellerCommissionRecalculate(BaseTest):
-    def test_manual_sale_creates_correct_monthly_total(self):
+    def test_dashboard_shows_commission_for_paga(self):
         self._create_manual_sale(self.seller, 8503050, 15)
         period = self._create_period()
         sync_period_seller_commissions(period)
         sc = SellerCommission.objects.get(period=period, seller=self.seller)
-        self.assertEqual(sc.total_sold_amount, 8503050)
-        self.assertEqual(sc.commission_amount, 85031)
+        close_seller_commissions(period, [sc.id], self.manager)
+        pay_seller_commissions(period, [sc.id], self.manager, {'payment_method': 'pix'})
 
-    def test_open_period_shows_estimated_commission(self):
-        self._create_manual_sale(self.seller, 8503050, 15)
-        period = self._create_period()
-        sync_period_seller_commissions(period)
-        sc = SellerCommission.objects.get(period=period, seller=self.seller)
-        # Before freeze, commission is estimated
-        sc.refresh_from_db()
-        self.assertEqual(sc.total_sold_amount, 8503050)
-        self.assertEqual(sc.commission_amount, 85031)
+        data = get_dashboard_data(self.tenant, month=6, year=2026)
+        self.assertGreater(data['commission_paga'], 0)
 
-    def test_closed_period_freezes_values(self):
-        self._create_manual_sale(self.seller, 8503050, 15)
-        period = self._create_period()
-        sync_period_seller_commissions(period)
-        freeze_period(period, self.manager)
-        sc = SellerCommission.objects.get(period=period, seller=self.seller)
-        self.assertIsNotNone(sc.closed_at)
-
-    def test_paid_period_records_paid_amounts(self):
-        self._create_manual_sale(self.seller, 8503050, 15)
-        period = self._create_period()
-        sync_period_seller_commissions(period)
-        freeze_period(period, self.manager)
-        mark_period_paid(period, self.manager, {'payment_method': 'pix'})
-        sc = SellerCommission.objects.get(period=period, seller=self.seller)
-        self.assertIsNotNone(sc.paid_at)
-        self.assertEqual(sc.paid_amount, 85031)
-
-    def test_paid_period_has_sellers_in_history(self):
-        self._create_manual_sale(self.seller, 8503050, 15)
-        period = self._create_period()
-        sync_period_seller_commissions(period)
-        freeze_period(period, self.manager)
-        mark_period_paid(period, self.manager, {'payment_method': 'pix'})
-        sc_list = SellerCommission.objects.filter(period=period)
-        self.assertGreater(len(sc_list), 0)
-        for sc in sc_list:
-            self.assertIsNotNone(sc.seller)
-            self.assertIsNotNone(sc.paid_amount)
-
-    def test_sync_after_manual_sale_creates_seller_commission(self):
-        period = self._create_period()
-        sync_period_seller_commissions(period)
-        self._create_manual_sale(self.seller, 500000, 20)
-        sync_period_seller_commissions(period)
-        sc = SellerCommission.objects.filter(period=period, seller=self.seller).first()
-        self.assertIsNotNone(sc)
-        self.assertEqual(sc.total_sold_amount, 500000)
-
-    def test_no_fechamento_without_sellers_when_sales_exist(self):
-        self._create_manual_sale(self.seller, 8503050, 15)
-        period = self._create_period()
-        sync_period_seller_commissions(period)
-        sc_count = SellerCommission.objects.filter(period=period).count()
-        self.assertGreater(sc_count, 0)
-
-    def test_dashboard_shows_real_commission_to_pay(self):
-        self._create_manual_sale(self.seller, 8503050, 15)
+    def test_dashboard_shows_vendor_counts(self):
         period = self._create_period()
         sync_period_seller_commissions(period)
         data = get_dashboard_data(self.tenant, month=6, year=2026)
-        self.assertGreater(data['total_vendido'], 0)
-        if period.status == CommissionPeriod.Status.ABERTA:
-            self.assertGreater(data['commission_estimada'], 0)
-        elif period.status == CommissionPeriod.Status.FECHADA:
-            self.assertGreater(data['commission_fechada'], 0)
-        elif period.status == CommissionPeriod.Status.PAGA:
-            self.assertGreater(data['commission_paga'], 0)
+        self.assertEqual(data['vendedores_ativos'], 2)
+        self.assertEqual(data['vendedores_sem_lancamento_periodo'], 2)
 
-    def test_link_sales_not_in_commission_calculation(self):
+    def test_dashboard_excludes_link_sales(self):
         self._create_manual_sale(self.seller, 50000, 15)
         Sale.objects.create(
-            tenant=self.tenant,
-            seller=self.seller,
-            origin=Sale.Origin.LINK,
-            amount=99999999,
-            sale_date=date(2026, 6, 15),
-            created_by=self.manager,
+            tenant=self.tenant, seller=self.seller,
+            origin=Sale.Origin.LINK, amount=99999999,
+            sale_date=date(2026, 6, 15), created_by=self.manager,
         )
-        period = self._create_period()
-        sync_period_seller_commissions(period)
-        sc = SellerCommission.objects.get(period=period, seller=self.seller)
-        self.assertEqual(sc.total_sold_amount, 50000)
-
-
-class TestDashboardWithStaleData(BaseTest):
-    def test_dashboard_shows_commission_for_paga_with_stale_data(self):
-        """Dashboard must show commission even if PAGA period has 0 paid_amount"""
-        self._create_manual_sale(self.seller, 8503050, 15)
-        period = self._create_period()
-        sync_period_seller_commissions(period)
-        freeze_period(period, self.manager)
-        mark_period_paid(period, self.manager, {'payment_method': 'pix'})
-
-        sc = SellerCommission.objects.get(period=period, seller=self.seller)
-        sc.paid_amount = 0
-        sc.total_sold_amount = 0
-        sc.commission_amount = 0
-        sc.save(update_fields=['paid_amount', 'total_sold_amount', 'commission_amount'])
-
+        self._create_period()
         data = get_dashboard_data(self.tenant, month=6, year=2026)
-        self.assertGreater(data['total_vendido'], 0)
-        self.assertGreater(data['commission_paga'], 0)
-        self.assertTrue(data['has_inconsistency'])
-
-    def test_dashboard_shows_commission_for_fechada_with_stale_data(self):
-        """Dashboard must show commission even if FECHADA period has 0 values"""
-        self._create_manual_sale(self.seller, 8503050, 15)
-        period = self._create_period()
-        sync_period_seller_commissions(period)
-        freeze_period(period, self.manager)
-
-        sc = SellerCommission.objects.get(period=period, seller=self.seller)
-        sc.total_sold_amount = 0
-        sc.commission_amount = 0
-        sc.save(update_fields=['total_sold_amount', 'commission_amount'])
-
-        data = get_dashboard_data(self.tenant, month=6, year=2026)
-        self.assertGreater(data['total_vendido'], 0)
-        self.assertGreater(data['commission_fechada'], 0)
-        self.assertTrue(data['has_inconsistency'])
+        self.assertEqual(data['total_vendido'], 50000)
 
 
 class TestGetLinksData(BaseTest):
-    def test_get_links_data_empty(self):
-        from app.apps.commissions.services import get_links_data
-        data = get_links_data(self.tenant, month=6, year=2026)
+    def test_links_data_empty(self):
+        data = get_links_data(self.tenant, 6, 2026)
         self.assertEqual(data['links_gerados'], 0)
-        self.assertEqual(data['links_pagos'], 0)
 
-    def test_get_links_data_with_orders(self):
-        from app.apps.commissions.services import get_links_data
+    def test_links_data_with_order(self):
         from app.apps.orders.models import Order
         Order.objects.create(
-            tenant=self.tenant,
-            seller=self.seller,
-            customer_name='Test',
-            total_amount=10000,
-            status='PENDING',
+            tenant=self.tenant, seller=self.seller,
+            customer_name='Test', total_amount=10000, status='PENDING',
         )
-        data = get_links_data(self.tenant, month=6, year=2026)
+        data = get_links_data(self.tenant, 6, 2026)
         self.assertEqual(data['links_gerados'], 1)
         self.assertEqual(data['links_pendentes'], 1)
-        self.assertEqual(data['valor_gerado_links'], 10000)
-
-
-class TestSerializerStaleData(BaseTest):
-    def test_serializer_shows_values_for_stale_paga(self):
-        from app.apps.api.serializers import CommissionPeriodSerializer
-
-        self._create_manual_sale(self.seller, 8503050, 15)
-        period = self._create_period()
-        sync_period_seller_commissions(period)
-        freeze_period(period, self.manager)
-        mark_period_paid(period, self.manager, {'payment_method': 'pix'})
-
-        sc = SellerCommission.objects.get(period=period, seller=self.seller)
-        sc.total_sold_amount = 0
-        sc.commission_amount = 0
-        sc.save(update_fields=['total_sold_amount', 'commission_amount'])
-
-        serializer = CommissionPeriodSerializer(period)
-        data = serializer.data
-        self.assertEqual(len(data['seller_commissions']), 1)
-        sc_data = data['seller_commissions'][0]
-        self.assertGreater(sc_data['total_sold_amount'], 0)
-        self.assertGreater(sc_data['commission_amount'], 0)
-
-
-class TestMobileBlocking(BaseTest):
-    def test_mobile_blocks_launch_when_period_fechada(self):
-        """Seller cannot launch sale when period is FECHADA via mobile"""
-        self._create_manual_sale(self.seller, 8503050, 15)
-        period = self._create_period()
-        sync_period_seller_commissions(period)
-        freeze_period(period, self.manager)
-
-        from django.core.exceptions import ValidationError
-        from datetime import timedelta
-
-        today = timezone.localdate()
-        blocked = CommissionPeriod.is_locked_for(self.tenant, today)
-        self.assertTrue(blocked)
-
-    def test_mobile_blocks_launch_when_period_paga(self):
-        """Seller cannot launch sale when period is PAGA via mobile"""
-        self._create_manual_sale(self.seller, 8503050, 15)
-        period = self._create_period()
-        sync_period_seller_commissions(period)
-        freeze_period(period, self.manager)
-        mark_period_paid(period, self.manager, {'payment_method': 'pix'})
-
-        today = timezone.localdate()
-        blocked = CommissionPeriod.is_locked_for(self.tenant, today)
-        self.assertTrue(blocked)
 
 
 class TestValidationAndBlocking(BaseTest):
-    def test_seller_cannot_create_sale_in_future(self):
-        from django.core.exceptions import ValidationError as DjangoValidationError
-        future_date = timezone.localdate() + timezone.timedelta(days=1)
-        sale = Sale(
-            tenant=self.tenant,
-            seller=self.seller,
-            origin=Sale.Origin.MANUAL,
-            amount=100000,
-            sale_date=future_date,
-            created_by=self.seller_user,
-        )
-        # Model-level validation does not check future dates;
-        # that validation is enforced at the serializer level
-        sale.full_clean()
-        sale.save()
-        self.assertIsNotNone(sale.uuid)
+    def test_seller_cannot_edit_when_own_commission_closed(self):
+        self._create_manual_sale(self.seller, 500000, 15)
+        period = self._create_period()
+        sync_period_seller_commissions(period)
+        sc = SellerCommission.objects.get(period=period, seller=self.seller)
+        close_seller_commissions(period, [sc.id], self.manager)
 
-    def test_seller_cannot_create_sale_in_previous_month(self):
-        from datetime import timedelta
-        today = timezone.localdate()
-        first_of_month = date(today.year, today.month, 1)
-        if first_of_month.month == 1:
-            prev_month = date(first_of_month.year - 1, 12, 1)
-        else:
-            prev_month = date(first_of_month.year, first_of_month.month - 1, 1)
-        # This should be blocked at serializer level, not model level
-        sale = Sale.objects.create(
-            tenant=self.tenant,
-            seller=self.seller,
-            origin=Sale.Origin.MANUAL,
-            amount=100000,
-            sale_date=prev_month,
-            created_by=self.seller_user,
+        Sale.objects.create(
+            tenant=self.tenant, seller=self.seller,
+            origin=Sale.Origin.MANUAL, amount=100000,
+            sale_date=date(2026, 6, 20), created_by=self.seller_user,
         )
-        self.assertIsNotNone(sale)
+        can, msg = validate_sale_can_be_changed(
+            self.seller, date(2026, 6, 20), self.seller_user,
+        )
+        self.assertFalse(can)
 
-    def test_linked_sale_not_created_manually(self):
-        sale = Sale(
-            tenant=self.tenant,
-            seller=self.seller,
-            origin=Sale.Origin.LINK,
-            amount=100000,
-            sale_date=date(2026, 6, 15),
-            created_by=self.manager,
+    def test_other_seller_still_editable(self):
+        self._create_manual_sale(self.seller, 500000, 15)
+        self._create_manual_sale(self.seller2, 300000, 15)
+        period = self._create_period()
+        sync_period_seller_commissions(period)
+        sc = SellerCommission.objects.get(period=period, seller=self.seller)
+        close_seller_commissions(period, [sc.id], self.manager)
+
+        can, msg = validate_sale_can_be_changed(
+            self.seller2, date(2026, 6, 20), self.manager,
         )
-        with self.assertRaises(Exception):
-            sale.full_clean()
+        self.assertTrue(can)

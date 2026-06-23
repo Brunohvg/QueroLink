@@ -101,13 +101,12 @@ class SaleViewSet(viewsets.ModelViewSet):
         log_action(self.request, 'sale.updated', instance=serializer.instance)
 
     def perform_destroy(self, instance):
-        if CommissionPeriod.is_locked_for(instance.tenant, instance.sale_date):
-            raise drf_serializers.ValidationError({
-                'detail': (
-                    'Este periodo ja foi fechado. '
-                    'Nao e possivel excluir vendas deste mes.'
-                ),
-            })
+        from app.apps.commissions.services import validate_sale_can_be_changed
+        can_change, error_msg = validate_sale_can_be_changed(
+            instance.seller, instance.sale_date, self.request.user,
+        )
+        if not can_change:
+            raise drf_serializers.ValidationError({'detail': error_msg})
         log_action(self.request, 'sale.deleted', instance=instance)
         instance.delete()
 
@@ -125,18 +124,6 @@ class CommissionPeriodViewSet(viewsets.ModelViewSet):
             tenant=self.request.user.tenant,
         ).prefetch_related('seller_commissions__seller')
 
-    def list(self, request, *args, **kwargs):
-        from app.apps.commissions.services import sync_period_seller_commissions
-        for period in self.filter_queryset(self.get_queryset()):
-            sync_period_seller_commissions(period)
-        return super().list(request, *args, **kwargs)
-
-    def retrieve(self, request, *args, **kwargs):
-        from app.apps.commissions.services import sync_period_seller_commissions
-        period = self.get_object()
-        sync_period_seller_commissions(period)
-        return super().retrieve(request, *args, **kwargs)
-
     def perform_create(self, serializer):
         tenant = self.request.user.tenant
         period = serializer.save(tenant=tenant)
@@ -145,25 +132,45 @@ class CommissionPeriodViewSet(viewsets.ModelViewSet):
         sync_period_seller_commissions(period)
 
     @action(detail=True, methods=['post'])
-    def close(self, request, pk=None):
-        from app.apps.commissions.services import freeze_period
+    def sync(self, request, pk=None):
+        from app.apps.commissions.services import sync_period_seller_commissions
+        period = self.get_object()
+        created = sync_period_seller_commissions(period)
+        return Response({
+            'synced': True,
+            'created': created,
+            'message': 'Competencia sincronizada com sucesso.' if created > 0
+                       else 'Competencia ja estava sincronizada.',
+        })
+
+    @action(detail=True, methods=['post'])
+    def close_sellers(self, request, pk=None):
+        from app.apps.commissions.services import close_seller_commissions
 
         period = self.get_object()
+        seller_ids = request.data.get('seller_commission_ids', [])
+
+        if not seller_ids:
+            return Response(
+                {'error': 'Selecione ao menos um vendedor.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
         try:
-            calculations = freeze_period(period, request.user)
+            calculations = close_seller_commissions(period, seller_ids, request.user)
         except ValueError as e:
             return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
         log_action(
-            request, 'commission_period.closed', instance=period,
+            request, 'commission_period.close_sellers', instance=period,
             changes={
                 'month': period.month, 'year': period.year,
-                'commissions_closed': len(calculations),
+                'seller_ids': seller_ids,
+                'closed_count': len(calculations),
             },
         )
         return Response({
-            'status': CommissionPeriod.Status.FECHADA,
-            'closed_at': period.closed_at.isoformat() if period.closed_at else None,
+            'closed': len(calculations),
             'commissions': calculations,
         })
 
@@ -171,34 +178,53 @@ class CommissionPeriodViewSet(viewsets.ModelViewSet):
         detail=True, methods=['post'],
         permission_classes=[IsAuthenticated, IsManagerOrAdmin],
     )
-    def reopen(self, request, pk=None):
-        from app.apps.commissions.services import reopen_period
+    def reopen_sellers(self, request, pk=None):
+        from app.apps.commissions.services import reopen_seller_commissions
 
         period = self.get_object()
+        seller_ids = request.data.get('seller_commission_ids', [])
         reason = request.data.get('reason', '').strip()
 
+        if not seller_ids:
+            return Response(
+                {'error': 'Selecione ao menos um vendedor.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
         try:
-            period = reopen_period(period, request.user, reason)
+            commissions = reopen_seller_commissions(period, seller_ids, request.user, reason)
         except ValueError as e:
             return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
         log_action(
-            request, 'commission_period.reopened', instance=period,
+            request, 'commission_period.reopen_sellers', instance=period,
             changes={
                 'month': period.month, 'year': period.year,
+                'seller_ids': seller_ids,
                 'reason': reason,
             },
         )
-        return Response(self.get_serializer(period).data)
+        return Response({
+            'reopened': len(commissions),
+            'message': f'{len(commissions)} vendedor(es) reaberto(s).',
+        })
 
     @action(
         detail=True, methods=['post'],
         permission_classes=[IsAuthenticated, IsManagerOrAdmin | IsFinancialOrAdmin],
     )
-    def mark_paid(self, request, pk=None):
-        from app.apps.commissions.services import mark_period_paid
+    def pay_sellers(self, request, pk=None):
+        from app.apps.commissions.services import pay_seller_commissions
 
         period = self.get_object()
+        seller_ids = request.data.get('seller_commission_ids', [])
+
+        if not seller_ids:
+            return Response(
+                {'error': 'Selecione ao menos um vendedor.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
         payment_data = {
             'payment_date': request.data.get('payment_date'),
             'payment_method': request.data.get('payment_method', ''),
@@ -206,98 +232,22 @@ class CommissionPeriodViewSet(viewsets.ModelViewSet):
         }
 
         try:
-            period = mark_period_paid(period, request.user, payment_data)
+            commissions = pay_seller_commissions(period, seller_ids, request.user, payment_data)
         except ValueError as e:
             return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
         log_action(
-            request, 'commission_period.paid', instance=period,
+            request, 'commission_period.pay_sellers', instance=period,
             changes={
                 'month': period.month, 'year': period.year,
+                'seller_ids': seller_ids,
                 'payment_date': payment_data.get('payment_date'),
             },
         )
-
-        return Response(self.get_serializer(period).data)
-
-    @action(
-        detail=True, methods=['post'],
-        permission_classes=[IsAuthenticated, IsManagerOrAdmin],
-    )
-    def adjust(self, request, pk=None):
-        period = self.get_object()
-        if period.status not in (
-            CommissionPeriod.Status.FECHADA,
-            CommissionPeriod.Status.PAGA,
-            CommissionPeriod.Status.AJUSTADA,
-        ):
-            return Response(
-                {'error': (
-                    f'Nao e possivel ajustar competencia '
-                    f'com status {period.status}.'
-                )},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
-        reason = request.data.get('reason', '').strip()
-        if not reason:
-            return Response(
-                {'error': 'E necessario informar o motivo do ajuste.'},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
-        adjustments_data = request.data.get('adjustments', [])
-        if not adjustments_data:
-            return Response(
-                {'error': 'Informe ao menos um ajuste de comissao.'},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
-        with transaction.atomic():
-            for adj in adjustments_data:
-                sc_id = adj.get('seller_commission_id')
-                new_amount = adj.get('new_amount')
-
-                if not sc_id or new_amount is None:
-                    continue
-
-                try:
-                    sc = period.seller_commissions.get(id=sc_id)
-                except SellerCommission.DoesNotExist:
-                    continue
-
-                previous_amount = sc.commission_amount
-                difference = new_amount - previous_amount
-
-                CommissionAdjustment.objects.create(
-                    seller_commission=sc,
-                    previous_amount=previous_amount,
-                    new_amount=new_amount,
-                    difference=difference,
-                    reason=reason,
-                    adjusted_by=request.user,
-                )
-
-                sc.commission_amount = new_amount
-                sc.save(update_fields=['commission_amount'])
-
-            period.status = CommissionPeriod.Status.AJUSTADA
-            period.adjusted_by = request.user
-            period.adjusted_at = timezone.now()
-            period.adjustment_reason = reason
-            period.save(update_fields=[
-                'status', 'adjusted_by', 'adjusted_at',
-                'adjustment_reason', 'updated_at',
-            ])
-
-        log_action(
-            request, 'commission_period.adjusted', instance=period,
-            changes={
-                'month': period.month, 'year': period.year,
-                'reason': reason,
-            },
-        )
-        return Response(self.get_serializer(period).data)
+        return Response({
+            'paid': len(commissions),
+            'message': f'{len(commissions)} vendedor(es) pago(s).',
+        })
 
     @action(
         detail=True, methods=['post'],
@@ -306,8 +256,9 @@ class CommissionPeriodViewSet(viewsets.ModelViewSet):
     def cancel(self, request, pk=None):
         period = self.get_object()
         if period.status not in (
-            CommissionPeriod.Status.FECHADA,
-            CommissionPeriod.Status.AJUSTADA,
+            CommissionPeriod.Status.ABERTA,
+            CommissionPeriod.Status.PARCIALMENTE_FECHADA,
+            CommissionPeriod.Status.PARCIALMENTE_PAGA,
         ):
             return Response(
                 {'error': (
@@ -440,12 +391,6 @@ class CommissionPeriodsByStatusView(generics.ListAPIView):
         ).prefetch_related(
             'seller_commissions__seller',
         ).order_by('-year', '-month')
-
-    def list(self, request, *args, **kwargs):
-        from app.apps.commissions.services import sync_period_seller_commissions
-        for period in self.filter_queryset(self.get_queryset()):
-            sync_period_seller_commissions(period)
-        return super().list(request, *args, **kwargs)
 
 
 class CommissionPeriodCsvView(generics.GenericAPIView):
@@ -603,8 +548,16 @@ class SellerDetailView(generics.GenericAPIView):
                 'total_sold_amount': total_sold,
                 'commission_rate': float(sc.commission_rate),
                 'commission_amount': commission_amount,
+                'status': sc.status,
+                'operational_status': sc.operational_status,
+                'submitted_days_count': sc.submitted_days_count,
+                'expected_working_days': sc.expected_working_days,
+                'missing_days_count': sc.missing_days_count,
                 'closed_at': sc.closed_at.isoformat() if sc.closed_at else None,
                 'paid_at': sc.paid_at.isoformat() if sc.paid_at else None,
+                'paid_amount': sc.paid_amount,
+                'payment_date': sc.payment_date.isoformat() if sc.payment_date else None,
+                'payment_method': sc.payment_method,
                 'adjustments': adjustments_data,
             })
 

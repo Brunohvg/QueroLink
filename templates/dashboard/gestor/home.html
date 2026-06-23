@@ -7,29 +7,14 @@
 <div class="surface-card mb-6 border-l-4 border-l-warning-500">
     <p class="text-[14px] font-medium text-gray-900">Configure sua loja para comecar</p>
     <p class="text-[13px] text-gray-500 mt-1">Conecte o Pagar.me e o WhatsApp antes de gerar links de pagamento.</p>
-    <a href="{% url 'dashboard:gestor_configuracoes' %}" class="inline-block mt-3 bg-brand-500 hover:bg-brand-600 text-white font-medium px-5 py-2.5 rounded-xl transition text-[14px]">
-        Configurar agora
-    </a>
-</div>
-{% endif %}
-
-{% if public_url %}
-<div class="surface-card mb-6">
-    <p class="text-[13px] font-semibold text-gray-500 uppercase tracking-wide mb-2">Link publico da sua loja</p>
-    <div class="flex items-center gap-2">
-        <code class="text-[14px] text-brand-500 bg-brand-50 px-3 py-1.5 rounded-lg font-mono break-all">{{ public_url }}</code>
-        <button onclick="navigator.clipboard.writeText('{{ public_url }}')" class="flex-shrink-0 p-2 text-gray-400 hover:text-brand-500 rounded-lg hover:bg-gray-50 tap-target" title="Copiar link">
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg>
-        </button>
-    </div>
-    <p class="text-[12px] text-gray-400 mt-2">Compartilhe este link com seus clientes para gerar pagamentos.</p>
+    <a href="{% url 'dashboard:gestor_configuracoes' %}" class="inline-block mt-3 bg-brand-500 hover:bg-brand-600 text-white font-medium px-5 py-2.5 rounded-xl transition text-[14px]">Configurar agora</a>
 </div>
 {% endif %}
 
 <div class="flex items-center gap-3 mb-6 flex-wrap">
     <select x-model="filterMonth" @change="loadSummary()" class="px-3 py-2 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
         <option value="">Mes atual</option>
-        <option value="1">01</option><option value="2">02</option><option value="3">03</option><option value="4">04</option><option value="5">05</option><option value="6">06</option><option value="7">07</option><option value="8">08</option><option value="9">09</option><option value="10">10</option><option value="11">11</option><option value="12">12</option>
+        {% for m in "123456789012"|make_list %}<option value="{{ forloop.counter }}">{{ forloop.counter|stringformat:"02d" }}</option>{% endfor %}
     </select>
     <select x-model="filterYear" @change="loadSummary()" class="px-3 py-2 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
         <option value="">Ano atual</option>
@@ -37,7 +22,7 @@
     </select>
     <button @click="loadSummary()" class="bg-brand-500 hover:bg-brand-600 text-white font-medium py-2 px-4 rounded-xl transition tap-target text-[14px] flex items-center gap-1">
         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
-        Atualizar dados
+        Atualizar
     </button>
 </div>
 
@@ -46,87 +31,67 @@
     <div class="flex items-center justify-between">
         <div>
             <p class="text-[14px] font-medium text-gray-900">Inconsistencia detectada</p>
-            <p class="text-[13px] text-gray-500 mt-1">Existem vendas manuais nesta competencia, mas os registros de comissao estao zerados.</p>
+            <p class="text-[13px] text-gray-500 mt-1">Existem vendas manuais mas registros de comissao inconsistentes.</p>
         </div>
-        <a href="/dashboard/gestor/fechamento/" class="bg-brand-500 hover:bg-brand-600 text-white font-medium py-2 px-4 rounded-xl transition tap-target text-[14px]">
-            Ir para fechamento
-        </a>
+        <a href="/dashboard/gestor/fechamento/" class="bg-brand-500 hover:bg-brand-600 text-white font-medium py-2 px-4 rounded-xl transition tap-target text-[14px]">Ir para fechamento</a>
     </div>
 </div>
 
 <div class="surface-hero mb-6">
     <p class="text-[13px] font-semibold text-gray-500 uppercase tracking-wide mb-2">Vendas manuais - Total no mes</p>
-    <p class="font-display text-[40px] font-semibold text-brand-500 leading-none" x-text="summary ? formatMoneyBRL(summary.total_vendido) : 'R$ 0,00'"></p>
+    <p class="font-display text-[40px] font-semibold text-brand-500 leading-none" x-text="formatMoneyBRL(summary?.total_vendido || 0)"></p>
     <p class="text-[11px] text-gray-400 mt-1">Entram no calculo da comissao</p>
 </div>
 
 <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-    <div class="surface-card border-l-4 border-l-brand-500" x-show="!summary || summary.period_status==='ABERTA'">
-        <p class="text-[13px] font-semibold text-gray-500 uppercase tracking-wide mb-1">Comissao estimada (aberta)</p>
-        <p class="font-display text-[28px] font-semibold text-brand-700" x-text="formatMoneyBRL(summary?.commission_estimada || 0)"></p>
+    <div class="surface-card border-l-4 border-l-brand-500">
+        <p class="text-[13px] font-semibold text-gray-500 uppercase tracking-wide mb-1">Comissao em aberto</p>
+        <p class="font-display text-[24px] font-semibold text-brand-700" x-text="formatMoneyBRL(summary?.commission_aberta || 0)"></p>
         <p class="text-[11px] text-gray-400">Valor estimado em tempo real</p>
     </div>
-    <div class="surface-card border-l-4 border-l-warning-500" x-show="summary?.period_status==='FECHADA'">
+    <div class="surface-card border-l-4 border-l-warning-500">
         <p class="text-[13px] font-semibold text-gray-500 uppercase tracking-wide mb-1">Comissao fechada</p>
-        <p class="font-display text-[28px] font-semibold text-warning-700" x-text="formatMoneyBRL(summary?.commission_fechada || 0)"></p>
+        <p class="font-display text-[24px] font-semibold text-warning-700" x-text="formatMoneyBRL(summary?.commission_fechada || 0)"></p>
         <p class="text-[11px] text-gray-400">Valor congelado</p>
     </div>
-    <div class="surface-card border-l-4 border-l-success-500" x-show="summary?.period_status==='PAGA'">
+    <div class="surface-card border-l-4 border-l-success-500">
         <p class="text-[13px] font-semibold text-gray-500 uppercase tracking-wide mb-1">Comissao paga</p>
-        <p class="font-display text-[28px] font-semibold text-success-700" x-text="formatMoneyBRL(summary?.commission_paga || 0)"></p>
+        <p class="font-display text-[24px] font-semibold text-success-700" x-text="formatMoneyBRL(summary?.commission_paga || 0)"></p>
         <p class="text-[11px] text-gray-400">Valor ja pago</p>
     </div>
-    <div class="surface-card" x-show="summary?.period_status==='AJUSTADA' || summary?.period_status==='CANCELADA'">
-        <p class="text-[13px] font-semibold text-gray-500 uppercase tracking-wide mb-1">Status</p>
-        <p class="text-[28px] font-semibold text-gray-900" x-text="summary?.period_status"></p>
-    </div>
+</div>
 {% endverbatim %}
+
+<div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
     <div class="surface-card">
-        <p class="text-[13px] font-semibold text-gray-500 uppercase tracking-wide mb-1">Competencia</p>
-        <p class="text-[18px] font-semibold text-gray-900">
-            {% if competencia %}{{ competencia.month|stringformat:"02d" }}/{{ competencia.year }}{% else %}—{% endif %}
-        </p>
-        <div class="mt-1">
-            {% if competencia %}{% include 'components/_status_badge.html' with status=competencia.status %}{% else %}<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-600">Sem periodo</span>{% endif %}
-        </div>
+        <p class="text-[12px] text-gray-500 uppercase tracking-wide font-semibold">Competencia</p>
+        <p class="text-[16px] font-semibold text-gray-900">{% if competencia %}{{ competencia.month|stringformat:"02d" }}/{{ competencia.year }}{% else %}—{% endif %}</p>
+        <div class="mt-1">{% if competencia %}{% include 'components/_status_badge.html' with status=competencia.status %}{% else %}<span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-600">Sem periodo</span>{% endif %}</div>
     </div>
     <div class="surface-card">
-        <p class="text-[13px] font-semibold text-gray-500 uppercase tracking-wide mb-1">Vendedores ativos</p>
-        <p class="text-[28px] font-semibold text-gray-900" x-text="summary ? summary.vendedores_ativos : '{{ vendedores_ativos }}'"></p>
-        <p class="text-[12px] text-gray-400 mt-1" x-text="summary ? 'de ' + summary.vendedores_total + ' total' : ''"></p>
+        <p class="text-[12px] text-gray-500 uppercase tracking-wide font-semibold">Vendedores</p>
+        <p class="text-[16px] font-semibold text-gray-900" x-text="(summary?.vendedores_ativos || 0) + ' ativos'"></p>
+        <p class="text-[11px] text-gray-400" x-text="'de ' + (summary?.vendedores_total || 0) + ' total'"></p>
     </div>
     <div class="surface-card">
-        <p class="text-[13px] font-semibold text-gray-500 uppercase tracking-wide mb-1">Com venda no mes</p>
-        <p class="text-[28px] font-semibold text-gray-900" x-text="summary ? summary.vendedores_com_venda : '—'"></p>
+        <p class="text-[12px] text-gray-500 uppercase tracking-wide font-semibold">Prontos / Pendentes</p>
+        <p class="text-[16px] font-semibold text-gray-900"><span x-text="summary?.vendedores_prontos || 0"></span> / <span class="text-warning-700" x-text="summary?.vendedores_pendentes || 0"></span></p>
+        <p class="text-[11px] text-gray-400"><span x-text="summary?.vendedores_sem_lancamento_periodo || 0"></span> sem lancamento</p>
     </div>
     <div class="surface-card">
-        <p class="text-[13px] font-semibold text-gray-500 uppercase tracking-wide mb-1">Sem lancamento hoje</p>
-        <p class="text-[28px] font-semibold text-warning-700" x-text="summary ? summary.vendedores_sem_lancamento_hoje : '—'"></p>
+        <p class="text-[12px] text-gray-500 uppercase tracking-wide font-semibold">Abertos / Fechados / Pagos</p>
+        <p class="text-[16px] font-semibold text-gray-900"><span x-text="summary?.vendedores_abertos || 0"></span>/<span x-text="summary?.vendedores_fechados || 0"></span>/<span class="text-success-700" x-text="summary?.vendedores_pagos || 0"></span></p>
     </div>
 </div>
 
 <div class="surface-card mb-6">
     <p class="text-[13px] font-semibold text-gray-500 uppercase tracking-wide mb-3">Links de pagamento</p>
-    <p class="text-[11px] text-gray-400 mb-3">Links de pagamento sao informativos e nao entram automaticamente no calculo da comissao.</p>
+    <p class="text-[11px] text-gray-400 mb-3">Links sao informativos e nao entram no calculo da comissao.</p>
     <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <div>
-            <p class="text-[12px] text-gray-500">Gerados</p>
-            <p class="text-[20px] font-semibold text-gray-900" x-text="summary?.links_gerados || 0"></p>
-            <p class="text-[11px] text-gray-400" x-text="formatMoneyBRL(summary?.valor_gerado_links || 0)"></p>
-        </div>
-        <div>
-            <p class="text-[12px] text-gray-500">Pagos</p>
-            <p class="text-[20px] font-semibold text-success-700" x-text="summary?.links_pagos || 0"></p>
-            <p class="text-[11px] text-gray-400" x-text="formatMoneyBRL(summary?.valor_pago_links || 0)"></p>
-        </div>
-        <div>
-            <p class="text-[12px] text-gray-500">Pendentes</p>
-            <p class="text-[20px] font-semibold text-warning-700" x-text="summary?.links_pendentes || 0"></p>
-        </div>
-        <div>
-            <p class="text-[12px] text-gray-500">Recusados/Cancelados</p>
-            <p class="text-[20px] font-semibold text-danger-700" x-text="summary?.links_recusados || 0"></p>
-        </div>
+        <div><p class="text-[12px] text-gray-500">Gerados</p><p class="text-[18px] font-semibold text-gray-900" x-text="summary?.links_gerados || 0"></p><p class="text-[11px] text-gray-400" x-text="formatMoneyBRL(summary?.valor_gerado_links || 0)"></p></div>
+        <div><p class="text-[12px] text-gray-500">Pagos</p><p class="text-[18px] font-semibold text-success-700" x-text="summary?.links_pagos || 0"></p><p class="text-[11px] text-gray-400" x-text="formatMoneyBRL(summary?.valor_pago_links || 0)"></p></div>
+        <div><p class="text-[12px] text-gray-500">Pendentes</p><p class="text-[18px] font-semibold text-warning-700" x-text="summary?.links_pendentes || 0"></p></div>
+        <div><p class="text-[12px] text-gray-500">Recusados</p><p class="text-[18px] font-semibold text-danger-700" x-text="summary?.links_recusados || 0"></p></div>
     </div>
 </div>
 
@@ -135,40 +100,13 @@
     <p class="text-[13px] font-semibold text-gray-500 uppercase tracking-wide mb-2">Vendedores sem venda ha 7 dias</p>
     <p class="text-[14px] text-gray-600" x-text="summary?.sellers_inativos?.join(', ')"></p>
 </div>
-
-<div class="surface-card mb-6" x-show="summary?.top5_mes?.length">
-    <p class="text-[13px] font-semibold text-gray-500 uppercase tracking-wide mb-3">Top 5 vendedores do mes</p>
-    <table class="w-full text-[13px]">
-        <template x-for="(s,i) in summary?.top5_mes" :key="i">
-            <tr class="border-t border-gray-100">
-                <td class="py-2 font-medium" x-text="s.seller__name"></td>
-                <td class="py-2 text-right font-medium" x-text="formatMoneyBRL(s.total)"></td>
-            </tr>
-        </template>
-    </table>
-</div>
 {% endverbatim %}
 
 <h2 class="font-display text-[18px] font-semibold text-gray-900 mb-4">Acesso rapido</h2>
 <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-    <a href="{% url 'dashboard:gestor_ranking' %}" class="surface-card hover:border-brand-500 transition tap-target block">
-        <div class="flex items-center gap-3">
-            <svg class="w-6 h-6 text-brand-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path></svg>
-            <span class="font-medium text-[15px] text-gray-900">Ranking</span>
-        </div>
-    </a>
-    <a href="{% url 'dashboard:gestor_vendedores' %}" class="surface-card hover:border-brand-500 transition tap-target block">
-        <div class="flex items-center gap-3">
-            <svg class="w-6 h-6 text-brand-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"></path></svg>
-            <span class="font-medium text-[15px] text-gray-900">Vendedores</span>
-        </div>
-    </a>
-    <a href="{% url 'dashboard:gestor_fechamento' %}" class="surface-card hover:border-brand-500 transition tap-target block">
-        <div class="flex items-center gap-3">
-            <svg class="w-6 h-6 text-brand-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
-            <span class="font-medium text-[15px] text-gray-900">Fechamento</span>
-        </div>
-    </a>
+    <a href="{% url 'dashboard:gestor_ranking' %}" class="surface-card hover:border-brand-500 transition tap-target block"><div class="flex items-center gap-3"><svg class="w-5 h-5 text-brand-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path></svg><span class="font-medium text-[14px] text-gray-900">Ranking</span></div></a>
+    <a href="{% url 'dashboard:gestor_vendedores' %}" class="surface-card hover:border-brand-500 transition tap-target block"><div class="flex items-center gap-3"><svg class="w-5 h-5 text-brand-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"></path></svg><span class="font-medium text-[14px] text-gray-900">Vendedores</span></div></a>
+    <a href="{% url 'dashboard:gestor_fechamento' %}" class="surface-card hover:border-brand-500 transition tap-target block"><div class="flex items-center gap-3"><svg class="w-5 h-5 text-brand-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg><span class="font-medium text-[14px] text-gray-900">Fechamento</span></div></a>
 </div>
 
 </div>

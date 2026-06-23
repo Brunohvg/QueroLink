@@ -1,14 +1,13 @@
 {% extends 'mobile/base_mobile.html' %}
 {% block title %}Inicio — QueroLink{% endblock %}
 {% block content %}
-<div class="space-y-4" x-data="sellerHomePage()">
+<div class="space-y-4">
     <div class="flex items-center justify-between">
         <div>
             <h1 class="text-[18px] font-semibold text-gray-900">Ola, {{ seller.name|default:'Vendedor' }}</h1>
             <p class="text-[13px] text-gray-500">{% now "l, d/m/Y" %}</p>
         </div>
-        <a href="{% url 'dashboard:mobile_logout' %}"
-           class="text-gray-400 hover:text-gray-600 tap-target flex items-center justify-center w-10 h-10">
+        <a href="{% url 'dashboard:mobile_logout' %}" class="text-gray-400 hover:text-gray-600 tap-target flex items-center justify-center w-10 h-10">
             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path></svg>
         </a>
     </div>
@@ -17,14 +16,14 @@
     <div class="bg-danger-50 border border-danger-500/20 text-danger-700 px-4 py-3 rounded-xl text-sm">{{ error }}</div>
     {% else %}
 
-    {% if periodo_fechado %}
+    {% if not is_editable %}
     <div class="bg-warning-50 border border-warning-500/20 text-warning-700 px-4 py-3 rounded-xl text-sm flex items-center gap-2">
         <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"></path></svg>
-        Este periodo ja foi fechado. Para ajustes, fale com o gestor.
+        Sua comissao deste mes foi fechada ou paga. Para ajustes, fale com o gestor.
     </div>
     {% endif %}
 
-    {% if not has_entry_today and not periodo_fechado %}
+    {% if not has_entry_today and is_editable %}
     <div class="bg-warning-50 border border-warning-500/20 text-warning-700 px-4 py-3 rounded-xl text-sm flex items-center gap-2">
         <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"></path></svg>
         Voce ainda nao lancou o valor de hoje.
@@ -33,7 +32,7 @@
 
     <div class="surface-hero">
         <p class="text-[13px] font-semibold text-gray-500 uppercase tracking-wide mb-2">Total hoje</p>
-        <p class="font-display text-[32px] font-semibold text-brand-500 leading-none" x-text="formatMoneyBRL({{ today_total }})"></p>
+        <p class="font-display text-[32px] font-semibold text-brand-500 leading-none">R$ {% widthratio today_total 100 1 %},{{ today_total|stringformat:"02d"|slice:"-2:" }}</p>
         <p class="text-[14px] text-gray-500 mt-2">
             {% if has_entry_today %}Lancamento registrado{% else %}Nenhum lancamento hoje{% endif %}
         </p>
@@ -41,136 +40,50 @@
 
     <div class="grid grid-cols-2 gap-3">
         <div class="surface-card">
-            <p class="text-[13px] text-gray-500 mb-1">Comissao estimada</p>
-            <p class="font-display text-[18px] sm:text-[24px] font-semibold text-success-700 leading-tight" x-text="formatMoneyBRL({{ comissao_estimada }})"></p>
+            <p class="text-[13px] text-gray-500 mb-1">Comissao</p>
+            <p class="font-display text-[18px] font-semibold text-success-700 leading-tight">R$ {% widthratio comissao_estimada 100 1 %},{{ comissao_estimada|stringformat:"02d"|slice:"-2:" }}</p>
         </div>
         <div class="surface-card">
-            <p class="text-[13px] text-gray-500 mb-1">Total vendido no mes</p>
-            <p class="font-display text-[18px] sm:text-[24px] font-semibold text-gray-900 leading-tight" x-text="formatMoneyBRL({{ month_total }})"></p>
+            <p class="text-[13px] text-gray-500 mb-1">Total no mes</p>
+            <p class="font-display text-[18px] font-semibold text-gray-900 leading-tight">R$ {% widthratio month_total 100 1 %},{{ month_total|stringformat:"02d"|slice:"-2:" }}</p>
         </div>
     </div>
 
     <div class="surface-card">
         <div class="flex items-center justify-between">
-            <span class="text-[14px] text-gray-500">Vendas via link no mes</span>
-            <span class="text-[15px] font-semibold text-gray-900" x-text="formatMoneyBRL({{ month_link_total }})"></span>
+            <p class="text-[13px] text-gray-500">Vendas via link no mes</p>
+            <p class="text-[15px] font-semibold text-gray-900">R$ {% widthratio month_link_total 100 1 %},{{ month_link_total|stringformat:"02d"|slice:"-2:" }}</p>
         </div>
     </div>
 
-    <div x-show="showLinkForm" class="surface-card space-y-3">
-        <div class="flex items-center justify-between">
-            <p class="text-[14px] font-semibold text-gray-900">Gerar Link de Pagamento</p>
-            <button @click="showLinkForm=false; linkError=''; linkSuccess=''" class="tap-target flex items-center justify-center w-10 h-10 text-gray-400 hover:text-gray-600" aria-label="Fechar">
-                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
-            </button>
-        </div>
-        <div>
-            <label class="block text-[13px] text-gray-500 mb-1">Nome do cliente</label>
-            <input type="text" x-model="linkForm.customer" class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-500" placeholder="Nome do cliente" style="font-size:16px!important">
-        </div>
-        <div>
-            <label class="block text-[13px] text-gray-500 mb-1">Valor (R$)</label>
-            <input type="text" x-model="linkForm.value" class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-500" placeholder="100,00" style="font-size:16px!important">
-        </div>
-        <div>
-            <label class="block text-[13px] text-gray-500 mb-1">Parcelas</label>
-            <select x-model="linkForm.installments" class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-500" style="font-size:16px!important">
-                <option value="1">1x (a vista)</option>
-                <option value="2">2x</option>
-                <option value="3">3x</option>
-            </select>
-        </div>
-        <p x-show="linkError" class="text-[12px] text-danger-500" x-text="linkError"></p>
-        <p x-show="linkSuccess" class="text-[12px] text-success-700" x-text="linkSuccess"></p>
-        <div class="flex gap-2">
-            <button @click="createQuickLink()" :disabled="linkCreating" class="flex-1 bg-brand-500 hover:bg-brand-600 disabled:opacity-50 text-white font-medium py-3 rounded-xl transition text-[15px] tap-target">
-                <span x-show="!linkCreating">Gerar Link</span>
-                <span x-show="linkCreating">Gerando...</span>
-            </button>
-            <button @click="showLinkForm=false; linkError=''; linkSuccess=''" class="px-4 py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl text-[15px] font-medium transition tap-target">Cancelar</button>
-        </div>
-    </div>
-
-    {% if periodo_fechado %}
+    {% if is_editable %}
+        {% if has_entry_today %}
+        <a href="{% url 'dashboard:mobile_lancar_venda' %}" class="flex items-center justify-center gap-2 w-full bg-brand-500 hover:bg-brand-600 text-white font-medium py-4 rounded-xl transition shadow-lg tap-target">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path></svg>
+            <span class="text-[15px]">Editar lancamento de hoje</span>
+        </a>
+        {% else %}
+        <a href="{% url 'dashboard:mobile_lancar_venda' %}" class="flex items-center justify-center gap-2 w-full bg-brand-500 hover:bg-brand-600 text-white font-medium py-4 rounded-xl transition shadow-lg tap-target">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
+            <span class="text-[15px]">Lancar Venda</span>
+        </a>
+        {% endif %}
+    {% else %}
     <div class="flex items-center justify-center gap-2 w-full bg-gray-300 text-gray-500 font-medium py-4 rounded-xl cursor-not-allowed">
         <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path></svg>
-        <span class="text-[15px]">Periodo fechado — Lancamentos bloqueados</span>
+        <span class="text-[15px]">Lancamentos bloqueados</span>
     </div>
-    {% elif has_entry_today %}
-    <a href="{% url 'dashboard:mobile_lancar_venda' %}"
-       class="flex items-center justify-center gap-2 w-full bg-brand-500 hover:bg-brand-600 text-white font-medium py-4 rounded-xl transition shadow-lg tap-target">
-        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path></svg>
-        <span class="text-[15px]">Editar lancamento de hoje</span>
-    </a>
-    {% else %}
-    <a href="{% url 'dashboard:mobile_lancar_venda' %}"
-       class="flex items-center justify-center gap-2 w-full bg-brand-500 hover:bg-brand-600 text-white font-medium py-4 rounded-xl transition shadow-lg tap-target">
-        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
-        <span class="text-[15px]">Lancar Venda</span>
-    </a>
     {% endif %}
 
-    <button @click="showLinkForm=!showLinkForm"
-       class="flex items-center justify-center gap-2 w-full border border-brand-500 text-brand-500 hover:bg-brand-50 font-medium py-4 rounded-xl transition tap-target">
-        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"></path></svg>
-        <span class="text-[15px]">Gerar Link de Pagamento</span>
-    </button>
-
-    <a href="{% url 'dashboard:mobile_minhas_vendas' %}"
-       class="flex items-center justify-between surface-card tap-target">
+    <a href="{% url 'dashboard:mobile_minhas_vendas' %}" class="flex items-center justify-between surface-card tap-target">
         <span class="font-medium text-[14px] text-gray-900">Minhas Vendas</span>
         <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
     </a>
 
-    <a href="{% url 'dashboard:mobile_links' %}"
-       class="flex items-center justify-between surface-card tap-target">
+    <a href="{% url 'dashboard:mobile_links' %}" class="flex items-center justify-between surface-card tap-target">
         <span class="font-medium text-[14px] text-gray-900">Meus Links</span>
         <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
     </a>
     {% endif %}
 </div>
-
-<script>
-function sellerHomePage() {
-    return {
-        showLinkForm: false,
-        linkCreating: false,
-        linkError: '',
-        linkSuccess: '',
-        linkForm: { customer: '', value: '', installments: '1' },
-
-        async createQuickLink() {
-            this.linkError = '';
-            this.linkSuccess = '';
-            if (!this.linkForm.customer || !this.linkForm.value) {
-                this.linkError = 'Preencha nome do cliente e valor.';
-                return;
-            }
-            this.linkCreating = true;
-            try {
-                var r = await fetch('/api/seller/links/', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCSRFToken() },
-                    body: JSON.stringify({
-                        customer_name: this.linkForm.customer,
-                        amount: this.linkForm.value,
-                        installments: parseInt(this.linkForm.installments),
-                    })
-                });
-                var d = await r.json();
-                if (r.ok) {
-                    this.linkSuccess = 'Link gerado com sucesso!';
-                    this.showLinkForm = false;
-                    this.linkForm = { customer: '', value: '' };
-                } else {
-                    this.linkError = d.error || d.detail || 'Erro ao gerar link.';
-                }
-            } catch (e) {
-                this.linkError = 'Erro de conexao.';
-            }
-            this.linkCreating = false;
-        }
-    }
-}
-</script>
 {% endblock %}
