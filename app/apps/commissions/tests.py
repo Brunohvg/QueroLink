@@ -30,6 +30,9 @@ from app.apps.commissions.services import (
     validate_sale_can_be_changed,
     get_dashboard_data,
     get_links_data,
+    update_period,
+    delete_period,
+    cancel_period,
 )
 
 User = get_user_model()
@@ -552,3 +555,112 @@ class TestPermissions(BaseTest):
         pay_seller_commissions(self.period, self.sc_id, self.financeiro, {'payment_method': 'pix'})
         with self.assertRaises(ValueError):
             reopen_seller_commissions(self.period, self.sc_id, self.manager, 'teste')
+
+
+class TestEditPeriod(BaseTest):
+    def setUp(self):
+        super().setUp()
+        self.financeiro = User.objects.create_user(
+            username='financeiro_edit', password='test123',
+            role=User.Role.FINANCEIRO, tenant=self.tenant,
+        )
+
+    def test_edit_expected_days_in_open_period(self):
+        period = self._create_period(expected_days=22)
+        updated, changed = update_period(period, {'expected_working_days': 27}, self.manager)
+        self.assertIn('expected_working_days', changed)
+        period.refresh_from_db()
+        self.assertEqual(period.expected_working_days, 27)
+
+    def test_edit_notes_in_open_period(self):
+        period = self._create_period()
+        updated, changed = update_period(period, {'notes': 'Teste observacao'}, self.manager)
+        self.assertIn('notes', changed)
+        period.refresh_from_db()
+        self.assertEqual(period.notes, 'Teste observacao')
+
+    def test_cannot_edit_period_with_paid_commission(self):
+        self._create_manual_sale(self.seller, 100000, 15)
+        period = self._create_period()
+        sync_period_seller_commissions(period)
+        sc = SellerCommission.objects.get(period=period, seller=self.seller)
+        close_seller_commissions(period, [sc.id], self.manager)
+        pay_seller_commissions(period, [sc.id], self.financeiro, {'payment_method': 'pix'})
+        with self.assertRaises(ValueError):
+            update_period(period, {'notes': 'Nao deve'}, self.manager)
+
+    def test_cannot_edit_month_with_sales(self):
+        self._create_manual_sale(self.seller, 100000, 15)
+        period = self._create_period()
+        with self.assertRaises(ValueError):
+            update_period(period, {'month': 7}, self.manager)
+
+
+class TestDeletePeriod(BaseTest):
+    def setUp(self):
+        super().setUp()
+        self.financeiro = User.objects.create_user(
+            username='financeiro_del', password='test123',
+            role=User.Role.FINANCEIRO, tenant=self.tenant,
+        )
+
+    def test_delete_open_period_without_sales(self):
+        period = self._create_period()
+        count = delete_period(period, self.admin)
+        self.assertGreaterEqual(count, 0)
+        self.assertFalse(CommissionPeriod.objects.filter(pk=period.pk).exists())
+
+    def test_delete_does_not_remove_manual_sales(self):
+        sale = self._create_manual_sale(self.seller, 8503050, 15)
+        period = self._create_period()
+        delete_period(period, self.admin)
+        self.assertTrue(Sale.objects.filter(pk=sale.pk).exists())
+
+    def test_cannot_delete_with_closed_seller(self):
+        self._create_manual_sale(self.seller, 100000, 15)
+        period = self._create_period()
+        sync_period_seller_commissions(period)
+        sc = SellerCommission.objects.get(period=period, seller=self.seller)
+        close_seller_commissions(period, [sc.id], self.manager)
+        with self.assertRaises(ValueError):
+            delete_period(period, self.admin)
+
+    def test_cannot_delete_with_paid_seller(self):
+        self._create_manual_sale(self.seller, 100000, 15)
+        period = self._create_period()
+        sync_period_seller_commissions(period)
+        sc = SellerCommission.objects.get(period=period, seller=self.seller)
+        close_seller_commissions(period, [sc.id], self.manager)
+        pay_seller_commissions(period, [sc.id], self.financeiro, {'payment_method': 'pix'})
+        with self.assertRaises(ValueError):
+            delete_period(period, self.admin)
+
+
+class TestCancelPeriod(BaseTest):
+    def setUp(self):
+        super().setUp()
+        self.financeiro = User.objects.create_user(
+            username='financeiro_cancel', password='test123',
+            role=User.Role.FINANCEIRO, tenant=self.tenant,
+        )
+
+    def test_cancel_open_period(self):
+        period = self._create_period()
+        result = cancel_period(period, 'Teste cancelamento', self.manager)
+        self.assertEqual(result.status, CommissionPeriod.Status.CANCELADA)
+        self.assertEqual(result.cancel_reason, 'Teste cancelamento')
+
+    def test_cancel_requires_reason(self):
+        period = self._create_period()
+        with self.assertRaises(ValueError):
+            cancel_period(period, '', self.manager)
+
+    def test_cannot_cancel_with_paid_commission(self):
+        self._create_manual_sale(self.seller, 100000, 15)
+        period = self._create_period()
+        sync_period_seller_commissions(period)
+        sc = SellerCommission.objects.get(period=period, seller=self.seller)
+        close_seller_commissions(period, [sc.id], self.manager)
+        pay_seller_commissions(period, [sc.id], self.financeiro, {'payment_method': 'pix'})
+        with self.assertRaises(ValueError):
+            cancel_period(period, 'Nao deve', self.manager)

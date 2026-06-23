@@ -488,3 +488,162 @@ def validate_sale_can_be_changed(seller, sale_date, user):
             f'ou paga nesta competencia.'
         )
     return True, None
+
+
+def has_paid_commission(period):
+    return SellerCommission.objects.filter(
+        period=period,
+        status__in=[
+            SellerCommission.Status.PAGA,
+            SellerCommission.Status.AJUSTADA,
+        ],
+    ).exists()
+
+
+def can_edit_period(period):
+    if has_paid_commission(period):
+        return False, 'Esta competencia possui comissao paga. Nao e possivel editar.'
+    return True, None
+
+
+def can_edit_period_dates(period):
+    from app.apps.sales.models import Sale
+    has_sales = Sale.objects.filter(
+        tenant=period.tenant,
+        sale_date__year=period.year,
+        sale_date__month=period.month,
+    ).exists()
+    if has_sales:
+        return False, (
+            'Nao e possivel alterar mes ou ano de uma competencia '
+            'que ja possui lancamentos manuais vinculados.'
+        )
+    has_closed = SellerCommission.objects.filter(
+        period=period,
+        status__in=[
+            SellerCommission.Status.FECHADA,
+            SellerCommission.Status.PAGA,
+            SellerCommission.Status.AJUSTADA,
+            SellerCommission.Status.CANCELADA,
+        ],
+    ).exists()
+    if has_closed:
+        return False, (
+            'Nao e possivel alterar mes ou ano com vendedores '
+            'fechados ou pagos.'
+        )
+    return True, None
+
+
+def can_delete_period(period):
+    if period.status not in (CommissionPeriod.Status.ABERTA,):
+        return False, (
+            f'Nao e possivel excluir competencia com status '
+            f'{period.status}. Apenas competencias ABERTA podem ser excluidas.'
+        )
+    has_any_closed = SellerCommission.objects.filter(
+        period=period,
+    ).exclude(status=SellerCommission.Status.ABERTA).exists()
+    if has_any_closed:
+        return False, (
+            'Nao e possivel excluir competencia com vendedores '
+            'fechados, pagos ou ajustados.'
+        )
+    if has_paid_commission(period):
+        return False, 'Nao e possivel excluir competencia com comissao paga.'
+    return True, None
+
+
+def can_cancel_period(period):
+    if has_paid_commission(period):
+        return False, (
+            'Nao e possivel cancelar competencia com comissao paga. '
+            'Crie um ajuste administrativo.'
+        )
+    return True, None
+
+
+def update_period(period, data, user):
+    can, msg = can_edit_period(period)
+    if not can:
+        raise ValueError(msg)
+
+    changed_fields = []
+    if 'expected_working_days' in data:
+        new_days = data['expected_working_days']
+        if new_days != period.expected_working_days:
+            period.expected_working_days = new_days
+            changed_fields.append('expected_working_days')
+
+    if 'notes' in data:
+        period.notes = data['notes']
+        changed_fields.append('notes')
+
+    if 'month' in data or 'year' in data:
+        can_edit, msg = can_edit_period_dates(period)
+        if not can_edit:
+            raise ValueError(msg)
+        if 'month' in data:
+            period.month = int(data['month'])
+            changed_fields.append('month')
+        if 'year' in data:
+            period.year = int(data['year'])
+            changed_fields.append('year')
+
+    if not changed_fields:
+        return period, changed_fields
+
+    period.save(update_fields=changed_fields + ['updated_at'])
+
+    if 'expected_working_days' in changed_fields:
+        for sc in SellerCommission.objects.filter(
+            period=period,
+            status__in=[
+                SellerCommission.Status.ABERTA,
+                SellerCommission.Status.REABERTA,
+            ],
+        ):
+            sc.recalculate(commit=True)
+
+    return period, changed_fields
+
+
+def delete_period(period, user):
+    can, msg = can_delete_period(period)
+    if not can:
+        raise ValueError(msg)
+
+    from app.apps.audit.utils import log_action
+
+    sc_count = SellerCommission.objects.filter(period=period).count()
+    SellerCommission.objects.filter(period=period).delete()
+
+    period.delete()
+
+    return sc_count
+
+
+def cancel_period(period, reason, user):
+    if not reason or not reason.strip():
+        raise ValueError('E necessario informar o motivo do cancelamento.')
+
+    can, msg = can_cancel_period(period)
+    if not can:
+        raise ValueError(msg)
+
+    period.status = CommissionPeriod.Status.CANCELADA
+    period.cancelled_by = user
+    period.cancelled_at = __import__('django').utils.timezone.now()
+    period.cancel_reason = reason
+    period.save(update_fields=[
+        'status', 'cancelled_by', 'cancelled_at',
+        'cancel_reason', 'updated_at',
+    ])
+
+    SellerCommission.objects.filter(period=period).exclude(
+        status=SellerCommission.Status.PAGA,
+    ).update(
+        status=SellerCommission.Status.CANCELADA,
+    )
+
+    return period

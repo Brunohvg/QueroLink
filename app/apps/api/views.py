@@ -249,40 +249,59 @@ class CommissionPeriodViewSet(viewsets.ModelViewSet):
             'message': f'{len(commissions)} vendedor(es) pago(s).',
         })
 
+    def update(self, request, *args, **kwargs):
+        from app.apps.commissions.services import update_period
+
+        partial = kwargs.pop('partial', False)
+        period = self.get_object()
+        data = request.data
+
+        try:
+            period, changed = update_period(period, data, request.user)
+        except ValueError as e:
+            return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+        log_action(
+            request, 'commission_period.updated', instance=period,
+            changes={
+                'month': period.month, 'year': period.year,
+                'changed_fields': changed,
+                'new_data': dict(data),
+            },
+        )
+        return Response(self.get_serializer(period).data)
+
+    def perform_destroy(self, instance):
+        from app.apps.commissions.services import delete_period
+
+        try:
+            sc_count = delete_period(instance, self.request.user)
+        except ValueError as e:
+            from rest_framework import serializers as drf_ser
+            raise drf_ser.ValidationError({'detail': str(e)})
+
+        log_action(
+            self.request, 'commission_period.deleted', instance=instance,
+            changes={
+                'month': instance.month, 'year': instance.year,
+                'seller_commissions_removed': sc_count,
+            },
+        )
+
     @action(
         detail=True, methods=['post'],
         permission_classes=[IsAuthenticated, IsManagerOrAdmin],
     )
     def cancel(self, request, pk=None):
+        from app.apps.commissions.services import cancel_period
+
         period = self.get_object()
-        if period.status not in (
-            CommissionPeriod.Status.ABERTA,
-            CommissionPeriod.Status.PARCIALMENTE_FECHADA,
-            CommissionPeriod.Status.PARCIALMENTE_PAGA,
-        ):
-            return Response(
-                {'error': (
-                    f'Nao e possivel cancelar competencia '
-                    f'com status {period.status}.'
-                )},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
         reason = request.data.get('reason', '').strip()
-        if not reason:
-            return Response(
-                {'error': 'E necessario informar o motivo do cancelamento.'},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
 
-        period.status = CommissionPeriod.Status.CANCELADA
-        period.cancelled_by = request.user
-        period.cancelled_at = timezone.now()
-        period.cancel_reason = reason
-        period.save(update_fields=[
-            'status', 'cancelled_by', 'cancelled_at',
-            'cancel_reason', 'updated_at',
-        ])
+        try:
+            period = cancel_period(period, reason, request.user)
+        except ValueError as e:
+            return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
         log_action(
             request, 'commission_period.cancelled', instance=period,
