@@ -165,87 +165,90 @@ def mobile_forgot_password(request):
 
 @login_required
 def mobile_home(request):
-    seller = _get_seller_profile(request)
-    if not seller:
-        return render(request, 'mobile/home.html', {
-            'error': 'Perfil de vendedor nao encontrado.',
-        })
+    try:
+        seller = _get_seller_profile(request)
+        if not seller:
+            return render(request, 'mobile/home.html', {
+                'error': 'Perfil de vendedor nao encontrado.',
+            })
 
-    today = timezone.localdate()
-    today_manual = Sale.objects.filter(
-        seller=seller, origin=Sale.Origin.MANUAL, sale_date=today,
-    ).first()
-    today_total = today_manual.amount if today_manual else 0
-    has_entry_today = today_manual is not None
+        today = timezone.localdate()
+        today_manual = Sale.objects.filter(
+            seller=seller, origin=Sale.Origin.MANUAL, sale_date=today,
+        ).first()
+        today_total = today_manual.amount if today_manual else 0
+        has_entry_today = today_manual is not None
 
-    month_total = Sale.objects.filter(
-        seller=seller,
-        origin=Sale.Origin.MANUAL,
-        sale_date__year=today.year,
-        sale_date__month=today.month,
-    ).aggregate(total=Sum('amount'))['total'] or 0
+        month_total = Sale.objects.filter(
+            seller=seller,
+            origin=Sale.Origin.MANUAL,
+            sale_date__year=today.year,
+            sale_date__month=today.month,
+        ).aggregate(total=Sum('amount'))['total'] or 0
 
-    month_link_total = Sale.objects.filter(
-        seller=seller,
-        origin=Sale.Origin.LINK,
-        sale_date__year=today.year,
-        sale_date__month=today.month,
-    ).aggregate(total=Sum('amount'))['total'] or 0
+        month_link_total = Sale.objects.filter(
+            seller=seller,
+            origin=Sale.Origin.LINK,
+            sale_date__year=today.year,
+            sale_date__month=today.month,
+        ).aggregate(total=Sum('amount'))['total'] or 0
 
-    from app.apps.commissions.services import (
-        calculate_estimated_commission, sync_period_seller_commissions,
-    )
-
-    period = CommissionPeriod.objects.filter(
-        tenant=seller.tenant,
-        month=today.month,
-        year=today.year,
-    ).first()
-
-    if period:
-        sync_period_seller_commissions(period)
-
-    if period and period.status == CommissionPeriod.Status.ABERTA:
-        comissao_estimada_valor, month_total = calculate_estimated_commission(
-            seller, today.month, today.year,
+        from app.apps.commissions.services import (
+            calculate_estimated_commission, sync_period_seller_commissions,
         )
-        month_total = month_total
-    else:
+
+        period = CommissionPeriod.objects.filter(
+            tenant=seller.tenant,
+            month=today.month,
+            year=today.year,
+        ).first()
+
+        if period:
+            sync_period_seller_commissions(period)
+
+        if period and period.status == CommissionPeriod.Status.ABERTA:
+            comissao_estimada_valor, month_total = calculate_estimated_commission(
+                seller, today.month, today.year,
+            )
+        else:
+            sc = SellerCommission.objects.filter(
+                seller=seller,
+                period__month=today.month,
+                period__year=today.year,
+            ).first()
+            comissao_estimada_valor = sc.commission_amount if sc else 0
+
+        periodo_status = period.status if period else None
+        periodo_fechado = periodo_status in (
+            CommissionPeriod.Status.FECHADA,
+            CommissionPeriod.Status.PAGA,
+            CommissionPeriod.Status.AJUSTADA,
+            CommissionPeriod.Status.CANCELADA,
+        )
+
         sc = SellerCommission.objects.filter(
             seller=seller,
             period__month=today.month,
             period__year=today.year,
         ).first()
-        comissao_estimada_valor = sc.commission_amount if sc else 0
-        periodo_status = sc.period.status if sc else None
+        is_editable = sc.is_editable if sc else not periodo_fechado
 
-    periodo_status = period.status if period else None
-    periodo_fechado = periodo_status in (
-        CommissionPeriod.Status.FECHADA,
-        CommissionPeriod.Status.PAGA,
-        CommissionPeriod.Status.AJUSTADA,
-        CommissionPeriod.Status.CANCELADA,
-    )
-
-    sc = SellerCommission.objects.filter(
-        seller=seller,
-        period__month=today.month,
-        period__year=today.year,
-    ).first()
-    is_editable = sc.is_editable if sc else not periodo_fechado
-
-    return render(request, 'mobile/home.html', {
-        'seller': seller,
-        'today_total': today_total,
-        'has_entry_today': has_entry_today,
-        'month_total': month_total,
-        'month_link_total': month_link_total,
-        'comissao_estimada': comissao_estimada_valor,
-        'comissao_valor': comissao_estimada_valor,
-        'periodo_status': periodo_status,
-        'periodo_fechado': periodo_fechado,
-        'is_editable': is_editable,
-    })
+        return render(request, 'mobile/home.html', {
+            'seller': seller,
+            'today_total': today_total,
+            'has_entry_today': has_entry_today,
+            'month_total': month_total,
+            'month_link_total': month_link_total,
+            'comissao_estimada': comissao_estimada_valor,
+            'comissao_valor': comissao_estimada_valor,
+            'periodo_status': periodo_status,
+            'periodo_fechado': periodo_fechado,
+            'is_editable': is_editable,
+        })
+    except Exception as e:
+        return render(request, 'mobile/home.html', {
+            'error': f'Erro ao carregar pagina: {str(e)}',
+        })
 
 
 @login_required
