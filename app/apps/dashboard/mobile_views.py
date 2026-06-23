@@ -222,7 +222,8 @@ def mobile_home(request):
         periodo_fechado = periodo_status in (
             CommissionPeriod.Status.FECHADA,
             CommissionPeriod.Status.PAGA,
-            CommissionPeriod.Status.AJUSTADA,
+            CommissionPeriod.Status.PARCIALMENTE_FECHADA,
+            CommissionPeriod.Status.PARCIALMENTE_PAGA,
             CommissionPeriod.Status.CANCELADA,
         )
 
