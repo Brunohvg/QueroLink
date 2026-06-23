@@ -211,7 +211,7 @@ class CommissionPeriodViewSet(viewsets.ModelViewSet):
 
     @action(
         detail=True, methods=['post'],
-        permission_classes=[IsAuthenticated, IsManagerOrAdmin | IsFinancialOrAdmin],
+        permission_classes=[IsAuthenticated, IsFinancialOrAdmin],
     )
     def pay_sellers(self, request, pk=None):
         from app.apps.commissions.services import pay_seller_commissions
@@ -381,7 +381,7 @@ class RankingView(generics.GenericAPIView):
 
 class CommissionPeriodsByStatusView(generics.ListAPIView):
     serializer_class = CommissionPeriodSerializer
-    permission_classes = [IsAuthenticated, IsManagerOrAdmin]
+    permission_classes = [IsAuthenticated, IsManagerOrAdmin | IsFinancialOrAdmin]
 
     def get_queryset(self):
         tenant = self.request.user.tenant

@@ -482,3 +482,73 @@ class TestValidationAndBlocking(BaseTest):
             self.seller2, date(2026, 6, 20), self.manager,
         )
         self.assertTrue(can)
+
+
+class TestPermissions(BaseTest):
+    def setUp(self):
+        super().setUp()
+        self.financeiro = User.objects.create_user(
+            username='financeiro', password='test123',
+            role=User.Role.FINANCEIRO, tenant=self.tenant,
+        )
+        self._create_manual_sale(self.seller, 100000, 15)
+        self.period = self._create_period()
+        sync_period_seller_commissions(self.period)
+        self.sc = SellerCommission.objects.get(period=self.period, seller=self.seller)
+        self.sc_id = [self.sc.id]
+
+    def test_manager_can_close_seller(self):
+        result = close_seller_commissions(self.period, self.sc_id, self.manager)
+        self.assertEqual(len(result), 1)
+
+    def test_manager_can_reopen_before_payment(self):
+        close_seller_commissions(self.period, self.sc_id, self.manager)
+        result = reopen_seller_commissions(self.period, self.sc_id, self.manager, 'teste')
+        self.assertEqual(len(result), 1)
+
+    def test_manager_cannot_pay(self):
+        from app.apps.api.permissions import IsFinancialOrAdmin
+        class MockRequest:
+            user = self.manager
+            method = 'POST'
+        perm = IsFinancialOrAdmin()
+        self.assertFalse(perm.has_permission(MockRequest(), None))
+
+    def test_financeiro_can_pay(self):
+        close_seller_commissions(self.period, self.sc_id, self.manager)
+        result = pay_seller_commissions(self.period, self.sc_id, self.financeiro, {
+            'payment_method': 'pix',
+        })
+        self.assertEqual(len(result), 1)
+        self.sc.refresh_from_db()
+        self.assertEqual(self.sc.status, SellerCommission.Status.PAGA)
+
+    def test_financeiro_cannot_close(self):
+        from app.apps.api.permissions import IsManagerOrAdmin
+        class MockRequest:
+            user = self.financeiro
+            method = 'POST'
+        perm = IsManagerOrAdmin()
+        self.assertFalse(perm.has_permission(MockRequest(), None))
+
+    def test_financeiro_cannot_reopen(self):
+        from app.apps.api.permissions import IsManagerOrAdmin
+        class MockRequest:
+            user = self.financeiro
+            method = 'POST'
+        perm = IsManagerOrAdmin()
+        self.assertFalse(perm.has_permission(MockRequest(), None))
+
+    def test_admin_can_close_reopen_pay(self):
+        close_seller_commissions(self.period, self.sc_id, self.admin)
+        reopen_seller_commissions(self.period, self.sc_id, self.admin, 'teste')
+        close_seller_commissions(self.period, self.sc_id, self.admin)
+        pay_seller_commissions(self.period, self.sc_id, self.admin, {'payment_method': 'pix'})
+        self.sc.refresh_from_db()
+        self.assertEqual(self.sc.status, SellerCommission.Status.PAGA)
+
+    def test_paid_cannot_be_reopened(self):
+        close_seller_commissions(self.period, self.sc_id, self.manager)
+        pay_seller_commissions(self.period, self.sc_id, self.financeiro, {'payment_method': 'pix'})
+        with self.assertRaises(ValueError):
+            reopen_seller_commissions(self.period, self.sc_id, self.manager, 'teste')

@@ -44,11 +44,13 @@ def gestor_home(request):
 
     public_url = f"https://{settings.SERVICE_FQDN_WEB}/loja/{tenant.slug}/"
 
+    total_comissao = data['commission_aberta'] + data['commission_fechada'] + data['commission_paga']
+
     return render(request, 'dashboard/gestor/home.html', {
         'total_mes': data['total_vendido'],
         'total_mes_fmt': _fmt(data['total_vendido']),
-        'comissao_estimada': data['commission_estimada'] + data['commission_fechada'] + data['commission_paga'],
-        'comissao_estimada_fmt': _fmt(data['commission_estimada'] + data['commission_fechada'] + data['commission_paga']),
+        'comissao_estimada': total_comissao,
+        'comissao_estimada_fmt': _fmt(total_comissao),
         'competencia': competencia,
         'vendedores_ativos': data['vendedores_ativos'],
         'config_ok': config_ok,
