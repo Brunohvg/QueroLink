@@ -192,18 +192,34 @@ def mobile_home(request):
         sale_date__month=today.month,
     ).aggregate(total=Sum('amount'))['total'] or 0
 
-    comissao_estimada = SellerCommission.objects.filter(
-        seller=seller,
-        period__month=today.month,
-        period__year=today.year,
-    ).first()
-    comissao_estimada_valor = (
-        comissao_estimada.commission_amount if comissao_estimada else 0
+    from app.apps.commissions.services import (
+        calculate_estimated_commission, sync_period_seller_commissions,
     )
 
-    periodo_status = (
-        comissao_estimada.period.status if comissao_estimada else None
-    )
+    period = CommissionPeriod.objects.filter(
+        tenant=seller.tenant,
+        month=today.month,
+        year=today.year,
+    ).first()
+
+    if period:
+        sync_period_seller_commissions(period)
+
+    if period and period.status == CommissionPeriod.Status.ABERTA:
+        comissao_estimada_valor, month_total = calculate_estimated_commission(
+            seller, today.month, today.year,
+        )
+        month_total = month_total
+    else:
+        sc = SellerCommission.objects.filter(
+            seller=seller,
+            period__month=today.month,
+            period__year=today.year,
+        ).first()
+        comissao_estimada_valor = sc.commission_amount if sc else 0
+        periodo_status = sc.period.status if sc else None
+
+    periodo_status = period.status if period else None
     periodo_fechado = periodo_status in (
         CommissionPeriod.Status.FECHADA,
         CommissionPeriod.Status.PAGA,
@@ -218,7 +234,7 @@ def mobile_home(request):
         'month_total': month_total,
         'month_link_total': month_link_total,
         'comissao_estimada': comissao_estimada_valor,
-        'comissao_valor': comissao_estimada,
+        'comissao_valor': comissao_estimada_valor,
         'periodo_status': periodo_status,
         'periodo_fechado': periodo_fechado,
     })
@@ -380,14 +396,26 @@ def mobile_meu_desempenho(request):
         sale_date__month=today.month,
     ).aggregate(total=Sum('amount'))['total'] or 0
 
+    from app.apps.commissions.services import calculate_estimated_commission
+
     commissions = SellerCommission.objects.filter(
         seller=seller,
     ).select_related('period').order_by('-period__year', '-period__month')
 
+    commissions_data = []
+    for sc in commissions:
+        if sc.period.status == CommissionPeriod.Status.ABERTA:
+            est, total_est = calculate_estimated_commission(
+                seller, sc.period.month, sc.period.year,
+            )
+            sc.total_sold_amount = total_est
+            sc.commission_amount = est
+        commissions_data.append(sc)
+
     return render(request, 'mobile/meu_desempenho.html', {
         'seller': seller,
         'month_total': month_total,
-        'commissions': commissions,
+        'commissions': commissions_data,
         'current_month': f'{today.month:02d}/{today.year}',
     })
 

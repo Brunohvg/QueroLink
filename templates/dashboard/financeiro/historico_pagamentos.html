@@ -14,10 +14,6 @@
                     <span x-show="p.status==='AJUSTADA'" class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-amber-50 text-amber-700">AJUSTADA</span>
                 </div>
                 <div class="flex items-center gap-2">
-                    <button @click="markPaid(p)" x-show="p.status==='FECHADA'" class="bg-success-500 hover:bg-success-700 text-white font-medium py-2 px-4 rounded-xl transition tap-target text-[15px] shadow-md flex items-center gap-1">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
-                        Marcar Pago
-                    </button>
                     <a :href="'/api/financial/commissions/'+p.uuid+'/csv/'" class="bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium py-2 px-4 rounded-xl transition tap-target text-[15px] flex items-center gap-1">
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
                         CSV
@@ -25,27 +21,51 @@
                 </div>
             </div>
 
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4 text-[13px]">
+                <div>
+                    <p class="text-gray-500">Total vendido</p>
+                    <p class="font-semibold" x-text="formatMoneyBRL((p.seller_commissions||[]).reduce((a,c)=>a+(c.total_sold_amount||0),0))"></p>
+                </div>
+                <div>
+                    <p class="text-gray-500">Total comissao</p>
+                    <p class="font-semibold text-brand-500" x-text="formatMoneyBRL((p.seller_commissions||[]).reduce((a,c)=>a+(c.commission_amount||0),0))"></p>
+                </div>
+                <div x-show="p.paid_at">
+                    <p class="text-gray-500">Data pagamento</p>
+                    <p class="font-semibold" x-text="new Date(p.paid_at).toLocaleDateString('pt-BR')"></p>
+                </div>
+                <div>
+                    <p class="text-gray-500">Vendedores</p>
+                    <p class="font-semibold" x-text="(p.seller_commissions||[]).length"></p>
+                </div>
+            </div>
+
             <table class="w-full text-left text-[14px]">
-                <thead><tr><th class="px-4 py-3 font-semibold text-gray-500 border-b border-gray-200 bg-gray-50">Vendedor</th><th class="px-4 py-3 font-semibold text-gray-500 border-b border-gray-200 bg-gray-50">Total Vendido</th><th class="px-4 py-3 font-semibold text-gray-500 border-b border-gray-200 bg-gray-50">Comissao</th><th class="px-4 py-3 font-semibold text-gray-500 border-b border-gray-200 bg-gray-50">Notificacao</th></tr></thead>
+                <thead><tr><th class="px-4 py-3 font-semibold text-gray-500 border-b border-gray-200 bg-gray-50">Vendedor</th><th class="px-4 py-3 font-semibold text-gray-500 border-b border-gray-200 bg-gray-50">Total Vendido</th><th class="px-4 py-3 font-semibold text-gray-500 border-b border-gray-200 bg-gray-50">Taxa</th><th class="px-4 py-3 font-semibold text-gray-500 border-b border-gray-200 bg-gray-50">Comissao</th><th class="px-4 py-3 font-semibold text-gray-500 border-b border-gray-200 bg-gray-50">Pagamento</th></tr></thead>
                 <tbody>
                     <template x-for="sc in p.seller_commissions" :key="sc.id">
                         <tr class="hover:bg-gray-50">
                             <td class="px-4 py-3 border-b border-gray-100 font-medium" x-text="sc.seller_name"></td>
                             <td class="px-4 py-3 border-b border-gray-100" x-text="formatMoneyBRL(sc.total_sold_amount)"></td>
+                            <td class="px-4 py-3 border-b border-gray-100" x-text="(parseFloat(sc.commission_rate)*100).toFixed(2)+'%'"></td>
                             <td class="px-4 py-3 border-b border-gray-100 font-semibold text-brand-500" x-text="formatMoneyBRL(sc.commission_amount)"></td>
                             <td class="px-4 py-3 border-b border-gray-100">
-                                <span x-show="p.status==='PAGA'" class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-success-50 text-success-700">
+                                <span x-show="p.status==='PAGA' && sc.paid_amount" class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-success-50 text-success-700">
                                     <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 24 24"><path d="M20.285 2l-11.285 11.567-5.286-5.011-3.714 3.716 9 8.728 15-15.285z"/></svg>
-                                    Notificado
+                                    Pago
                                 </span>
+                                <span x-show="p.status==='FECHADA'" class="text-xs px-2 py-0.5 rounded-full bg-warning-50 text-warning-700">Aguardando</span>
                             </td>
                         </tr>
                     </template>
                 </tbody>
             </table>
+            <div x-show="!p.seller_commissions||!p.seller_commissions.length" class="text-[13px] text-gray-500 py-4 text-center">
+                Nenhum vendedor registrado nesta competencia.
+            </div>
         </div>
     </template>
-    <div x-show="!periods.length" class="text-center py-12 text-gray-500">Nenhuma competencia fechada ou paga.</div>
+    <div x-show="!periods.length" class="text-center py-12 text-gray-500">Nenhuma competencia encontrada.</div>
 </div>
 
 <script>
@@ -67,12 +87,6 @@ function historicoPage() {
             var p = await fetch('/api/manager/commissions/PAGA/').then(r=>r.json());
             var aj = await fetch('/api/manager/commissions/AJUSTADA/').then(r=>r.json());
             this.periods = [...a, ...p, ...aj].sort((a,b)=>b.year-a.year||b.month-a.month);
-        },
-        formatMoneyBRL(cents) { return 'R$ ' + (cents / 100).toFixed(2).replace('.', ','); },
-        async markPaid(p) {
-            if (!confirm('Marcar como pago? Notificacoes serao enviadas.')) return;
-            var r = await fetch(`/api/commissions/periods/${p.uuid}/mark_paid/`, { method:'POST', headers:{'X-CSRFToken': getCSRFToken()} });
-            if (r.ok) this.load(); else { var d = await r.json(); alert(d.error||'Erro'); }
         },
     }
 }

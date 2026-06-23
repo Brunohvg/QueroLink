@@ -27,8 +27,8 @@
 {% endif %}
 
 <div class="surface-hero mb-6">
-    <p class="text-[13px] font-semibold text-gray-500 uppercase tracking-wide mb-2">Total vendido no mes</p>
-    <p class="font-display text-[40px] font-semibold text-brand-500 leading-none" x-text="summary ? formatMoneyBRL(summary.total_vendido) : 'R$ {{ total_mes_fmt }}'"></p>
+    <p class="text-[13px] font-semibold text-gray-500 uppercase tracking-wide mb-2">Vendas manuais - Total no mes</p>
+    <p class="font-display text-[40px] font-semibold text-brand-500 leading-none">R$ {{ total_mes_fmt }}</p>
 </div>
 
 <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
@@ -47,23 +47,45 @@
         <p class="text-[12px] text-gray-400 mt-1" x-text="summary ? 'de ' + summary.vendedores_total + ' total' : ''"></p>
     </div>
     <div class="surface-card">
-        <p class="text-[13px] font-semibold text-gray-500 uppercase tracking-wide mb-1">Comissao a pagar</p>
-        <p class="font-display text-[28px] font-semibold text-success-700" x-text="summary ? formatMoneyBRL(summary.comissao_a_pagar) : '—'"></p>
+        <p class="text-[13px] font-semibold text-gray-500 uppercase tracking-wide mb-1">Vendedores com venda no mes</p>
+        <p class="text-[28px] font-semibold text-gray-900" x-text="summary ? summary.vendedores_com_venda : '—'"></p>
     </div>
     <div class="surface-card">
-        <p class="text-[13px] font-semibold text-gray-500 uppercase tracking-wide mb-1">Integracoes</p>
-        <p class="text-[14px] font-medium {% if config_ok %}text-success-700{% else %}text-gray-500{% endif %}">{% if config_ok %}Tudo configurado{% else %}Pendente{% endif %}</p>
+        <p class="text-[13px] font-semibold text-gray-500 uppercase tracking-wide mb-1">Sem lançamento hoje</p>
+        <p class="text-[28px] font-semibold text-warning-700" x-text="summary ? summary.vendedores_sem_lancamento_hoje : '—'"></p>
     </div>
 </div>
+
+{% verbatim %}
+<div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+    <div class="surface-card border-l-4 border-l-brand-500">
+        <p class="text-[13px] font-semibold text-gray-500 uppercase tracking-wide mb-1">Comissao estimada (aberta)</p>
+        <p class="font-display text-[28px] font-semibold text-brand-700" x-text="formatMoneyBRL(summary?.commission_estimada || 0)"></p>
+        <p class="text-[11px] text-gray-400">Valor estimado em tempo real</p>
+    </div>
+    <div class="surface-card border-l-4 border-l-warning-500">
+        <p class="text-[13px] font-semibold text-gray-500 uppercase tracking-wide mb-1">Comissao fechada</p>
+        <p class="font-display text-[28px] font-semibold text-warning-700" x-text="formatMoneyBRL(summary?.commission_fechada || 0)"></p>
+        <p class="text-[11px] text-gray-400">Valor congelado</p>
+    </div>
+    <div class="surface-card border-l-4 border-l-success-500">
+        <p class="text-[13px] font-semibold text-gray-500 uppercase tracking-wide mb-1">Comissao paga</p>
+        <p class="font-display text-[28px] font-semibold text-success-700" x-text="formatMoneyBRL(summary?.commission_paga || 0)"></p>
+        <p class="text-[11px] text-gray-400">Valor ja pago</p>
+    </div>
+</div>
+{% endverbatim %}
 
 <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
     <div class="surface-card">
         <p class="text-[13px] font-semibold text-gray-500 uppercase tracking-wide mb-1">Links de pagamento gerados</p>
         <p class="text-[28px] font-semibold text-gray-900">{{ total_orders }}</p>
+        <p class="text-[11px] text-gray-400 mt-1">Links sao informativos e nao entram no calculo da comissao</p>
     </div>
     <div class="surface-card">
         <p class="text-[13px] font-semibold text-gray-500 uppercase tracking-wide mb-1">Links pagos</p>
         <p class="text-[28px] font-semibold text-success-700">{{ paid_orders_count }}</p>
+        <p class="text-[11px] text-gray-400 mt-1">Nao entram automaticamente na comissao</p>
     </div>
 </div>
 
@@ -84,32 +106,7 @@
                 </tr>
             </template>
         </table>
-        <p x-show="!summary?.top5_mes?.length" class="text-gray-400 text-[13px]">Nenhuma venda no periodo.</p>
-    </div>
-    <div class="surface-card">
-        <p class="text-[13px] font-semibold text-gray-500 uppercase tracking-wide mb-3">Top 5 vendedores do ano</p>
-        <table class="w-full text-[13px]" x-show="summary?.top5_ano?.length">
-            <template x-for="(s,i) in summary?.top5_ano" :key="i">
-                <tr class="border-t border-gray-100">
-                    <td class="py-2 font-medium" x-text="s.seller__name"></td>
-                    <td class="py-2 text-right font-medium" x-text="formatMoneyBRL(s.total)"></td>
-                </tr>
-            </template>
-        </table>
-        <p x-show="!summary?.top5_ano?.length" class="text-gray-400 text-[13px]">Nenhuma venda no ano.</p>
-    </div>
-</div>
-
-<div x-show="summary?.total_ano_anterior > 0" class="surface-card mb-6">
-    <p class="text-[13px] font-semibold text-gray-500 uppercase tracking-wide mb-1">Comparativo com mesmo mes do ano anterior</p>
-    <div class="flex items-baseline gap-3">
-        <p class="text-[18px] font-semibold text-gray-900" x-text="formatMoneyBRL(summary?.total_vendido || 0)"></p>
-        <p class="text-[14px] text-gray-500">vs</p>
-        <p class="text-[18px] font-semibold text-gray-400" x-text="formatMoneyBRL(summary?.total_ano_anterior || 0)"></p>
-        <p class="text-[13px] font-semibold" :class="(summary?.total_vendido||0) > (summary?.total_ano_anterior||0) ? 'text-success-700' : 'text-danger-700'">
-            <span x-show="(summary?.total_vendido||0) > (summary?.total_ano_anterior||0)">+</span>
-            <span x-text="summary?.total_ano_anterior > 0 ? (((summary?.total_vendido||0) - summary.total_ano_anterior) / summary.total_ano_anterior * 100).toFixed(0) + '%' : ''"></span>
-        </p>
+        <p x-show="!summary?.top5_mes?.length" class="text-gray-400 text-[13px]">Nenhuma venda manual no periodo.</p>
     </div>
 </div>
 {% endverbatim %}

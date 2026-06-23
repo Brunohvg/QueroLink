@@ -25,31 +25,10 @@ def gestor_home(request):
     if not tenant:
         return redirect('dashboard:home')
 
+    from app.apps.commissions.services import get_dashboard_data
+    data = get_dashboard_data(tenant)
+
     hoje = timezone.localdate()
-    total_mes_manual = Sale.objects.filter(
-        tenant=tenant,
-        origin=Sale.Origin.MANUAL,
-        sale_date__year=hoje.year,
-        sale_date__month=hoje.month,
-    ).aggregate(total=Sum('amount'))['total'] or 0
-
-    total_mes_link = Sale.objects.filter(
-        tenant=tenant,
-        origin=Sale.Origin.LINK,
-        sale_date__year=hoje.year,
-        sale_date__month=hoje.month,
-    ).aggregate(total=Sum('amount'))['total'] or 0
-
-    competencia = CommissionPeriod.objects.filter(
-        tenant=tenant,
-        month=hoje.month,
-        year=hoje.year,
-    ).first()
-
-    vendedores_ativos = Seller.objects.filter(
-        tenant=tenant, is_active=True,
-    ).count()
-
     config_ok = tenant.pagarme_configured and tenant.whatsapp_configured
 
     def _fmt(val):
@@ -57,39 +36,26 @@ def gestor_home(request):
         c = val % 100
         return f'{r:,}.{c:02d}'.replace(',', '.')
 
-    total_mes_manual_fmt = _fmt(total_mes_manual)
-    total_mes_link_fmt = _fmt(total_mes_link)
-
-    from app.apps.orders.models import Order
-    total_orders = Order.objects.filter(tenant=tenant).count()
-    paid_orders_count = Order.objects.filter(
-        tenant=tenant, status='COMPLETED',
-    ).count()
-
-    if competencia:
-        comissao_estimada = sum(
-            sc.commission_amount
-            for sc in competencia.seller_commissions.all()
-        )
-    else:
-        comissao_estimada = 0
-    comissao_estimada_fmt = _fmt(comissao_estimada)
+    competencia = CommissionPeriod.objects.filter(
+        tenant=tenant,
+        month=hoje.month,
+        year=hoje.year,
+    ).first()
 
     public_url = f"https://{settings.SERVICE_FQDN_WEB}/loja/{tenant.slug}/"
 
     return render(request, 'dashboard/gestor/home.html', {
-        'total_mes': total_mes_manual,
-        'total_mes_fmt': total_mes_manual_fmt,
-        'total_mes_link': total_mes_link,
-        'total_mes_link_fmt': total_mes_link_fmt,
-        'comissao_estimada': comissao_estimada,
-        'comissao_estimada_fmt': comissao_estimada_fmt,
+        'total_mes': data['total_vendido'],
+        'total_mes_fmt': _fmt(data['total_vendido']),
+        'comissao_estimada': data['commission_estimada'] + data['commission_fechada'] + data['commission_paga'],
+        'comissao_estimada_fmt': _fmt(data['commission_estimada'] + data['commission_fechada'] + data['commission_paga']),
         'competencia': competencia,
-        'vendedores_ativos': vendedores_ativos,
+        'vendedores_ativos': data['vendedores_ativos'],
         'config_ok': config_ok,
-        'total_orders': total_orders,
-        'paid_orders_count': paid_orders_count,
+        'total_orders': data['links_gerados'],
+        'paid_orders_count': data['links_pagos'],
         'public_url': public_url,
+        'dashboard_data': data,
     })
 
 

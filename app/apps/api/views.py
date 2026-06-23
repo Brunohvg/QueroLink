@@ -125,134 +125,98 @@ class CommissionPeriodViewSet(viewsets.ModelViewSet):
             tenant=self.request.user.tenant,
         ).prefetch_related('seller_commissions__seller')
 
+    def list(self, request, *args, **kwargs):
+        from app.apps.commissions.services import sync_period_seller_commissions
+        for period in self.filter_queryset(self.get_queryset()):
+            sync_period_seller_commissions(period)
+        return super().list(request, *args, **kwargs)
+
+    def retrieve(self, request, *args, **kwargs):
+        from app.apps.commissions.services import sync_period_seller_commissions
+        period = self.get_object()
+        sync_period_seller_commissions(period)
+        return super().retrieve(request, *args, **kwargs)
+
     def perform_create(self, serializer):
         tenant = self.request.user.tenant
         period = serializer.save(tenant=tenant)
 
-        for seller in Seller.objects.filter(tenant=tenant, is_active=True):
-            SellerCommission.objects.get_or_create(
-                period=period,
-                seller=seller,
-                defaults={'commission_rate': seller.commission_rate},
-            )
+        from app.apps.commissions.services import sync_period_seller_commissions
+        sync_period_seller_commissions(period)
 
     @action(detail=True, methods=['post'])
     def close(self, request, pk=None):
+        from app.apps.commissions.services import freeze_period
+
         period = self.get_object()
-        if period.status != CommissionPeriod.Status.ABERTA:
-            return Response(
-                {'error': (
-                    f'Nao e possivel fechar competencia '
-                    f'com status {period.status}.'
-                )},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
-        seller_ids = request.data.get('seller_commission_ids', None)
-        commissions = period.seller_commissions.select_related('seller').all()
-
-        if seller_ids:
-            commissions = [sc for sc in commissions if str(sc.id) in seller_ids]
-            if not commissions:
-                return Response(
-                    {'error': 'Nenhuma comissao valida selecionada.'},
-                    status=status.HTTP_400_BAD_REQUEST,
-                )
-
-        calculations = []
-        with transaction.atomic():
-            for sc in commissions:
-                sc.freeze(request.user, commit=True)
-                calculations.append({
-                    'seller_name': sc.seller.name,
-                    'total_sold': sc.total_sold_amount,
-                    'commission_rate': float(sc.commission_rate),
-                    'commission_amount': sc.commission_amount,
-                })
-
-            period.status = CommissionPeriod.Status.FECHADA
-            period.closed_by = request.user
-            period.closed_at = timezone.now()
-            period.save(update_fields=[
-                'status', 'closed_by', 'closed_at', 'updated_at',
-            ])
+        try:
+            calculations = freeze_period(period, request.user)
+        except ValueError as e:
+            return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
         log_action(
             request, 'commission_period.closed', instance=period,
             changes={
                 'month': period.month, 'year': period.year,
-                'commissions_closed': len(commissions),
+                'commissions_closed': len(calculations),
             },
         )
         return Response({
             'status': CommissionPeriod.Status.FECHADA,
-            'closed_at': period.closed_at.isoformat(),
+            'closed_at': period.closed_at.isoformat() if period.closed_at else None,
             'commissions': calculations,
         })
+
+    @action(
+        detail=True, methods=['post'],
+        permission_classes=[IsAuthenticated, IsManagerOrAdmin],
+    )
+    def reopen(self, request, pk=None):
+        from app.apps.commissions.services import reopen_period
+
+        period = self.get_object()
+        reason = request.data.get('reason', '').strip()
+
+        try:
+            period = reopen_period(period, request.user, reason)
+        except ValueError as e:
+            return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+        log_action(
+            request, 'commission_period.reopened', instance=period,
+            changes={
+                'month': period.month, 'year': period.year,
+                'reason': reason,
+            },
+        )
+        return Response(self.get_serializer(period).data)
 
     @action(
         detail=True, methods=['post'],
         permission_classes=[IsAuthenticated, IsManagerOrAdmin | IsFinancialOrAdmin],
     )
     def mark_paid(self, request, pk=None):
+        from app.apps.commissions.services import mark_period_paid
+
         period = self.get_object()
-        if period.status != CommissionPeriod.Status.FECHADA:
-            return Response(
-                {'error': (
-                    f'Nao e possivel marcar como paga competencia '
-                    f'com status {period.status}. O status deve ser FECHADA.'
-                )},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
+        payment_data = {
+            'payment_date': request.data.get('payment_date'),
+            'payment_method': request.data.get('payment_method', ''),
+            'payment_notes': request.data.get('payment_notes', ''),
+        }
 
-        payment_date = request.data.get('payment_date')
-        payment_method = request.data.get('payment_method', '').strip()
-        payment_notes = request.data.get('payment_notes', '').strip()
-
-        if payment_date:
-            try:
-                payment_date = date.fromisoformat(payment_date)
-            except (ValueError, TypeError):
-                return Response(
-                    {'error': 'Data de pagamento invalida.'}, status=400,
-                )
-        else:
-            payment_date = timezone.localdate()
-
-        with transaction.atomic():
-            for sc in period.seller_commissions.all():
-                sc.paid_by = request.user
-                sc.paid_at = timezone.now()
-                sc.payment_date = payment_date
-                sc.paid_amount = sc.commission_amount
-                sc.payment_method = payment_method or None
-                sc.payment_notes = payment_notes or None
-                sc.save(update_fields=[
-                    'paid_by', 'paid_at', 'payment_date',
-                    'paid_amount', 'payment_method', 'payment_notes',
-                ])
-
-            period.status = CommissionPeriod.Status.PAGA
-            period.paid_by = request.user
-            period.paid_at = timezone.now()
-            period.save(update_fields=[
-                'status', 'paid_by', 'paid_at', 'updated_at',
-            ])
+        try:
+            period = mark_period_paid(period, request.user, payment_data)
+        except ValueError as e:
+            return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
         log_action(
             request, 'commission_period.paid', instance=period,
             changes={
                 'month': period.month, 'year': period.year,
-                'payment_date': str(payment_date),
+                'payment_date': payment_data.get('payment_date'),
             },
         )
-
-        from app.apps.notifications.tasks import notify_commission_paid
-        for sc in period.seller_commissions.select_related('seller').all():
-            try:
-                notify_commission_paid(sc)
-            except Exception:
-                pass
 
         return Response(self.get_serializer(period).data)
 
@@ -406,6 +370,10 @@ class RankingView(generics.GenericAPIView):
     permission_classes = [IsAuthenticated, IsManagerOrAdmin]
 
     def get(self, request):
+        from app.apps.commissions.services import (
+            calculate_estimated_commission, get_commission_rate,
+        )
+
         tenant = request.user.tenant
         month = int(request.query_params.get(
             'month', timezone.localdate().month,
@@ -419,17 +387,43 @@ class RankingView(generics.GenericAPIView):
             origin=Sale.Origin.MANUAL,
             sale_date__year=year,
             sale_date__month=month,
-        ).values('seller__uuid', 'seller__name').annotate(
+        ).values('seller__uuid', 'seller__name', 'seller__commission_rate').annotate(
             total_sold=Sum('amount'),
             sale_count=Sum(1),
         ).order_by('-total_sold')
 
-        top_seller = sales[0] if sales else None
+        ranking = []
+        for s in sales:
+            seller_uuid = s['seller__uuid']
+            total_sold = s['total_sold']
+            sale_count = s['sale_count']
+            ticket_medio = round(total_sold / sale_count) if sale_count > 0 else 0
+
+            from app.apps.sellers.models import Seller
+            try:
+                seller_obj = Seller.objects.get(uuid=seller_uuid)
+                rate = get_commission_rate(seller_obj)
+                commission_estimada = int(float(total_sold) * float(rate) + 0.5)
+            except Seller.DoesNotExist:
+                rate = 0
+                commission_estimada = 0
+
+            ranking.append({
+                'seller__uuid': seller_uuid,
+                'seller__name': s['seller__name'],
+                'total_sold': total_sold,
+                'sale_count': sale_count,
+                'ticket_medio': ticket_medio,
+                'commission_rate': float(rate),
+                'commission_estimada': commission_estimada,
+            })
+
+        top_seller = ranking[0] if ranking else None
 
         return Response({
             'month': month,
             'year': year,
-            'ranking': list(sales),
+            'ranking': ranking,
             'top_seller': top_seller,
         })
 
@@ -446,6 +440,12 @@ class CommissionPeriodsByStatusView(generics.ListAPIView):
         ).prefetch_related(
             'seller_commissions__seller',
         ).order_by('-year', '-month')
+
+    def list(self, request, *args, **kwargs):
+        from app.apps.commissions.services import sync_period_seller_commissions
+        for period in self.filter_queryset(self.get_queryset()):
+            sync_period_seller_commissions(period)
+        return super().list(request, *args, **kwargs)
 
 
 class CommissionPeriodCsvView(generics.GenericAPIView):
@@ -583,13 +583,26 @@ class SellerDetailView(generics.GenericAPIView):
                 }
                 for a in sc.adjustments.all()
             ]
+
+            period_status = sc.period.status
+            total_sold = sc.total_sold_amount
+            commission_amount = sc.commission_amount
+
+            if period_status == CommissionPeriod.Status.ABERTA:
+                from app.apps.commissions.services import calculate_estimated_commission
+                est, total = calculate_estimated_commission(
+                    seller, sc.period.month, sc.period.year,
+                )
+                total_sold = total
+                commission_amount = est
+
             commissions_data.append({
                 'period_month': sc.period.month,
                 'period_year': sc.period.year,
-                'period_status': sc.period.status,
-                'total_sold_amount': sc.total_sold_amount,
+                'period_status': period_status,
+                'total_sold_amount': total_sold,
                 'commission_rate': float(sc.commission_rate),
-                'commission_amount': sc.commission_amount,
+                'commission_amount': commission_amount,
                 'closed_at': sc.closed_at.isoformat() if sc.closed_at else None,
                 'paid_at': sc.paid_at.isoformat() if sc.paid_at else None,
                 'adjustments': adjustments_data,
@@ -627,11 +640,21 @@ class SellerDetailView(generics.GenericAPIView):
             sc_c = commissions.filter(
                 period__month=cm, period__year=cy,
             ).first()
+
+            commission_value = 0
+            if sc_c:
+                if sc_c.period.status == CommissionPeriod.Status.ABERTA:
+                    from app.apps.commissions.services import calculate_estimated_commission
+                    est, _ = calculate_estimated_commission(seller, cm, cy)
+                    commission_value = est
+                else:
+                    commission_value = sc_c.commission_amount
+
             comp_data.append({
                 'month': f'{cm:02d}/{cy}',
                 'total': mt,
                 'sale_count': mc,
-                'commission': sc_c.commission_amount if sc_c else 0,
+                'commission': commission_value,
             })
 
         return Response({
@@ -696,6 +719,19 @@ class SellerReportCsvView(generics.GenericAPIView):
             period__year=start.year,
         ).first()
 
+        commission_amount = 0
+        commission_rate_display = 0
+        status_display = 'Aberta'
+        if commission:
+            if commission.period.status == CommissionPeriod.Status.ABERTA:
+                from app.apps.commissions.services import calculate_estimated_commission
+                est, _ = calculate_estimated_commission(seller, start.month, start.year)
+                commission_amount = est
+            else:
+                commission_amount = commission.commission_amount
+            commission_rate_display = float(commission.commission_rate)
+            status_display = commission.period.get_status_display()
+
         buf = io.StringIO()
         writer = csv.writer(buf)
         writer.writerow(['Data', 'Valor (R$)', 'Observacao'])
@@ -713,14 +749,14 @@ class SellerReportCsvView(generics.GenericAPIView):
         if commission:
             writer.writerow([
                 'Taxa de comissao',
-                f'{float(commission.commission_rate) * 100:.2f}%', '',
+                f'{commission_rate_display * 100:.2f}%', '',
             ])
             writer.writerow([
                 'Comissao calculada',
-                f'{commission.commission_amount / 100:.2f}', '',
+                f'{commission_amount / 100:.2f}', '',
             ])
             writer.writerow([
-                'Status', commission.period.get_status_display(), '',
+                'Status', status_display, '',
             ])
         writer.writerow([])
         writer.writerow([f'Vendedor: {seller.name}'])
@@ -773,6 +809,19 @@ class SellerReportExcelView(generics.GenericAPIView):
             period__year=start.year,
         ).first()
 
+        commission_amount = 0
+        commission_rate_display = 0
+        status_display = 'Aberta'
+        if commission:
+            if commission.period.status == CommissionPeriod.Status.ABERTA:
+                from app.apps.commissions.services import calculate_estimated_commission
+                est, _ = calculate_estimated_commission(seller, start.month, start.year)
+                commission_amount = est
+            else:
+                commission_amount = commission.commission_amount
+            commission_rate_display = float(commission.commission_rate)
+            status_display = commission.period.get_status_display()
+
         wb = Workbook()
         ws = wb.active
         ws.title = 'Vendas (Comissao)'
@@ -821,15 +870,15 @@ class SellerReportExcelView(generics.GenericAPIView):
             ws.append([])
             ws.append([
                 'Taxa de comissao',
-                f'{float(commission.commission_rate) * 100:.2f}%', '',
+                f'{commission_rate_display * 100:.2f}%', '',
             ])
             ws.append([
                 'Comissao calculada',
-                commission.commission_amount / 100, '',
+                commission_amount / 100, '',
             ])
             ws.append([
                 'Status',
-                commission.period.get_status_display(), '',
+                status_display, '',
             ])
 
         ws.column_dimensions['A'].width = 14
@@ -889,6 +938,31 @@ class SellerReportPdfView(generics.GenericAPIView):
             period__year=start.year,
         ).first()
 
+        commission_amount = 0
+        commission_rate_display = 0
+        status_display = 'Aberta'
+        if commission:
+            if commission.period.status == CommissionPeriod.Status.ABERTA:
+                from app.apps.commissions.services import calculate_estimated_commission
+                est, _ = calculate_estimated_commission(seller, start.month, start.year)
+                commission_amount = est
+            else:
+                commission_amount = commission.commission_amount
+            commission_rate_display = float(commission.commission_rate)
+            status_display = commission.period.get_status_display()
+
+        def _fmt(cents):
+            r = cents // 100
+            c = cents % 100
+            return f'{r:,}.{c:02d}'.replace(',', '.')
+
+        def _pct(rate):
+            return f'{float(rate) * 100:.2f}%'
+
+        total_fmt = _fmt(total)
+        commission_amount_fmt = _fmt(commission_amount)
+        rate_fmt = _pct(commission_rate_display)
+
         html = render_to_string('reports/seller_report_pdf.html', {
             'seller': seller,
             'tenant': tenant,
@@ -896,7 +970,12 @@ class SellerReportPdfView(generics.GenericAPIView):
             'end': end,
             'sales': sales,
             'total': total,
+            'total_fmt': total_fmt,
             'commission': commission,
+            'commission_amount': commission_amount,
+            'commission_amount_fmt': commission_amount_fmt,
+            'rate_fmt': rate_fmt,
+            'status_display': status_display,
             'hoje': hoje,
         })
 
@@ -937,99 +1016,19 @@ class DashboardSummaryView(generics.GenericAPIView):
     permission_classes = [IsAuthenticated, IsManagerOrAdmin]
 
     def get(self, request):
-        import calendar
-
         tenant = request.user.tenant
-        hoje = timezone.localdate()
-        start_str = request.query_params.get('start')
-        end_str = request.query_params.get('end')
+        month = request.query_params.get('month')
+        year = request.query_params.get('year')
 
-        if start_str and end_str:
-            start = date.fromisoformat(start_str)
-            end = date.fromisoformat(end_str)
-        else:
-            month = int(request.query_params.get('month', hoje.month))
-            year = int(request.query_params.get('year', hoje.year))
-            start = date(year, month, 1)
-            end = date(year, month, calendar.monthrange(year, month)[1])
+        if month:
+            month = int(month)
+        if year:
+            year = int(year)
 
-        total_vendido = Sale.objects.filter(
-            tenant=tenant,
-            origin=Sale.Origin.MANUAL,
-            sale_date__gte=start, sale_date__lte=end,
-        ).aggregate(t=Sum('amount'))['t'] or 0
+        from app.apps.commissions.services import get_dashboard_data
+        data = get_dashboard_data(tenant, month=month, year=year)
 
-        comissao_a_pagar = SellerCommission.objects.filter(
-            period__tenant=tenant,
-            period__status__in=[
-                CommissionPeriod.Status.ABERTA,
-                CommissionPeriod.Status.FECHADA,
-            ],
-        ).aggregate(t=Sum('commission_amount'))['t'] or 0
-
-        comissao_fechada = SellerCommission.objects.filter(
-            period__tenant=tenant,
-            period__status=CommissionPeriod.Status.FECHADA,
-        ).aggregate(t=Sum('commission_amount'))['t'] or 0
-
-        comissao_paga = SellerCommission.objects.filter(
-            period__tenant=tenant,
-            period__status=CommissionPeriod.Status.PAGA,
-        ).aggregate(t=Sum('paid_amount'))['t'] or 0
-
-        top5_mes = Sale.objects.filter(
-            tenant=tenant,
-            origin=Sale.Origin.MANUAL,
-            sale_date__gte=start, sale_date__lte=end,
-        ).values('seller__name').annotate(
-            total=Sum('amount'),
-        ).order_by('-total')[:5]
-
-        top5_ano = SellerCommission.objects.filter(
-            period__tenant=tenant,
-            period__year=hoje.year,
-        ).values('seller__name').annotate(
-            total=Sum('total_sold_amount'),
-        ).order_by('-total')[:5]
-
-        same_month_last_year = start.replace(year=start.year - 1)
-        last_day_lastyear = calendar.monthrange(
-            start.year - 1, start.month,
-        )[1]
-        end_lastyear = date(start.year - 1, start.month, last_day_lastyear)
-        total_ano_anterior = Sale.objects.filter(
-            tenant=tenant,
-            origin=Sale.Origin.MANUAL,
-            sale_date__gte=same_month_last_year,
-            sale_date__lte=end_lastyear,
-        ).aggregate(t=Sum('amount'))['t'] or 0
-
-        semana_atras = hoje - timedelta(days=7)
-        sellers_inativos = list(
-            Seller.objects.filter(tenant=tenant, is_active=True).exclude(
-                sales__sale_date__gte=semana_atras,
-                sales__origin=Sale.Origin.MANUAL,
-            ).values_list('name', flat=True),
-        )
-
-        vendedores_ativos = Seller.objects.filter(
-            tenant=tenant, is_active=True,
-        ).count()
-        vendedores_total = Seller.objects.filter(tenant=tenant).count()
-
-        return Response({
-            'period': {'start': start.isoformat(), 'end': end.isoformat()},
-            'total_vendido': total_vendido,
-            'comissao_a_pagar': comissao_a_pagar,
-            'comissao_fechada': comissao_fechada,
-            'comissao_paga': comissao_paga,
-            'top5_mes': list(top5_mes),
-            'top5_ano': list(top5_ano),
-            'total_ano_anterior': total_ano_anterior,
-            'sellers_inativos': sellers_inativos,
-            'vendedores_ativos': vendedores_ativos,
-            'vendedores_total': vendedores_total,
-        })
+        return Response(data)
 
 
 class SellerLinkCreateView(generics.GenericAPIView):

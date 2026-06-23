@@ -136,6 +136,7 @@ class SellerCommission(models.Model):
     def recalculate(self, commit=True):
         from app.apps.sales.models import Sale
         import calendar
+        from decimal import Decimal
 
         last_day = calendar.monthrange(self.period.year, self.period.month)[1]
         start = f"{self.period.year}-{self.period.month:02d}-01"
@@ -148,7 +149,14 @@ class SellerCommission(models.Model):
         )
         total = sum(s.amount for s in sales)
         self.total_sold_amount = total
-        self.commission_amount = round(float(total) * float(self.commission_rate))
+        rate = self.commission_rate
+        if rate is None or rate <= 0:
+            rate = self.seller.commission_rate
+        if rate is None or rate <= 0:
+            rate = self.seller.tenant.default_commission_rate
+        if rate is None or rate <= 0:
+            rate = Decimal('0.01')
+        self.commission_amount = int(float(total) * float(rate) + 0.5)
         if commit:
             self.save(update_fields=['total_sold_amount', 'commission_amount'])
 

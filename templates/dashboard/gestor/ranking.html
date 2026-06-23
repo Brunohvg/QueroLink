@@ -4,6 +4,7 @@
 <div x-data="rankingPage()" x-init="load()">
     <div class="flex items-center justify-between mb-8">
         <h1 class="font-display text-[18px] font-semibold text-gray-900">Ranking de Vendedores</h1>
+        <p class="text-[13px] text-gray-400">Apenas vendas manuais entram no ranking</p>
         <div class="flex items-center gap-3">
             <select x-model="month" @change="load()" class="px-3 py-2 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
                 <option value="1">01</option><option value="2">02</option><option value="3">03</option><option value="4">04</option><option value="5">05</option><option value="6">06</option><option value="7">07</option><option value="8">08</option><option value="9">09</option><option value="10">10</option><option value="11">11</option><option value="12">12</option>
@@ -25,14 +26,16 @@
             <p class="text-[15px] font-medium text-gray-700 mt-2">
                 <a :href="'/dashboard/gestor/vendedores/' + (topSeller?.seller__uuid || '') + '/'" class="text-brand-500 hover:underline" x-text="topSeller?.seller__name || '-'"></a>
             </p>
-            <p class="text-[13px] text-gray-500 mt-1" x-text="(topSeller?.sale_count || 0) + ' vendas'"></p>
+            <p class="text-[13px] text-gray-500 mt-1" x-text="topSeller?.sale_count + (topSeller?.sale_count === 1 ? ' venda' : ' vendas')"></p>
+            <p class="text-[13px] text-gray-500 mt-1">Comissao estimada: <span class="font-semibold text-brand-500" x-text="formatMoneyBRL(topSeller?.commission_estimada || 0)"></span></p>
+            <p class="text-[13px] text-gray-500">Taxa: <span x-text="topSeller?.commission_rate ? (topSeller.commission_rate*100).toFixed(2)+'%' : '-'"></span></p>
         </div>
     </div>
 
     <div class="surface-card" x-show="ranking.length">
         <table class="w-full text-left text-[14px]">
             <thead>
-                <tr><th class="px-4 py-3 font-semibold text-gray-500 border-b border-gray-200 bg-gray-50">#</th><th class="px-4 py-3 font-semibold text-gray-500 border-b border-gray-200 bg-gray-50">Vendedor</th><th class="px-4 py-3 font-semibold text-gray-500 border-b border-gray-200 bg-gray-50">Total</th><th class="px-4 py-3 font-semibold text-gray-500 border-b border-gray-200 bg-gray-50">Vendas</th><th class="px-4 py-3 font-semibold text-gray-500 border-b border-gray-200 bg-gray-50">Ticket Medio</th></tr>
+                <tr><th class="px-4 py-3 font-semibold text-gray-500 border-b border-gray-200 bg-gray-50">#</th><th class="px-4 py-3 font-semibold text-gray-500 border-b border-gray-200 bg-gray-50">Vendedor</th><th class="px-4 py-3 font-semibold text-gray-500 border-b border-gray-200 bg-gray-50">Total</th><th class="px-4 py-3 font-semibold text-gray-500 border-b border-gray-200 bg-gray-50">Vendas</th><th class="px-4 py-3 font-semibold text-gray-500 border-b border-gray-200 bg-gray-50">Ticket Medio</th><th class="px-4 py-3 font-semibold text-gray-500 border-b border-gray-200 bg-gray-50">Taxa</th><th class="px-4 py-3 font-semibold text-gray-500 border-b border-gray-200 bg-gray-50">Comissao</th></tr>
             </thead>
             <tbody>
                 <template x-for="(s, i) in ranking" :key="s.seller__uuid">
@@ -42,14 +45,16 @@
                             <a :href="'/dashboard/gestor/vendedores/' + s.seller__uuid + '/'" class="text-brand-500 hover:underline" x-text="s.seller__name"></a>
                         </td>
                         <td class="px-4 py-3 border-b border-gray-100 font-semibold" x-text="formatMoneyBRL(s.total_sold)"></td>
-                        <td class="px-4 py-3 border-b border-gray-100" x-text="s.sale_count"></td>
-                        <td class="px-4 py-3 border-b border-gray-100" x-text="formatMoneyBRL(Math.round(s.total_sold / s.sale_count))"></td>
+                        <td class="px-4 py-3 border-b border-gray-100" x-text="s.sale_count + (s.sale_count === 1 ? ' venda' : ' vendas')"></td>
+                        <td class="px-4 py-3 border-b border-gray-100" x-text="formatMoneyBRL(s.ticket_medio || 0)"></td>
+                        <td class="px-4 py-3 border-b border-gray-100" x-text="(s.commission_rate*100).toFixed(2)+'%'"></td>
+                        <td class="px-4 py-3 border-b border-gray-100 font-semibold text-brand-500" x-text="formatMoneyBRL(s.commission_estimada)"></td>
                     </tr>
                 </template>
             </tbody>
         </table>
     </div>
-    <div class="text-center py-12 text-gray-500" x-show="!ranking.length">Nenhuma venda neste periodo.</div>
+    <div class="text-center py-12 text-gray-500" x-show="!ranking.length">Nenhuma venda manual neste periodo.</div>
 </div>
 
 <script>
@@ -80,7 +85,6 @@ function rankingPage() {
                 options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true } } }
             });
         },
-
     }
 }
 </script>

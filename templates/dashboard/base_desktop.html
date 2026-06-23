@@ -6,28 +6,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}QueroLink{% endblock %}</title>
     <link href="https://fonts.googleapis.com/css2?family=Lexend:wght@400;500;600;700&family=Public+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="/static/css/tailwind.css" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.9/dist/cdn.min.js" defer></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
     <script src="/static/js/format.js"></script>
-    <script>
-        tailwind.config = {
-            theme: {
-                extend: {
-                    colors: {
-                        brand: { 50:'#eef2ff',100:'#e0e7ff',400:'#6b7fee',500:'#4361ee',600:'#3051d3',700:'#2540ad',900:'#1e2a6e' },
-                        success: { 50:'#ecfdf5',500:'#31c48d',700:'#1f9d6e' },
-                        warning: { 50:'#fffbeb',500:'#d97706',700:'#92400e' },
-                        danger: { 50:'#fef2f2',500:'#e53e3e',700:'#b91c1c' },
-                    },
-                    fontFamily: {
-                        sans: ['"Public Sans"', 'system-ui', 'sans-serif'],
-                        display: ['"Lexend"', 'system-ui', 'sans-serif'],
-                    },
-                }
-            }
-        }
-    </script>
     <style>
         body { font-family: 'Public Sans', system-ui, sans-serif; }
 

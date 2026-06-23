@@ -21,7 +21,6 @@
         <select x-model="month" @change="load()" class="px-3 py-2 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
             <option value="1">01</option><option value="2">02</option><option value="3">03</option><option value="4">04</option><option value="5">05</option><option value="6">06</option><option value="7">07</option><option value="8">08</option><option value="9">09</option><option value="10">10</option><option value="11">11</option><option value="12">12</option>
         </select>
-        </select>
         <select x-model="year" @change="load()" class="px-3 py-2 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
             <option value="2025">2025</option><option value="2026">2026</option><option value="2027">2027</option>
         </select>
@@ -38,10 +37,22 @@
     </div>
 
     {% verbatim %}
-    <div class="surface-hero mb-6">
-        <p class="text-[13px] font-semibold text-gray-500 uppercase tracking-wide mb-2">Total no periodo</p>
-        <p class="font-display text-[40px] font-semibold text-brand-500 leading-none" x-text="formatMoneyBRL(sellerData?.total_amount || 0)"></p>
-        <p class="text-[14px] text-gray-500 mt-2" x-text="(sellerData?.sale_count || 0) + ' vendas'"></p>
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+        <div class="surface-hero">
+            <p class="text-[13px] font-semibold text-gray-500 uppercase tracking-wide mb-2">Total vendido (manual)</p>
+            <p class="font-display text-[32px] font-semibold text-brand-500 leading-none" x-text="formatMoneyBRL(sellerData?.manual_total || 0)"></p>
+            <p class="text-[14px] text-gray-500 mt-2" x-text="(sellerData?.manual_sale_count || 0) + ' lançamento(s)'"></p>
+        </div>
+        <div class="surface-card">
+            <p class="text-[13px] font-semibold text-gray-500 uppercase tracking-wide mb-2">Comissao</p>
+            <p class="font-display text-[28px] font-semibold text-success-700 leading-none" x-text="formatMoneyBRL(sellerData?.commissions?.[0]?.commission_amount || 0)"></p>
+            <p class="text-[13px] text-gray-500 mt-1">Taxa: <span x-text="sellerData?.seller?.commission_rate ? (sellerData.seller.commission_rate*100).toFixed(2)+'%' : '-'"></span></p>
+        </div>
+        <div class="surface-card">
+            <p class="text-[13px] font-semibold text-gray-500 uppercase tracking-wide mb-2">Vendas por link</p>
+            <p class="font-display text-[28px] font-semibold text-gray-900 leading-none" x-text="formatMoneyBRL(sellerData?.link_total || 0)"></p>
+            <p class="text-[13px] text-gray-500 mt-1">Informativo - nao entra na comissao</p>
+        </div>
     </div>
 
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
@@ -69,18 +80,36 @@
         </div>
     </div>
 
-    <div class="surface-card mb-6" x-show="sellerData?.sales?.length">
-        <h2 class="text-[13px] font-semibold text-gray-500 uppercase tracking-wide mb-4">Vendas do periodo</h2>
+    <div class="surface-card mb-6" x-show="sellerData?.manual_sales?.length">
+        <h2 class="text-[13px] font-semibold text-gray-500 uppercase tracking-wide mb-4">Vendas manuais do periodo</h2>
         <table class="w-full text-left text-[14px]">
             <thead>
-                <tr><th class="px-4 py-3 font-semibold text-gray-500 border-b border-gray-200 bg-gray-50">Data</th><th class="px-4 py-3 font-semibold text-gray-500 border-b border-gray-200 bg-gray-50">Valor</th><th class="px-4 py-3 font-semibold text-gray-500 border-b border-gray-200 bg-gray-50">Origem</th><th class="px-4 py-3 font-semibold text-gray-500 border-b border-gray-200 bg-gray-50">Observacao</th></tr>
+                <tr><th class="px-4 py-3 font-semibold text-gray-500 border-b border-gray-200 bg-gray-50">Data</th><th class="px-4 py-3 font-semibold text-gray-500 border-b border-gray-200 bg-gray-50">Valor</th><th class="px-4 py-3 font-semibold text-gray-500 border-b border-gray-200 bg-gray-50">Observacao</th></tr>
             </thead>
             <tbody>
-                <template x-for="s in sellerData?.sales" :key="s.uuid">
+                <template x-for="s in sellerData?.manual_sales" :key="s.uuid">
                     <tr class="hover:bg-gray-50">
                         <td class="px-4 py-3 border-b border-gray-100 text-gray-500" x-text="new Date(s.sale_date).toLocaleDateString('pt-BR')"></td>
                         <td class="px-4 py-3 border-b border-gray-100 font-semibold" x-text="formatMoneyBRL(s.amount)"></td>
-                        <td class="px-4 py-3 border-b border-gray-100"><span class="text-xs px-2 py-0.5 rounded-full font-medium" :class="s.origin==='LINK'?'bg-brand-50 text-brand-600':'bg-success-50 text-success-700'" x-text="s.origin_display"></span></td>
+                        <td class="px-4 py-3 border-b border-gray-100 text-gray-500" x-text="s.notes || '—'"></td>
+                    </tr>
+                </template>
+            </tbody>
+        </table>
+    </div>
+
+    <div class="surface-card mb-6" x-show="sellerData?.link_sales?.length">
+        <h2 class="text-[13px] font-semibold text-gray-500 uppercase tracking-wide mb-4">Vendas por link (informativo)</h2>
+        <p class="text-[12px] text-gray-400 mb-3">Links de pagamento sao informativos e nao entram automaticamente no calculo da comissao.</p>
+        <table class="w-full text-left text-[14px]">
+            <thead>
+                <tr><th class="px-4 py-3 font-semibold text-gray-500 border-b border-gray-200 bg-gray-50">Data</th><th class="px-4 py-3 font-semibold text-gray-500 border-b border-gray-200 bg-gray-50">Valor</th><th class="px-4 py-3 font-semibold text-gray-500 border-b border-gray-200 bg-gray-50">Observacao</th></tr>
+            </thead>
+            <tbody>
+                <template x-for="s in sellerData?.link_sales" :key="s.uuid">
+                    <tr class="hover:bg-gray-50">
+                        <td class="px-4 py-3 border-b border-gray-100 text-gray-500" x-text="new Date(s.sale_date).toLocaleDateString('pt-BR')"></td>
+                        <td class="px-4 py-3 border-b border-gray-100 font-semibold" x-text="formatMoneyBRL(s.amount)"></td>
                         <td class="px-4 py-3 border-b border-gray-100 text-gray-500" x-text="s.notes || '—'"></td>
                     </tr>
                 </template>
@@ -101,7 +130,7 @@
                                    'bg-danger-50 text-danger-700': c.period_status==='CANCELADA',
                                    'bg-success-50 text-success-700': c.period_status==='PAGA'}"
                           x-text="c.period_status.replace(/_/g,' ')"></span>
-                    <span class="text-[13px] text-gray-500" x-text="'Vendas: R$ '+formatMoneyBRL(c.total_sold_amount)"></span>
+                    <span class="text-[13px] text-gray-500" x-text="'Vendas: '+formatMoneyBRL(c.total_sold_amount)"></span>
                     <span class="text-[14px] font-semibold text-success-700" x-text="formatMoneyBRL(c.commission_amount)"></span>
                 </div>
             </template>
@@ -166,8 +195,6 @@ function sellerDetailPage() {
                 }
             });
         },
-
-
 
         buildParams() {
             var p = new URLSearchParams();
