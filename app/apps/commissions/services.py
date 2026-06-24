@@ -414,6 +414,7 @@ def get_dashboard_data(tenant, month=None, year=None):
             'vendedores_prontos': 0,
             'vendedores_pendentes': 0,
             'vendedores_sem_lancamento': 0,
+            'total_vendedores': 0,
         }
         period_status = None
 
