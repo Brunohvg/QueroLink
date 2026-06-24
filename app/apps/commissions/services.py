@@ -474,6 +474,22 @@ def get_dashboard_data(tenant, month=None, year=None):
     if summary['total_vendedores'] > 0 and sellers_with_manual_sales > summary['total_vendedores']:
         has_inconsistency = True
 
+    evolution = list(Sale.objects.filter(
+        tenant=tenant, origin=Sale.Origin.MANUAL,
+        sale_date__gte=start, sale_date__lte=end,
+    ).values('sale_date').annotate(
+        total=Sum('amount'),
+    ).order_by('sale_date'))
+
+    prev_month = month - 1 if month > 1 else 12
+    prev_year = year if month > 1 else year - 1
+    prev_last_day = calendar.monthrange(prev_year, prev_month)[1]
+    prev_total = Sale.objects.filter(
+        tenant=tenant, origin=Sale.Origin.MANUAL,
+        sale_date__gte=date(prev_year, prev_month, 1),
+        sale_date__lte=date(prev_year, prev_month, prev_last_day),
+    ).aggregate(t=Sum('amount'))['t'] or 0
+
     return {
         'period': {
             'start': start.isoformat(),
@@ -505,6 +521,8 @@ def get_dashboard_data(tenant, month=None, year=None):
         'valor_pago_links': links_data['valor_pago_links'],
         'top5_mes': list(top5_mes),
         'sellers_inativos': sellers_inativos,
+        'evolution': evolution,
+        'comparison_prev': prev_total,
     }
 
 
