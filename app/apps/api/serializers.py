@@ -110,14 +110,40 @@ class SellerImportSerializer(serializers.Serializer):
                     'Nao foi possivel decodificar o arquivo. Tente salvar como UTF-8.'
                 )
 
-            reader = csv.DictReader(io.StringIO(decoded))
-            return [row for row in reader]
+            rows = self._parse_csv(decoded)
+            if not rows:
+                raise serializers.ValidationError(
+                    'Nenhuma linha encontrada. Verifique se o arquivo tem cabecalho '
+                    'com as colunas "nome" e "telefone".'
+                )
+            return rows
 
         import openpyxl
         wb = openpyxl.load_workbook(io.BytesIO(content), read_only=True)
         ws = wb.active
         headers = [cell.value for cell in next(ws.iter_rows(min_row=1, max_row=1))]
         return [dict(zip(headers, row)) for row in ws.iter_rows(min_row=2, values_only=True)]
+
+    def _parse_csv(self, decoded):
+        import csv
+        import io
+
+        delimiters = [',', ';', '\t', '|']
+
+        for delim in delimiters:
+            reader = csv.DictReader(io.StringIO(decoded), delimiter=delim)
+            try:
+                rows = [row for row in reader]
+            except Exception:
+                continue
+            if not rows:
+                continue
+            keys = set(rows[0].keys())
+            if 'nome' in keys or 'name' in keys or 'telefone' in keys or 'phone' in keys:
+                return rows
+
+        reader = csv.DictReader(io.StringIO(decoded))
+        return [row for row in reader]
 
     def create(self, validated_data):
         file = validated_data['file']
