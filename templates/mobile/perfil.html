@@ -10,7 +10,7 @@
     </div>
 
     {% if error %}
-    <div class="bg-danger-50 border border-danger-200/50 text-danger-700 px-4 py-3 rounded-xl text-sm">{{ error }}</div>
+    <script>showToast("{{ error|escapejs }}", "error");</script>
     {% else %}
 
     <div class="surface-card">
@@ -73,7 +73,7 @@
         </div>
     </div>
 
-    <div x-data="{ showPasswordForm: false, currentPassword: '', newPassword: '', confirmPassword: '', message: '', error: '' }" class="space-y-2">
+    <div x-data="{ showPasswordForm: false, currentPassword: '', newPassword: '', confirmPassword: '' }" class="space-y-2">
         <button @click="showPasswordForm = !showPasswordForm" class="w-full surface-card-link flex items-center justify-between">
             <div class="flex items-center gap-3">
                 <div class="w-9 h-9 rounded-xl bg-brand-50 flex items-center justify-center">
@@ -93,9 +93,9 @@
                     method: 'POST',
                     headers: {'Content-Type': 'application/json', 'X-CSRFToken': getCSRFToken()},
                     body: JSON.stringify({current_password: currentPassword, new_password: newPassword})
-                }).then(r => r.json().then(d => {
-                    if (r.ok) { message = 'Senha alterada com sucesso!'; currentPassword = ''; newPassword = ''; confirmPassword = ''; }
-                    else { error = d.current_password ? d.current_password[0] : d.error || 'Erro ao alterar senha.'; }
+                })                .then(r => r.json().then(d => {
+                    if (r.ok) { showToast('Senha alterada com sucesso!', 'success'); currentPassword = ''; newPassword = ''; confirmPassword = ''; }
+                    else { showToast(d.current_password ? d.current_password[0] : d.error || 'Erro ao alterar senha.', 'error'); }
                 }));
             " class="space-y-4">
                 <div>
@@ -110,8 +110,6 @@
                     <label class="block text-[13px] font-medium text-gray-600 mb-1.5">Confirmar nova senha</label>
                     <input type="password" x-model="confirmPassword" required minlength="8" class="input-field" placeholder="Repita a nova senha">
                 </div>
-                <div x-show="message" class="bg-success-50 border border-success-200/50 text-success-700 px-4 py-3 rounded-xl text-[13px]" x-text="message"></div>
-                <div x-show="error" class="bg-danger-50 border border-danger-200/50 text-danger-700 px-4 py-3 rounded-xl text-[13px]" x-text="error"></div>
                 <button type="submit" class="btn-primary">Salvar senha</button>
             </form>
         </div>

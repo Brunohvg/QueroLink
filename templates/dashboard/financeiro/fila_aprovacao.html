@@ -118,7 +118,7 @@ function filaPage() {
                     var firstId = this.selected.keys().next().value;
                     var firstPeriod = this.getPeriodForCommission(firstId);
                     if (firstPeriod && firstPeriod.uuid !== group.period.uuid) {
-                        alert('Selecione vendedores de apenas uma competencia por vez.'); return;
+                    showToast('Selecione vendedores de apenas uma competencia por vez.', 'warning'); return;
                     }
                 }
                 group.commissions.forEach(sc => this.selected.set(sc.id, {seller: sc, period: group.period}));
@@ -133,7 +133,7 @@ function filaPage() {
         getUniquePeriod() {
             var periods = new Set();
             this.selected.forEach(v => periods.add(v.period.uuid));
-            if (periods.size !== 1) { alert('Selecione vendedores de apenas uma competencia.'); return null; }
+            if (periods.size !== 1) { showToast('Selecione vendedores de apenas uma competencia.', 'warning'); return null; }
             return this.selected.values().next().value.period;
         },
         getCurrentPeriodUuid() {
@@ -155,7 +155,7 @@ function filaPage() {
                 body: JSON.stringify({seller_commission_ids: ids, payment_date: this.payDate, payment_method: this.payMethod, payment_notes: this.payNotes})
             });
             if (r.ok) { this.showPay = false; this.load(); }
-            else { var d = await r.json(); alert(d.error || d.detail || 'Erro ao pagar'); }
+            else { var d = await r.json(); showToast(d.error || d.detail || 'Erro ao pagar', 'error'); }
         },
         openReopenModal() {
             if (!this.getUniquePeriod()) return;
@@ -173,7 +173,7 @@ function filaPage() {
                 body: JSON.stringify({seller_commission_ids: ids, reason: this.reopenReason})
             });
             if (r.ok) { this.showReopen = false; this.load(); }
-            else { var d = await r.json(); alert(d.error || d.detail || 'Erro ao reverter'); }
+            else { var d = await r.json(); showToast(d.error || d.detail || 'Erro ao reverter', 'error'); }
         }
     }
 }

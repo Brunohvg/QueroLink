@@ -15,13 +15,13 @@
                 <p style="color: var(--text-secondary); font-size: 0.875rem; text-transform: uppercase; letter-spacing: 0.05em;">Acesse seu painel administrativo</p>
             </div>
             
-            {% if messages %}
+                {% if messages %}
+                <script>
                 {% for message in messages %}
-                <div class="alert {% if message.tags == 'error' %}alert-error{% endif %}">
-                    {{ message }}
-                </div>
+                showToast("{{ message|escapejs }}", "{% if message.tags == 'error' %}error{% elif message.tags == 'success' %}success{% else %}info{% endif %}");
                 {% endfor %}
-            {% endif %}
+                </script>
+                {% endif %}
 
             <form method="post" action="{% url 'dashboard:login' %}">
                 {% csrf_token %}

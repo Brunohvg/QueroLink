@@ -332,7 +332,7 @@ function fechamentoPage() {
         },
 
         showError(d) {
-            alert(d.error || d.detail || d.message || 'Erro inesperado');
+            showToast(d.error || d.detail || d.message || 'Erro inesperado', 'error');
         },
 
         getCommissions(p) { return p.seller_commissions || []; },

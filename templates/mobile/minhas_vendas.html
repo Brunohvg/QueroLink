@@ -10,7 +10,7 @@
     </div>
 
     {% if error %}
-    <div class="bg-danger-50 border border-danger-200/50 text-danger-700 px-4 py-3 rounded-2xl text-sm">{{ error }}</div>
+    <script>showToast("{{ error|escapejs }}", "error");</script>
     {% endif %}
 
     {% if not sales %}
@@ -69,12 +69,18 @@ function minhasVendas() {
         canDelete(d) { return d === new Date().toISOString().split('T')[0]; },
         async deleteSale(u, d) {
             if (!this.canDelete(d)) return;
-            if (!confirm('Excluir esta venda?')) return;
+            if (!window._confirmDelete) { window._confirmDelete = {}; }
+            if (!window._confirmDelete[u]) {
+                showToast('Toque novamente para confirmar a exclusao.', 'warning');
+                window._confirmDelete[u] = true;
+                setTimeout(function() { delete window._confirmDelete[u]; }, 3000);
+                return;
+            }
             try {
                 var r = await fetch('/api/sales/' + u + '/', { method: 'DELETE', headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCSRFToken() } });
                 if (r.ok || r.status === 204) location.reload();
-                else { var j = await r.json(); alert(j.detail || 'Erro ao excluir.'); }
-            } catch (e) { alert('Erro de conexao.'); }
+                else { var j = await r.json(); showToast(j.detail || 'Erro ao excluir.', 'error'); }
+            } catch (e) { showToast('Erro de conexao.', 'error'); }
         }
     }
 }

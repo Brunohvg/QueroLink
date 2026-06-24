@@ -3,11 +3,11 @@
 {% block content %}
 
 {% if messages %}
-    {% for message in messages %}
-    <div class="mb-4 px-4 py-3 rounded-xl text-sm {% if message.tags == 'error' %}bg-danger-50 border border-danger-500/20 text-danger-700{% else %}bg-success-50 border border-success-500/20 text-success-700{% endif %}">
-        {{ message }}
-    </div>
-    {% endfor %}
+<script>
+{% for message in messages %}
+showToast("{{ message|escapejs }}", "{% if message.tags == 'error' %}error{% elif message.tags == 'success' %}success{% else %}info{% endif %}");
+{% endfor %}
+</script>
 {% endif %}
 
 <h1 class="font-display text-[18px] font-semibold text-gray-900 mb-6">Configuracoes da Loja</h1>

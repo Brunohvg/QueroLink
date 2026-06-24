@@ -30,7 +30,7 @@
             </select>
         </div>
         <p x-show="formError" class="text-[13px] text-danger-500" x-text="formError"></p>
-        <p x-show="formSuccess" class="text-[13px] text-success-700" x-text="formSuccess"></p>
+        <div x-show="formSuccess" class="bg-success-50 border border-success-200/50 text-success-700 px-4 py-3 rounded-xl text-[13px]" x-text="formSuccess"></div>
         <div class="flex gap-2">
             <button @click="createLink()" :disabled="creating" class="flex-1 bg-brand-500 hover:bg-brand-600 disabled:opacity-50 text-white font-medium py-3 rounded-xl transition text-[15px] tap-target">
                 <span x-show="!creating">Gerar Link</span>
@@ -116,11 +116,14 @@ function sellerLinksPage() {
                         refusal_reason: null,
                         created_at: new Date().toISOString(),
                     });
+                    showToast('Link gerado com sucesso!', 'success');
                 } else {
                     this.formError = d.error || d.detail || 'Erro ao gerar link.';
+                    showToast(this.formError, 'error');
                 }
             } catch (e) {
                 this.formError = 'Erro de conexao.';
+                showToast(this.formError, 'error');
             }
             this.creating = false;
         },
