@@ -231,6 +231,13 @@ function vendedoresPage() {
             var formData = new FormData();
             formData.append('file', this.selectedFile);
             var r = await fetch('/api/sellers/import_sellers/', { method:'POST', headers:{'X-CSRFToken': getCSRFToken()}, body: formData });
+            if (!r.ok) {
+                this.importing = false;
+                this.showImportModal = false;
+                this.selectedFile = null;
+                alert('Erro ao importar. Verifique o formato do arquivo e tente novamente.');
+                return;
+            }
             var d = await r.json();
             this.importResult = d;
             this.importing = false;

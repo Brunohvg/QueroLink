@@ -43,10 +43,9 @@ class SellerCreateSerializer(serializers.Serializer):
         tenant = request.user.tenant
 
         base = slugify(validated_data['name'])
-        existing = set(User.objects.values_list('username', flat=True))
         username = base
         n = 2
-        while username in existing:
+        while User.objects.filter(username=username).exists():
             username = f"{base}-{n}"
             n += 1
 
@@ -93,32 +92,43 @@ class SellerImportSerializer(serializers.Serializer):
             )
         return value
 
-    def create(self, validated_data):
+    def _parse_file(self, file):
         import csv
         import io
 
-        file = validated_data['file']
         content = file.read()
 
-        rows = []
         if file.name.lower().endswith('.csv'):
-            decoded = content.decode('utf-8-sig')
+            for encoding in ('utf-8-sig', 'latin-1', 'cp1252'):
+                try:
+                    decoded = content.decode(encoding)
+                    break
+                except (UnicodeDecodeError, LookupError):
+                    continue
+            else:
+                raise serializers.ValidationError(
+                    'Nao foi possivel decodificar o arquivo. Tente salvar como UTF-8.'
+                )
+
             reader = csv.DictReader(io.StringIO(decoded))
-            for row in reader:
-                rows.append(row)
-        else:
-            import openpyxl
-            wb = openpyxl.load_workbook(io.BytesIO(content), read_only=True)
-            ws = wb.active
-            headers = [cell.value for cell in next(ws.iter_rows(min_row=1, max_row=1))]
-            for row in ws.iter_rows(min_row=2, values_only=True):
-                rows.append(dict(zip(headers, row)))
+            return [row for row in reader]
+
+        import openpyxl
+        wb = openpyxl.load_workbook(io.BytesIO(content), read_only=True)
+        ws = wb.active
+        headers = [cell.value for cell in next(ws.iter_rows(min_row=1, max_row=1))]
+        return [dict(zip(headers, row)) for row in ws.iter_rows(min_row=2, values_only=True)]
+
+    def create(self, validated_data):
+        file = validated_data['file']
+        rows = self._parse_file(file)
 
         request = self.context['request']
         tenant = request.user.tenant
 
         created = []
         errors = []
+        used_usernames = set()
 
         for i, row in enumerate(rows, start=2):
             name = (row.get('nome') or row.get('name') or '').strip()
@@ -137,10 +147,10 @@ class SellerImportSerializer(serializers.Serializer):
                 continue
 
             base = slugify(name)
-            existing = set(User.objects.values_list('username', flat=True))
             username = base
             n = 2
-            while username in existing:
+            while (username in used_usernames or
+                   User.objects.filter(username=username).exists()):
                 username = f'{base}-{n}'
                 n += 1
 
@@ -167,6 +177,7 @@ class SellerImportSerializer(serializers.Serializer):
                 except Exception:
                     pass
 
+                used_usernames.add(username)
                 created.append({
                     'linha': i,
                     'nome': name,

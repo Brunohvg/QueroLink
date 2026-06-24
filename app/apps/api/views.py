@@ -80,7 +80,11 @@ class SellerViewSet(viewsets.ModelViewSet):
         serializer = SellerImportSerializer(data=request.data, context={'request': request})
         serializer.is_valid(raise_exception=True)
         result = serializer.save()
-        log_action(request, 'seller.import', description=f"Importados {result['criados']} vendedores, {result['erros']} erros")
+        log_action(request, 'seller.import', changes={
+            'total': result['total'],
+            'criados': result['criados'],
+            'erros': result['erros'],
+        })
         return Response(result, status=status.HTTP_200_OK)
 
 
