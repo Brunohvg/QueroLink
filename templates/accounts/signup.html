@@ -36,7 +36,8 @@
                 <div class="form-group">
                     <label class="form-label" for="id_cnpj">CNPJ</label>
                     <input type="text" id="id_cnpj" name="cnpj" class="form-control" required
-                           placeholder="00.000.000/0000-00"
+                           placeholder="00.000.000/0000-00" maxlength="18"
+                           oninput="this.value=cnpjMask(this.value)"
                            value="{{ form.cnpj.value|default_if_none:'' }}">
                 </div>
 
@@ -97,5 +98,16 @@
             </p>
         </div>
     </div>
+<script>
+function cnpjMask(v) {
+    v = v.replace(/\D/g, '');
+    if (v.length > 14) v = v.slice(0, 14);
+    if (v.length > 12) v = v.slice(0, 2) + '.' + v.slice(2, 5) + '.' + v.slice(5, 8) + '/' + v.slice(8, 12) + '-' + v.slice(12);
+    else if (v.length > 8) v = v.slice(0, 2) + '.' + v.slice(2, 5) + '.' + v.slice(5, 8) + '/' + v.slice(8);
+    else if (v.length > 5) v = v.slice(0, 2) + '.' + v.slice(2, 5) + '.' + v.slice(5);
+    else if (v.length > 2) v = v.slice(0, 2) + '.' + v.slice(2);
+    return v;
+}
+</script>
 </body>
 </html>

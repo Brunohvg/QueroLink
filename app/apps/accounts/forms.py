@@ -1,32 +1,7 @@
-import re
 from django import forms
 from django.contrib.auth.password_validation import validate_password
+from app.apps.accounts.validators import clean_cnpj, validate_cnpj
 from app.apps.accounts.models import Tenant, User
-
-
-def _clean_cnpj(cnpj):
-    return re.sub(r'[^0-9]', '', cnpj)
-
-
-def _validate_cnpj_check_digits(cnpj):
-    cnpj = _clean_cnpj(cnpj)
-    if len(cnpj) != 14:
-        return False
-    if cnpj == cnpj[0] * 14:
-        return False
-
-    def _calc_digit(prefix, weights):
-        total = sum(int(prefix[i]) * weights[i] for i in range(len(weights)))
-        remainder = total % 11
-        return 0 if remainder < 2 else 11 - remainder
-
-    w1 = [5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2]
-    w2 = [6, 5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2]
-
-    d1 = _calc_digit(cnpj[:12], w1)
-    d2 = _calc_digit(cnpj[:13], w2)
-
-    return int(cnpj[12]) == d1 and int(cnpj[13]) == d2
 
 
 class TenantRegistrationForm(forms.Form):
@@ -105,11 +80,11 @@ class TenantRegistrationForm(forms.Form):
     )
 
     def clean_cnpj(self):
-        cnpj = _clean_cnpj(self.cleaned_data['cnpj'])
+        cnpj = clean_cnpj(self.cleaned_data['cnpj'])
         if len(cnpj) != 14 or not cnpj.isdigit():
             raise forms.ValidationError('CNPJ invalido. Digite os 14 digitos.')
 
-        if not _validate_cnpj_check_digits(cnpj):
+        if not validate_cnpj(cnpj):
             raise forms.ValidationError('CNPJ invalido. Verifique os digitos e tente novamente.')
 
         if Tenant.objects.filter(cnpj=cnpj).exists():

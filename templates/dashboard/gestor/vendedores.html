@@ -4,10 +4,16 @@
 <div x-data="vendedoresPage()" x-init="loadSellers()">
     <div class="flex items-center justify-between mb-6">
         <h1 class="font-display text-[18px] font-semibold text-gray-900">Vendedores</h1>
-        <button @click="openCreateModal()" class="bg-brand-500 hover:bg-brand-600 text-white font-medium py-2 px-4 rounded-xl transition tap-target text-[14px] flex items-center gap-1">
-            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
-            Novo Vendedor
-        </button>
+        <div class="flex gap-2">
+            <button @click="showImportModal = true" class="bg-white border border-brand-500 text-brand-500 hover:bg-brand-50 font-medium py-2 px-4 rounded-xl transition tap-target text-[14px] flex items-center gap-1">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5 5 5-5M12 15V3"></path></svg>
+                Importar Planilha
+            </button>
+            <button @click="openCreateModal()" class="bg-brand-500 hover:bg-brand-600 text-white font-medium py-2 px-4 rounded-xl transition tap-target text-[14px] flex items-center gap-1">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
+                Novo Vendedor
+            </button>
+        </div>
     </div>
 
     <div class="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
@@ -59,7 +65,7 @@
             <h2 class="text-[18px] font-semibold mb-4" x-text="editing?'Editar Vendedor':'Novo Vendedor'"></h2>
             <form @submit.prevent="editing?updateSeller():createSeller()" class="space-y-4">
                 <div><label class="block text-[13px] text-gray-500 mb-1">Nome</label><input type="text" x-model="form.name" required class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-500"></div>
-                <div><label class="block text-[13px] text-gray-500 mb-1">Telefone</label><input type="text" x-model="form.phone" required class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-500"></div>
+                <div><label class="block text-[13px] text-gray-500 mb-1">Telefone</label><input type="text" x-model="form.phone" @input="maskPhone('form.phone')" required class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-500" placeholder="(31) 99999-9999"></div>
                 <div x-show="editing"><label class="block text-[13px] text-gray-500 mb-1">Taxa (%)</label><input type="number" x-model="form.commission_rate" step="0.01" min="0" max="100" class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-500"></div>
                 <div class="flex gap-3 justify-end">
                     <button type="button" @click="showModal=false" class="bg-white border border-gray-300 text-gray-700 font-medium py-2 px-4 rounded-xl transition text-[14px]">Cancelar</button>
@@ -82,6 +88,42 @@
             <button @click="showPasswordModal=false" class="w-full bg-brand-500 text-white font-medium py-2 px-4 rounded-xl transition text-[14px]">Entendi</button>
         </div>
     </div>
+
+    <div x-show="showImportModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40" @click.self="showImportModal=false">
+        <div class="bg-white rounded-2xl shadow-xl p-6 w-full max-w-lg mx-4">
+            <h2 class="text-[18px] font-semibold mb-4">Importar Vendedores</h2>
+            <p class="text-[13px] text-gray-500 mb-4">Envie um arquivo CSV ou XLSX com as colunas <strong>nome</strong> e <strong>telefone</strong>.</p>
+
+            <div x-show="!importResult">
+                <div @drop.prevent="handleFileDrop($event)" @dragover.prevent="dragOver=true" @dragleave.prevent="dragOver=false" class="border-2 border-dashed rounded-xl p-8 text-center cursor-pointer hover:bg-gray-50 transition" :class="{'border-brand-500 bg-brand-50': dragOver, 'border-gray-300': !dragOver}" @click="$refs.fileInput.click()">
+                    <svg class="w-10 h-10 mx-auto mb-2 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path></svg>
+                    <p class="text-[14px] text-gray-600" x-text="selectedFile ? selectedFile.name : 'Clique ou arraste o arquivo aqui'"></p>
+                    <p class="text-[12px] text-gray-400 mt-1">CSV ou XLSX</p>
+                    <input type="file" x-ref="fileInput" accept=".csv,.xlsx" @change="selectedFile = $refs.fileInput.files[0]" class="hidden">
+                </div>
+                <div class="mt-4 flex gap-3 justify-end">
+                    <button type="button" @click="showImportModal=false; selectedFile=null" class="bg-white border border-gray-300 text-gray-700 font-medium py-2 px-4 rounded-xl transition text-[14px]">Cancelar</button>
+                    <button type="button" @click="importSellers()" :disabled="!selectedFile || importing" class="bg-brand-500 hover:bg-brand-600 disabled:bg-gray-300 text-white font-medium py-2 px-4 rounded-xl transition text-[14px]" x-text="importing ? 'Importando...' : 'Importar'"></button>
+                </div>
+            </div>
+
+            <div x-show="importResult" class="space-y-4">
+                <div class="flex items-center gap-2" :class="importResult.erros > 0 ? 'text-warning-700' : 'text-success-700'">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                    <span class="text-[15px] font-semibold" x-text="importResult.criados + ' de ' + importResult.total + ' vendedores importados'"></span>
+                </div>
+                <div x-show="importResult.errors.length" class="bg-danger-50 rounded-xl p-3">
+                    <p class="text-[13px] font-semibold text-danger-700 mb-2">Erros:</p>
+                    <template x-for="e in importResult.errors" :key="e.linha">
+                        <p class="text-[12px] text-danger-600">Linha <span x-text="e.linha"></span>: <span x-text="e.erro"></span></p>
+                    </template>
+                </div>
+                <div class="flex gap-3 justify-end">
+                    <button type="button" @click="showImportModal=false; selectedFile=null; importResult=null; loadSellers()" class="bg-brand-500 text-white font-medium py-2 px-4 rounded-xl transition text-[14px]">Concluir</button>
+                </div>
+            </div>
+        </div>
+    </div>
 </div>
 
 <script>
@@ -95,11 +137,32 @@ function getCSRFToken() {
     return '';
 }
 
+function maskPhone(path) {
+    var digits = this.getPropertyAtPath(path).replace(/\D/g, '');
+    var formatted = '';
+    if (digits.length > 0) formatted = '(' + digits.slice(0, 2);
+    if (digits.length > 2) formatted += ') ' + digits.slice(2, 7);
+    if (digits.length > 7) formatted += '-' + digits.slice(7, 11);
+    this.setPropertyAtPath(path, formatted.slice(0, 16));
+}
+
 function vendedoresPage() {
     return {
-        sellers: [], showModal: false, editing: false, showPasswordModal: false, passwordResult: {}, passwordAction: '',
+        sellers: [], showModal: false, editing: false, showPasswordModal: false,
+        showImportModal: false, importing: false, selectedFile: null, importResult: null,
+        dragOver: false,
+        passwordResult: {}, passwordAction: '',
         form: { name: '', phone: '', commission_rate: '1.00' },
         stats: { total: 0, ativos: 0, comVendaNoMes: 0, semLancamento: 0, semLancamentoHoje: 0, prontos: 0, pendentes: 0, comissaoAberta: 0, comissaoPaga: 0 },
+        getPropertyAtPath(path) {
+            return path.split('.').reduce((obj, key) => obj && obj[key], this);
+        },
+        setPropertyAtPath(path, value) {
+            var keys = path.split('.');
+            var obj = this;
+            for (var i = 0; i < keys.length - 1; i++) obj = obj[keys[i]];
+            obj[keys[keys.length - 1]] = value;
+        },
         async loadSellers() {
             var r = await fetch('/api/sellers/');
             var list = await r.json();
@@ -155,6 +218,23 @@ function vendedoresPage() {
         },
         async toggleActive(s) { await fetch(`/api/sellers/${s.uuid}/`, { method:'PATCH', headers:{'Content-Type':'application/json', 'X-CSRFToken': getCSRFToken()}, body:JSON.stringify({is_active:!s.is_active}) }); this.loadSellers(); },
         async resetPassword(s) { var r = await fetch(`/api/sellers/${s.uuid}/reset_password/`, { method:'POST', headers:{'X-CSRFToken': getCSRFToken()} }); var d = await r.json(); if (r.ok) { this.passwordResult = d; this.passwordAction = 'reset'; this.showPasswordModal = true; } },
+        async handleFileDrop(event) {
+            this.dragOver = false;
+            var file = event.dataTransfer.files[0];
+            if (file && (file.name.endsWith('.csv') || file.name.endsWith('.xlsx'))) {
+                this.selectedFile = file;
+            }
+        },
+        async importSellers() {
+            if (!this.selectedFile) return;
+            this.importing = true;
+            var formData = new FormData();
+            formData.append('file', this.selectedFile);
+            var r = await fetch('/api/sellers/import_sellers/', { method:'POST', headers:{'X-CSRFToken': getCSRFToken()}, body: formData });
+            var d = await r.json();
+            this.importResult = d;
+            this.importing = false;
+        },
     }
 }
 </script>

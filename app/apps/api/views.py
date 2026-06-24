@@ -24,6 +24,7 @@ from app.apps.accounts.models import User
 from .serializers import (
     SellerSerializer,
     SellerCreateSerializer,
+    SellerImportSerializer,
     SaleSerializer,
     SaleCreateSerializer,
     CommissionPeriodSerializer,
@@ -73,6 +74,14 @@ class SellerViewSet(viewsets.ModelViewSet):
             pass
         log_action(request, 'seller.password_reset', instance=seller)
         return Response({'password': password, 'username': seller.user.username})
+
+    @action(detail=False, methods=['post'])
+    def import_sellers(self, request):
+        serializer = SellerImportSerializer(data=request.data, context={'request': request})
+        serializer.is_valid(raise_exception=True)
+        result = serializer.save()
+        log_action(request, 'seller.import', description=f"Importados {result['criados']} vendedores, {result['erros']} erros")
+        return Response(result, status=status.HTTP_200_OK)
 
 
 class SaleViewSet(viewsets.ModelViewSet):

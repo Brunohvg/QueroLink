@@ -11,6 +11,7 @@ from app.apps.commissions.models import (
     CommissionAdjustment,
 )
 from app.apps.accounts.models import User
+from app.apps.accounts.validators import clean_phone, validate_phone_br
 
 
 class SellerSerializer(serializers.ModelSerializer):
@@ -28,6 +29,14 @@ class SellerSerializer(serializers.ModelSerializer):
 class SellerCreateSerializer(serializers.Serializer):
     name = serializers.CharField(max_length=100)
     phone = serializers.CharField(max_length=20)
+
+    def validate_phone(self, value):
+        cleaned = clean_phone(value)
+        if not validate_phone_br(cleaned):
+            raise serializers.ValidationError(
+                'Telefone invalido. Informe um numero com DDD (10 ou 11 digitos).'
+            )
+        return cleaned
 
     def create(self, validated_data):
         request = self.context['request']
@@ -70,6 +79,110 @@ class SellerCreateSerializer(serializers.Serializer):
             'phone': seller.phone,
             'username': username,
             'password': password,
+        }
+
+
+class SellerImportSerializer(serializers.Serializer):
+    file = serializers.FileField()
+
+    def validate_file(self, value):
+        name = value.name.lower()
+        if not (name.endswith('.csv') or name.endswith('.xlsx')):
+            raise serializers.ValidationError(
+                'Formato de arquivo invalido. Envie um arquivo .csv ou .xlsx.'
+            )
+        return value
+
+    def create(self, validated_data):
+        import csv
+        import io
+
+        file = validated_data['file']
+        content = file.read()
+
+        rows = []
+        if file.name.lower().endswith('.csv'):
+            decoded = content.decode('utf-8-sig')
+            reader = csv.DictReader(io.StringIO(decoded))
+            for row in reader:
+                rows.append(row)
+        else:
+            import openpyxl
+            wb = openpyxl.load_workbook(io.BytesIO(content), read_only=True)
+            ws = wb.active
+            headers = [cell.value for cell in next(ws.iter_rows(min_row=1, max_row=1))]
+            for row in ws.iter_rows(min_row=2, values_only=True):
+                rows.append(dict(zip(headers, row)))
+
+        request = self.context['request']
+        tenant = request.user.tenant
+
+        created = []
+        errors = []
+
+        for i, row in enumerate(rows, start=2):
+            name = (row.get('nome') or row.get('name') or '').strip()
+            phone = (row.get('telefone') or row.get('phone') or '').strip()
+
+            if not name:
+                errors.append({'linha': i, 'erro': 'Nome nao informado.'})
+                continue
+            if not phone:
+                errors.append({'linha': i, 'erro': 'Telefone nao informado.'})
+                continue
+
+            cleaned_phone = clean_phone(phone)
+            if not validate_phone_br(cleaned_phone):
+                errors.append({'linha': i, 'erro': f'Telefone invalido: {phone}'})
+                continue
+
+            base = slugify(name)
+            existing = set(User.objects.values_list('username', flat=True))
+            username = base
+            n = 2
+            while username in existing:
+                username = f'{base}-{n}'
+                n += 1
+
+            password = get_random_string(12)
+
+            try:
+                user = User.objects.create_user(
+                    username=username,
+                    password=password,
+                    role=User.Role.SELLER,
+                    tenant=tenant,
+                )
+                seller = Seller.objects.create(
+                    tenant=tenant,
+                    user=user,
+                    name=name,
+                    phone=cleaned_phone,
+                    commission_rate=tenant.default_commission_rate,
+                )
+
+                try:
+                    from app.apps.notifications.tasks import notify_seller_credentials
+                    notify_seller_credentials(seller, password)
+                except Exception:
+                    pass
+
+                created.append({
+                    'linha': i,
+                    'nome': name,
+                    'telefone': cleaned_phone,
+                    'username': username,
+                })
+
+            except Exception as e:
+                errors.append({'linha': i, 'erro': str(e)})
+
+        return {
+            'total': len(rows),
+            'criados': len(created),
+            'erros': len(errors),
+            'created': created,
+            'errors': errors,
         }
 
 
