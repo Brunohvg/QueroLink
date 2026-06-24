@@ -23,6 +23,18 @@
         .surface-flat {
             background: transparent; border-bottom: 1px solid #e5e7eb;
         }
+        .input-field {
+            padding: 0.625rem 1rem; border: 1px solid #d1d5db; border-radius: 12px;
+            outline: none; transition: border-color 0.15s, box-shadow 0.15s;
+        }
+        .input-field:focus { border-color: #6b7fee; box-shadow: 0 0 0 3px rgba(67,97,238,0.08); }
+        .btn-primary {
+            padding: 0.625rem 1.25rem; border-radius: 12px;
+            background: #4361ee; color: #fff; font-weight: 600; font-size: 14px;
+            transition: background 0.15s;
+        }
+        .btn-primary:hover { background: #3051d3; }
+        .btn-primary:disabled { background: #d1d5db; cursor: not-allowed; }
     </style>
 </head>
 <body class="bg-gray-50 text-gray-900">

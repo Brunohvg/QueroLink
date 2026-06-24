@@ -230,8 +230,14 @@ def mobile_home(request):
             comissao_valor = sc.commission_amount
             comissao_label = 'Ajustada'
         else:
-            comissao_valor = sc.commission_amount if sc else 0
-            comissao_label = ''
+            if not sc:
+                comissao_valor, _ = calculate_estimated_commission(
+                    seller, today.month, today.year,
+                )
+                comissao_label = 'Estimada'
+            else:
+                comissao_valor = sc.commission_amount
+                comissao_label = ''
 
         periodo_status = period.status if period else None
 
