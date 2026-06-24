@@ -150,13 +150,11 @@
         <div x-show="!summary?.top5_mes?.length" class="text-center py-8 text-gray-400 text-[13px]">
             Nenhuma venda no periodo
         </div>
-        <a href="{% url 'dashboard:gestor_ranking' %}" class="block text-center text-[12px] text-brand-500 hover:text-brand-600 font-medium mt-3 pt-3 border-t border-gray-100">
+        <a href="/dashboard/gestor/ranking/" class="block text-center text-[12px] text-brand-500 hover:text-brand-600 font-medium mt-3 pt-3 border-t border-gray-100">
             Ver ranking completo →
         </a>
     </div>
 </div>
-
-<div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
     <div class="surface-card">
         <div class="flex items-center gap-2 mb-2">
             <div class="w-8 h-8 rounded-lg bg-brand-50 flex items-center justify-center">
