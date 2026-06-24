@@ -16,6 +16,7 @@ urlpatterns = [
 
     path('seller/sales/', views.SellerSalesListView.as_view(), name='api-seller-sales'),
     path('seller/links/', views.SellerLinkCreateView.as_view(), name='seller-link-create'),
+    path('seller/change-password/', views.ChangePasswordView.as_view(), name='api-change-password'),
     path('manager/sales/', views.ManagerSalesListView.as_view(), name='api-manager-sales'),
     path('manager/ranking/', views.RankingView.as_view(), name='api-ranking'),
     path('manager/ranking/annual/', views.AnnualRankingView.as_view(), name='api-ranking-annual'),

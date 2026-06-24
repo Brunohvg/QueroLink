@@ -7,32 +7,58 @@
         <a href="{% url 'dashboard:gestor_vendedores' %}" class="tap-target flex items-center justify-center w-10 h-10 rounded-xl hover:bg-gray-100">
             <svg class="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path></svg>
         </a>
-        <div>
-            <h1 class="font-display text-[18px] font-semibold text-gray-900" x-text="sellerData?.seller?.name || '{{ seller.name }}'"></h1>
-            <p class="text-[13px] text-gray-500" x-text="sellerData?.seller?.phone || '{{ seller.phone }}'"></p>
-        </div>
-        <span class="ml-auto inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-success-50 text-success-700"
-              x-show="sellerData?.seller?.is_active">Ativo</span>
-        <span class="ml-auto inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-600"
-              x-show="!sellerData?.seller?.is_active">Inativo</span>
+        <h1 class="font-display text-[18px] font-semibold text-gray-900">Detalhe do Vendedor</h1>
     </div>
 
-    <div class="flex flex-wrap items-center gap-3 mb-6">
-        <select x-model="month" @change="load()" class="px-3 py-2 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
-            <option value="1">01</option><option value="2">02</option><option value="3">03</option><option value="4">04</option><option value="5">05</option><option value="6">06</option><option value="7">07</option><option value="8">08</option><option value="9">09</option><option value="10">10</option><option value="11">11</option><option value="12">12</option>
-        </select>
-        <select x-model="year" @change="load()" class="px-3 py-2 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
-            <option value="2025">2025</option><option value="2026">2026</option><option value="2027">2027</option>
-        </select>
-        <span class="text-[13px] text-gray-400">ou</span>
-        <input type="date" x-model="startDate" @change="load()" class="px-3 py-2 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
-        <span class="text-[13px] text-gray-400">ate</span>
-        <input type="date" x-model="endDate" @change="load()" class="px-3 py-2 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
-        <div class="flex items-center gap-2 ml-auto">
-            <span class="text-[13px] text-gray-500">Exportar:</span>
-            <button @click="exportCsv()" class="px-3 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl text-sm font-medium transition">CSV</button>
-            <button @click="exportXlsx()" class="px-3 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl text-sm font-medium transition">Excel</button>
-            <button @click="exportPdf()" class="px-3 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl text-sm font-medium transition">PDF</button>
+    <div class="surface-card mb-6">
+        <div class="flex items-center gap-5">
+            <div class="w-16 h-16 rounded-full bg-brand-100 flex items-center justify-center flex-shrink-0">
+                <span class="text-[26px] font-bold text-brand-600">{{ seller.name|first|upper }}</span>
+            </div>
+            <div class="flex-1 min-w-0">
+                <div class="flex items-center gap-3 mb-1">
+                    <h2 class="font-display text-[20px] font-semibold text-gray-900" x-text="sellerData?.seller?.name || '{{ seller.name }}'"></h2>
+                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium"
+                          :class="sellerData?.seller?.is_active ? 'bg-success-50 text-success-700' : 'bg-gray-100 text-gray-600'"
+                          x-text="sellerData?.seller?.is_active ? 'Ativo' : 'Inativo'"></span>
+                </div>
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-x-6 gap-y-1 text-[13px]">
+                    <div><span class="text-gray-500">Telefone:</span> <span class="font-medium text-gray-800" x-text="sellerData?.seller?.phone || '{{ seller.phone }}'"></span></div>
+                    <div><span class="text-gray-500">Usuario:</span> <span class="font-medium text-gray-800" x-text="sellerData?.seller?.username"></span></div>
+                    <div><span class="text-gray-500">Taxa:</span> <span class="font-medium text-brand-600" x-text="sellerData?.seller?.commission_rate ? (sellerData.seller.commission_rate*100).toFixed(2)+'%' : '-'"></span></div>
+                    <div><span class="text-gray-500">Cadastro:</span> <span class="font-medium text-gray-800" x-text="sellerData?.seller?.created_at ? new Date(sellerData.seller.created_at).toLocaleDateString('pt-BR') : '-'"></span></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="bg-white rounded-2xl p-4 mb-6 border border-gray-200">
+        <div class="flex flex-wrap items-center gap-2">
+            <select x-model="month" @change="load()" class="px-3 py-2 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 bg-white">
+                <option value="1">01</option><option value="2">02</option><option value="3">03</option><option value="4">04</option><option value="5">05</option><option value="6">06</option><option value="7">07</option><option value="8">08</option><option value="9">09</option><option value="10">10</option><option value="11">11</option><option value="12">12</option>
+            </select>
+            <select x-model="year" @change="load()" class="px-3 py-2 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 bg-white">
+                <option value="2024">2024</option><option value="2025">2025</option><option value="2026">2026</option><option value="2027">2027</option><option value="2028">2028</option>
+            </select>
+            <span class="text-[13px] text-gray-400 mx-1">ou</span>
+            <input type="date" x-model="startDate" @change="load()" class="px-3 py-2 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
+            <span class="text-[13px] text-gray-400">ate</span>
+            <input type="date" x-model="endDate" @change="load()" class="px-3 py-2 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
+            <div class="flex items-center gap-1 ml-auto">
+                <span class="text-[13px] text-gray-500 mr-1">Exportar:</span>
+                <button @click="exportCsv()" class="px-3 py-2 bg-gray-100 hover:bg-brand-50 hover:text-brand-600 text-gray-700 rounded-xl text-sm font-medium transition flex items-center gap-1">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+                    CSV
+                </button>
+                <button @click="exportXlsx()" class="px-3 py-2 bg-gray-100 hover:bg-brand-50 hover:text-brand-600 text-gray-700 rounded-xl text-sm font-medium transition flex items-center gap-1">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+                    Excel
+                </button>
+                <button @click="exportPdf()" class="px-3 py-2 bg-gray-100 hover:bg-brand-50 hover:text-brand-600 text-gray-700 rounded-xl text-sm font-medium transition flex items-center gap-1">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"></path></svg>
+                    PDF
+                </button>
+            </div>
         </div>
     </div>
 
@@ -51,28 +77,28 @@
         <div class="surface-card">
             <p class="text-[13px] font-semibold text-gray-500 uppercase tracking-wide mb-2">Vendas por link</p>
             <p class="font-display text-[28px] font-semibold text-gray-900 leading-none" x-text="formatMoneyBRL(sellerData?.link_total || 0)"></p>
-            <p class="text-[13px] text-gray-500 mt-1">Informativo - nao entra na comissao</p>
+            <p class="text-[13px] text-gray-500 mt-1">Informativo — nao entra na comissao</p>
         </div>
     </div>
 
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
         <div class="surface-card" x-show="sellerData?.evolution?.length">
             <h2 class="text-[13px] font-semibold text-gray-500 uppercase tracking-wide mb-4">Evolucao no periodo</h2>
-            <div class="h-56"><canvas id="evolutionChart"></canvas></div>
+            <div class="h-64"><canvas id="evolutionChart"></canvas></div>
         </div>
         <div class="surface-card" x-show="sellerData?.comparison?.length">
             <h2 class="text-[13px] font-semibold text-gray-500 uppercase tracking-wide mb-4">Comparacao mensal</h2>
             <table class="w-full text-left text-[13px]">
                 <thead>
-                    <tr><th class="py-2 text-gray-500">Mes</th><th class="py-2 text-gray-500 text-right">Vendas</th><th class="py-2 text-gray-500 text-right">Total</th><th class="py-2 text-gray-500 text-right">Comissao</th></tr>
+                    <tr><th class="py-2 text-gray-500 font-semibold border-b border-gray-200">Mes</th><th class="py-2 text-gray-500 font-semibold border-b border-gray-200 text-right">Vendas</th><th class="py-2 text-gray-500 font-semibold border-b border-gray-200 text-right">Total</th><th class="py-2 text-gray-500 font-semibold border-b border-gray-200 text-right">Comissao</th></tr>
                 </thead>
                 <tbody>
                     <template x-for="c in sellerData?.comparison" :key="c.month">
-                        <tr class="border-t border-gray-100">
-                            <td class="py-2 font-medium" x-text="c.month"></td>
-                            <td class="py-2 text-right" x-text="c.sale_count"></td>
-                            <td class="py-2 text-right font-medium" x-text="formatMoneyBRL(c.total)"></td>
-                            <td class="py-2 text-right" x-text="formatMoneyBRL(c.commission)"></td>
+                        <tr class="border-b border-gray-50 hover:bg-gray-50">
+                            <td class="py-3 font-medium" x-text="c.month"></td>
+                            <td class="py-3 text-right" x-text="c.sale_count"></td>
+                            <td class="py-3 text-right font-medium" x-text="formatMoneyBRL(c.total)"></td>
+                            <td class="py-3 text-right font-medium text-success-700" x-text="formatMoneyBRL(c.commission)"></td>
                         </tr>
                     </template>
                 </tbody>
@@ -84,7 +110,7 @@
         <h2 class="text-[13px] font-semibold text-gray-500 uppercase tracking-wide mb-4">Vendas manuais do periodo</h2>
         <table class="w-full text-left text-[14px]">
             <thead>
-                <tr><th class="px-4 py-3 font-semibold text-gray-500 border-b border-gray-200 bg-gray-50">Data</th><th class="px-4 py-3 font-semibold text-gray-500 border-b border-gray-200 bg-gray-50">Valor</th><th class="px-4 py-3 font-semibold text-gray-500 border-b border-gray-200 bg-gray-50">Observacao</th></tr>
+                <tr><th class="px-4 py-3 font-semibold text-gray-500 border-b border-gray-200 bg-gray-50 rounded-tl-xl">Data</th><th class="px-4 py-3 font-semibold text-gray-500 border-b border-gray-200 bg-gray-50">Valor</th><th class="px-4 py-3 font-semibold text-gray-500 border-b border-gray-200 bg-gray-50 rounded-tr-xl">Observacao</th></tr>
             </thead>
             <tbody>
                 <template x-for="s in sellerData?.manual_sales" :key="s.uuid">
@@ -119,11 +145,11 @@
 
     <div class="surface-card" x-show="sellerData?.commissions?.length">
         <h2 class="text-[13px] font-semibold text-gray-500 uppercase tracking-wide mb-4">Historico de comissoes</h2>
-        <div class="space-y-2">
+        <div class="space-y-1">
             <template x-for="c in sellerData?.commissions" :key="c.period_month + '/' + c.period_year">
-                <div class="flex items-center justify-between py-2 border-b border-gray-100 last:border-0">
-                    <span class="text-[14px] font-medium" x-text="String(c.period_month).padStart(2,'0')+'/'+c.period_year"></span>
-                    <span class="text-xs px-2 py-0.5 rounded-full font-medium"
+                <div class="flex items-center justify-between py-3 px-3 rounded-xl hover:bg-gray-50 transition -mx-3">
+                    <span class="text-[14px] font-semibold text-gray-900 min-w-[80px]" x-text="String(c.period_month).padStart(2,'0')+'/'+c.period_year"></span>
+                    <span class="text-xs px-2.5 py-1 rounded-full font-medium"
                           :class="{'bg-gray-100 text-gray-600': c.period_status==='ABERTA',
                                    'bg-warning-50 text-warning-700': c.period_status==='FECHADA',
                                    'bg-amber-50 text-amber-700': c.period_status==='AJUSTADA',
@@ -131,7 +157,7 @@
                                    'bg-success-50 text-success-700': c.period_status==='PAGA'}"
                           x-text="c.period_status.replace(/_/g,' ')"></span>
                     <span class="text-[13px] text-gray-500" x-text="'Vendas: '+formatMoneyBRL(c.total_sold_amount)"></span>
-                    <span class="text-[14px] font-semibold text-success-700" x-text="formatMoneyBRL(c.commission_amount)"></span>
+                    <span class="text-[14px] font-semibold text-success-700 min-w-[100px] text-right" x-text="formatMoneyBRL(c.commission_amount)"></span>
                 </div>
             </template>
         </div>
@@ -139,6 +165,7 @@
     {% endverbatim %}
 </div>
 
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
 <script>
 function sellerDetailPage() {
     return {
@@ -185,13 +212,14 @@ function sellerDetailPage() {
                         backgroundColor: 'rgba(67, 97, 238, 0.08)',
                         fill: true,
                         tension: 0.3,
-                        pointRadius: 2,
+                        pointRadius: 3,
+                        pointBackgroundColor: '#4361ee',
                     }]
                 },
                 options: {
                     responsive: true, maintainAspectRatio: false,
                     plugins: { legend: { display: false } },
-                    scales: { y: { beginAtZero: true } }
+                    scales: { y: { beginAtZero: true, ticks: { callback: v => 'R$ ' + v.toFixed(2).replace('.', ',') } } }
                 }
             });
         },

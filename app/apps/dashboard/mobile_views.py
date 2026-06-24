@@ -433,6 +433,19 @@ def _get_seller_profile(request):
 
 
 @login_required
+def mobile_perfil(request):
+    seller = _get_seller_profile(request)
+    if not seller:
+        return render(request, 'mobile/perfil.html', {
+            'error': 'Perfil de vendedor nao encontrado.',
+        })
+
+    return render(request, 'mobile/perfil.html', {
+        'seller': seller,
+    })
+
+
+@login_required
 def mobile_links(request):
     seller = _get_seller_profile(request)
     if not seller:

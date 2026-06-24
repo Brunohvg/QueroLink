@@ -29,6 +29,7 @@ from .serializers import (
     SaleCreateSerializer,
     CommissionPeriodSerializer,
     CommissionPeriodCreateSerializer,
+    ChangePasswordSerializer,
 )
 from .permissions import IsManagerOrAdmin, IsFinancialOrAdmin, IsSellerOwner
 from app.apps.audit.utils import log_action
@@ -1121,3 +1122,15 @@ class SellerLinkCreateView(generics.GenericAPIView):
 
         except Exception as e:
             return Response({'error': str(e)}, status=500)
+
+
+class ChangePasswordView(generics.GenericAPIView):
+    permission_classes = [IsAuthenticated]
+    serializer_class = ChangePasswordSerializer
+
+    def post(self, request):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        log_action(request, 'user.password_changed')
+        return Response({'message': 'Senha alterada com sucesso.'})

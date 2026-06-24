@@ -29,4 +29,5 @@ urlpatterns += [
     path('mobile/vendas/', mobile_views.mobile_minhas_vendas, name='mobile_minhas_vendas'),
     path('mobile/desempenho/', mobile_views.mobile_meu_desempenho, name='mobile_meu_desempenho'),
     path('mobile/links/', mobile_views.mobile_links, name='mobile_links'),
+    path('mobile/perfil/', mobile_views.mobile_perfil, name='mobile_perfil'),
 ]
