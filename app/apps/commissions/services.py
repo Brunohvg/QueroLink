@@ -404,17 +404,24 @@ def get_dashboard_data(tenant, month=None, year=None):
         summary = calculate_period_summary(period)
         period_status = period.status
     else:
+        sellers_ativos = Seller.objects.filter(tenant=tenant, is_active=True)
+        comissao_estimada = 0
+        for s in sellers_ativos:
+            total = get_manual_sales_total(s, month, year)
+            rate = get_commission_rate(s)
+            comissao_estimada += int(float(total) * float(rate) + 0.5)
+
         summary = {
-            'commission_aberta': 0,
+            'commission_aberta': comissao_estimada,
             'commission_fechada': 0,
             'commission_paga': 0,
-            'vendedores_abertos': 0,
+            'vendedores_abertos': sellers_ativos.count(),
             'vendedores_fechados': 0,
             'vendedores_pagos': 0,
             'vendedores_prontos': 0,
             'vendedores_pendentes': 0,
             'vendedores_sem_lancamento': 0,
-            'total_vendedores': 0,
+            'total_vendedores': sellers_ativos.count(),
         }
         period_status = None
 
