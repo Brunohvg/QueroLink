@@ -8,52 +8,64 @@
             <p class="text-[13px] text-gray-500">Feche, reverta, pague e acompanhe as comissoes dos vendedores por mes.</p>
         </div>
         <div class="flex items-center gap-2">
+            <button @click="openCreateModal()" class="bg-brand-500 hover:bg-brand-600 text-white font-medium py-2 px-4 rounded-xl transition tap-target text-[14px] flex items-center gap-1">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
+                Criar competencia
+            </button>
             <button @click="load()" class="bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium py-2 px-4 rounded-xl transition tap-target text-[14px] flex items-center gap-1">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
-                Atualizar valores
+                Sincronizar
             </button>
-            <template x-if="!periods.length">
-                <button @click="openCreateModal()" class="bg-brand-500 hover:bg-brand-600 text-white font-medium py-2 px-4 rounded-xl transition tap-target text-[14px] flex items-center gap-1">
-                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
-                    Criar competencia
-                </button>
-            </template>
         </div>
     </div>
 
     <template x-for="p in periods" :key="p.uuid">
-        <div class="surface-card mb-4">
-            <div class="flex items-start justify-between mb-3">
-                <div>
-                    <div class="flex items-center gap-3 mb-1">
-                        <h3 class="font-semibold text-[18px]" x-text="String(p.month).padStart(2,'0')+'/'+p.year"></h3>
-                        <span x-show="p.status==='ABERTA'" class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-600">ABERTA</span>
-                        <span x-show="p.status==='PARCIALMENTE_FECHADA'" class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-700">PARCIALMENTE FECHADA</span>
-                        <span x-show="p.status==='FECHADA'" class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-warning-50 text-warning-700">FECHADA</span>
-                        <span x-show="p.status==='PARCIALMENTE_PAGA'" class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-indigo-100 text-indigo-700">PARCIALMENTE PAGA</span>
-                        <span x-show="p.status==='PAGA'" class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-success-50 text-success-700">PAGA</span>
-                        <span x-show="p.status==='CANCELADA'" class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-danger-50 text-danger-700">CANCELADA</span>
-                    </div>
-                    <div class="grid grid-cols-2 md:grid-cols-4 gap-x-6 gap-y-1 text-[12px] text-gray-500 mt-2">
-                        <span>Total vendido: <strong class="text-gray-800" x-text="formatMoneyBRL(totalVendido(p))"></strong></span>
-                        <span>Comissao total: <strong class="text-brand-600" x-text="formatMoneyBRL(totalComissao(p))"></strong></span>
-                        <span>Vendedores: <strong class="text-gray-800" x-text="(p.seller_commissions||[]).length"></strong></span>
-                        <span>Dias esperados: <strong class="text-gray-800" x-text="p.expected_working_days || 22"></strong></span>
-                        <span x-show="p.closed_at">Fechamento: <strong class="text-gray-800" x-text="new Date(p.closed_at).toLocaleDateString('pt-BR')"></strong></span>
-                        <span x-show="p.paid_at">Pagamento: <strong class="text-gray-800" x-text="new Date(p.paid_at).toLocaleDateString('pt-BR')"></strong></span>
-                    </div>
+        <div class="surface-card mb-4 overflow-hidden">
+            <div class="flex items-center justify-between mb-4">
+                <div class="flex items-center gap-3">
+                    <h3 class="font-display text-[18px] font-semibold text-gray-900" x-text="String(p.month).padStart(2,'0')+'/'+p.year"></h3>
+                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium"
+                          :class="{'bg-gray-100 text-gray-600': p.status==='ABERTA',
+                                   'bg-amber-100 text-amber-700': p.status==='PARCIALMENTE_FECHADA',
+                                   'bg-warning-50 text-warning-700': p.status==='FECHADA',
+                                   'bg-indigo-100 text-indigo-700': p.status==='PARCIALMENTE_PAGA',
+                                   'bg-success-50 text-success-700': p.status==='PAGA',
+                                   'bg-danger-50 text-danger-700': p.status==='CANCELADA'}"
+                          x-text="p.status.replace(/_/g,' ')"></span>
+                </div>
+                <div class="flex items-center gap-4 text-[13px]">
+                    <span class="text-gray-500">Vendido: <strong class="text-gray-800" x-text="formatMoneyBRL(totalVendido(p))"></strong></span>
+                    <span class="text-gray-500">Comissao: <strong class="text-brand-600" x-text="formatMoneyBRL(totalComissao(p))"></strong></span>
+                    <span class="text-gray-500">Vendedores: <strong class="text-gray-800" x-text="(p.seller_commissions||[]).length"></strong></span>
+                    <span x-show="p.closed_at" class="text-gray-500">Fechado: <strong class="text-gray-800" x-text="new Date(p.closed_at).toLocaleDateString('pt-BR')"></strong></span>
+                    <span x-show="p.paid_at" class="text-gray-500">Pago: <strong class="text-gray-800" x-text="new Date(p.paid_at).toLocaleDateString('pt-BR')"></strong></span>
                 </div>
             </div>
 
-            <div class="flex items-center gap-2 mb-3">
-                <button @click="selectAbertos(p)" class="text-[12px] text-brand-500 hover:underline">Abertos</button>
-                <button @click="selectFechados(p)" class="text-[12px] text-brand-500 hover:underline">Fechados</button>
-                <button @click="selectProntos(p)" class="text-[12px] text-brand-500 hover:underline">Prontos</button>
-                <button @click="clearSelection(p)" class="text-[12px] text-gray-500 hover:underline">Limpar</button>
-                <button @click="openEditModal(p)" class="text-[12px] text-gray-600 hover:underline ml-auto">Editar competencia</button>
-                <button @click="openDeleteModal(p)" x-show="p.status==='ABERTA'" class="text-[12px] text-danger-500 hover:underline">Excluir</button>
-                <button @click="openCancelModal(p)" x-show="p.status!=='PAGA' && p.status!=='CANCELADA'" class="text-[12px] text-danger-500 hover:underline">Cancelar</button>
-                <a :href="'/api/financial/commissions/'+p.uuid+'/csv/'" class="text-[12px] text-gray-600 hover:underline">CSV</a>
+            <div class="flex items-center gap-2 mb-4 pb-4 border-b border-gray-100">
+                <span class="text-[12px] text-gray-400 font-medium mr-1">Selecionar:</span>
+                <button @click="selectAbertos(p)" class="text-[12px] px-2.5 py-1 rounded-lg bg-gray-100 hover:bg-brand-50 hover:text-brand-600 text-gray-600 font-medium transition">Abertos</button>
+                <button @click="selectFechados(p)" class="text-[12px] px-2.5 py-1 rounded-lg bg-gray-100 hover:bg-brand-50 hover:text-brand-600 text-gray-600 font-medium transition">Fechados</button>
+                <button @click="selectProntos(p)" class="text-[12px] px-2.5 py-1 rounded-lg bg-gray-100 hover:bg-brand-50 hover:text-brand-600 text-gray-600 font-medium transition">Prontos</button>
+                <button @click="clearSelection(p)" class="text-[12px] px-2.5 py-1 rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-600 font-medium transition">Limpar</button>
+                <div class="ml-auto flex items-center gap-1">
+                    <button @click="openEditModal(p)" class="text-[12px] px-2.5 py-1 rounded-lg hover:bg-gray-100 text-gray-600 font-medium transition flex items-center gap-1">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path></svg>
+                        Editar
+                    </button>
+                    <button @click="openDeleteModal(p)" x-show="p.status==='ABERTA'" class="text-[12px] px-2.5 py-1 rounded-lg hover:bg-danger-50 text-danger-500 font-medium transition flex items-center gap-1">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                        Excluir
+                    </button>
+                    <button @click="openCancelModal(p)" x-show="p.status!=='PAGA' && p.status!=='CANCELADA'" class="text-[12px] px-2.5 py-1 rounded-lg hover:bg-warning-50 text-warning-700 font-medium transition flex items-center gap-1">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                        Cancelar
+                    </button>
+                    <a :href="'/api/financial/commissions/'+p.uuid+'/csv/'" class="text-[12px] px-2.5 py-1 rounded-lg hover:bg-gray-100 text-gray-600 font-medium transition flex items-center gap-1">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+                        CSV
+                    </a>
+                </div>
             </div>
 
             <table class="w-full text-left text-[13px]" x-show="p.seller_commissions&&p.seller_commissions.length">
@@ -277,8 +289,19 @@ function fechamentoPage() {
 
         openCreateModal() {
             var d = new Date();
-            this.createMonth = d.getMonth() + 1;
-            this.createYear = d.getFullYear();
+            var tryMonth = d.getMonth() + 1;
+            var tryYear = d.getFullYear();
+            var exists = this.periods.some(p => p.month === tryMonth && p.year === tryYear);
+            if (exists) {
+                tryMonth += 1;
+                if (tryMonth > 12) { tryMonth = 1; tryYear += 1; }
+                while (this.periods.some(p => p.month === tryMonth && p.year === tryYear)) {
+                    tryMonth += 1;
+                    if (tryMonth > 12) { tryMonth = 1; tryYear += 1; }
+                }
+            }
+            this.createMonth = tryMonth;
+            this.createYear = tryYear;
             this.createExpectedDays = 22;
             this.createNotes = '';
             this.showCreateModal = true;
