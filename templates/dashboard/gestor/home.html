@@ -11,32 +11,39 @@
 </div>
 {% endif %}
 
-<div class="flex items-center gap-3 mb-6 flex-wrap">
-    <select x-model="filterMonth" @change="loadSummary()" class="input-field text-[14px] bg-white">
-        <option value="">Mes atual</option>
-        <template x-for="m in 12" :key="m">
-            <option :value="m" x-text="String(m).padStart(2,'0')"></option>
-        </template>
-    </select>
-    <select x-model="filterYear" @change="loadSummary()" class="input-field text-[14px] bg-white">
-        <option value="">Ano atual</option>
-        <template x-for="y in [2024,2025,2026,2027,2028]" :key="y">
-            <option :value="y" x-text="y"></option>
-        </template>
-    </select>
-    <span class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium"
-          :class="{'bg-brand-50 text-brand-700': summary?.period_status === 'ABERTA',
-                   'bg-warning-50 text-warning-700': summary?.period_status === 'FECHADA',
-                   'bg-success-50 text-success-700': summary?.period_status === 'PAGA',
-                   'bg-gray-100 text-gray-500': !summary?.period_status}">
-        <span class="w-1.5 h-1.5 rounded-full"
-              :class="{'bg-brand-500': summary?.period_status === 'ABERTA',
-                       'bg-warning-500': summary?.period_status === 'FECHADA',
-                       'bg-success-500': summary?.period_status === 'PAGA',
-                       'bg-gray-400': !summary?.period_status}"></span>
-        <span x-text="summary?.period_status ? summary.period_status.replace(/_/g,' ') : 'Sem periodo'"></span>
-    </span>
-    <button @click="loadSummary()" class="bg-brand-500 hover:bg-brand-600 text-white font-medium py-2 px-4 rounded-xl transition tap-target text-[14px] flex items-center gap-1.5 ml-auto">
+<div class="bg-white rounded-2xl p-4 mb-6 border border-gray-200 flex items-center gap-4 flex-wrap">
+    <div class="flex items-center gap-2">
+        <label class="text-[13px] text-gray-500 font-medium whitespace-nowrap">Periodo</label>
+        <div class="flex items-center gap-1">
+            <select x-model="filterMonth" @change="loadSummary()" class="px-3 py-2 border border-gray-200 rounded-xl text-[14px] bg-gray-50 hover:bg-white focus:bg-white focus:border-brand-400 focus:outline-none transition cursor-pointer appearance-none pr-8" style="background-image:url('data:image/svg+xml;utf8,<svg xmlns=%22http://www.w3.org/2000/svg%22 width=%2216%22 height=%2216%22 viewBox=%220 0 24 24%22 fill=%22none%22 stroke=%22%239ca3af%22 stroke-width=%222%22><path stroke-linecap=%22round%22 stroke-linejoin=%22round%22 d=%22M6 9l6 6 6-6%22/></svg>');background-repeat:no-repeat;background-position:right 8px center;">
+                <option value="">Mes atual</option>
+                <template x-for="m in 12" :key="m">
+                    <option :value="m" x-text="String(m).padStart(2,'0')"></option>
+                </template>
+            </select>
+            <select x-model="filterYear" @change="loadSummary()" class="px-3 py-2 border border-gray-200 rounded-xl text-[14px] bg-gray-50 hover:bg-white focus:bg-white focus:border-brand-400 focus:outline-none transition cursor-pointer appearance-none pr-8" style="background-image:url('data:image/svg+xml;utf8,<svg xmlns=%22http://www.w3.org/2000/svg%22 width=%2216%22 height=%2216%22 viewBox=%220 0 24 24%22 fill=%22none%22 stroke=%22%239ca3af%22 stroke-width=%222%22><path stroke-linecap=%22round%22 stroke-linejoin=%22round%22 d=%22M6 9l6 6 6-6%22/></svg>');background-repeat:no-repeat;background-position:right 8px center;">
+                <option value="">Ano atual</option>
+                <template x-for="y in [2024,2025,2026,2027,2028]" :key="y">
+                    <option :value="y" x-text="y"></option>
+                </template>
+            </select>
+        </div>
+    </div>
+    <div class="flex items-center gap-3">
+        <span class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium"
+              :class="{'bg-brand-50 text-brand-700': summary?.period_status === 'ABERTA',
+                       'bg-warning-50 text-warning-700': summary?.period_status === 'FECHADA',
+                       'bg-success-50 text-success-700': summary?.period_status === 'PAGA',
+                       'bg-gray-100 text-gray-500': !summary?.period_status}">
+            <span class="w-1.5 h-1.5 rounded-full"
+                  :class="{'bg-brand-500': summary?.period_status === 'ABERTA',
+                           'bg-warning-500': summary?.period_status === 'FECHADA',
+                           'bg-success-500': summary?.period_status === 'PAGA',
+                           'bg-gray-400': !summary?.period_status}"></span>
+            <span x-text="summary?.period_status ? summary.period_status.replace(/_/g,' ') : 'Sem periodo'"></span>
+        </span>
+    </div>
+    <button @click="loadSummary()" class="ml-auto bg-brand-500 hover:bg-brand-600 text-white font-medium py-2 px-5 rounded-xl transition tap-target text-[14px] flex items-center gap-2 shadow-sm hover:shadow-md">
         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
         Sincronizar
     </button>
