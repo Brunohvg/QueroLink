@@ -25,6 +25,22 @@ class SellerSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = ['uuid', 'username', 'created_at']
 
+    def validate_phone(self, value):
+        cleaned = clean_phone(value)
+        if not validate_phone_br(cleaned):
+            raise serializers.ValidationError(
+                'Telefone invalido. Informe um numero com DDD (10 ou 11 digitos).'
+            )
+        tenant = self.context['request'].user.tenant
+        qs = Seller.objects.filter(tenant=tenant, phone=cleaned)
+        if self.instance:
+            qs = qs.exclude(pk=self.instance.pk)
+        if qs.exists():
+            raise serializers.ValidationError(
+                'Este telefone ja esta cadastrado para outro vendedor.'
+            )
+        return cleaned
+
 
 class SellerCreateSerializer(serializers.Serializer):
     name = serializers.CharField(max_length=100)
@@ -36,6 +52,14 @@ class SellerCreateSerializer(serializers.Serializer):
             raise serializers.ValidationError(
                 'Telefone invalido. Informe um numero com DDD (10 ou 11 digitos).'
             )
+        request = self.context.get('request')
+        if request and request.user.tenant:
+            if Seller.objects.filter(
+                tenant=request.user.tenant, phone=cleaned
+            ).exists():
+                raise serializers.ValidationError(
+                    'Este telefone ja esta cadastrado para outro vendedor.'
+                )
         return cleaned
 
     def create(self, validated_data):
@@ -155,6 +179,10 @@ class SellerImportSerializer(serializers.Serializer):
         created = []
         errors = []
         used_usernames = set()
+        used_phones = set(
+            Seller.objects.filter(tenant=tenant)
+            .values_list('phone', flat=True)
+        )
 
         for i, row in enumerate(rows, start=2):
             name = (row.get('nome') or row.get('name') or '').strip()
@@ -170,6 +198,10 @@ class SellerImportSerializer(serializers.Serializer):
             cleaned_phone = clean_phone(phone)
             if not validate_phone_br(cleaned_phone):
                 errors.append({'linha': i, 'erro': f'Telefone invalido: {phone}'})
+                continue
+
+            if cleaned_phone in used_phones:
+                errors.append({'linha': i, 'erro': f'Telefone ja cadastrado: {phone}'})
                 continue
 
             base = slugify(name)
@@ -204,6 +236,7 @@ class SellerImportSerializer(serializers.Serializer):
                     pass
 
                 used_usernames.add(username)
+                used_phones.add(cleaned_phone)
                 created.append({
                     'linha': i,
                     'nome': name,

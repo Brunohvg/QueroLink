@@ -51,6 +51,7 @@
                                 <button @click="openEditModal(s)" class="p-1.5 text-gray-400 hover:text-brand-500 rounded-lg hover:bg-gray-50" title="Editar"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path></svg></button>
                                 <button @click="toggleActive(s)" class="p-1.5 text-gray-400 hover:text-warning-500 rounded-lg hover:bg-gray-50" title="Ativar/Desativar"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path></svg></button>
                                 <button @click="resetPassword(s)" class="p-1.5 text-gray-400 hover:text-brand-500 rounded-lg hover:bg-gray-50" title="Resetar senha"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"></path></svg></button>
+                                <button @click="confirmDelete(s)" class="p-1.5 text-gray-400 hover:text-danger-500 rounded-lg hover:bg-gray-50" title="Excluir"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg></button>
                             </div>
                         </td>
                     </tr>
@@ -124,6 +125,18 @@
             </div>
         </div>
     </div>
+
+    <div x-show="showDeleteModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40" @click.self="showDeleteModal=false">
+        <div class="bg-white rounded-2xl shadow-xl p-6 w-full max-w-sm mx-4 text-center">
+            <div class="w-12 h-12 bg-danger-50 rounded-full flex items-center justify-center mx-auto mb-3"><svg class="w-6 h-6 text-danger-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"></path></svg></div>
+            <h3 class="text-[16px] font-semibold mb-2">Excluir Vendedor</h3>
+            <p class="text-[13px] text-gray-500 mb-4">Tem certeza que deseja excluir <strong x-text="deletingSeller?.name"></strong>? Esta acao nao pode ser desfeita.</p>
+            <div class="flex gap-3 justify-center">
+                <button type="button" @click="showDeleteModal=false" class="bg-white border border-gray-300 text-gray-700 font-medium py-2 px-4 rounded-xl transition text-[14px]">Cancelar</button>
+                <button type="button" @click="executeDelete()" class="bg-danger-600 hover:bg-danger-700 text-white font-medium py-2 px-4 rounded-xl transition text-[14px]">Excluir</button>
+            </div>
+        </div>
+    </div>
 </div>
 
 <script>
@@ -150,6 +163,7 @@ function vendedoresPage() {
     return {
         sellers: [], showModal: false, editing: false, showPasswordModal: false,
         showImportModal: false, importing: false, selectedFile: null, importResult: null,
+        showDeleteModal: false, deletingSeller: null,
         dragOver: false,
         passwordResult: {}, passwordAction: '',
         form: { name: '', phone: '', commission_rate: '1.00' },
@@ -218,6 +232,15 @@ function vendedoresPage() {
         },
         async toggleActive(s) { await fetch(`/api/sellers/${s.uuid}/`, { method:'PATCH', headers:{'Content-Type':'application/json', 'X-CSRFToken': getCSRFToken()}, body:JSON.stringify({is_active:!s.is_active}) }); this.loadSellers(); },
         async resetPassword(s) { var r = await fetch(`/api/sellers/${s.uuid}/reset_password/`, { method:'POST', headers:{'X-CSRFToken': getCSRFToken()} }); var d = await r.json(); if (r.ok) { this.passwordResult = d; this.passwordAction = 'reset'; this.showPasswordModal = true; } },
+        confirmDelete(s) { this.deletingSeller = s; this.showDeleteModal = true; },
+        async executeDelete() {
+            if (!this.deletingSeller) return;
+            var r = await fetch(`/api/sellers/${this.deletingSeller.uuid}/`, { method:'DELETE', headers:{'X-CSRFToken': getCSRFToken()} });
+            this.showDeleteModal = false;
+            this.deletingSeller = null;
+            if (r.ok) this.loadSellers();
+            else { var d = await r.json(); alert(Object.values(d).flat().join('\n')); }
+        },
         async handleFileDrop(event) {
             this.dragOver = false;
             var file = event.dataTransfer.files[0];

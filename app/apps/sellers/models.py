@@ -18,6 +18,12 @@ class Seller(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=['tenant', 'phone'],
+                name='unique_tenant_phone',
+            ),
+        ]
         indexes = [
             models.Index(fields=['tenant', 'is_active']),
         ]
