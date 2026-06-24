@@ -1,57 +1,62 @@
 {% extends 'mobile/base_mobile.html' %}
 {% block title %}Minhas Vendas — QueroLink{% endblock %}
 {% block content %}
-<div class="space-y-4" x-data="minhasVendas()">
+<div class="space-y-5" x-data="minhasVendas()">
     <div class="flex items-center gap-3">
-        <a href="{% url 'dashboard:mobile_home' %}" class="tap-target flex items-center justify-center w-10 h-10">
-            <svg class="w-6 h-6 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path></svg>
+        <a href="{% url 'dashboard:mobile_home' %}" class="w-10 h-10 bg-white rounded-xl shadow-sm flex items-center justify-center tap-target text-slate-400 hover:text-brand-500 transition">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path></svg>
         </a>
-        <h1 class="font-display text-[18px] font-semibold text-gray-900">Minhas Vendas</h1>
+        <h1 class="font-display text-[18px] font-semibold text-slate-800">Minhas Vendas</h1>
     </div>
 
     {% if error %}
-    <div class="bg-danger-50 border border-danger-500/20 text-danger-700 px-4 py-3 rounded-xl text-sm">{{ error }}</div>
+    <div class="bg-danger-50 border border-danger-200/50 text-danger-700 px-4 py-3 rounded-2xl text-sm">{{ error }}</div>
     {% endif %}
 
     {% if not sales %}
-    <div class="text-center py-12">
-        <p class="text-gray-500">Nenhuma venda registrada ainda.</p>
+    <div class="text-center py-16">
+        <div class="w-16 h-16 rounded-2xl bg-slate-100 flex items-center justify-center mx-auto mb-4">
+            <svg class="w-8 h-8 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path></svg>
+        </div>
+        <p class="text-slate-500 font-medium">Nenhuma venda registrada ainda.</p>
         <a href="{% url 'dashboard:mobile_lancar_venda' %}"
-           class="inline-block mt-3 bg-brand-500 hover:bg-brand-600 text-white font-medium px-5 py-2.5 rounded-xl tap-target text-[15px]">
+           class="inline-block mt-4 bg-brand-500 hover:bg-brand-600 text-white font-semibold px-6 py-3 rounded-2xl tap-target text-[15px] shadow-lg">
             Lancar primeira venda
         </a>
     </div>
     {% else %}
 
-    <div id="sales-list">
+    <div id="sales-list" class="space-y-5">
         {% regroup sales by sale_date|date:"d/m/Y" as sales_by_date %}
         {% for group in sales_by_date %}
-        <div class="mb-4">
-            <div class="flex items-center justify-between mb-2">
-                <h3 class="text-[13px] font-semibold text-gray-500">{{ group.grouper }}</h3>
-                <span class="text-xs text-gray-400">{{ group.list|length }} venda{{ group.list|length|pluralize:'s' }}</span>
+        <div>
+            <div class="flex items-center justify-between mb-3 px-1">
+                <h3 class="text-[13px] font-semibold text-slate-500">{{ group.grouper }}</h3>
+                <span class="text-xs text-slate-400 font-medium">{{ group.list|length }} venda{{ group.list|length|pluralize:'s' }}</span>
             </div>
 
+            <div class="space-y-2">
             {% for sale in group.list %}
-            <div class="surface-card mb-2 flex items-center justify-between"
+            <div class="surface-card flex items-center justify-between"
                  x-data="{ saleId: '{{ sale.uuid }}', deleted: false }" x-show="!deleted">
                 <div class="flex-1 min-w-0">
-                    <span class="text-xs px-2 py-0.5 rounded-full font-medium
-                        {% if sale.origin == 'LINK' %}bg-brand-50 text-brand-600{% else %}bg-success-50 text-success-700{% endif %}">
+                    <span class="text-[11px] px-2 py-0.5 rounded-lg font-semibold
+                        {% if sale.origin == 'LINK' %}bg-brand-50 text-brand-600{% else %}bg-emerald-50 text-emerald-600{% endif %}">
                         {{ sale.get_origin_display }}
                     </span>
-                    <p class="font-semibold text-gray-900 text-[14px] mt-1" x-text="formatMoneyBRL({{ sale.amount }})"></p>
+                    <p class="font-semibold text-slate-800 text-[15px] mt-1.5" x-text="formatMoneyBRL({{ sale.amount }})"></p>
                     {% if sale.notes %}
-                    <p class="text-xs text-gray-400 truncate mt-0.5">{{ sale.notes }}</p>
+                    <p class="text-xs text-slate-400 truncate mt-0.5">{{ sale.notes }}</p>
                     {% endif %}
                 </div>
                 <button x-on:click="deleteSale('{{ sale.uuid }}', '{{ sale.sale_date|date:"Y-m-d" }}')"
                         x-show="canDelete('{{ sale.sale_date|date:"Y-m-d" }}')"
-                        class="tap-target flex items-center justify-center w-10 h-10 text-gray-400 hover:text-danger-500 transition ml-2">
+                        class="tap-target flex items-center justify-center w-10 h-10 text-slate-300 hover:text-danger-500 transition ml-2 rounded-xl hover:bg-danger-50">
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
                 </button>
             </div>
             {% endfor %}
+            </div>
         </div>
         {% endfor %}
     </div>
@@ -59,16 +64,6 @@
 </div>
 
 <script>
-function getCSRFToken() {
-    var name = 'csrftoken';
-    var cookies = document.cookie.split(';');
-    for (var i = 0; i < cookies.length; i++) {
-        var c = cookies[i].trim();
-        if (c.indexOf(name + '=') === 0) return c.substring(name.length + 1);
-    }
-    return '';
-}
-
 function minhasVendas() {
     return {
         canDelete(d) { return d === new Date().toISOString().split('T')[0]; },
