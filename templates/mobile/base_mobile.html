@@ -32,6 +32,39 @@
                 }
             }
         }
+        function getCSRFToken() {
+            var name = 'csrftoken';
+            var cookies = document.cookie.split(';');
+            for (var i = 0; i < cookies.length; i++) {
+                var c = cookies[i].trim();
+                if (c.indexOf(name + '=') === 0) return c.substring(name.length + 1);
+            }
+            return '';
+        }
+        function showToast(message, type, duration) {
+            var c = {
+                success: { bg: 'bg-emerald-50', border: 'border-emerald-200', text: 'text-emerald-700', dot: 'bg-emerald-500', icon: '<svg class="w-5 h-5 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>' },
+                error:   { bg: 'bg-red-50', border: 'border-red-200', text: 'text-red-700', dot: 'bg-red-500', icon: '<svg class="w-5 h-5 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>' },
+                warning: { bg: 'bg-amber-50', border: 'border-amber-200', text: 'text-amber-700', dot: 'bg-amber-500', icon: '<svg class="w-5 h-5 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"></path></svg>' },
+                info:    { bg: 'bg-blue-50', border: 'border-blue-200', text: 'text-blue-700', dot: 'bg-blue-500', icon: '<svg class="w-5 h-5 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>' },
+            };
+            var s = c[type] || c.info;
+            duration = duration || (type === 'error' ? 6000 : 4000);
+            var el = document.createElement('div');
+            el.className = 'pointer-events-auto flex items-start gap-3 px-4 py-3 rounded-xl border shadow-lg toast-enter ' + s.bg + ' ' + s.border;
+            el.innerHTML = '<div class="flex-shrink-0 mt-0.5">' + s.icon + '</div>'
+                + '<div class="flex-1 min-w-0"><p class="text-sm font-medium ' + s.text + '">' + message + '</p></div>'
+                + '<button onclick="this.closest(\'#toast-container\').querySelectorAll(\'>div\').forEach(function(t){removeToast(t)})" class="flex-shrink-0 text-gray-400 hover:text-gray-600 transition"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg></button>'
+                + '<div class="absolute bottom-0 left-0 h-0.5 rounded-full ' + s.dot + '" style="width:100%;animation:shrink ' + duration + 'ms linear forwards;"></div>';
+            var container = document.getElementById('toast-container');
+            container.appendChild(el);
+            setTimeout(function() { removeToast(el); }, duration);
+        }
+        function removeToast(el) {
+            if (!el || el.classList.contains('toast-leave')) return;
+            el.className = el.className.replace('toast-enter', 'toast-leave');
+            setTimeout(function() { if (el.parentNode) el.parentNode.removeChild(el); }, 300);
+        }
     </script>
     <style>
         body { font-family: 'Public Sans', system-ui, sans-serif; background: #f9fafb; }
@@ -88,41 +121,6 @@
     </div>
 
     <script>
-        function getCSRFToken() {
-            var name = 'csrftoken';
-            var cookies = document.cookie.split(';');
-            for (var i = 0; i < cookies.length; i++) {
-                var c = cookies[i].trim();
-                if (c.indexOf(name + '=') === 0) return c.substring(name.length + 1);
-            }
-            return '';
-        }
-
-    function showToast(message, type, duration) {
-        var c = {
-            success: { bg: 'bg-emerald-50', border: 'border-emerald-200', text: 'text-emerald-700', dot: 'bg-emerald-500', icon: '<svg class="w-5 h-5 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>' },
-            error:   { bg: 'bg-red-50', border: 'border-red-200', text: 'text-red-700', dot: 'bg-red-500', icon: '<svg class="w-5 h-5 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>' },
-            warning: { bg: 'bg-amber-50', border: 'border-amber-200', text: 'text-amber-700', dot: 'bg-amber-500', icon: '<svg class="w-5 h-5 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"></path></svg>' },
-            info:    { bg: 'bg-blue-50', border: 'border-blue-200', text: 'text-blue-700', dot: 'bg-blue-500', icon: '<svg class="w-5 h-5 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>' },
-        };
-        var s = c[type] || c.info;
-        duration = duration || (type === 'error' ? 6000 : 4000);
-        var el = document.createElement('div');
-        el.className = 'pointer-events-auto flex items-start gap-3 px-4 py-3 rounded-xl border shadow-lg toast-enter ' + s.bg + ' ' + s.border;
-        el.innerHTML = '<div class="flex-shrink-0 mt-0.5">' + s.icon + '</div>'
-            + '<div class="flex-1 min-w-0"><p class="text-sm font-medium ' + s.text + '">' + message + '</p></div>'
-            + '<button onclick="this.closest(\'#toast-container\').querySelectorAll(\'>div\').forEach(function(t){removeToast(t)})" class="flex-shrink-0 text-gray-400 hover:text-gray-600 transition"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg></button>'
-            + '<div class="absolute bottom-0 left-0 h-0.5 rounded-full ' + s.dot + '" style="width:100%;animation:shrink ' + duration + 'ms linear forwards;"></div>';
-        var container = document.getElementById('toast-container');
-        container.appendChild(el);
-        setTimeout(function() { removeToast(el); }, duration);
-    }
-    function removeToast(el) {
-        if (!el || el.classList.contains('toast-leave')) return;
-        el.className = el.className.replace('toast-enter', 'toast-leave');
-        setTimeout(function() { if (el.parentNode) el.parentNode.removeChild(el); }, 300);
-    }
-
         if ('serviceWorker' in navigator) {
             navigator.serviceWorker.register("{% static 'sw.js' %}")
                 .then(function(reg) { console.log('SW registrado'); })

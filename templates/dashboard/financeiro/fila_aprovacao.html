@@ -99,7 +99,7 @@ function filaPage() {
                 var firstId = this.selected.keys().next().value;
                 var firstPeriod = this.getPeriodForCommission(firstId);
                 if (firstPeriod && firstPeriod.uuid !== group.period.uuid) {
-                    alert('Selecione vendedores de apenas uma competencia por vez.'); return;
+                    showToast('Selecione vendedores de apenas uma competencia por vez.', 'warning'); return;
                 }
             }
             this.selected.set(sc.id, {seller: sc, period: group.period});
