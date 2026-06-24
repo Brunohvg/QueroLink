@@ -303,6 +303,13 @@ def pay_seller_commissions(period, seller_commission_ids, user, payment_data):
             }, commit=True)
         recalculate_period_status(period)
 
+    for sc in commissions:
+        try:
+            from app.apps.notifications.tasks import notify_commission_paid
+            notify_commission_paid(sc)
+        except Exception:
+            pass
+
     return list(commissions)
 
 
@@ -448,6 +455,17 @@ def get_dashboard_data(tenant, month=None, year=None):
         ).values_list('name', flat=True),
     )
 
+    sellers_with_manual_sales = Seller.objects.filter(
+        tenant=tenant, is_active=True,
+        sales__sale_date__gte=start,
+        sales__sale_date__lte=end,
+        sales__origin=Sale.Origin.MANUAL,
+    ).distinct().count()
+
+    has_inconsistency = False
+    if summary['total_vendedores'] > 0 and sellers_with_manual_sales > summary['total_vendedores']:
+        has_inconsistency = True
+
     return {
         'period': {
             'start': start.isoformat(),
@@ -460,7 +478,7 @@ def get_dashboard_data(tenant, month=None, year=None):
         'commission_fechada': summary['commission_fechada'],
         'commission_paga': summary['commission_paga'],
         'period_status': period_status,
-        'has_inconsistency': False,
+        'has_inconsistency': has_inconsistency,
         'vendedores_ativos': vendedores_ativos,
         'vendedores_total': vendedores_total,
         'vendedores_com_venda': sellers_with_sales,

@@ -144,6 +144,7 @@ class CommissionPeriodViewSet(viewsets.ModelViewSet):
         })
 
     @action(detail=True, methods=['post'])
+    @method_decorator(ratelimit(key='user', rate='30/h', method='POST', block=True))
     def close_sellers(self, request, pk=None):
         from app.apps.commissions.services import close_seller_commissions
 
@@ -178,6 +179,7 @@ class CommissionPeriodViewSet(viewsets.ModelViewSet):
         detail=True, methods=['post'],
         permission_classes=[IsAuthenticated, IsManagerOrAdmin],
     )
+    @method_decorator(ratelimit(key='user', rate='30/h', method='POST', block=True))
     def reopen_sellers(self, request, pk=None):
         from app.apps.commissions.services import reopen_seller_commissions
 
@@ -213,6 +215,7 @@ class CommissionPeriodViewSet(viewsets.ModelViewSet):
         detail=True, methods=['post'],
         permission_classes=[IsAuthenticated, IsFinancialOrAdmin],
     )
+    @method_decorator(ratelimit(key='user', rate='30/h', method='POST', block=True))
     def pay_sellers(self, request, pk=None):
         from app.apps.commissions.services import pay_seller_commissions
 
