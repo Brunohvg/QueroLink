@@ -10,201 +10,278 @@ showToast("{{ message|escapejs }}", "{% if message.tags == 'error' %}error{% eli
 </script>
 {% endif %}
 
-<div x-data="configPage()" x-init="checkWhatsAppStatus()">
-<div class="flex items-center justify-between mb-6">
-    <div>
-        <h1 class="font-display text-[20px] font-semibold text-gray-900">Configuracoes</h1>
-        <p class="text-[13px] text-gray-500 mt-0.5">{{ tenant.company_name }}</p>
-    </div>
-    <button type="submit" form="config-form" class="bg-brand-500 hover:bg-brand-600 text-white font-semibold py-2.5 px-6 rounded-xl transition text-[14px] flex items-center gap-2 shadow-sm hover:shadow-md">
-        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
-        Salvar
-    </button>
-</div>
+<div x-data="configPage()" x-init="checkWhatsAppStatus()" class="max-w-4xl mx-auto">
 
-<div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-    <div class="surface-card">
-        <div class="flex items-center justify-between mb-2">
-            <p class="text-[12px] font-semibold text-gray-500 uppercase tracking-wider">Pagar.me</p>
-            <span class="w-2 h-2 rounded-full {% if tenant.pagarme_configured %}bg-success-500{% else %}bg-gray-300{% endif %}"></span>
-        </div>
-        <p class="text-[14px] font-medium {% if tenant.pagarme_configured %}text-success-700{% else %}text-gray-500{% endif %}">
-            {% if tenant.pagarme_configured %}Conectado{% else %}Pendente{% endif %}
+  <div class="sticky top-0 z-10 -mx-6 px-6 py-4 bg-gray-50/90 backdrop-blur-lg border-b border-gray-200/60 mb-6">
+    <div class="flex items-center justify-between">
+      <div>
+        <h1 class="font-display text-[22px] font-bold text-gray-900 tracking-tight">Configuracoes</h1>
+        <p class="text-[13px] text-gray-500 mt-0.5 flex items-center gap-1.5">
+          <svg class="w-3.5 h-3.5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"></path></svg>
+          {{ tenant.company_name }}
         </p>
-        <p class="text-[11px] text-gray-400 mt-0.5">Gateway de pagamento</p>
+      </div>
+      <div class="flex items-center gap-3">
+        <button type="submit" form="config-form"
+                class="inline-flex items-center gap-2 bg-gray-900 hover:bg-gray-800 text-white font-semibold py-2.5 px-5 rounded-xl transition-all text-[14px] shadow-sm hover:shadow-md active:scale-[0.97]">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+          Salvar
+        </button>
+      </div>
     </div>
-    <div class="surface-card">
-        <div class="flex items-center justify-between mb-2">
-            <p class="text-[12px] font-semibold text-gray-500 uppercase tracking-wider">WhatsApp</p>
-            <span class="w-2 h-2 rounded-full" :class="whatsappState === 'open' ? 'bg-success-500' : (whatsappState === 'connecting' ? 'bg-warning-500' : 'bg-gray-300')"></span>
-        </div>
-        <p class="text-[14px] font-medium" :class="whatsappState === 'open' ? 'text-success-700' : (whatsappState === 'connecting' ? 'text-warning-700' : 'text-gray-500')"
-           x-text="whatsappState === 'open' ? 'Conectado' : (whatsappState === 'connecting' ? 'Aguardando leitura...' : 'Desconectado')"></p>
-        <p class="text-[11px] text-gray-400 mt-0.5">Notificacoes</p>
-    </div>
-    <div class="surface-card">
-        <div class="flex items-center justify-between mb-2">
-            <p class="text-[12px] font-semibold text-gray-500 uppercase tracking-wider">Comissao padrao</p>
-        </div>
-        <p class="text-[14px] font-medium text-gray-800">{{ tenant.default_commission_rate|floatformat:2 }}%</p>
-        <p class="text-[11px] text-gray-400 mt-0.5">Para novos vendedores</p>
-    </div>
-</div>
+  </div>
 
-<form method="post" id="config-form" action="{% url 'dashboard:gestor_configuracoes' %}" class="space-y-5">
+  <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+    <div class="relative overflow-hidden bg-white rounded-2xl p-5 border border-gray-100 shadow-[0_1px_3px_-1px_rgba(0,0,0,0.04),0_4px_16px_-4px_rgba(67,97,238,0.06)]">
+      <div class="absolute top-0 right-0 w-32 h-32 bg-gradient-to-bl from-emerald-50/60 to-transparent rounded-full -mr-8 -mt-8"></div>
+      <div class="relative">
+        <div class="flex items-center justify-between mb-3">
+          <p class="text-[11px] font-semibold text-gray-400 uppercase tracking-[0.08em]">Pagar.me</p>
+          <span class="flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[11px] font-medium {% if tenant.pagarme_configured %}bg-emerald-50 text-emerald-600{% else %}bg-gray-100 text-gray-500{% endif %}">
+            <span class="w-1.5 h-1.5 rounded-full {% if tenant.pagarme_configured %}bg-emerald-500{% else %}bg-gray-400{% endif %}"></span>
+            {% if tenant.pagarme_configured %}Conectado{% else %}Pendente{% endif %}
+          </span>
+        </div>
+        <p class="text-[22px] font-bold text-gray-900">{% if tenant.pagarme_configured %}<span class="text-emerald-600">Ativo</span>{% else %}<span class="text-gray-400">—</span>{% endif %}</p>
+        <p class="text-[12px] text-gray-400 mt-1">Gateway de pagamento</p>
+      </div>
+    </div>
+
+    <div class="relative overflow-hidden bg-white rounded-2xl p-5 border border-gray-100 shadow-[0_1px_3px_-1px_rgba(0,0,0,0.04),0_4px_16px_-4px_rgba(67,97,238,0.06)]">
+      <div class="absolute top-0 right-0 w-32 h-32 bg-gradient-to-bl from-emerald-50/60 to-transparent rounded-full -mr-8 -mt-8"
+           x-show="whatsappState === 'open'"></div>
+      <div class="absolute top-0 right-0 w-32 h-32 bg-gradient-to-bl from-amber-50/60 to-transparent rounded-full -mr-8 -mt-8"
+           x-show="whatsappState === 'connecting'"></div>
+      <div class="relative">
+        <div class="flex items-center justify-between mb-3">
+          <p class="text-[11px] font-semibold text-gray-400 uppercase tracking-[0.08em]">WhatsApp</p>
+          <span class="flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[11px] font-medium"
+                :class="whatsappState === 'open' ? 'bg-emerald-50 text-emerald-600' : (whatsappState === 'connecting' ? 'bg-amber-50 text-amber-600' : 'bg-gray-100 text-gray-500')">
+            <span class="w-1.5 h-1.5 rounded-full"
+                  :class="whatsappState === 'open' ? 'bg-emerald-500' : (whatsappState === 'connecting' ? 'bg-amber-500 animate-pulse' : 'bg-gray-400')"></span>
+            <span x-text="whatsappState === 'open' ? 'Conectado' : (whatsappState === 'connecting' ? 'Pendente' : 'Inativo')"></span>
+          </span>
+        </div>
+        <p class="text-[22px] font-bold text-gray-900">
+          <span x-show="whatsappState === 'open'" class="text-emerald-600">Conectado</span>
+          <span x-show="whatsappState === 'connecting'" class="text-amber-600">Aguardando...</span>
+          <span x-show="whatsappState !== 'open' && whatsappState !== 'connecting'" class="text-gray-400">—</span>
+        </p>
+        <p class="text-[12px] text-gray-400 mt-1">Notificacoes para vendedores</p>
+      </div>
+    </div>
+
+    <div class="relative overflow-hidden bg-white rounded-2xl p-5 border border-gray-100 shadow-[0_1px_3px_-1px_rgba(0,0,0,0.04),0_4px_16px_-4px_rgba(67,97,238,0.06)]">
+      <div class="absolute top-0 right-0 w-32 h-32 bg-gradient-to-bl from-brand-50/50 to-transparent rounded-full -mr-8 -mt-8"></div>
+      <div class="relative">
+        <div class="flex items-center justify-between mb-3">
+          <p class="text-[11px] font-semibold text-gray-400 uppercase tracking-[0.08em]">Comissao</p>
+          <span class="flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[11px] font-medium bg-brand-50 text-brand-600">
+            <span class="w-1.5 h-1.5 rounded-full bg-brand-500"></span>
+            {{ tenant.default_commission_rate|floatformat:2 }}%
+          </span>
+        </div>
+        <p class="text-[22px] font-bold text-gray-900">{{ tenant.default_commission_rate|floatformat:1 }}<span class="text-[14px] font-medium text-gray-400">%</span></p>
+        <p class="text-[12px] text-gray-400 mt-1">Taxa padrao para novos vendedores</p>
+      </div>
+    </div>
+  </div>
+
+  <form method="post" id="config-form" action="{% url 'dashboard:gestor_configuracoes' %}" class="space-y-6">
     {% csrf_token %}
 
-    <div class="surface-card">
-        <div class="flex items-center gap-3 mb-5">
-            <div class="w-10 h-10 rounded-xl bg-green-50 flex items-center justify-center">
-                <svg class="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"></path></svg>
-            </div>
-            <div>
-                <h2 class="text-[15px] font-semibold text-gray-900">Pagar.me</h2>
-                <p class="text-[12px] text-gray-400">Gateway de pagamento para gerar links</p>
-            </div>
-            <span class="ml-auto inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium {% if tenant.pagarme_configured %}bg-success-50 text-success-700{% else %}bg-gray-100 text-gray-600{% endif %}">
-                {% if tenant.pagarme_configured %}Configurado{% else %}Pendente{% endif %}
-            </span>
+    <div class="bg-white rounded-2xl border border-gray-100 shadow-[0_1px_3px_-1px_rgba(0,0,0,0.04),0_4px_16px_-4px_rgba(67,97,238,0.06)] overflow-hidden">
+      <div class="px-6 py-5 border-b border-gray-100">
+        <div class="flex items-center gap-3">
+          <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-400 to-emerald-500 flex items-center justify-center shadow-sm">
+            <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"></path></svg>
+          </div>
+          <div>
+            <h2 class="text-[15px] font-semibold text-gray-900">Pagar.me</h2>
+            <p class="text-[12px] text-gray-400">Gateway de pagamento para gerar links de pagamento</p>
+          </div>
         </div>
-        <div>
-            <label for="pagarme_api_key" class="block text-[13px] font-medium text-gray-700 mb-1.5">Chave de API</label>
-            <input type="password" id="pagarme_api_key" name="pagarme_api_key"
-                   class="input-field"
-                   placeholder="sk_test_xxxxxxxxxx"
-                   value="{% if tenant.pagarme_api_key %}••••••••{% endif %}"
-                   autocomplete="off">
-            <p class="text-[11px] text-gray-400 mt-1.5 flex items-center gap-1">
-                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
-                A chave nao sera exibida apos salva. Deixe em branco para manter a atual.
-            </p>
+      </div>
+      <div class="px-6 py-5">
+        <label for="pagarme_api_key" class="block text-[13px] font-medium text-gray-700 mb-1.5">Chave de API (sk_)</label>
+        <div class="relative">
+          <input type="password" id="pagarme_api_key" name="pagarme_api_key"
+                 class="w-full pl-4 pr-10 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-[14px] outline-none transition-all focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100 focus:bg-white"
+                 placeholder="sk_test_xxxxxxxxxx"
+                 value="{% if tenant.pagarme_api_key %}••••••••{% endif %}"
+                 autocomplete="off">
+          <button type="button" onclick="var i=document.getElementById('pagarme_api_key');i.type=i.type==='password'?'text':'password';this.innerHTML=i.type==='password'?'<svg class=\"w-4 h-4\" fill=\"none\" stroke=\"currentColor\" viewBox=\"0 0 24 24\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" stroke-width=\"2\" d=\"M15 12a3 3 0 11-6 0 3 3 0 016 0z\"/><path stroke-linecap=\"round\" stroke-linejoin=\"round\" stroke-width=\"2\" d=\"M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z\"/></svg>':'<svg class=\"w-4 h-4\" fill=\"none\" stroke=\"currentColor\" viewBox=\"0 0 24 24\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" stroke-width=\"2\" d=\"M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21\"/></svg>';"
+                  class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
+          </button>
         </div>
+        <p class="text-[12px] text-gray-400 mt-2 flex items-center gap-1.5">
+          <svg class="w-3.5 h-3.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+          Deixe em branco para manter a chave atual. A chave nao sera exibida apos salva.
+        </p>
+      </div>
     </div>
 
-    <div class="surface-card">
-        <div class="flex items-center gap-3 mb-5">
-            <div class="w-10 h-10 rounded-xl bg-success-50 flex items-center justify-center">
-                <svg class="w-5 h-5 text-success-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"></path></svg>
-            </div>
-            <div>
-                <h2 class="text-[15px] font-semibold text-gray-900">WhatsApp</h2>
-                <p class="text-[12px] text-gray-400">Envio de notificacoes para vendedores</p>
-            </div>
-            <span class="ml-auto inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium"
-                  :class="whatsappState === 'open' ? 'bg-success-50 text-success-700' : (whatsappState === 'connecting' ? 'bg-warning-50 text-warning-700' : 'bg-gray-100 text-gray-600')">
-                <span class="w-1.5 h-1.5 rounded-full" :class="whatsappState === 'open' ? 'bg-success-500' : (whatsappState === 'connecting' ? 'bg-warning-500 animate-pulse' : 'bg-gray-400')"></span>
-                <span x-text="whatsappState === 'open' ? 'Conectado' : (whatsappState === 'connecting' ? 'Pendente' : 'Desconectado')"></span>
-            </span>
+    <div class="bg-white rounded-2xl border border-gray-100 shadow-[0_1px_3px_-1px_rgba(0,0,0,0.04),0_4px_16px_-4px_rgba(67,97,238,0.06)] overflow-hidden">
+      <div class="px-6 py-5 border-b border-gray-100">
+        <div class="flex items-center gap-3">
+          <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-400 to-emerald-500 flex items-center justify-center shadow-sm">
+            <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"></path></svg>
+          </div>
+          <div class="flex-1">
+            <h2 class="text-[15px] font-semibold text-gray-900">WhatsApp</h2>
+            <p class="text-[12px] text-gray-400">Envio de notificacoes de comissao para vendedores</p>
+          </div>
+          <div class="flex items-center gap-1.5 px-3 py-1 rounded-full text-[12px] font-medium"
+               :class="whatsappState === 'open' ? 'bg-emerald-50 text-emerald-600' : (whatsappState === 'connecting' ? 'bg-amber-50 text-amber-600' : 'bg-gray-100 text-gray-500')">
+            <span class="w-1.5 h-1.5 rounded-full"
+                  :class="whatsappState === 'open' ? 'bg-emerald-500' : (whatsappState === 'connecting' ? 'bg-amber-500 animate-pulse' : 'bg-gray-400')"></span>
+            <span x-text="whatsappState === 'open' ? 'Conectado' : (whatsappState === 'connecting' ? 'Aguardando QR' : 'Desconectado')"></span>
+          </div>
         </div>
-        <div class="space-y-4">
-            <div>
-                <label for="whatsapp_instance_id" class="block text-[13px] font-medium text-gray-700 mb-1.5">Nome da Instancia</label>
-                <input type="text" id="whatsapp_instance_id" name="whatsapp_instance_id"
-                       class="input-field"
-                       placeholder="Ex: minha-loja"
-                       value="{{ tenant.whatsapp_instance_id|default:'' }}">
-                <p class="text-[11px] text-gray-400 mt-1.5 flex items-center gap-1">
-                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
-                    Escolha um nome unico. Ex: nome-da-loja
+      </div>
+
+      <div class="px-6 py-5 space-y-5">
+        <div>
+          <label for="whatsapp_instance_id" class="block text-[13px] font-medium text-gray-700 mb-1.5">Nome da Instancia</label>
+          <div class="relative">
+            <input type="text" id="whatsapp_instance_id" name="whatsapp_instance_id"
+                   class="w-full pl-4 pr-10 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-[14px] outline-none transition-all focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100 focus:bg-white"
+                   placeholder="Ex: minha-loja"
+                   value="{{ tenant.whatsapp_instance_id|default:'' }}"
+                   @input.debounce.500ms="checkWhatsAppStatus()">
+            <span class="absolute right-3 top-1/2 -translate-y-1/2">
+              <span x-show="whatsappLoading" class="block w-4 h-4 border-2 border-gray-300 border-t-brand-500 rounded-full animate-spin"></span>
+              <svg x-show="!whatsappLoading && whatsappState === 'open'" class="w-4 h-4 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+              <svg x-show="!whatsappLoading && whatsappState === 'not_configured'" class="w-4 h-4 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"></path></svg>
+            </span>
+          </div>
+          <p class="text-[12px] text-gray-400 mt-2 flex items-center gap-1.5">
+            <svg class="w-3.5 h-3.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+            Escolha um nome unico. Ex: nome-da-loja
+          </p>
+        </div>
+
+        <div class="border-t border-gray-100 pt-5">
+          <div class="space-y-4">
+
+            <div x-show="whatsappLoading" class="flex items-center justify-center py-8">
+              <div class="w-7 h-7 border-[3px] border-brand-200 border-t-brand-500 rounded-full animate-spin"></div>
+              <span class="ml-3 text-[13px] text-gray-500 font-medium">Consultando instancia...</span>
+            </div>
+
+            <div x-show="!whatsappLoading && whatsappState === 'open'"
+                 class="bg-gradient-to-br from-emerald-50 to-emerald-50/50 border border-emerald-200 rounded-2xl p-5">
+              <div class="flex items-center gap-4">
+                <div class="w-12 h-12 rounded-full bg-emerald-100 flex items-center justify-center flex-shrink-0">
+                  <svg class="w-6 h-6 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+                </div>
+                <div>
+                  <p class="text-[15px] font-semibold text-emerald-800">WhatsApp conectado</p>
+                  <p class="text-[12px] text-emerald-600 mt-0.5" x-text="'Instancia: ' + (whatsappOwner || whatsappInstance)"></p>
+                </div>
+                <div class="ml-auto flex items-center gap-1.5 px-2.5 py-1 bg-emerald-100 rounded-full">
+                  <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
+                  <span class="text-[11px] font-medium text-emerald-700">Online</span>
+                </div>
+              </div>
+            </div>
+
+            <div x-show="!whatsappLoading && whatsappState === 'connecting'"
+                 class="bg-gradient-to-br from-amber-50 to-amber-50/50 border border-amber-200 rounded-2xl p-5">
+              <div class="flex items-center gap-4 mb-4">
+                <div class="w-12 h-12 rounded-full bg-amber-100 flex items-center justify-center flex-shrink-0">
+                  <svg class="w-6 h-6 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v1m6 11h2m-6 0h-2m4 0h2M4 12h2m12-7v2M6 6l15 15M6 12v8h4v-4h4v4h4v-8H6z"></path></svg>
+                </div>
+                <div>
+                  <p class="text-[15px] font-semibold text-amber-800">Aguardando leitura do QR Code</p>
+                  <p class="text-[12px] text-amber-600 mt-0.5">Abra o WhatsApp no celular e escaneie o codigo</p>
+                </div>
+              </div>
+              <div x-show="whatsappQrCode" class="flex flex-col items-center">
+                <div class="bg-white rounded-2xl border-2 border-amber-200 p-4 shadow-sm inline-block">
+                  <img :src="whatsappQrCode" alt="QR Code" class="w-56 h-56">
+                </div>
+                <p class="text-[11px] text-gray-400 mt-3 flex items-center gap-1.5">
+                  <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                  O QR Code expira em alguns minutos. Se expirar, gere novamente.
                 </p>
+                <button @click="fetchQRCode()" class="mt-4 inline-flex items-center gap-2 bg-amber-500 hover:bg-amber-600 text-white font-medium py-2.5 px-6 rounded-xl transition-all text-[13px] shadow-sm active:scale-[0.97]">
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
+                  Regenerar QR Code
+                </button>
+              </div>
             </div>
 
-            <div class="border-t border-gray-100 pt-4 mt-4">
-                <div class="flex items-center justify-between mb-3">
-                    <p class="text-[13px] font-semibold text-gray-700">Conexao via QR Code</p>
-                    <span class="text-[11px] text-gray-400" x-show="whatsappState === 'not_configured'">Defina o nome da instancia primeiro</span>
+            <div x-show="!whatsappLoading && (whatsappState === 'disconnected' || whatsappState === 'not_found' || whatsappState === 'error' || whatsappState === 'auth_error')"
+                 class="bg-gradient-to-br from-gray-50 to-gray-50/50 border border-gray-200 rounded-2xl p-6">
+              <div class="text-center max-w-sm mx-auto">
+                <div class="w-14 h-14 mx-auto mb-4 rounded-2xl bg-gray-100 flex items-center justify-center">
+                  <svg class="w-7 h-7 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v1m6 11h2m-6 0h-2m4 0h2M4 12h2m12-7v2M6 6l15 15M6 12v8h4v-4h4v4h4v-8H6z"></path></svg>
                 </div>
-
-                <div x-show="whatsappLoading" class="flex items-center justify-center py-8">
-                    <div class="w-6 h-6 border-2 border-brand-500 border-t-transparent rounded-full animate-spin"></div>
-                    <span class="ml-3 text-[13px] text-gray-500">Consultando instancia...</span>
-                </div>
-
-                <div x-show="!whatsappLoading && whatsappState === 'open'" class="bg-success-50 border border-success-200 rounded-xl p-4">
-                    <div class="flex items-center gap-3">
-                        <div class="w-9 h-9 rounded-full bg-success-100 flex items-center justify-center">
-                            <svg class="w-5 h-5 text-success-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
-                        </div>
-                        <div>
-                            <p class="text-[14px] font-semibold text-success-700">WhatsApp conectado</p>
-                            <p class="text-[12px] text-success-600" x-text="'Instancia: ' + (whatsappOwner || whatsappInstance)"></p>
-                        </div>
-                    </div>
-                </div>
-
-                <div x-show="!whatsappLoading && whatsappState === 'connecting'" class="bg-warning-50 border border-warning-200 rounded-xl p-4">
-                    <div class="flex items-center gap-3 mb-3">
-                        <div class="w-9 h-9 rounded-full bg-warning-100 flex items-center justify-center animate-pulse">
-                            <svg class="w-5 h-5 text-warning-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v1m6 11h2m-6 0h-2m4 0h2M4 12h2m12-7v2M6 6l15 15M6 12v8h4v-4h4v4h4v-8H6z"></path></svg>
-                        </div>
-                        <div>
-                            <p class="text-[14px] font-semibold text-warning-700">Aguardando leitura do QR Code</p>
-                            <p class="text-[12px] text-warning-600">Abra o WhatsApp no celular e escaneie o codigo</p>
-                        </div>
-                    </div>
-                    <div x-show="whatsappQrCode" class="flex justify-center">
-                        <img :src="whatsappQrCode" alt="QR Code" class="w-56 h-56 rounded-xl border-2 border-warning-300 bg-white p-2">
-                    </div>
-                    <button @click="fetchQRCode()" class="mt-3 w-full bg-warning-500 hover:bg-warning-600 text-white font-medium py-2 px-4 rounded-xl transition text-[13px]">
-                        Regenerar QR Code
-                    </button>
-                </div>
-
-                <div x-show="!whatsappLoading && (whatsappState === 'disconnected' || whatsappState === 'not_found' || whatsappState === 'error' || whatsappState === 'auth_error')"
-                     class="bg-gray-50 border border-gray-200 rounded-xl p-4">
-                    <div class="text-center">
-                        <p class="text-[13px] text-gray-600 mb-1" x-text="whatsappError || 'Instancia nao conectada.'"></p>
-                        <p class="text-[11px] text-gray-400 mb-3">Gere o QR Code para conectar o WhatsApp</p>
-                        <button @click="fetchQRCode()"
-                                :disabled="whatsappState === 'not_configured'"
-                                class="bg-brand-500 hover:bg-brand-600 disabled:bg-gray-300 text-white font-medium py-2 px-5 rounded-xl transition text-[14px]">
-                            <span x-show="whatsappQrLoading" class="flex items-center gap-2">
-                                <span class="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
-                                Gerando...
-                            </span>
-                            <span x-show="!whatsappQrLoading">Gerar QR Code</span>
-                        </button>
-                    </div>
-                </div>
-
-                <div x-show="!whatsappLoading && whatsappState === 'not_configured'" class="bg-gray-50 border border-gray-200 rounded-xl p-4 text-center">
-                    <p class="text-[13px] text-gray-500 mb-1">Digite o nome da instancia e clique em "Gerar QR Code"</p>
-                    <p class="text-[11px] text-gray-400">Nao precisa salvar antes — o QR code sera gerado direto</p>
-                </div>
+                <p class="text-[14px] font-medium text-gray-700 mb-1" x-text="whatsappError || 'Instancia nao conectada'"></p>
+                <p class="text-[12px] text-gray-400 mb-5">Digite um nome de instancia e gere o QR Code para conectar</p>
+                <button @click="fetchQRCode()" :disabled="whatsappQrLoading"
+                        class="inline-flex items-center gap-2 bg-gray-900 hover:bg-gray-800 disabled:bg-gray-300 text-white font-semibold py-2.5 px-6 rounded-xl transition-all text-[14px] shadow-sm hover:shadow-md active:scale-[0.97]">
+                  <svg x-show="whatsappQrLoading" class="w-4 h-4 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
+                  <span x-text="whatsappQrLoading ? 'Gerando...' : 'Gerar QR Code'"></span>
+                  <svg x-show="!whatsappQrLoading" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v1m6 11h2m-6 0h-2m4 0h2M4 12h2m12-7v2M6 6l15 15M6 12v8h4v-4h4v4h4v-8H6z"></path></svg>
+                </button>
+              </div>
             </div>
+
+            <div x-show="!whatsappLoading && whatsappState === 'not_configured'"
+                 class="border-2 border-dashed border-gray-200 rounded-2xl p-6">
+              <div class="text-center max-w-sm mx-auto">
+                <div class="w-14 h-14 mx-auto mb-4 rounded-2xl bg-gray-50 flex items-center justify-center">
+                  <svg class="w-7 h-7 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"></path></svg>
+                </div>
+                <p class="text-[14px] font-medium text-gray-600 mb-1">Configure sua instancia WhatsApp</p>
+                <p class="text-[12px] text-gray-400">Digite o nome da instancia acima e clique em "Gerar QR Code"</p>
+              </div>
+            </div>
+
+          </div>
         </div>
+      </div>
     </div>
 
-    <div class="surface-card">
-        <div class="flex items-center gap-3 mb-5">
-            <div class="w-10 h-10 rounded-xl bg-brand-50 flex items-center justify-center">
-                <svg class="w-5 h-5 text-brand-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
-            </div>
-            <div>
-                <h2 class="text-[15px] font-semibold text-gray-900">Taxa de Comissao Padrao</h2>
-                <p class="text-[12px] text-gray-400">Aplicada automaticamente a novos vendedores</p>
-            </div>
+    <div class="bg-white rounded-2xl border border-gray-100 shadow-[0_1px_3px_-1px_rgba(0,0,0,0.04),0_4px_16px_-4px_rgba(67,97,238,0.06)] overflow-hidden">
+      <div class="px-6 py-5 border-b border-gray-100">
+        <div class="flex items-center gap-3">
+          <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-brand-400 to-brand-500 flex items-center justify-center shadow-sm">
+            <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+          </div>
+          <div>
+            <h2 class="text-[15px] font-semibold text-gray-900">Comissao Padrao</h2>
+            <p class="text-[12px] text-gray-400">Percentual aplicado automaticamente a novos vendedores</p>
+          </div>
         </div>
-        <div>
-            <label for="default_commission_rate" class="block text-[13px] font-medium text-gray-700 mb-1.5">Percentual (%)</label>
-            <div class="relative">
-                <input type="text" id="default_commission_rate" name="default_commission_rate"
-                       class="input-field pr-8"
-                       placeholder="1,00"
-                       value="{{ tenant.default_commission_rate|floatformat:2 }}">
-                <span class="absolute right-3 top-1/2 -translate-y-1/2 text-[14px] text-gray-400 font-medium">%</span>
-            </div>
-            <p class="text-[11px] text-gray-400 mt-1.5">Ex: 1,00 = 1% de comissao sobre as vendas.</p>
+      </div>
+      <div class="px-6 py-5">
+        <label for="default_commission_rate" class="block text-[13px] font-medium text-gray-700 mb-1.5">Percentual (%)</label>
+        <div class="relative max-w-xs">
+          <input type="text" id="default_commission_rate" name="default_commission_rate"
+                 class="w-full pl-4 pr-10 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-[14px] outline-none transition-all focus:border-brand-400 focus:ring-2 focus:ring-brand-100 focus:bg-white"
+                 placeholder="1,00"
+                 value="{{ tenant.default_commission_rate|floatformat:2 }}">
+          <span class="absolute right-3 top-1/2 -translate-y-1/2 text-[14px] text-gray-400 font-medium">%</span>
         </div>
+        <p class="text-[12px] text-gray-400 mt-2 flex items-center gap-1.5">
+          <svg class="w-3.5 h-3.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+          Ex: 1,00 = 1% de comissao sobre as vendas. Altere a qualquer momento.
+        </p>
+      </div>
     </div>
 
-    <div class="flex justify-end">
-        <button type="submit" form="config-form" class="bg-brand-500 hover:bg-brand-600 text-white font-semibold py-3 px-8 rounded-xl transition text-[15px] flex items-center gap-2 shadow-sm hover:shadow-md">
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
-            Salvar Configuracoes
-        </button>
+    <div class="flex justify-end gap-3 pt-2 pb-8">
+      <button type="submit" form="config-form"
+              class="inline-flex items-center gap-2 bg-gray-900 hover:bg-gray-800 text-white font-semibold py-3 px-8 rounded-xl transition-all text-[15px] shadow-sm hover:shadow-md active:scale-[0.97]">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+        Salvar Configuracoes
+      </button>
     </div>
-</form>
+  </form>
 </div>
 
 <script>
