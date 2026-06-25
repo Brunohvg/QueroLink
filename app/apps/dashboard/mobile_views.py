@@ -140,10 +140,12 @@ def mobile_forgot_password(request):
             from datetime import timedelta as td
 
             pin = get_random_string(length=6, allowed_chars='0123456789')
-            PRR.objects.create(
-                user=user, pin=pin,
+            reset = PRR(
+                user=user,
                 expires_at=tz.now() + td(minutes=10),
             )
+            reset.set_pin(pin)
+            reset.save()
 
             try:
                 from app.apps.notifications.models import Notification
