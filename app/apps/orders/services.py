@@ -27,7 +27,7 @@ def create_payment_link(tenant, seller, customer_name, amount_cents, installment
         )
 
         link_url = response.get("url", "")
-        gateway_id = response.get("id", "")
+        gateway_link_id = response.get("id", "")
 
         if not link_url:
             raise Exception("Falha ao gerar o link de pagamento no Pagar.me.")
@@ -35,7 +35,6 @@ def create_payment_link(tenant, seller, customer_name, amount_cents, installment
         payment = Payment.objects.create(
             order=order,
             gateway_name='pagarme',
-            gateway_transaction_id=gateway_id,
             status=Payment.Status.PENDING,
             installments=installments,
         )
@@ -43,7 +42,7 @@ def create_payment_link(tenant, seller, customer_name, amount_cents, installment
         payment_link = PaymentLink.objects.create(
             order=order,
             gateway_url=link_url,
-            gateway_link_id=gateway_id,
+            gateway_link_id=gateway_link_id,
         )
 
     return order, link_url

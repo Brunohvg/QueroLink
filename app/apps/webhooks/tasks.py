@@ -39,7 +39,6 @@ def process_pagarme_webhook(event_id):
 
         if event_type in ('order.paid', 'charge.paid'):
             order_uuid = data.get('code')
-            charge_data = data if event_type == 'charge.paid' else None
 
             if event_type == 'charge.paid' and not order_uuid:
                 order_obj = data.get('order', {})
@@ -64,9 +63,14 @@ def process_pagarme_webhook(event_id):
                         f"Payment nao encontrado para a Order {order_uuid}",
                     )
 
-                gateway_order_id = data.get('id')
-                if gateway_order_id:
-                    payment.gateway_order_id = gateway_order_id
+                if event_type == 'order.paid':
+                    payment.gateway_order_id = data.get('id')
+                    charges = data.get('charges', [])
+                    if charges and isinstance(charges, list):
+                        payment.gateway_transaction_id = charges[0].get('id')
+                elif event_type == 'charge.paid':
+                    payment.gateway_transaction_id = data.get('id')
+                    payment.gateway_order_id = data.get('order', {}).get('id')
 
                 if payment.status == Payment.Status.PAID:
                     logger.info(

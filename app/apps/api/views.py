@@ -1107,7 +1107,7 @@ class SellerLinkCreateView(generics.GenericAPIView):
             return Response({'error': 'Valor invalido.'}, status=400)
 
         if installments < 1 or installments > 12:
-            installments = 1
+            return Response({'error': 'Numero de parcelas invalido (1-12).'}, status=400)
 
         try:
             from app.apps.orders.services import (
