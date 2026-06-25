@@ -96,6 +96,10 @@ def process_pagarme_webhook(event_id):
                         },
                     )
 
+                    if order.seller:
+                        from app.apps.notifications.tasks import notify_seller_link_status
+                        notify_seller_link_status(order.seller, order, 'payment_paid')
+
         event.processed = True
         event.save()
 

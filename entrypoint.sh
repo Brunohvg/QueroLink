@@ -108,6 +108,11 @@ from app.apps.notifications.models import MessageTemplate
 DEFAULT = [
     ('seller_credentials','whatsapp','Ola {{vendedor}}! Seu acesso ao sistema de comissoes foi criado.\nUsuario: {{usuario}}\nSenha temporaria: {{senha}}\nAcesse e troque sua senha no primeiro login.'),
     ('commission_paid','whatsapp','Ola {{vendedor}}! Sua comissao de {{periodo}} no valor de {{valor}} foi paga. Confira os detalhes no app.'),
+    ('link_created','whatsapp','Ola {{vendedor}}! Seu link de {{valor}} para {{cliente}} foi gerado com sucesso.'),
+    ('payment_paid','whatsapp','Ola {{vendedor}}! O link de {{valor}} do(a) {{cliente}} foi pago!'),
+    ('link_canceled','whatsapp','Ola {{vendedor}}! O link de {{valor}} do(a) {{cliente}} foi cancelado.'),
+    ('payment_expired','whatsapp','Ola {{vendedor}}! O link de {{valor}} do(a) {{cliente}} expirou.'),
+    ('payment_refunded','whatsapp','Ola {{vendedor}}! O pagamento de {{valor}} do(a) {{cliente}} foi estornado.'),
 ]
 for t in Tenant.objects.all():
     for et, ch, body in DEFAULT:

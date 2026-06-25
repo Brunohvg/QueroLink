@@ -1123,6 +1123,9 @@ class SellerLinkCreateView(generics.GenericAPIView):
 
             log_action(request, 'order.link_created', instance=order)
 
+            from app.apps.notifications.tasks import notify_seller_link_status
+            notify_seller_link_status(seller, order, 'link_created')
+
             return Response({
                 'uuid': str(order.uuid),
                 'customer_name': order.customer_name,

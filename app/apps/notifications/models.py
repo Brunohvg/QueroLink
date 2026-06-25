@@ -11,6 +11,7 @@ from app.apps.commissions.models import CommissionPeriod
 class MessageTemplate(models.Model):
     class EventType(models.TextChoices):
         LINK_CREATED = 'link_created', 'Link Created'
+        LINK_CANCELED = 'link_canceled', 'Link Canceled'
         LINK_OPENED = 'link_opened', 'Link Opened'
         CHECKOUT_STARTED = 'checkout_started', 'Checkout Started'
         PAYMENT_PAID = 'payment_paid', 'Payment Paid'

@@ -112,6 +112,27 @@ def notify_seller_credentials(seller, password):
     )
 
 
+def notify_seller_link_status(seller, order, event_type):
+    if not seller or not seller.phone:
+        logger.warning("Seller %s has no phone, skipping link notification", seller.id if seller else '?')
+        return None
+    valor = f"R$ {order.total_amount // 100},{order.total_amount % 100:02d}"
+    create_and_send_notification(
+        tenant=seller.tenant,
+        event_type=event_type,
+        channel=MessageTemplate.Channel.WHATSAPP,
+        recipient=seller.phone,
+        seller=seller,
+        order=order,
+        context={
+            "vendedor": seller.name,
+            "cliente": order.customer_name or 'cliente',
+            "valor": valor,
+            "link": order.payment_link.gateway_url if hasattr(order, 'payment_link') and order.payment_link else '',
+        },
+    )
+
+
 def notify_commission_paid(seller_commission):
     seller = seller_commission.seller
     period = seller_commission.period
@@ -135,9 +156,13 @@ def notify_commission_paid(seller_commission):
 
 
 def _fallback_body(event_type, context):
+    v = context.get('vendedor', '')
+    val = context.get('valor', '')
+    cli = context.get('cliente', '')
+    link = context.get('link', '')
     if event_type == MessageTemplate.EventType.SELLER_CREDENTIALS:
         return (
-            f"Ola {context.get('vendedor', '')}! "
+            f"Ola {v}! "
             f"Seu acesso ao sistema de comissoes foi criado.\n"
             f"Usuario: {context.get('usuario', '')}\n"
             f"Senha temporaria: {context.get('senha', '')}\n"
@@ -145,9 +170,21 @@ def _fallback_body(event_type, context):
         )
     if event_type == MessageTemplate.EventType.COMMISSION_PAID:
         return (
-            f"Ola {context.get('vendedor', '')}! "
+            f"Ola {v}! "
             f"Sua comissao de {context.get('periodo', '')} "
-            f"no valor de {context.get('valor', '')} foi paga. "
+            f"no valor de {val} foi paga. "
             f"Confira os detalhes no app."
         )
+    if event_type in (MessageTemplate.EventType.LINK_CREATED,):
+        return f"Ola {v}! Seu link de {val} para {cli} foi gerado com sucesso."
+    if event_type in (MessageTemplate.EventType.PAYMENT_PAID,):
+        return f"Ola {v}! O link de {val} do(a) {cli} foi pago!"
+    if event_type in (MessageTemplate.EventType.LINK_CANCELED,):
+        return f"Ola {v}! O link de {val} do(a) {cli} foi cancelado."
+    if event_type in (MessageTemplate.EventType.PAYMENT_EXPIRED,):
+        return f"Ola {v}! O link de {val} do(a) {cli} expirou."
+    if event_type in (MessageTemplate.EventType.PAYMENT_FAILED,):
+        return f"Ola {v}! O pagamento de {val} do(a) {cli} falhou."
+    if event_type in (MessageTemplate.EventType.PAYMENT_REFUNDED,):
+        return f"Ola {v}! O pagamento de {val} do(a) {cli} foi estornado."
     return ""

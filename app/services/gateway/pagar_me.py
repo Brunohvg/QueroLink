@@ -51,6 +51,8 @@ class PagarMeGateway:
                 method, url, headers=self._get_headers(),
                 timeout=self.timeout, **kwargs,
             )
+            if response.status_code == 204:
+                return {}
             response.raise_for_status()
             return response.json()
         except requests.exceptions.Timeout:
@@ -126,6 +128,6 @@ class PagarMeGateway:
         )
 
     def cancel_payment_link(self, link_id):
-        """Cancel a payment link on Pagar.me."""
+        """Cancel a payment link on Pagar.me (PATCH, returns 204)."""
         logger.info("Pagar.me cancel_payment_link: link_id=%s", link_id)
-        return self._request("POST", f"{self.api_url_links}/{link_id}/cancel")
+        return self._request("PATCH", f"{self.api_url_links}/{link_id}/cancel")
