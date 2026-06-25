@@ -1,305 +1,382 @@
 {% extends 'dashboard/base_desktop.html' %}
 {% block title %}Competencias de Comissao — QueroLink{% endblock %}
 {% block content %}
-<div x-data="fechamentoPage()" x-init="load()">
-    <div class="flex items-center justify-between mb-4">
-        <div>
-            <h1 class="font-display text-[18px] font-semibold text-gray-900">Competencias de Comissao</h1>
-            <p class="text-[13px] text-gray-500">Feche, reverta, pague e acompanhe as comissoes dos vendedores por mes.</p>
-        </div>
-        <div class="flex items-center gap-2">
-            <button @click="openCreateModal()" class="bg-brand-500 hover:bg-brand-600 text-white font-medium py-2 px-4 rounded-xl transition tap-target text-[14px] flex items-center gap-1">
-                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
-                Criar competencia
-            </button>
-            <button @click="load()" class="bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium py-2 px-4 rounded-xl transition tap-target text-[14px] flex items-center gap-1">
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
-                Sincronizar
-            </button>
-        </div>
+<div x-data="fechamentoPage()" x-init="load()" class="max-w-7xl mx-auto">
+
+  <div class="sticky top-0 z-10 -mx-6 px-6 py-4 bg-gray-50/90 backdrop-blur-lg border-b border-gray-200/60 mb-6">
+    <div class="flex items-center justify-between">
+      <div>
+        <h1 class="font-display text-[22px] font-bold text-gray-900 tracking-tight">Competencias</h1>
+        <p class="text-[13px] text-gray-500 mt-0.5">Feche, pague e acompanhe as comissoes por mes</p>
+      </div>
+      <div class="flex items-center gap-2">
+        <button @click="load()"
+                class="inline-flex items-center gap-2 bg-white border border-gray-200 hover:border-gray-300 text-gray-700 font-medium py-2.5 px-4 rounded-xl transition-all text-[14px] shadow-sm hover:shadow active:scale-[0.97]">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
+          Sincronizar
+        </button>
+        <button @click="openCreateModal()"
+                class="inline-flex items-center gap-2 bg-gray-900 hover:bg-gray-800 text-white font-semibold py-2.5 px-5 rounded-xl transition-all text-[14px] shadow-sm hover:shadow-md active:scale-[0.97]">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
+          Nova Competencia
+        </button>
+      </div>
     </div>
+  </div>
 
-    <template x-for="p in periods" :key="p.uuid">
-        <div class="surface-card mb-4 overflow-hidden">
-            <div class="flex items-center justify-between mb-4">
-                <div class="flex items-center gap-3">
-                    <h3 class="font-display text-[18px] font-semibold text-gray-900" x-text="String(p.month).padStart(2,'0')+'/'+p.year"></h3>
-                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium"
-                          :class="{'bg-gray-100 text-gray-600': p.status==='ABERTA',
-                                   'bg-amber-100 text-amber-700': p.status==='PARCIALMENTE_FECHADA',
-                                   'bg-warning-50 text-warning-700': p.status==='FECHADA',
-                                   'bg-indigo-100 text-indigo-700': p.status==='PARCIALMENTE_PAGA',
-                                   'bg-success-50 text-success-700': p.status==='PAGA',
-                                   'bg-danger-50 text-danger-700': p.status==='CANCELADA'}"
-                          x-text="p.status.replace(/_/g,' ')"></span>
-                </div>
-                <div class="flex items-center gap-4 text-[13px]">
-                    <span class="text-gray-500">Vendido: <strong class="text-gray-800" x-text="formatMoneyBRL(totalVendido(p))"></strong></span>
-                    <span class="text-gray-500">Comissao: <strong class="text-brand-600" x-text="formatMoneyBRL(totalComissao(p))"></strong></span>
-                    <span class="text-gray-500">Vendedores: <strong class="text-gray-800" x-text="(p.seller_commissions||[]).length"></strong></span>
-                    <span x-show="p.closed_at" class="text-gray-500">Fechado: <strong class="text-gray-800" x-text="new Date(p.closed_at).toLocaleDateString('pt-BR')"></strong></span>
-                    <span x-show="p.paid_at" class="text-gray-500">Pago: <strong class="text-gray-800" x-text="new Date(p.paid_at).toLocaleDateString('pt-BR')"></strong></span>
-                </div>
-            </div>
-
-            <div class="flex items-center gap-2 mb-4 pb-4 border-b border-gray-100">
-                <span class="text-[12px] text-gray-400 font-medium mr-1">Selecionar:</span>
-                <button @click="selectAbertos(p)" class="text-[12px] px-2.5 py-1 rounded-lg bg-gray-100 hover:bg-brand-50 hover:text-brand-600 text-gray-600 font-medium transition">Abertos</button>
-                <button @click="selectFechados(p)" class="text-[12px] px-2.5 py-1 rounded-lg bg-gray-100 hover:bg-brand-50 hover:text-brand-600 text-gray-600 font-medium transition">Fechados</button>
-                <button @click="selectProntos(p)" class="text-[12px] px-2.5 py-1 rounded-lg bg-gray-100 hover:bg-brand-50 hover:text-brand-600 text-gray-600 font-medium transition">Prontos</button>
-                <button @click="clearSelection(p)" class="text-[12px] px-2.5 py-1 rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-600 font-medium transition">Limpar</button>
-                <div class="ml-auto flex items-center gap-1">
-                    <button @click="openEditModal(p)" class="text-[12px] px-2.5 py-1 rounded-lg hover:bg-gray-100 text-gray-600 font-medium transition flex items-center gap-1">
-                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path></svg>
-                        Editar
-                    </button>
-                    <button @click="openDeleteModal(p)" x-show="p.status==='ABERTA'" class="text-[12px] px-2.5 py-1 rounded-lg hover:bg-danger-50 text-danger-500 font-medium transition flex items-center gap-1">
-                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
-                        Excluir
-                    </button>
-                    <button @click="openCancelModal(p)" x-show="p.status!=='PAGA' && p.status!=='CANCELADA'" class="text-[12px] px-2.5 py-1 rounded-lg hover:bg-warning-50 text-warning-700 font-medium transition flex items-center gap-1">
-                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
-                        Cancelar
-                    </button>
-                    <a :href="'/api/financial/commissions/'+p.uuid+'/csv/'" class="text-[12px] px-2.5 py-1 rounded-lg hover:bg-gray-100 text-gray-600 font-medium transition flex items-center gap-1">
-                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
-                        CSV
-                    </a>
-                </div>
-            </div>
-
-            <table class="w-full text-left text-[13px]" x-show="p.seller_commissions&&p.seller_commissions.length">
-                <thead>
-                    <tr>
-                        <th class="px-3 py-2 font-semibold text-gray-500 border-b bg-gray-50 w-8"></th>
-                        <th class="px-3 py-2 font-semibold text-gray-500 border-b bg-gray-50">Vendedor</th>
-                        <th class="px-3 py-2 font-semibold text-gray-500 border-b bg-gray-50">Dias</th>
-                        <th class="px-3 py-2 font-semibold text-gray-500 border-b bg-gray-50">Faltam</th>
-                        <th class="px-3 py-2 font-semibold text-gray-500 border-b bg-gray-50">Operac.</th>
-                        <th class="px-3 py-2 font-semibold text-gray-500 border-b bg-gray-50">Total</th>
-                        <th class="px-3 py-2 font-semibold text-gray-500 border-b bg-gray-50">Taxa</th>
-                        <th class="px-3 py-2 font-semibold text-gray-500 border-b bg-gray-50">Comissao</th>
-                        <th class="px-3 py-2 font-semibold text-gray-500 border-b bg-gray-50">Pago</th>
-                        <th class="px-3 py-2 font-semibold text-gray-500 border-b bg-gray-50">Status</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <template x-for="sc in p.seller_commissions" :key="sc.id">
-                        <tr class="hover:bg-gray-50">
-                            <td class="px-3 py-2 border-b"><input type="checkbox" :checked="isSelected(sc)" @change="toggle(sc)" :disabled="sc.status==='PAGA'||sc.status==='AJUSTADA'||sc.status==='CANCELADA'"></td>
-                            <td class="px-3 py-2 border-b font-medium"><a :href="'/dashboard/gestor/vendedores/' + sc.seller_uuid + '/'" class="text-brand-500 hover:underline" x-text="sc.seller_name"></a></td>
-                            <td class="px-3 py-2 border-b text-gray-600" x-text="(sc.submitted_days_count||0)+'/'+(sc.expected_working_days||22)"></td>
-                            <td class="px-3 py-2 border-b text-gray-500" x-text="sc.missing_days_count||0"></td>
-                            <td class="px-3 py-2 border-b"><span class="text-xs px-1.5 py-0.5 rounded-full" :class="{'bg-success-50 text-success-700': sc.operational_status==='PRONTO', 'bg-warning-50 text-warning-700': sc.operational_status==='PENDENTE', 'bg-gray-100 text-gray-600': !sc.operational_status||sc.operational_status==='SEM_LANCAMENTO'}" x-text="sc.operational_status||'—'"></span></td>
-                            <td class="px-3 py-2 border-b font-semibold" x-text="formatMoneyBRL(sc.total_sold_amount)"></td>
-                            <td class="px-3 py-2 border-b" x-text="(parseFloat(sc.commission_rate)*100).toFixed(2)+'%'"></td>
-                            <td class="px-3 py-2 border-b font-semibold text-brand-500" x-text="formatMoneyBRL(sc.commission_amount)"></td>
-                            <td class="px-3 py-2 border-b" x-text="sc.paid_amount ? formatMoneyBRL(sc.paid_amount) : '—'"></td>
-                            <td class="px-3 py-2 border-b"><span class="text-xs px-1.5 py-0.5 rounded-full" :class="{'bg-success-50 text-success-700': sc.status==='PAGA', 'bg-warning-50 text-warning-700': sc.status==='FECHADA', 'bg-amber-50 text-amber-700': sc.status==='AJUSTADA', 'bg-gray-100 text-gray-600': sc.status==='ABERTA'||sc.status==='REABERTA', 'bg-danger-50 text-danger-700': sc.status==='CANCELADA'}" x-text="sc.status"></span></td>
-                        </tr>
-                    </template>
-                </tbody>
-            </table>
-
-            <div x-show="selectedCount(p) > 0" class="mt-3 pt-3 border-t border-gray-100 flex items-center justify-between flex-wrap gap-2">
-                <p class="text-[13px] text-gray-600"><span x-text="selectedCount(p)"></span> selecionado(s) — Comissao: <strong class="text-brand-600" x-text="selectedTotal(p)"></strong></p>
-                <div class="flex gap-2">
-                    <button @click="closeSelected(p)" class="bg-brand-500 hover:bg-brand-600 text-white font-medium py-1.5 px-3 rounded-xl transition tap-target text-[13px]">Fechar selecionados</button>
-                    {% if request.user.role == 'ADMIN' or request.user.role == 'FINANCEIRO' %}
-                    <button @click="confirmMarkPaid(p)" class="bg-success-500 hover:bg-success-700 text-white font-medium py-1.5 px-3 rounded-xl transition tap-target text-[13px]">Pagar selecionados</button>
-                    {% endif %}
-                    <button @click="openReopenModal(p)" class="bg-warning-500 hover:bg-warning-700 text-white font-medium py-1.5 px-3 rounded-xl transition tap-target text-[13px]">Reverter selecionados</button>
-                </div>
-            </div>
-
-            <p x-show="!p.seller_commissions||!p.seller_commissions.length" class="text-[13px] text-gray-500 py-3">Nenhum vendedor sincronizado nesta competencia.</p>
-        </div>
-    </template>
-    <div x-show="!periods.length" class="text-center py-12 text-gray-500">Nenhuma competencia encontrada.</div>
-
-    <!-- Create Modal -->
-    <div x-show="showCreateModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40" @click.self="showCreateModal=false">
-        <div class="bg-white rounded-2xl shadow-xl p-6 w-full max-w-lg mx-4">
-            <div class="flex items-center gap-3 mb-4">
-                <div class="w-10 h-10 rounded-xl bg-brand-50 flex items-center justify-center">
-                    <svg class="w-5 h-5 text-brand-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
-                </div>
-                <div>
-                    <h3 class="text-[17px] font-semibold text-gray-800">Criar competencia</h3>
-                    <p class="text-[12px] text-gray-500">Defina o periodo e os dias uteis esperados</p>
-                </div>
-            </div>
-
-            <div class="flex gap-3 mb-4">
-                <div class="flex-1">
-                    <label class="block text-[12px] font-medium text-gray-600 mb-1.5">Mes</label>
-                    <select x-model="createMonth" @change="calcCalendar()" class="w-full px-3 py-2.5 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-500 bg-white text-[14px]">
-                        <template x-for="m in 12" :key="m">
-                            <option :value="m" x-text="String(m).padStart(2,'0')"></option>
-                        </template>
-                    </select>
-                </div>
-                <div class="flex-1">
-                    <label class="block text-[12px] font-medium text-gray-600 mb-1.5">Ano</label>
-                    <select x-model="createYear" @change="calcCalendar()" class="w-full px-3 py-2.5 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-500 bg-white text-[14px]">
-                        <template x-for="y in 10" :key="y">
-                            <option :value="2024 + y - 1" x-text="2024 + y - 1"></option>
-                        </template>
-                    </select>
-                </div>
-            </div>
-
-            <div class="mb-4">
-                <label class="block text-[12px] font-medium text-gray-600 mb-1.5">Calendario de dias uteis</label>
-                <div class="bg-gray-50 rounded-xl p-3 border border-gray-200">
-                    <div class="grid grid-cols-7 gap-0 text-center mb-1">
-                        <template x-for="d in ['Dom','Seg','Ter','Qua','Qui','Sex','Sab']" :key="d">
-                            <div class="text-[11px] font-semibold text-gray-400 py-1" x-text="d"></div>
-                        </template>
-                    </div>
-                    <div class="grid grid-cols-7 gap-0 text-center">
-                        <!-- empty cells before first day -->
-                        <template x-for="n in calendarOffset" :key="'e'+n">
-                            <div class="py-1"></div>
-                        </template>
-                        <!-- days of the month -->
-                        <template x-for="(day, idx) in calendarDays" :key="'d'+idx">
-                            <div class="py-1 text-[13px] rounded-lg"
-                                 :class="calendarIsWeekend(day) ? 'text-gray-300' : 'text-gray-700 font-medium'"
-                                 x-text="day"></div>
-                        </template>
-                    </div>
-                </div>
-                <p class="text-[11px] text-gray-400 mt-1.5">
-                    <span class="inline-block w-3 h-3 rounded bg-gray-100 align-middle mr-1"></span> Dias uteis
-                    <span class="inline-block w-3 h-3 rounded bg-white border border-gray-200 align-middle mx-1.5 ml-2"></span> Fim de semana
-                </p>
-            </div>
-
-            <div class="flex gap-3 mb-4">
-                <div class="flex-1">
-                    <label class="block text-[12px] font-medium text-gray-600 mb-1.5">Dias uteis <span class="text-gray-400 font-normal">(calculado)</span></label>
-                    <input type="number" x-model="createExpectedDays" min="1" max="31" class="w-full px-3 py-2.5 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-500 text-[14px] bg-white">
-                </div>
-                <div class="flex-1">
-                    <label class="block text-[12px] font-medium text-gray-600 mb-1.5">Dias totais</label>
-                    <div class="w-full px-3 py-2.5 border border-gray-200 rounded-xl bg-gray-50 text-[14px] text-gray-500" x-text="calendarDays.length"></div>
-                </div>
-            </div>
-
-            <div class="mb-4">
-                <label class="block text-[12px] font-medium text-gray-600 mb-1.5">Observacao <span class="text-gray-400 font-normal">(opcional)</span></label>
-                <textarea x-model="createNotes" class="w-full px-3 py-2.5 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-500 text-[14px]" rows="2" placeholder="Ex: Feriados no dia 15 e 20"></textarea>
-            </div>
-
-            <div class="flex gap-3 justify-end pt-2 border-t border-gray-100">
-                <button @click="showCreateModal=false" class="px-4 py-2.5 bg-white border border-gray-300 text-gray-700 font-medium rounded-xl hover:bg-gray-50 transition text-[14px]">Cancelar</button>
-                <button @click="doCreate()" class="px-4 py-2.5 bg-brand-500 hover:bg-brand-600 text-white font-medium rounded-xl transition text-[14px]">Criar competencia</button>
-            </div>
-        </div>
+  <div x-show="!periods.length" class="text-center py-20">
+    <div class="w-16 h-16 mx-auto mb-4 rounded-2xl bg-gray-50 flex items-center justify-center">
+      <svg class="w-8 h-8 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
     </div>
+    <p class="text-[15px] font-medium text-gray-500 mb-1">Nenhuma competencia encontrada</p>
+    <p class="text-[13px] text-gray-400 mb-5">Crie uma nova competencia para começar</p>
+    <button @click="openCreateModal()" class="inline-flex items-center gap-2 bg-gray-900 hover:bg-gray-800 text-white font-semibold py-2.5 px-5 rounded-xl transition-all text-[14px] shadow-sm hover:shadow-md active:scale-[0.97]">
+      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
+      Criar competencia
+    </button>
+  </div>
 
-    <!-- Edit Modal -->
-    <div x-show="showEditModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40" @click.self="showEditModal=false">
-        <div class="bg-white rounded-2xl shadow-xl p-6 w-full max-w-md mx-4">
-            <h3 class="text-[18px] font-semibold mb-3">Editar Competencia</h3>
-            <p class="text-[13px] text-gray-500 mb-4" x-text="editPeriod ? String(editPeriod.month).padStart(2,'0')+'/'+editPeriod.year : ''"></p>
-            <div class="mb-3"><label class="block text-[13px] font-medium text-gray-700 mb-1">Mes</label><input type="number" x-model="editMonth" min="1" max="12" :disabled="editHasSales" class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-500 disabled:bg-gray-100 disabled:text-gray-400 text-[14px]"><p x-show="editHasSales" class="text-[11px] text-warning-600 mt-1">Nao e possivel alterar mes com lancamentos.</p></div>
-            <div class="mb-3"><label class="block text-[13px] font-medium text-gray-700 mb-1">Ano</label><input type="number" x-model="editYear" min="2020" max="2100" :disabled="editHasSales" class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-500 disabled:bg-gray-100 disabled:text-gray-400 text-[14px]"><p x-show="editHasSales" class="text-[11px] text-warning-600 mt-1">Nao e possivel alterar ano com lancamentos.</p></div>
-            <div class="mb-3"><label class="block text-[13px] font-medium text-gray-700 mb-1">Dias trabalhados esperados</label><input type="number" x-model="editExpectedDays" min="1" max="31" class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-500 text-[14px]"><p class="text-[11px] text-gray-400 mt-1">Afeta apenas conferencia operacional.</p></div>
-            <div class="mb-4"><label class="block text-[13px] font-medium text-gray-700 mb-1">Observacao</label><textarea x-model="editNotes" class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-500 text-[14px]" rows="2"></textarea></div>
-            <div class="flex gap-3 justify-end">
-                <button @click="showEditModal=false" class="bg-white border border-gray-300 text-gray-700 font-medium py-2 px-4 rounded-xl transition text-[14px]">Cancelar</button>
-                <button @click="doEdit()" class="bg-brand-500 hover:bg-brand-600 text-white font-medium py-2 px-4 rounded-xl transition text-[14px]">Salvar</button>
+  <template x-for="p in periods" :key="p.uuid">
+    <div class="bg-white rounded-2xl border border-gray-100 shadow-[0_1px_3px_-1px_rgba(0,0,0,0.04),0_4px_16px_-4px_rgba(67,97,238,0.06)] overflow-hidden mb-5">
+      <div class="px-6 py-5 border-b border-gray-100">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div class="flex items-center gap-3">
+            <div class="w-10 h-10 rounded-xl flex items-center justify-center shadow-sm"
+                 :class="{'bg-gradient-to-br from-brand-400 to-brand-500': p.status==='ABERTA',
+                          'bg-gradient-to-br from-amber-400 to-amber-500': p.status==='PARCIALMENTE_FECHADA'||p.status==='FECHADA',
+                          'bg-gradient-to-br from-emerald-400 to-emerald-500': p.status==='PARCIALMENTE_PAGA'||p.status==='PAGA',
+                          'bg-gradient-to-br from-red-400 to-red-500': p.status==='CANCELADA'}">
+              <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
             </div>
+            <div>
+              <h3 class="text-[17px] font-bold text-gray-900" x-text="String(p.month).padStart(2,'0')+'/'+p.year"></h3>
+              <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-medium mt-1"
+                    :class="{'bg-gray-100 text-gray-600': p.status==='ABERTA',
+                             'bg-amber-50 text-amber-700': p.status==='PARCIALMENTE_FECHADA',
+                             'bg-warning-50 text-warning-700': p.status==='FECHADA',
+                             'bg-indigo-50 text-indigo-700': p.status==='PARCIALMENTE_PAGA',
+                             'bg-emerald-50 text-emerald-700': p.status==='PAGA',
+                             'bg-red-50 text-red-700': p.status==='CANCELADA'}">
+                <span class="w-1.5 h-1.5 rounded-full"
+                      :class="{'bg-gray-400': p.status==='ABERTA',
+                               'bg-amber-500': p.status==='PARCIALMENTE_FECHADA',
+                               'bg-warning-500': p.status==='FECHADA',
+                               'bg-indigo-500': p.status==='PARCIALMENTE_PAGA',
+                               'bg-emerald-500': p.status==='PAGA',
+                               'bg-red-500': p.status==='CANCELADA'}"></span>
+                <span x-text="p.status.replace(/_/g,' ')"></span>
+              </span>
+            </div>
+          </div>
+          <div class="flex items-center gap-4 sm:gap-6 text-[12px] sm:text-[13px] flex-wrap">
+            <span class="text-gray-500">Vendido: <strong class="text-gray-800" x-text="formatMoneyBRL(totalVendido(p))"></strong></span>
+            <span class="text-gray-500">Comissao: <strong class="text-brand-600" x-text="formatMoneyBRL(totalComissao(p))"></strong></span>
+            <span class="text-gray-500">Vendedores: <strong class="text-gray-800" x-text="(p.seller_commissions||[]).length"></strong></span>
+            <span x-show="p.closed_at" class="text-gray-500">Fechamento: <strong class="text-gray-800" x-text="new Date(p.closed_at).toLocaleDateString('pt-BR')"></strong></span>
+            <span x-show="p.paid_at" class="text-gray-500">Pagamento: <strong class="text-emerald-600" x-text="new Date(p.paid_at).toLocaleDateString('pt-BR')"></strong></span>
+          </div>
         </div>
-    </div>
+      </div>
 
-    <!-- Delete Modal -->
-    <div x-show="showDeleteModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40" @click.self="showDeleteModal=false">
-        <div class="bg-white rounded-2xl shadow-xl p-6 w-full max-w-md mx-4">
-            <h3 class="text-[18px] font-semibold mb-3 text-danger-700">Excluir Competencia</h3>
-            <p class="text-[13px] text-gray-500 mb-1">Competencia <strong x-text="deletePeriod ? String(deletePeriod.month).padStart(2,'0')+'/'+deletePeriod.year : ''"></strong></p>
-            <p class="text-[13px] text-gray-500 mb-4">Isso remove registros de comissao, mas nao apaga vendas manuais.</p>
-            <div class="mb-4"><label class="block text-[13px] font-medium text-gray-700 mb-1">Digite EXCLUIR para confirmar</label><input type="text" x-model="deleteConfirmText" class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-500 text-[14px]" placeholder="EXCLUIR"></div>
-            <div class="flex gap-3 justify-end">
-                <button @click="showDeleteModal=false" class="bg-white border border-gray-300 text-gray-700 font-medium py-2 px-4 rounded-xl transition text-[14px]">Cancelar</button>
-                <button @click="doDelete()" class="bg-danger-500 hover:bg-danger-700 text-white font-medium py-2 px-4 rounded-xl transition text-[14px]" :disabled="deleteConfirmText!=='EXCLUIR'">Excluir competencia</button>
-            </div>
+      <div class="px-6 py-3 border-b border-gray-100 flex items-center gap-2 flex-wrap">
+        <span class="text-[12px] text-gray-400 font-medium mr-1">Selecionar:</span>
+        <button @click="selectAbertos(p)" class="text-[12px] px-3 py-1.5 rounded-lg bg-gray-100 hover:bg-brand-50 hover:text-brand-600 text-gray-600 font-medium transition">Abertos</button>
+        <button @click="selectFechados(p)" class="text-[12px] px-3 py-1.5 rounded-lg bg-gray-100 hover:bg-brand-50 hover:text-brand-600 text-gray-600 font-medium transition">Fechados</button>
+        <button @click="selectProntos(p)" class="text-[12px] px-3 py-1.5 rounded-lg bg-gray-100 hover:bg-brand-50 hover:text-brand-600 text-gray-600 font-medium transition">Prontos</button>
+        <button @click="clearSelection(p)" class="text-[12px] px-3 py-1.5 rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-600 font-medium transition">Limpar</button>
+        <div class="ml-auto flex items-center gap-1">
+          <button @click="openEditModal(p)" class="text-[12px] px-3 py-1.5 rounded-lg hover:bg-gray-100 text-gray-600 font-medium transition flex items-center gap-1.5">
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
+            Editar
+          </button>
+          <button @click="openDeleteModal(p)" x-show="p.status==='ABERTA'" class="text-[12px] px-3 py-1.5 rounded-lg hover:bg-red-50 text-red-500 font-medium transition flex items-center gap-1.5">
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+            Excluir
+          </button>
+          <button @click="openCancelModal(p)" x-show="p.status!=='PAGA' && p.status!=='CANCELADA'" class="text-[12px] px-3 py-1.5 rounded-lg hover:bg-amber-50 text-amber-600 font-medium transition flex items-center gap-1.5">
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+            Cancelar
+          </button>
+          <a :href="'/api/financial/commissions/'+p.uuid+'/csv/'"
+             class="text-[12px] px-3 py-1.5 rounded-lg hover:bg-gray-100 text-gray-600 font-medium transition flex items-center gap-1.5">
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+            CSV
+          </a>
         </div>
-    </div>
+      </div>
 
-    <!-- Cancel Modal -->
-    <div x-show="showCancelModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40" @click.self="showCancelModal=false">
-        <div class="bg-white rounded-2xl shadow-xl p-6 w-full max-w-md mx-4">
-            <h3 class="text-[18px] font-semibold mb-3 text-warning-700">Cancelar Competencia</h3>
-            <p class="text-[13px] text-gray-500 mb-1">Competencia <strong x-text="cancelPeriod ? String(cancelPeriod.month).padStart(2,'0')+'/'+cancelPeriod.year : ''"></strong></p>
-            <p class="text-[13px] text-gray-500 mb-4">Cancelar mantem o historico e bloqueia o uso. Vendas manuais nao serao apagadas.</p>
-            <div class="mb-4"><label class="block text-[13px] font-medium text-gray-700 mb-1">Motivo do cancelamento *</label><textarea x-model="cancelReason" class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-500 text-[14px]" rows="3" placeholder="Motivo obrigatorio"></textarea></div>
-            <div class="flex gap-3 justify-end">
-                <button @click="showCancelModal=false" class="bg-white border border-gray-300 text-gray-700 font-medium py-2 px-4 rounded-xl transition text-[14px]">Voltar</button>
-                <button @click="doCancel()" class="bg-warning-500 hover:bg-warning-700 text-white font-medium py-2 px-4 rounded-xl transition text-[14px]" :disabled="!cancelReason.trim()">Cancelar competencia</button>
-            </div>
+      <template x-if="p.seller_commissions && p.seller_commissions.length">
+        <div class="overflow-x-auto">
+          <table class="w-full text-left">
+            <thead>
+              <tr class="bg-gray-50/80">
+                <th class="px-4 py-3 text-[11px] font-semibold text-gray-500 uppercase tracking-wider w-10"></th>
+                <th class="px-4 py-3 text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Vendedor</th>
+                <th class="px-4 py-3 text-[11px] font-semibold text-gray-500 uppercase tracking-wider hidden sm:table-cell">Dias</th>
+                <th class="px-4 py-3 text-[11px] font-semibold text-gray-500 uppercase tracking-wider hidden sm:table-cell">Faltam</th>
+                <th class="px-4 py-3 text-[11px] font-semibold text-gray-500 uppercase tracking-wider hidden md:table-cell">Operac.</th>
+                <th class="px-4 py-3 text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Total</th>
+                <th class="px-4 py-3 text-[11px] font-semibold text-gray-500 uppercase tracking-wider hidden sm:table-cell">Taxa</th>
+                <th class="px-4 py-3 text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Comissao</th>
+                <th class="px-4 py-3 text-[11px] font-semibold text-gray-500 uppercase tracking-wider hidden lg:table-cell">Pago</th>
+                <th class="px-4 py-3 text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              <template x-for="sc in p.seller_commissions" :key="sc.id">
+                <tr class="border-b border-gray-50 hover:bg-gray-50/50 transition-colors">
+                  <td class="px-4 py-3.5">
+                    <input type="checkbox" :checked="isSelected(sc)" @change="toggle(sc)"
+                           :disabled="sc.status==='PAGA'||sc.status==='AJUSTADA'||sc.status==='CANCELADA'"
+                           class="w-4 h-4 rounded border-gray-300 text-brand-500 focus:ring-brand-500 cursor-pointer">
+                  </td>
+                  <td class="px-4 py-3.5">
+                    <a :href="'/dashboard/gestor/vendedores/' + sc.seller_uuid + '/'" class="text-[14px] font-semibold text-gray-900 hover:text-brand-600 transition-colors" x-text="sc.seller_name"></a>
+                  </td>
+                  <td class="px-4 py-3.5 text-[13px] text-gray-700 hidden sm:table-cell" x-text="(sc.submitted_days_count||0)+'/'+(sc.expected_working_days||22)"></td>
+                  <td class="px-4 py-3.5 text-[13px] text-gray-500 hidden sm:table-cell" x-text="sc.missing_days_count||0"></td>
+                  <td class="px-4 py-3.5 hidden md:table-cell">
+                    <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-medium"
+                          :class="{'bg-emerald-50 text-emerald-700': sc.operational_status==='PRONTO', 'bg-amber-50 text-amber-700': sc.operational_status==='PENDENTE', 'bg-gray-100 text-gray-600': !sc.operational_status||sc.operational_status==='SEM_LANCAMENTO'}">
+                      <span class="w-1.5 h-1.5 rounded-full"
+                            :class="{'bg-emerald-500': sc.operational_status==='PRONTO', 'bg-amber-500': sc.operational_status==='PENDENTE', 'bg-gray-400': !sc.operational_status||sc.operational_status==='SEM_LANCAMENTO'}"></span>
+                      <span x-text="sc.operational_status==='PRONTO'?'Pronto':sc.operational_status==='PENDENTE'?'Pendente':sc.operational_status||'—'"></span>
+                    </span>
+                  </td>
+                  <td class="px-4 py-3.5 font-semibold text-[14px] text-gray-900" x-text="formatMoneyBRL(sc.total_sold_amount)"></td>
+                  <td class="px-4 py-3.5 text-[13px] text-gray-600 hidden sm:table-cell" x-text="(parseFloat(sc.commission_rate)*100).toFixed(2)+'%'"></td>
+                  <td class="px-4 py-3.5 font-semibold text-[14px] text-brand-600" x-text="formatMoneyBRL(sc.commission_amount)"></td>
+                  <td class="px-4 py-3.5 text-[13px] text-gray-500 hidden lg:table-cell" x-text="sc.paid_amount ? formatMoneyBRL(sc.paid_amount) : '—'"></td>
+                  <td class="px-4 py-3.5">
+                    <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-medium"
+                          :class="{'bg-emerald-50 text-emerald-700': sc.status==='PAGA', 'bg-amber-50 text-amber-700': sc.status==='FECHADA', 'bg-sky-50 text-sky-700': sc.status==='AJUSTADA', 'bg-purple-50 text-purple-700': sc.status==='REABERTA', 'bg-red-50 text-red-700': sc.status==='CANCELADA', 'bg-gray-100 text-gray-600': sc.status==='ABERTA'}">
+                      <span class="w-1.5 h-1.5 rounded-full"
+                            :class="{'bg-emerald-500': sc.status==='PAGA', 'bg-amber-500': sc.status==='FECHADA', 'bg-sky-500': sc.status==='AJUSTADA', 'bg-purple-500': sc.status==='REABERTA', 'bg-red-500': sc.status==='CANCELADA', 'bg-gray-400': sc.status==='ABERTA'}"></span>
+                      <span x-text="sc.status"></span>
+                    </span>
+                  </td>
+                </tr>
+              </template>
+            </tbody>
+          </table>
         </div>
-    </div>
+      </template>
 
-    <!-- Close Modal -->
-    <div x-show="showCloseModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40" @click.self="showCloseModal=false">
-        <div class="bg-white rounded-2xl shadow-xl p-6 w-full max-w-md mx-4">
-            <h3 class="text-[18px] font-semibold mb-3">Fechar Comissoes</h3>
-            <p class="text-[13px] text-gray-500 mb-2">Voce esta fechando <strong x-text="closeSellers.length"></strong> vendedor(es):</p>
-            <ul class="text-[13px] text-gray-700 mb-3 space-y-1 max-h-32 overflow-y-auto">
-                <template x-for="s in closeSellers" :key="s.id">
-                    <li x-text="s.seller_name + ' — Total: ' + formatMoneyBRL(s.total_sold_amount) + ' — Comissao: ' + formatMoneyBRL(s.commission_amount)"></li>
-                </template>
-            </ul>
-            <p class="text-[12px] text-gray-500 mb-4">Somente os listados serao fechados. Os demais continuarao abertos.</p>
-            <div class="flex gap-3 justify-end">
-                <button @click="showCloseModal=false" class="bg-white border border-gray-300 text-gray-700 font-medium py-2 px-4 rounded-xl transition text-[14px]">Cancelar</button>
-                <button @click="doClose()" class="bg-brand-500 hover:bg-brand-600 text-white font-medium py-2 px-4 rounded-xl transition text-[14px]">Confirmar fechamento</button>
-            </div>
-        </div>
-    </div>
+      <p x-show="!p.seller_commissions||!p.seller_commissions.length" class="text-[13px] text-gray-500 py-6 text-center">Nenhum vendedor sincronizado nesta competencia.</p>
 
-    <!-- Pay Modal -->
-    <div x-show="showPayModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40" @click.self="showPayModal=false">
-        <div class="bg-white rounded-2xl shadow-xl p-6 w-full max-w-md mx-4">
-            <h3 class="text-[18px] font-semibold mb-3">Pagar Comissoes</h3>
-            <p class="text-[13px] text-gray-500 mb-2">Voce esta pagando <strong x-text="paySellers.length"></strong> vendedor(es):</p>
-            <ul class="text-[13px] text-gray-700 mb-3 space-y-1 max-h-32 overflow-y-auto">
-                <template x-for="s in paySellers" :key="s.id">
-                    <li x-text="s.seller_name + ' — Comissao: ' + formatMoneyBRL(s.commission_amount)"></li>
-                </template>
-            </ul>
-            <p class="text-[12px] text-danger-500 mb-4">Confirme apenas se o pagamento ja foi realizado. Nao podera ser revertido.</p>
-            <div class="mb-3"><label class="block text-[13px] font-medium text-gray-700 mb-1">Data</label><input type="date" x-model="payDate" class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-500 text-[14px]"></div>
-            <div class="mb-3"><label class="block text-[13px] font-medium text-gray-700 mb-1">Forma</label><select x-model="payMethod" class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-500 text-[14px]"><option value="">Selecione</option><option value="pix">PIX</option><option value="ted">TED</option><option value="dinheiro">Dinheiro</option><option value="outro">Outro</option></select></div>
-            <div class="mb-4"><label class="block text-[13px] font-medium text-gray-700 mb-1">Observacao</label><textarea x-model="payNotes" class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-500 text-[14px]" rows="2"></textarea></div>
-            <div class="flex gap-3 justify-end">
-                <button @click="showPayModal=false" class="bg-white border border-gray-300 text-gray-700 font-medium py-2 px-4 rounded-xl transition text-[14px]">Cancelar</button>
-                <button @click="doPay()" class="bg-success-500 hover:bg-success-700 text-white font-medium py-2 px-4 rounded-xl transition text-[14px]">Confirmar Pagamento</button>
-            </div>
+      <div x-show="selectedCount(p) > 0" class="px-6 py-4 border-t border-gray-100 bg-gray-50/50 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+        <p class="text-[13px] text-gray-600">
+          <span class="font-semibold text-gray-800" x-text="selectedCount(p)"></span> selecionado(s) — Comissao total: <strong class="text-brand-600" x-text="selectedTotal(p)"></strong>
+        </p>
+        <div class="flex gap-2">
+          <button @click="closeSelected(p)" class="inline-flex items-center gap-1.5 bg-gray-900 hover:bg-gray-800 text-white font-medium py-2 px-4 rounded-xl transition-all text-[13px] shadow-sm active:scale-[0.97]">
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+            Fechar
+          </button>
+          {% if request.user.role == 'ADMIN' or request.user.role == 'FINANCEIRO' %}
+          <button @click="confirmMarkPaid(p)" class="inline-flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-medium py-2 px-4 rounded-xl transition-all text-[13px] shadow-sm active:scale-[0.97]">
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+            Pagar
+          </button>
+          {% endif %}
+          <button @click="openReopenModal(p)" class="inline-flex items-center gap-1.5 bg-amber-500 hover:bg-amber-600 text-white font-medium py-2 px-4 rounded-xl transition-all text-[13px] shadow-sm active:scale-[0.97]">
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+            Reverter
+          </button>
         </div>
+      </div>
     </div>
+  </template>
 
-    <!-- Reopen Modal -->
-    <div x-show="showReopenModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40" @click.self="showReopenModal=false">
-        <div class="bg-white rounded-2xl shadow-xl p-6 w-full max-w-md mx-4">
-            <h3 class="text-[18px] font-semibold mb-3">Reverter Comissoes</h3>
-            <p class="text-[13px] text-gray-500 mb-2">Voce esta revertendo <strong x-text="reopenSellers.length"></strong> vendedor(es):</p>
-            <ul class="text-[13px] text-gray-700 mb-3 space-y-1 max-h-32 overflow-y-auto">
-                <template x-for="s in reopenSellers" :key="s.id">
-                    <li x-text="s.seller_name + ' — Comissao: ' + formatMoneyBRL(s.commission_amount)"></li>
-                </template>
-            </ul>
-            <p class="text-[12px] text-gray-500 mb-3">Somente os listados serao reabertos. Vendedores pagos nao podem ser revertidos.</p>
-            <div class="mb-4"><label class="block text-[13px] font-medium text-gray-700 mb-1">Motivo *</label><textarea x-model="reopenReason" class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-500 text-[14px]" rows="3" placeholder="Motivo obrigatorio"></textarea></div>
-            <div class="flex gap-3 justify-end">
-                <button @click="showReopenModal=false" class="bg-white border border-gray-300 text-gray-700 font-medium py-2 px-4 rounded-xl transition text-[14px]">Cancelar</button>
-                <button @click="doReopen()" class="bg-warning-500 hover:bg-warning-700 text-white font-medium py-2 px-4 rounded-xl transition text-[14px]" :disabled="!reopenReason.trim()">Confirmar Reversao</button>
-            </div>
+  <div x-show="showCreateModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm" @click.self="showCreateModal=false">
+    <div class="bg-white rounded-2xl shadow-xl p-6 w-full max-w-lg mx-4" @click.stop>
+      <div class="flex items-center gap-3 mb-5">
+        <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-brand-400 to-brand-500 flex items-center justify-center shadow-sm">
+          <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
         </div>
+        <div><h3 class="text-[17px] font-bold text-gray-900">Criar competencia</h3><p class="text-[12px] text-gray-400">Defina o periodo e os dias uteis esperados</p></div>
+      </div>
+      <div class="flex gap-3 mb-4">
+        <div class="flex-1">
+          <label class="block text-[13px] font-medium text-gray-700 mb-1.5">Mes</label>
+          <select x-model="createMonth" @change="calcCalendar()" class="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-[14px] outline-none transition-all focus:border-brand-400 focus:ring-2 focus:ring-brand-100">
+            <template x-for="m in 12" :key="m"><option :value="m" x-text="String(m).padStart(2,'0')"></option></template>
+          </select>
+        </div>
+        <div class="flex-1">
+          <label class="block text-[13px] font-medium text-gray-700 mb-1.5">Ano</label>
+          <select x-model="createYear" @change="calcCalendar()" class="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-[14px] outline-none transition-all focus:border-brand-400 focus:ring-2 focus:ring-brand-100">
+            <template x-for="y in 10" :key="y"><option :value="2024 + y - 1" x-text="2024 + y - 1"></option></template>
+          </select>
+        </div>
+      </div>
+      <div class="mb-4">
+        <label class="block text-[13px] font-medium text-gray-700 mb-1.5">Calendario de dias uteis</label>
+        <div class="bg-gray-50 rounded-xl p-4 border border-gray-200">
+          <div class="grid grid-cols-7 gap-0 text-center mb-1">
+            <template x-for="d in ['Dom','Seg','Ter','Qua','Qui','Sex','Sab']" :key="d"><div class="text-[11px] font-semibold text-gray-400 py-1" x-text="d"></div></template>
+          </div>
+          <div class="grid grid-cols-7 gap-0 text-center">
+            <template x-for="n in calendarOffset" :key="'e'+n"><div class="py-1"></div></template>
+            <template x-for="(day, idx) in calendarDays" :key="'d'+idx">
+              <div class="py-1 text-[13px] rounded-lg" :class="calendarIsWeekend(day) ? 'text-gray-300' : 'text-gray-700 font-medium'" x-text="day"></div>
+            </template>
+          </div>
+        </div>
+      </div>
+      <div class="flex gap-3 mb-4">
+        <div class="flex-1">
+          <label class="block text-[13px] font-medium text-gray-700 mb-1.5">Dias uteis <span class="text-gray-400 font-normal">(calculado)</span></label>
+          <input type="number" x-model="createExpectedDays" min="1" max="31" class="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-[14px] outline-none transition-all focus:border-brand-400 focus:ring-2 focus:ring-brand-100">
+        </div>
+        <div class="flex-1">
+          <label class="block text-[13px] font-medium text-gray-700 mb-1.5">Dias totais</label>
+          <div class="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-[14px] text-gray-500" x-text="calendarDays.length"></div>
+        </div>
+      </div>
+      <div class="mb-4">
+        <label class="block text-[13px] font-medium text-gray-700 mb-1.5">Observacao <span class="text-gray-400 font-normal">(opcional)</span></label>
+        <textarea x-model="createNotes" class="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-[14px] outline-none transition-all focus:border-brand-400 focus:ring-2 focus:ring-brand-100" rows="2" placeholder="Ex: Feriados no dia 15 e 20"></textarea>
+      </div>
+      <div class="flex gap-3 justify-end pt-2 border-t border-gray-100">
+        <button @click="showCreateModal=false" class="px-5 py-2.5 bg-white border border-gray-200 text-gray-700 font-medium rounded-xl transition-all text-[14px] hover:bg-gray-50 active:scale-[0.97]">Cancelar</button>
+        <button @click="doCreate()" class="px-5 py-2.5 bg-gray-900 hover:bg-gray-800 text-white font-semibold rounded-xl transition-all text-[14px] shadow-sm active:scale-[0.97]">Criar competencia</button>
+      </div>
     </div>
+  </div>
+
+  <div x-show="showEditModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm" @click.self="showEditModal=false">
+    <div class="bg-white rounded-2xl shadow-xl p-6 w-full max-w-md mx-4" @click.stop>
+      <div class="flex items-center gap-3 mb-5">
+        <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-sky-400 to-sky-500 flex items-center justify-center shadow-sm">
+          <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
+        </div>
+        <div><h3 class="text-[17px] font-bold text-gray-900">Editar Competencia</h3><p class="text-[12px] text-gray-400" x-text="editPeriod ? String(editPeriod.month).padStart(2,'0')+'/'+editPeriod.year : ''"></p></div>
+      </div>
+      <div class="mb-3"><label class="block text-[13px] font-medium text-gray-700 mb-1.5">Mes</label><input type="number" x-model="editMonth" min="1" max="12" :disabled="editHasSales" class="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-[14px] outline-none transition-all focus:border-brand-400 focus:ring-2 focus:ring-brand-100 disabled:bg-gray-100 disabled:text-gray-400"><p x-show="editHasSales" class="text-[11px] text-amber-600 mt-1.5 flex items-center gap-1"><svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"/></svg>Nao e possivel alterar mes/ano com lancamentos.</p></div>
+      <div class="mb-3"><label class="block text-[13px] font-medium text-gray-700 mb-1.5">Ano</label><input type="number" x-model="editYear" min="2020" max="2100" :disabled="editHasSales" class="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-[14px] outline-none transition-all focus:border-brand-400 focus:ring-2 focus:ring-brand-100 disabled:bg-gray-100 disabled:text-gray-400"></div>
+      <div class="mb-3"><label class="block text-[13px] font-medium text-gray-700 mb-1.5">Dias trabalhados esperados</label><input type="number" x-model="editExpectedDays" min="1" max="31" class="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-[14px] outline-none transition-all focus:border-brand-400 focus:ring-2 focus:ring-brand-100"></div>
+      <div class="mb-4"><label class="block text-[13px] font-medium text-gray-700 mb-1.5">Observacao</label><textarea x-model="editNotes" class="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-[14px] outline-none transition-all focus:border-brand-400 focus:ring-2 focus:ring-brand-100" rows="2"></textarea></div>
+      <div class="flex gap-3 justify-end pt-2 border-t border-gray-100">
+        <button @click="showEditModal=false" class="px-5 py-2.5 bg-white border border-gray-200 text-gray-700 font-medium rounded-xl transition-all text-[14px] hover:bg-gray-50 active:scale-[0.97]">Cancelar</button>
+        <button @click="doEdit()" class="px-5 py-2.5 bg-gray-900 hover:bg-gray-800 text-white font-semibold rounded-xl transition-all text-[14px] shadow-sm active:scale-[0.97]">Salvar</button>
+      </div>
+    </div>
+  </div>
+
+  <div x-show="showDeleteModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm" @click.self="showDeleteModal=false">
+    <div class="bg-white rounded-2xl shadow-xl p-6 w-full max-w-md mx-4 text-center" @click.stop>
+      <div class="w-14 h-14 mx-auto mb-4 rounded-2xl bg-red-50 flex items-center justify-center">
+        <svg class="w-7 h-7 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+      </div>
+      <h3 class="text-[17px] font-bold text-gray-900 mb-2">Excluir Competencia</h3>
+      <p class="text-[13px] text-gray-500 mb-1" x-text="deletePeriod ? String(deletePeriod.month).padStart(2,'0')+'/'+deletePeriod.year : ''"></p>
+      <p class="text-[13px] text-gray-500 mb-5">Isso remove registros de comissao, mas nao apaga vendas manuais.</p>
+      <div class="text-left mb-5">
+        <label class="block text-[13px] font-medium text-gray-700 mb-1.5">Digite <strong>EXCLUIR</strong> para confirmar</label>
+        <input type="text" x-model="deleteConfirmText" class="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-[14px] outline-none transition-all focus:border-red-400 focus:ring-2 focus:ring-red-100" placeholder="EXCLUIR">
+      </div>
+      <div class="flex gap-3 justify-center">
+        <button @click="showDeleteModal=false" class="px-5 py-2.5 bg-white border border-gray-200 text-gray-700 font-medium rounded-xl transition-all text-[14px] hover:bg-gray-50 active:scale-[0.97]">Cancelar</button>
+        <button @click="doDelete()" class="px-5 py-2.5 bg-red-600 hover:bg-red-700 text-white font-semibold rounded-xl transition-all text-[14px] shadow-sm active:scale-[0.97]" :disabled="deleteConfirmText!=='EXCLUIR'">Excluir</button>
+      </div>
+    </div>
+  </div>
+
+  <div x-show="showCancelModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm" @click.self="showCancelModal=false">
+    <div class="bg-white rounded-2xl shadow-xl p-6 w-full max-w-md mx-4" @click.stop>
+      <div class="flex items-center gap-3 mb-5">
+        <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-amber-400 to-amber-500 flex items-center justify-center shadow-sm">
+          <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+        </div>
+        <div><h3 class="text-[17px] font-bold text-gray-900">Cancelar Competencia</h3><p class="text-[12px] text-gray-400" x-text="cancelPeriod ? String(cancelPeriod.month).padStart(2,'0')+'/'+cancelPeriod.year : ''"></p></div>
+      </div>
+      <p class="text-[13px] text-gray-500 mb-5">Cancelar mantem o historico e bloqueia o uso. Vendas manuais nao serao apagadas.</p>
+      <div class="mb-4"><label class="block text-[13px] font-medium text-gray-700 mb-1.5">Motivo do cancelamento *</label><textarea x-model="cancelReason" class="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-[14px] outline-none transition-all focus:border-amber-400 focus:ring-2 focus:ring-amber-100" rows="3" placeholder="Motivo obrigatorio"></textarea></div>
+      <div class="flex gap-3 justify-end pt-2 border-t border-gray-100">
+        <button @click="showCancelModal=false" class="px-5 py-2.5 bg-white border border-gray-200 text-gray-700 font-medium rounded-xl transition-all text-[14px] hover:bg-gray-50 active:scale-[0.97]">Voltar</button>
+        <button @click="doCancel()" class="px-5 py-2.5 bg-amber-500 hover:bg-amber-600 text-white font-semibold rounded-xl transition-all text-[14px] shadow-sm active:scale-[0.97]" :disabled="!cancelReason.trim()">Cancelar competencia</button>
+      </div>
+    </div>
+  </div>
+
+  <div x-show="showCloseModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm" @click.self="showCloseModal=false">
+    <div class="bg-white rounded-2xl shadow-xl p-6 w-full max-w-md mx-4" @click.stop>
+      <div class="flex items-center gap-3 mb-5">
+        <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-brand-400 to-brand-500 flex items-center justify-center shadow-sm">
+          <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+        </div>
+        <div><h3 class="text-[17px] font-bold text-gray-900">Fechar Comissoes</h3><p class="text-[12px] text-gray-400" x-text="closeSellers.length + ' vendedor(es) selecionado(s)'"></p></div>
+      </div>
+      <div class="bg-gray-50 rounded-xl p-4 mb-4 max-h-36 overflow-y-auto">
+        <template x-for="s in closeSellers" :key="s.id">
+          <div class="flex items-center justify-between py-1.5 text-[13px]">
+            <span class="text-gray-700 font-medium" x-text="s.seller_name"></span>
+            <span class="text-brand-600 font-semibold" x-text="formatMoneyBRL(s.commission_amount)"></span>
+          </div>
+        </template>
+      </div>
+      <p class="text-[12px] text-gray-500 mb-4">Somente os listados serao fechados. Os demais continuarao abertos.</p>
+      <div class="flex gap-3 justify-end pt-2 border-t border-gray-100">
+        <button @click="showCloseModal=false" class="px-5 py-2.5 bg-white border border-gray-200 text-gray-700 font-medium rounded-xl transition-all text-[14px] hover:bg-gray-50 active:scale-[0.97]">Cancelar</button>
+        <button @click="doClose()" class="px-5 py-2.5 bg-gray-900 hover:bg-gray-800 text-white font-semibold rounded-xl transition-all text-[14px] shadow-sm active:scale-[0.97]">Confirmar fechamento</button>
+      </div>
+    </div>
+  </div>
+
+  <div x-show="showPayModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm" @click.self="showPayModal=false">
+    <div class="bg-white rounded-2xl shadow-xl p-6 w-full max-w-md mx-4" @click.stop>
+      <div class="flex items-center gap-3 mb-5">
+        <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-400 to-emerald-500 flex items-center justify-center shadow-sm">
+          <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+        </div>
+        <div><h3 class="text-[17px] font-bold text-gray-900">Pagar Comissoes</h3><p class="text-[12px] text-gray-400" x-text="paySellers.length + ' vendedor(es)'"></p></div>
+      </div>
+      <div class="bg-gray-50 rounded-xl p-4 mb-4 max-h-36 overflow-y-auto">
+        <template x-for="s in paySellers" :key="s.id">
+          <div class="flex items-center justify-between py-1.5 text-[13px]">
+            <span class="text-gray-700 font-medium" x-text="s.seller_name"></span>
+            <span class="text-emerald-600 font-semibold" x-text="formatMoneyBRL(s.commission_amount)"></span>
+          </div>
+        </template>
+      </div>
+      <p class="text-[12px] text-red-500 mb-4 flex items-center gap-1.5">
+        <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"/></svg>
+        Confirme apenas se o pagamento ja foi realizado. Nao podera ser revertido.
+      </p>
+      <div class="mb-3"><label class="block text-[13px] font-medium text-gray-700 mb-1.5">Data</label><input type="date" x-model="payDate" class="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-[14px] outline-none transition-all focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100"></div>
+      <div class="mb-3"><label class="block text-[13px] font-medium text-gray-700 mb-1.5">Forma</label><select x-model="payMethod" class="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-[14px] outline-none transition-all focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100"><option value="">Selecione</option><option value="pix">PIX</option><option value="ted">TED</option><option value="dinheiro">Dinheiro</option><option value="outro">Outro</option></select></div>
+      <div class="mb-4"><label class="block text-[13px] font-medium text-gray-700 mb-1.5">Observacao</label><textarea x-model="payNotes" class="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-[14px] outline-none transition-all focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100" rows="2"></textarea></div>
+      <div class="flex gap-3 justify-end pt-2 border-t border-gray-100">
+        <button @click="showPayModal=false" class="px-5 py-2.5 bg-white border border-gray-200 text-gray-700 font-medium rounded-xl transition-all text-[14px] hover:bg-gray-50 active:scale-[0.97]">Cancelar</button>
+        <button @click="doPay()" class="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold rounded-xl transition-all text-[14px] shadow-sm active:scale-[0.97]">Confirmar Pagamento</button>
+      </div>
+    </div>
+  </div>
+
+  <div x-show="showReopenModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm" @click.self="showReopenModal=false">
+    <div class="bg-white rounded-2xl shadow-xl p-6 w-full max-w-md mx-4" @click.stop>
+      <div class="flex items-center gap-3 mb-5">
+        <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-amber-400 to-amber-500 flex items-center justify-center shadow-sm">
+          <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+        </div>
+        <div><h3 class="text-[17px] font-bold text-gray-900">Reverter Comissoes</h3><p class="text-[12px] text-gray-400" x-text="reopenSellers.length + ' vendedor(es)'"></p></div>
+      </div>
+      <div class="bg-gray-50 rounded-xl p-4 mb-4 max-h-36 overflow-y-auto">
+        <template x-for="s in reopenSellers" :key="s.id">
+          <div class="flex items-center justify-between py-1.5 text-[13px]">
+            <span class="text-gray-700 font-medium" x-text="s.seller_name"></span>
+            <span class="text-amber-600 font-semibold" x-text="formatMoneyBRL(s.commission_amount)"></span>
+          </div>
+        </template>
+      </div>
+      <div class="mb-4"><label class="block text-[13px] font-medium text-gray-700 mb-1.5">Motivo *</label><textarea x-model="reopenReason" class="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-[14px] outline-none transition-all focus:border-amber-400 focus:ring-2 focus:ring-amber-100" rows="3" placeholder="Motivo obrigatorio"></textarea></div>
+      <div class="flex gap-3 justify-end pt-2 border-t border-gray-100">
+        <button @click="showReopenModal=false" class="px-5 py-2.5 bg-white border border-gray-200 text-gray-700 font-medium rounded-xl transition-all text-[14px] hover:bg-gray-50 active:scale-[0.97]">Cancelar</button>
+        <button @click="doReopen()" class="px-5 py-2.5 bg-amber-500 hover:bg-amber-600 text-white font-semibold rounded-xl transition-all text-[14px] shadow-sm active:scale-[0.97]" :disabled="!reopenReason.trim()">Confirmar Reversao</button>
+      </div>
+    </div>
+  </div>
 </div>
 
 <script>
@@ -324,17 +401,14 @@ function fechamentoPage() {
         showPayModal: false, payPeriod: null, paySellers: [], payDate: '', payMethod: '', payNotes: '',
         showReopenModal: false, reopenPeriod: null, reopenSellers: [], reopenReason: '',
         selected: new Map(),
-
         async load() {
             var r = await fetch('/api/commissions/periods/');
             this.periods = await r.json();
             this.selected = new Map();
         },
-
         showError(d) {
             showToast(d.error || d.detail || d.message || 'Erro inesperado', 'error');
         },
-
         getCommissions(p) { return p.seller_commissions || []; },
         totalVendido(p) { return this.getCommissions(p).reduce((a,c)=>a+(c.total_sold_amount||0),0); },
         totalComissao(p) { return this.getCommissions(p).reduce((a,c)=>a+(c.commission_amount||0),0); },
@@ -342,17 +416,10 @@ function fechamentoPage() {
         toggle(sc) { this.selected.has(sc.id) ? this.selected.delete(sc.id) : this.selected.set(sc.id, sc); },
         selectedCount(p) { return this.getCommissions(p).filter(sc => this.selected.has(sc.id)).length; },
         selectedTotal(p) { var t=0; this.getCommissions(p).forEach(sc=>{if(this.selected.has(sc.id))t+=sc.commission_amount||0;}); return formatMoneyBRL(t); },
-        allSelected(p) { return this.getCommissions(p).length > 0 && this.getCommissions(p).every(sc => this.selected.has(sc.id)); },
-        toggleAll(p) {
-            var all = this.getCommissions(p);
-            if (all.every(sc => this.selected.has(sc.id))) { all.forEach(sc => this.selected.delete(sc.id)); }
-            else { all.forEach(sc => this.selected.set(sc.id, sc)); }
-        },
         selectAbertos(p) { this.getCommissions(p).forEach(sc => { if (sc.status==='ABERTA'||sc.status==='REABERTA') this.selected.set(sc.id, sc); }); },
         selectFechados(p) { this.getCommissions(p).forEach(sc => { if (sc.status==='FECHADA') this.selected.set(sc.id, sc); }); },
         selectProntos(p) { this.getCommissions(p).forEach(sc => { if (sc.operational_status==='PRONTO'&&(sc.status==='ABERTA'||sc.status==='REABERTA')) this.selected.set(sc.id, sc); }); },
         clearSelection(p) { var ids = new Set(this.getCommissions(p).map(sc => sc.id)); this.selected.forEach((v,k) => { if (ids.has(k)) this.selected.delete(k); }); },
-
         openCreateModal() {
             var d = new Date();
             var tryMonth = d.getMonth() + 1;
@@ -372,16 +439,13 @@ function fechamentoPage() {
             this.showCreateModal = true;
             this.$nextTick(() => this.calcCalendar());
         },
-
-        calendarOffset: 0,
-        calendarDays: [],
+        calendarOffset: 0, calendarDays: [],
         calcCalendar() {
             var m = parseInt(this.createMonth);
             var y = parseInt(this.createYear);
             var first = new Date(y, m - 1, 1);
-            var offset = first.getDay();
+            this.calendarOffset = first.getDay();
             var total = new Date(y, m, 0).getDate();
-            this.calendarOffset = offset;
             var days = [];
             for (var i = 1; i <= total; i++) days.push(i);
             this.calendarDays = days;
@@ -392,133 +456,60 @@ function fechamentoPage() {
             var y = parseInt(this.createYear);
             var count = 0;
             var total = new Date(y, m, 0).getDate();
-            for (var d = 1; d <= total; d++) {
-                var day = new Date(y, m - 1, d).getDay();
-                if (day !== 0 && day !== 6) count++;
-            }
+            for (var d = 1; d <= total; d++) { var day = new Date(y, m - 1, d).getDay(); if (day !== 0 && day !== 6) count++; }
             return count;
         },
-        calendarIsWeekday(day) {
-            var m = parseInt(this.createMonth);
-            var y = parseInt(this.createYear);
-            var dow = new Date(y, m - 1, day).getDay();
-            return dow !== 0 && dow !== 6;
-        },
-        calendarIsWeekend(day) {
-            return !this.calendarIsWeekday(day);
-        },
+        calendarIsWeekday(day) { var m=parseInt(this.createMonth);var y=parseInt(this.createYear);var dow=new Date(y,m-1,day).getDay();return dow!==0&&dow!==6; },
+        calendarIsWeekend(day) { return !this.calendarIsWeekday(day); },
         async doCreate() {
-            var r = await fetch('/api/commissions/periods/', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json', 'X-CSRFToken': getCSRFToken()},
-                body: JSON.stringify({month: parseInt(this.createMonth), year: parseInt(this.createYear), expected_working_days: parseInt(this.createExpectedDays), notes: this.createNotes})
-            });
-            if (r.ok) { this.showCreateModal = false; this.load(); }
-            else { var d = await r.json(); this.showError(d); }
+            var r = await fetch('/api/commissions/periods/', { method:'POST', headers:{'Content-Type':'application/json','X-CSRFToken':getCSRFToken()}, body:JSON.stringify({month:parseInt(this.createMonth),year:parseInt(this.createYear),expected_working_days:parseInt(this.createExpectedDays),notes:this.createNotes}) });
+            if (r.ok) { this.showCreateModal = false; this.load(); } else { var d = await r.json(); this.showError(d); }
         },
-
-        openEditModal(p) {
-            this.editPeriod = p;
-            this.editMonth = p.month;
-            this.editYear = p.year;
-            this.editExpectedDays = p.expected_working_days || 22;
-            this.editNotes = p.notes || '';
-            this.editHasSales = (p.seller_commissions || []).length > 0;
-            this.showEditModal = true;
-        },
+        openEditModal(p) { this.editPeriod=p;this.editMonth=p.month;this.editYear=p.year;this.editExpectedDays=p.expected_working_days||22;this.editNotes=p.notes||'';this.editHasSales=(p.seller_commissions||[]).length>0;this.showEditModal=true; },
         async doEdit() {
-            var body = {};
-            if (parseInt(this.editMonth) !== this.editPeriod.month) body.month = parseInt(this.editMonth);
-            if (parseInt(this.editYear) !== this.editPeriod.year) body.year = parseInt(this.editYear);
-            body.expected_working_days = parseInt(this.editExpectedDays);
-            body.notes = this.editNotes;
-            var r = await fetch('/api/commissions/periods/' + this.editPeriod.uuid + '/', {
-                method: 'PATCH',
-                headers: {'Content-Type': 'application/json', 'X-CSRFToken': getCSRFToken()},
-                body: JSON.stringify(body)
-            });
-            if (r.ok) { this.showEditModal = false; this.load(); }
-            else { var d = await r.json(); this.showError(d); }
+            var body={};if(parseInt(this.editMonth)!==this.editPeriod.month)body.month=parseInt(this.editMonth);if(parseInt(this.editYear)!==this.editPeriod.year)body.year=parseInt(this.editYear);body.expected_working_days=parseInt(this.editExpectedDays);body.notes=this.editNotes;
+            var r=await fetch('/api/commissions/periods/'+this.editPeriod.uuid+'/',{method:'PATCH',headers:{'Content-Type':'application/json','X-CSRFToken':getCSRFToken()},body:JSON.stringify(body)});
+            if(r.ok){this.showEditModal=false;this.load();}else{var d=await r.json();this.showError(d);}
         },
-
-        openDeleteModal(p) { this.deletePeriod = p; this.deleteConfirmText = ''; this.showDeleteModal = true; },
+        openDeleteModal(p) { this.deletePeriod=p;this.deleteConfirmText='';this.showDeleteModal=true; },
         async doDelete() {
-            if (this.deleteConfirmText !== 'EXCLUIR') return;
-            var r = await fetch('/api/commissions/periods/' + this.deletePeriod.uuid + '/', { method: 'DELETE', headers: {'X-CSRFToken': getCSRFToken()} });
-            if (r.ok) { this.showDeleteModal = false; this.load(); }
-            else { var d = await r.json(); this.showError(d); }
+            if(this.deleteConfirmText!=='EXCLUIR')return;
+            var r=await fetch('/api/commissions/periods/'+this.deletePeriod.uuid+'/',{method:'DELETE',headers:{'X-CSRFToken':getCSRFToken()}});
+            if(r.ok){this.showDeleteModal=false;this.load();}else{var d=await r.json();this.showError(d);}
         },
-
-        openCancelModal(p) { this.cancelPeriod = p; this.cancelReason = ''; this.showCancelModal = true; },
+        openCancelModal(p) { this.cancelPeriod=p;this.cancelReason='';this.showCancelModal=true; },
         async doCancel() {
-            if (!this.cancelReason.trim()) return;
-            var r = await fetch('/api/commissions/periods/' + this.cancelPeriod.uuid + '/cancel/', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json', 'X-CSRFToken': getCSRFToken()},
-                body: JSON.stringify({reason: this.cancelReason})
-            });
-            if (r.ok) { this.showCancelModal = false; this.load(); }
-            else { var d = await r.json(); this.showError(d); }
+            if(!this.cancelReason.trim())return;
+            var r=await fetch('/api/commissions/periods/'+this.cancelPeriod.uuid+'/cancel/',{method:'POST',headers:{'Content-Type':'application/json','X-CSRFToken':getCSRFToken()},body:JSON.stringify({reason:this.cancelReason})});
+            if(r.ok){this.showCancelModal=false;this.load();}else{var d=await r.json();this.showError(d);}
         },
-
         closeSelected(p) {
-            var ids = [];
-            var sellers = [];
-            this.getCommissions(p).forEach(sc => {
-                if (this.selected.has(sc.id) && (sc.status==='ABERTA'||sc.status==='REABERTA')) {
-                    ids.push(sc.id); sellers.push(sc);
-                }
-            });
-            if (!ids.length) { this.showError({error: 'Selecione vendedores ABERTOS ou REABERTOS.'}); return; }
-            this.closePeriod = p; this.closeSellers = sellers; this.showCloseModal = true;
+            var ids=[];var sellers=[];this.getCommissions(p).forEach(sc=>{if(this.selected.has(sc.id)&&(sc.status==='ABERTA'||sc.status==='REABERTA')){ids.push(sc.id);sellers.push(sc);}});
+            if(!ids.length){this.showError({error:'Selecione vendedores ABERTOS ou REABERTOS.'});return;}
+            this.closePeriod=p;this.closeSellers=sellers;this.showCloseModal=true;
         },
         async doClose() {
-            var r = await fetch('/api/commissions/periods/' + this.closePeriod.uuid + '/close_sellers/', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json', 'X-CSRFToken': getCSRFToken()},
-                body: JSON.stringify({seller_commission_ids: this.closeSellers.map(s => s.id)})
-            });
-            if (r.ok) { this.showCloseModal = false; this.load(); }
-            else { var d = await r.json(); this.showError(d); }
+            var r=await fetch('/api/commissions/periods/'+this.closePeriod.uuid+'/close_sellers/',{method:'POST',headers:{'Content-Type':'application/json','X-CSRFToken':getCSRFToken()},body:JSON.stringify({seller_commission_ids:this.closeSellers.map(s=>s.id)})});
+            if(r.ok){this.showCloseModal=false;this.load();}else{var d=await r.json();this.showError(d);}
         },
-
         confirmMarkPaid(p) {
-            var ids = []; var sellers = [];
-            this.getCommissions(p).forEach(sc => {
-                if (this.selected.has(sc.id) && sc.status==='FECHADA') { ids.push(sc.id); sellers.push(sc); }
-            });
-            if (!ids.length) { this.showError({error: 'Selecione vendedores FECHADOS.'}); return; }
-            this.payPeriod = p; this.paySellers = sellers; this.payDate = ''; this.payMethod = ''; this.payNotes = '';
-            this.showPayModal = true;
+            var ids=[];var sellers=[];this.getCommissions(p).forEach(sc=>{if(this.selected.has(sc.id)&&sc.status==='FECHADA'){ids.push(sc.id);sellers.push(sc);}});
+            if(!ids.length){this.showError({error:'Selecione vendedores FECHADOS.'});return;}
+            this.payPeriod=p;this.paySellers=sellers;this.payDate='';this.payMethod='';this.payNotes='';this.showPayModal=true;
         },
         async doPay() {
-            var r = await fetch('/api/commissions/periods/' + this.payPeriod.uuid + '/pay_sellers/', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json', 'X-CSRFToken': getCSRFToken()},
-                body: JSON.stringify({seller_commission_ids: this.paySellers.map(s => s.id), payment_date: this.payDate, payment_method: this.payMethod, payment_notes: this.payNotes})
-            });
-            if (r.ok) { this.showPayModal = false; this.load(); }
-            else { var d = await r.json(); this.showError(d); }
+            var r=await fetch('/api/commissions/periods/'+this.payPeriod.uuid+'/pay_sellers/',{method:'POST',headers:{'Content-Type':'application/json','X-CSRFToken':getCSRFToken()},body:JSON.stringify({seller_commission_ids:this.paySellers.map(s=>s.id),payment_date:this.payDate,payment_method:this.payMethod,payment_notes:this.payNotes})});
+            if(r.ok){this.showPayModal=false;this.load();}else{var d=await r.json();this.showError(d);}
         },
-
         openReopenModal(p) {
-            var ids = []; var sellers = [];
-            this.getCommissions(p).forEach(sc => {
-                if (this.selected.has(sc.id) && sc.status==='FECHADA') { ids.push(sc.id); sellers.push(sc); }
-            });
-            if (!ids.length) { this.showError({error: 'Selecione vendedores FECHADOS.'}); return; }
-            this.reopenPeriod = p; this.reopenSellers = sellers; this.reopenReason = '';
-            this.showReopenModal = true;
+            var ids=[];var sellers=[];this.getCommissions(p).forEach(sc=>{if(this.selected.has(sc.id)&&sc.status==='FECHADA'){ids.push(sc.id);sellers.push(sc);}});
+            if(!ids.length){this.showError({error:'Selecione vendedores FECHADOS.'});return;}
+            this.reopenPeriod=p;this.reopenSellers=sellers;this.reopenReason='';this.showReopenModal=true;
         },
         async doReopen() {
-            if (!this.reopenReason.trim()) return;
-            var r = await fetch('/api/commissions/periods/' + this.reopenPeriod.uuid + '/reopen_sellers/', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json', 'X-CSRFToken': getCSRFToken()},
-                body: JSON.stringify({seller_commission_ids: this.reopenSellers.map(s => s.id), reason: this.reopenReason})
-            });
-            if (r.ok) { this.showReopenModal = false; this.load(); }
-            else { var d = await r.json(); this.showError(d); }
+            if(!this.reopenReason.trim())return;
+            var r=await fetch('/api/commissions/periods/'+this.reopenPeriod.uuid+'/reopen_sellers/',{method:'POST',headers:{'Content-Type':'application/json','X-CSRFToken':getCSRFToken()},body:JSON.stringify({seller_commission_ids:this.reopenSellers.map(s=>s.id),reason:this.reopenReason})});
+            if(r.ok){this.showReopenModal=false;this.load();}else{var d=await r.json();this.showError(d);}
         },
     }
 }
