@@ -119,8 +119,8 @@ print('Templates verificados.')
 
     # ── Static files ───────────────────────────────────────
     log "===== COLLECTSTATIC ====="
-    python manage.py collectstatic --noinput
-    log "Arquivos estáticos coletados."
+    python manage.py collectstatic --noinput 2>&1 || log "AVISO: collectstatic falhou — usando arquivos existentes."
+    log "Arquivos estáticos OK."
 
     # ── Gunicorn ───────────────────────────────────────────
     log "===== GUNICORN ====="

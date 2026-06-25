@@ -25,7 +25,6 @@ services:
       - CONN_MAX_AGE=${CONN_MAX_AGE:-600}
       - LOG_LEVEL=${LOG_LEVEL:-WARNING}
     volumes:
-      - static_volume:/app/staticfiles
       - media_volume:/app/media
     depends_on:
       querolink-redis:
@@ -136,7 +135,6 @@ services:
 
 volumes:
   redis_data:
-  static_volume:
   media_volume:
   celery_beat_schedule:
 
