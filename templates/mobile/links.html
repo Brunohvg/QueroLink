@@ -12,13 +12,15 @@
 
   <div class="bg-white rounded-2xl p-4 card-shadow">
     <div class="flex gap-2">
-      <select x-model="filterMonth" @change="filterOrders()" class="flex-1 px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-[13px] outline-none transition-all focus:border-brand-400 focus:ring-2 focus:ring-brand-100">
+      <select x-model="filterMonth" @change="filterOrders()"
+              class="flex-1 px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-[13px] outline-none transition-all focus:border-brand-400 focus:ring-2 focus:ring-brand-100">
         <option value="">Todos os meses</option>
         <template x-for="m in 12" :key="m">
           <option :value="m" x-text="String(m).padStart(2,'0')"></option>
         </template>
       </select>
-      <select x-model="filterStatus" @change="filterOrders()" class="flex-1 px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-[13px] outline-none transition-all focus:border-brand-400 focus:ring-2 focus:ring-brand-100">
+      <select x-model="filterStatus" @change="filterOrders()"
+              class="flex-1 px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-[13px] outline-none transition-all focus:border-brand-400 focus:ring-2 focus:ring-brand-100">
         <option value="">Todos</option>
         <option value="PENDING">Pendente</option>
         <option value="COMPLETED">Pago</option>
@@ -28,53 +30,68 @@
   </div>
 
   {% verbatim %}
-  <div x-show="showForm" class="bg-white rounded-2xl p-5 card-shadow space-y-4">
-    <p class="text-[15px] font-bold text-gray-900">Novo Link de Pagamento</p>
-    <div>
-      <label class="block text-[13px] font-medium text-gray-600 mb-1.5">Nome do cliente</label>
-      <input type="text" x-model="form.customer" class="input-field" placeholder="Nome do cliente">
+  <div x-show="showForm" class="bg-white rounded-2xl card-shadow overflow-hidden">
+    <div class="px-5 pt-5 pb-4 border-b border-gray-100">
+      <p class="text-[15px] font-bold text-gray-900">Novo Link de Pagamento</p>
     </div>
-    <div>
-      <label class="block text-[13px] font-medium text-gray-600 mb-1.5">Valor (R$)</label>
-      <input type="text" x-model="form.value" class="input-field" placeholder="100,00">
-    </div>
-    <div>
-      <label class="block text-[13px] font-medium text-gray-600 mb-1.5">Parcelas</label>
-      <select x-model="form.installments" class="input-field">
-        <option value="1">1x (a vista)</option>
-        <option value="2">2x</option>
-        <option value="3">3x</option>
-      </select>
-    </div>
-    <p x-show="formError" class="text-[13px] text-red-500" x-text="formError"></p>
-    <div x-show="formSuccess" class="bg-emerald-50 border border-emerald-100 text-emerald-700 px-4 py-3 rounded-xl text-[13px]" x-text="formSuccess"></div>
-    <div class="flex flex-col sm:flex-row gap-2 pt-1">
-      <button @click="createLink()" :disabled="creating"
-              class="flex-1 bg-gray-900 hover:bg-gray-800 disabled:bg-gray-300 text-white font-semibold py-3 rounded-xl transition-all text-[15px] tap-target shadow-sm active:scale-[0.97]">
-        <span x-show="!creating">Gerar Link</span>
-        <span x-show="creating">Gerando...</span>
-      </button>
-      <button @click="showForm=false; formError=''; formSuccess=''"
-              class="px-5 py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl text-[15px] font-medium transition tap-target">Cancelar</button>
+    <div class="px-5 py-4 space-y-4">
+      <div>
+        <label class="block text-[11px] font-semibold text-gray-400 uppercase tracking-wider mb-2">Nome do cliente</label>
+        <input type="text" x-model="form.customer"
+               class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-[14px] outline-none transition-all focus:border-brand-400 focus:ring-2 focus:ring-brand-100"
+               placeholder="Nome do cliente">
+      </div>
+      <div>
+        <label class="block text-[11px] font-semibold text-gray-400 uppercase tracking-wider mb-2">Valor (R$)</label>
+        <input type="text" x-model="form.value"
+               class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-[14px] outline-none transition-all focus:border-brand-400 focus:ring-2 focus:ring-brand-100"
+               placeholder="100,00">
+      </div>
+      <div>
+        <label class="block text-[11px] font-semibold text-gray-400 uppercase tracking-wider mb-2">Parcelas</label>
+        <select x-model="form.installments"
+                class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-[14px] outline-none transition-all focus:border-brand-400 focus:ring-2 focus:ring-brand-100">
+          <option value="1">1x (a vista)</option>
+          <option value="2">2x</option>
+          <option value="3">3x</option>
+        </select>
+      </div>
+      <p x-show="formError" class="text-[13px] text-red-500" x-text="formError"></p>
+      <div x-show="formSuccess" class="bg-emerald-50 border border-emerald-100 text-emerald-700 px-4 py-3 rounded-xl text-[13px]" x-text="formSuccess"></div>
+      <div class="flex flex-col sm:flex-row gap-2 pt-1">
+        <button @click="createLink()" :disabled="creating"
+                class="flex-1 bg-gray-900 hover:bg-gray-800 disabled:bg-gray-300 text-white font-semibold py-3 rounded-xl transition-all text-[15px] tap-target shadow-sm active:scale-[0.97]">
+          <span x-show="!creating">Gerar Link</span>
+          <span x-show="creating">Gerando...</span>
+        </button>
+        <button @click="showForm=false; formError=''; formSuccess=''"
+                class="px-5 py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl text-[15px] font-medium transition tap-target">Cancelar</button>
+      </div>
     </div>
   </div>
 
   <button @click="showForm=!showForm" x-show="!showForm"
-          class="w-full bg-gray-900 hover:bg-gray-800 text-white font-semibold py-4 rounded-2xl transition-all shadow-lg shadow-gray-100 tap-target active:scale-[0.97] flex items-center justify-center gap-2">
+          class="w-full py-3.5 rounded-2xl bg-gray-900 hover:bg-gray-800 text-white font-semibold text-[15px] shadow-lg shadow-gray-200 active:scale-[0.97] transition-all flex items-center justify-center gap-2">
     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
-    <span class="text-[15px]">Novo Link</span>
+    Novo Link
   </button>
 
   <div x-show="!filteredOrders.length && !showForm" class="text-center pt-8">
+    <div class="w-16 h-16 rounded-2xl bg-gray-100 flex items-center justify-center mx-auto mb-4">
+      <svg class="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"/></svg>
+    </div>
     <p class="text-gray-500 font-medium text-[15px]">Nenhum link encontrado.</p>
   </div>
 
   <div class="space-y-2">
     <template x-for="o in filteredOrders" :key="o.uuid">
       <div class="bg-white rounded-2xl p-4 card-shadow">
-        <div class="flex items-start justify-between gap-2 mb-1.5">
-          <span class="text-[15px] font-bold text-gray-900 truncate flex-1 min-w-0" x-text="o.customer_name"></span>
-          <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-medium flex-shrink-0"
+        <div class="flex items-start justify-between gap-2 mb-2">
+          <div class="flex-1 min-w-0">
+            <p class="text-[15px] font-bold text-gray-900 truncate" x-text="o.customer_name || 'Cliente'"></p>
+            <p class="text-[13px] text-gray-400 mt-0.5" x-text="new Date(o.created_at).toLocaleDateString('pt-BR')"></p>
+          </div>
+          <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-medium flex-shrink-0"
                 :class="{'bg-gray-100 text-gray-600': o.status==='PENDING',
                          'bg-emerald-50 text-emerald-700': o.status==='COMPLETED',
                          'bg-red-50 text-red-700': o.status==='CANCELED' || o.status==='FAILED' || o.status==='EXPIRED',
@@ -87,13 +104,12 @@
             <span x-text="o.status_display"></span>
           </span>
         </div>
-        <p class="text-[16px] font-bold text-brand-600 mt-1" x-text="formatMoneyBRL(o.total_amount)"></p>
-        <p x-show="o.refusal_reason" class="text-[12px] text-red-500 mt-1">Motivo: <span x-text="o.refusal_reason"></span></p>
-        <div class="flex items-center gap-2 mt-3" x-show="o.link_url && o.status==='PENDING'">
-          <code class="text-[12px] text-gray-500 bg-gray-50 px-3 py-2 rounded-xl flex-1 truncate border border-gray-100" x-text="o.link_url"></code>
-          <button @click="copyLink(o.link_url)" class="text-brand-600 text-[13px] font-semibold hover:underline flex-shrink-0 py-2 px-3 tap-target">Copiar</button>
+        <p class="text-[18px] font-bold text-brand-600" x-text="formatMoneyBRL(o.total_amount)"></p>
+        <p x-show="o.refusal_reason" class="text-[12px] text-red-500 mt-1.5">Motivo: <span x-text="o.refusal_reason"></span></p>
+        <div class="flex items-center gap-2 mt-3 p-3 bg-gray-50 rounded-xl" x-show="o.link_url && o.status==='PENDING'">
+          <code class="text-[12px] text-gray-500 flex-1 truncate" x-text="o.link_url"></code>
+          <button @click="copyLink(o.link_url)" class="text-brand-600 text-[13px] font-semibold hover:text-brand-700 flex-shrink-0 tap-target">Copiar</button>
         </div>
-        <p class="text-[12px] text-gray-400 mt-2" x-text="new Date(o.created_at).toLocaleDateString('pt-BR')"></p>
       </div>
     </template>
   </div>
@@ -119,10 +135,7 @@ function sellerLinksPage() {
             var m = this.filterMonth;
             var s = this.filterStatus;
             this.filteredOrders = this.orders.filter(function(o) {
-                if (m) {
-                    var d = new Date(o.created_at);
-                    if (d.getMonth() + 1 !== parseInt(m)) return false;
-                }
+                if (m) { var d = new Date(o.created_at); if (d.getMonth() + 1 !== parseInt(m)) return false; }
                 if (s && o.status !== s) return false;
                 return true;
             });
@@ -140,27 +153,14 @@ function sellerLinksPage() {
                 var r = await fetch('/api/seller/links/', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCSRFToken() },
-                    body: JSON.stringify({
-                        customer_name: this.form.customer,
-                        amount: this.form.value,
-                        installments: parseInt(this.form.installments),
-                    })
+                    body: JSON.stringify({ customer_name: this.form.customer, amount: this.form.value, installments: parseInt(this.form.installments) })
                 });
                 var d = await r.json();
                 if (r.ok) {
                     this.formSuccess = 'Link gerado!';
                     this.showForm = false;
                     this.form = { customer: '', value: '', installments: '1' };
-                    this.orders.unshift({
-                        uuid: d.uuid,
-                        customer_name: d.customer_name,
-                        total_amount: d.total_amount,
-                        status: 'PENDING',
-                        status_display: 'Pendente',
-                        link_url: d.link_url,
-                        refusal_reason: null,
-                        created_at: new Date().toISOString(),
-                    });
+                    this.orders.unshift({ uuid: d.uuid, customer_name: d.customer_name, total_amount: d.total_amount, status: 'PENDING', status_display: 'Pendente', link_url: d.link_url, refusal_reason: null, created_at: new Date().toISOString() });
                     showToast('Link gerado com sucesso!', 'success');
                 } else {
                     this.formError = d.error || d.detail || 'Erro ao gerar link.';
@@ -174,7 +174,7 @@ function sellerLinksPage() {
         },
 
         copyLink(url) {
-            navigator.clipboard.writeText(url);
+            navigator.clipboard.writeText(url).then(function() { showToast('Link copiado!', 'success'); }).catch(function() { showToast('Erro ao copiar.', 'error'); });
         }
     }
 }

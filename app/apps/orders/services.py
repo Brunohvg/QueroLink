@@ -6,11 +6,19 @@ from app.services.gateway.pagar_me import PagarMeGateway
 
 
 def create_payment_link(tenant, seller, customer_name, amount_cents, installments=1):
+    # Remove acentos e caracteres especiais para evitar erro na API do Pagar.me
+    import unicodedata
+    safe_name = ''.join(
+        c for c in unicodedata.normalize('NFD', customer_name)
+        if not unicodedata.combining(c)
+    )
+    safe_name = safe_name.encode('ascii', errors='ignore').decode('ascii')
+
     with transaction.atomic():
         order = Order.objects.create(
             tenant=tenant,
             seller=seller,
-            customer_name=customer_name,
+            customer_name=safe_name,
             total_amount=amount_cents,
             status=Order.Status.PENDING,
         )
@@ -20,7 +28,7 @@ def create_payment_link(tenant, seller, customer_name, amount_cents, installment
         response = gateway.create_payment_link(
             total_amount=amount_cents,
             max_installments=installments,
-            name=customer_name,
+            name=safe_name,
             free_installments=installments,
             order_code=str(order.uuid),
             success_url=success_url,

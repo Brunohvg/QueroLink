@@ -14,74 +14,134 @@
   <script>showToast("{{ error|escapejs }}", "error");</script>
   {% endif %}
 
+  <div class="bg-white rounded-2xl p-4 card-shadow space-y-3">
+    <div class="flex gap-2">
+      <select x-model="filterMonth" @change="filterSales()"
+              class="flex-1 px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-[13px] outline-none transition-all focus:border-brand-400 focus:ring-2 focus:ring-brand-100">
+        <option value="">Todos os meses</option>
+        {% for m in months %}
+        <option value="{{ m.value }}">{{ m.label }}</option>
+        {% endfor %}
+      </select>
+      <input type="text" x-model="search" @input="filterSales()" placeholder="Buscar..."
+             class="flex-1 px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-[13px] outline-none transition-all focus:border-brand-400 focus:ring-2 focus:ring-brand-100">
+    </div>
+    <p class="text-[12px] text-gray-400 font-medium" x-show="sales.length" x-text="filteredSales.length + ' de ' + sales.length + ' venda' + (sales.length !== 1 ? 's' : '')"></p>
+  </div>
+
   {% if not sales %}
   <div class="text-center pt-16">
     <div class="w-16 h-16 rounded-2xl bg-gray-100 flex items-center justify-center mx-auto mb-4">
       <svg class="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
     </div>
-    <p class="text-gray-500 font-medium text-[15px]">Nenhuma venda registrada ainda.</p>
+    <p class="text-gray-500 font-medium text-[15px]">Nenhuma venda ainda.</p>
     <a href="{% url 'dashboard:mobile_lancar_venda' %}"
        class="inline-block mt-5 btn-primary shadow-lg shadow-brand-100">
       Lancar primeira venda
     </a>
   </div>
-  {% else %}
+  {% endif %}
 
   <div id="sales-list" class="space-y-5">
-    {% regroup sales by sale_date|date:"d/m/Y" as sales_by_date %}
-    {% for group in sales_by_date %}
-    <div>
-      <div class="flex items-center justify-between mb-3 px-1">
-        <h3 class="text-[13px] font-bold text-gray-500">{{ group.grouper }}</h3>
-        <span class="text-[12px] text-gray-400 font-medium">{{ group.list|length }} venda{{ group.list|length|pluralize:'s' }}</span>
-      </div>
-      <div class="space-y-2">
-      {% for sale in group.list %}
-      <div class="bg-white rounded-2xl p-4 card-shadow flex items-center justify-between"
-           x-data="{ saleId: '{{ sale.uuid }}', deleted: false }" x-show="!deleted">
-        <div class="flex-1 min-w-0">
-          <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-medium
-              {% if sale.origin == 'LINK' %}bg-brand-50 text-brand-600{% else %}bg-emerald-50 text-emerald-600{% endif %}">
-            <span class="w-1.5 h-1.5 rounded-full {% if sale.origin == 'LINK' %}bg-brand-500{% else %}bg-emerald-500{% endif %}"></span>
-            {{ sale.get_origin_display }}
-          </span>
-          <p class="font-bold text-gray-800 text-[16px] mt-1.5" x-text="formatMoneyBRL({{ sale.amount }})"></p>
-          {% if sale.notes %}
-          <p class="text-[12px] text-gray-400 truncate max-w-[200px] mt-0.5">{{ sale.notes|truncatechars:40 }}</p>
-          {% endif %}
+    <template x-for="(group, gIdx) in filteredGroups" :key="gIdx">
+      <div>
+        <div class="flex items-center justify-between mb-3 px-1">
+          <h3 class="text-[13px] font-bold text-gray-500" x-text="group.date"></h3>
+          <span class="text-[12px] text-gray-400 font-medium" x-text="group.sales.length + ' venda' + (group.sales.length !== 1 ? 's' : '')"></span>
         </div>
-        <button x-on:click="deleteSale('{{ sale.uuid }}', '{{ sale.sale_date|date:"Y-m-d" }}')"
-                x-show="canDelete('{{ sale.sale_date|date:"Y-m-d" }}')"
-                class="tap-target flex items-center justify-center w-10 h-10 text-gray-300 hover:text-red-500 transition ml-2 rounded-xl hover:bg-red-50">
-          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
-        </button>
+        <div class="space-y-2">
+          <template x-for="sale in group.sales" :key="sale.uuid">
+            <div class="bg-white rounded-2xl p-4 card-shadow flex items-center justify-between"
+                 x-show="!sale._deleted">
+              <div class="flex-1 min-w-0">
+                <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-medium"
+                      :class="sale.origin === 'LINK' ? 'bg-brand-50 text-brand-600' : 'bg-emerald-50 text-emerald-600'">
+                  <span class="w-1.5 h-1.5 rounded-full" :class="sale.origin === 'LINK' ? 'bg-brand-500' : 'bg-emerald-500'"></span>
+                  <span x-text="sale.origin_display"></span>
+                </span>
+                <p class="font-bold text-gray-800 text-[16px] mt-1.5" x-text="formatMoneyBRL(sale.amount)"></p>
+                <p x-show="sale.notes" class="text-[12px] text-gray-400 truncate max-w-[200px] mt-0.5" x-text="sale.notes"></p>
+              </div>
+              <button x-on:click="deleteSale(sale)"
+                      x-show="sale.canDelete"
+                      class="tap-target flex items-center justify-center w-10 h-10 text-gray-300 hover:text-red-500 transition ml-2 rounded-xl hover:bg-red-50">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+              </button>
+            </div>
+          </template>
+        </div>
       </div>
-      {% endfor %}
+    </template>
+    <template x-if="filteredSales.length === 0 && sales.length > 0">
+      <div class="text-center py-10">
+        <p class="text-gray-500 font-medium">Nenhuma venda encontrada.</p>
       </div>
-    </div>
-    {% endfor %}
+    </template>
   </div>
-  {% endif %}
 </div>
 
 <script>
 function minhasVendas() {
     return {
-        canDelete(d) { return d === new Date().toISOString().split('T')[0]; },
-        async deleteSale(u, d) {
-            if (!this.canDelete(d)) return;
-            if (!window._confirmDelete) { window._confirmDelete = {}; }
-            if (!window._confirmDelete[u]) {
+        sales: {{ sales_json|safe }},
+        filteredSales: [],
+        filterMonth: '',
+        search: '',
+        _confirmIds: {},
+
+        init() { this.filterSales(); },
+
+        get filteredGroups() {
+            var groups = {};
+            this.filteredSales.forEach(function(s) {
+                var key = s.date;
+                if (!groups[key]) groups[key] = { date: key, sales: [] };
+                groups[key].sales.push(s);
+            });
+            var result = [];
+            var keys = Object.keys(groups).sort(function(a, b) { return new Date(b.split('/').reverse().join('-')) - new Date(a.split('/').reverse().join('-')); });
+            keys.forEach(function(k) { result.push(groups[k]); });
+            return result;
+        },
+
+        filterSales() {
+            var m = this.filterMonth;
+            var q = this.search.toLowerCase().trim();
+            this.filteredSales = this.sales.filter(function(s) {
+                if (m) {
+                    var parts = s.date.split('/');
+                    var saleMonth = parseInt(parts[1], 10);
+                    if (saleMonth !== parseInt(m, 10)) return false;
+                }
+                if (q) {
+                    var match = s.notes.toLowerCase().includes(q) || s.amount.toString().includes(q);
+                    if (!match) return false;
+                }
+                return true;
+            });
+        },
+
+        deleteSale(sale) {
+            if (!sale.canDelete) return;
+            if (!this._confirmIds[sale.uuid]) {
                 showToast('Toque novamente para confirmar a exclusao.', 'warning');
-                window._confirmDelete[u] = true;
-                setTimeout(function() { delete window._confirmDelete[u]; }, 3000);
+                this._confirmIds[sale.uuid] = true;
+                var self = this;
+                setTimeout(function() { delete self._confirmIds[sale.uuid]; }, 3000);
                 return;
             }
-            try {
-                var r = await fetch('/api/sales/' + u + '/', { method: 'DELETE', headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCSRFToken() } });
-                if (r.ok || r.status === 204) location.reload();
-                else { var j = await r.json(); showToast(j.detail || 'Erro ao excluir.', 'error'); }
-            } catch (e) { showToast('Erro de conexao.', 'error'); }
+            var self = this;
+            fetch('/api/sales/' + sale.uuid + '/', {
+                method: 'DELETE',
+                headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCSRFToken() }
+            }).then(function(r) {
+                if (r.ok || r.status === 204) {
+                    sale._deleted = true;
+                    showToast('Venda excluida.', 'success');
+                } else {
+                    r.json().then(function(j) { showToast(j.detail || 'Erro ao excluir.', 'error'); });
+                }
+            }).catch(function() { showToast('Erro de conexao.', 'error'); });
         }
     }
 }

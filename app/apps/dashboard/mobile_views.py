@@ -402,9 +402,27 @@ def mobile_minhas_vendas(request):
         '-sale_date', '-created_at',
     )
 
+    import json as json_module
+    today = timezone.localdate()
+    sales_data = []
+    for s in sales:
+        sales_data.append({
+            'uuid': str(s.uuid),
+            'amount': s.amount,
+            'notes': s.notes or '',
+            'origin': s.origin,
+            'origin_display': s.get_origin_display(),
+            'date': s.sale_date.strftime('%d/%m/%Y'),
+            'canDelete': s.sale_date == today,
+        })
+
     return render(request, 'mobile/minhas_vendas.html', {
         'seller': seller,
         'sales': sales,
+        'sales_json': json_module.dumps(sales_data),
+        'months': [
+            {'value': i, 'label': f'{i:02d}'} for i in range(1, 13)
+        ],
     })
 
 
