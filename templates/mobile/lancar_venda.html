@@ -1,62 +1,74 @@
 {% extends 'mobile/base_mobile.html' %}
 {% block title %}Lancar Venda — QueroLink{% endblock %}
 {% block content %}
-<div class="space-y-5" x-data="lancarVenda()">
-    <div class="flex items-center gap-3">
-        <a href="{% url 'dashboard:mobile_home' %}" class="w-10 h-10 bg-white rounded-xl shadow-sm flex items-center justify-center tap-target text-slate-400 hover:text-brand-500 transition">
-            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path></svg>
-        </a>
-        <h1 class="font-display text-[18px] font-semibold text-slate-800">Lancar Venda</h1>
+<div class="space-y-6 fade-up" x-data="lancarVenda()">
+  <div class="flex items-center gap-3">
+    <a href="{% url 'dashboard:mobile_home' %}"
+       class="w-10 h-10 bg-white rounded-xl card-shadow flex items-center justify-center tap-target text-gray-400 hover:text-brand-500 transition-all active:scale-[0.95]">
+      <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
+    </a>
+    <h1 class="font-display text-[20px] font-bold text-gray-900">Lancar Venda</h1>
+  </div>
+
+  {% if success %}
+  <script>showToast("{% if was_update %}Lancamento atualizado!{% else %}Venda registrada!{% endif %}", "success");</script>
+  <div class="relative overflow-hidden rounded-2xl p-8 text-center text-white" style="background: linear-gradient(135deg, #059669, #047857);">
+    <div class="absolute top-0 right-0 w-40 h-40 bg-white/5 rounded-full -mr-12 -mt-12"></div>
+    <div class="relative">
+      <div class="w-14 h-14 mx-auto mb-4 rounded-full bg-white/20 flex items-center justify-center">
+        <svg class="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+      </div>
+      <p class="font-display text-[20px] font-bold">{% if was_update %}Lancamento atualizado!{% else %}Venda registrada!{% endif %}</p>
+      <p class="font-display text-[36px] font-bold mt-3 tracking-tight">R$ {% widthratio last_amount 100 1 %},{{ last_amount|stringformat:"02d"|slice:"-2:" }}</p>
+      <a href="{% url 'dashboard:mobile_lancar_venda' %}"
+         class="inline-block mt-6 bg-white/20 hover:bg-white/30 text-white font-semibold px-8 py-3 rounded-2xl tap-target text-[15px] backdrop-blur-sm transition-all">
+        Nova Venda
+      </a>
+    </div>
+  </div>
+  {% else %}
+
+  {% if error %}
+  <script>showToast("{{ error|escapejs }}", "error");</script>
+  {% endif %}
+
+  <form method="post" action="{% url 'dashboard:mobile_lancar_venda' %}" class="space-y-5">
+    {% csrf_token %}
+    <div class="bg-white rounded-2xl p-6 card-shadow">
+      <label for="valor_display" class="block text-[14px] font-medium text-gray-700 mb-3">Valor da Venda</label>
+      <div class="relative">
+        <span class="absolute left-5 top-1/2 -translate-y-1/2 text-gray-400 text-lg font-semibold">R$</span>
+        <input type="text" id="valor_display" x-ref="valorDisplay" x-on:input="formatInput()"
+               class="w-full pl-14 pr-6 py-5 bg-gray-50 border-2 border-gray-100 rounded-2xl focus:border-brand-400 focus:outline-none transition-all font-display text-[30px] font-bold text-gray-800"
+               placeholder="0,00" style="font-size:30px!important"
+               {% if existing_sale %}value="{{ existing_sale.amount|default:0 }}"{% endif %}>
+      </div>
+      <input type="hidden" name="amount_cents" x-ref="amountCents" value="{{ existing_sale.amount|default:0 }}">
     </div>
 
-    {% if success %}
-    <script>showToast("{% if was_update %}Lancamento atualizado!{% else %}Venda registrada!{% endif %}", "success");</script>
-    <div class="surface-hero text-center">
-        <p class="font-display text-[18px] font-semibold text-slate-800">{% if was_update %}Lancamento atualizado!{% else %}Venda registrada!{% endif %}</p>
-        <p class="font-display text-[32px] font-bold text-emerald-600 mt-2">R$ {% widthratio last_amount 100 1 %},{{ last_amount|stringformat:"02d"|slice:"-2:" }}</p>
-        <a href="{% url 'dashboard:mobile_lancar_venda' %}"
-           class="inline-block mt-5 bg-brand-500 hover:bg-brand-600 text-white font-semibold px-8 py-3 rounded-2xl tap-target text-[15px] shadow-lg">
-            Nova Venda
-        </a>
+    <div class="bg-white rounded-2xl p-6 card-shadow space-y-4">
+      <div>
+        <label for="sale_date" class="block text-[14px] font-medium text-gray-700 mb-1.5">Data</label>
+        <input type="date" id="sale_date" name="sale_date" x-ref="saleDate"
+               class="input-field"
+               value="{% if existing_sale %}{{ existing_sale.sale_date|date:'Y-m-d' }}{% else %}{% now 'Y-m-d' %}{% endif %}">
+      </div>
+      <div>
+        <label for="notes" class="block text-[14px] font-medium text-gray-700 mb-1.5">Observacao (opcional)</label>
+        <input type="text" id="notes" name="notes" class="input-field"
+               placeholder="Ex: Cliente pagou no PIX"
+               value="{{ existing_sale.notes|default:'' }}">
+      </div>
     </div>
-    {% else %}
 
-    {% if error %}
-    <script>showToast("{{ error|escapejs }}", "error");</script>
-    {% endif %}
-
-    <form method="post" action="{% url 'dashboard:mobile_lancar_venda' %}" class="space-y-5">
-        {% csrf_token %}
-        <div>
-            <label for="valor_display" class="block text-[13px] font-medium text-slate-600 mb-1.5">Valor da Venda</label>
-            <div class="relative">
-                <span class="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 text-lg font-semibold">R$</span>
-                <input type="text" id="valor_display" x-ref="valorDisplay" x-on:input="formatInput()"
-                       class="w-full pl-14 pr-5 py-4 bg-white border-2 border-slate-200 rounded-2xl focus:border-brand-400 focus:outline-none transition font-display text-[28px] font-bold text-slate-800 shadow-sm"
-                       placeholder="0,00" style="font-size:28px!important"
-                       {% if existing_sale %}value="{{ existing_sale.amount|default:0 }}"{% endif %}>
-            </div>
-            <input type="hidden" name="amount_cents" x-ref="amountCents" value="{{ existing_sale.amount|default:0 }}">
-        </div>
-        <div>
-            <label for="sale_date" class="block text-[13px] font-medium text-slate-600 mb-1.5">Data</label>
-            <input type="date" id="sale_date" name="sale_date" x-ref="saleDate"
-                   class="input-field"
-                   value="{% if existing_sale %}{{ existing_sale.sale_date|date:'Y-m-d' }}{% else %}{% now 'Y-m-d' %}{% endif %}">
-        </div>
-        <div>
-            <label for="notes" class="block text-[13px] font-medium text-slate-600 mb-1.5">Observacao (opcional)</label>
-            <input type="text" id="notes" name="notes" class="input-field"
-                   placeholder="Ex: Cliente pagou no PIX"
-                   value="{{ existing_sale.notes|default:'' }}">
-        </div>
-        <button type="submit" x-bind:disabled="amountCents <= 0"
-                x-bind:class="amountCents > 0 ? 'btn-primary shadow-lg' : 'w-full py-3.5 rounded-2xl bg-slate-200 text-slate-400 font-semibold cursor-not-allowed text-[15px]'"
-                class="w-full py-3.5 rounded-2xl bg-slate-200 text-slate-400 font-semibold cursor-not-allowed text-[15px]">
-            Registrar Venda
-        </button>
-    </form>
-    {% endif %}
+    <button type="submit" x-bind:disabled="amountCents <= 0"
+            x-bind:class="amountCents > 0 ? 'btn-primary shadow-lg shadow-brand-100' : 'w-full py-3.5 rounded-2xl bg-gray-100 text-gray-400 font-semibold cursor-not-allowed text-[15px]'"
+            class="w-full py-3.5 rounded-2xl bg-gray-100 text-gray-400 font-semibold cursor-not-allowed text-[15px]">
+      <span x-show="amountCents > 0">Registrar Venda</span>
+      <span x-show="amountCents <= 0">Digite o valor</span>
+    </button>
+  </form>
+  {% endif %}
 </div>
 
 <script>
@@ -64,7 +76,6 @@ function lancarVenda() {
     return {
         amountCents: 0,
         lastAmount: {{ request.session.last_venda_amount|default:0 }},
-        init() { this.$refs.saleDate.value = new Date().toISOString().split('T')[0]; },
         formatInput() {
             var raw = this.$refs.valorDisplay.value.replace(/\D/g, '');
             if (!raw) { this.$refs.valorDisplay.value = ''; this.amountCents = 0; this.$refs.amountCents.value = '0'; return; }
