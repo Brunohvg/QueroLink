@@ -39,10 +39,13 @@ class PagarMeGateway:
         return ascii_text.encode('ascii', errors='ignore').decode('ascii')
 
     def _get_headers(self):
+        key = self.api_key or ''
+        if isinstance(key, str):
+            key = key.encode('ascii', errors='ignore').decode('ascii')
         return {
             "accept": "application/json",
             "content-type": "application/json",
-            "authorization": f"Basic {self.api_key}",
+            "authorization": f"Basic {key}",
         }
 
     def _request(self, method, url, **kwargs):
