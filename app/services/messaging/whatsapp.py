@@ -221,7 +221,7 @@ class WhatsappClient:
         }
 
     def disconnect(self):
-        self._post(f"/instance/logout/{self.instance}", {})
+        self._delete(f"/instance/logout/{self.instance}")
 
     def delete_instance(self):
         self._delete(f"/instance/delete/{self.instance}")
