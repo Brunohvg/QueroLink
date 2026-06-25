@@ -168,8 +168,8 @@ showToast("{{ message|escapejs }}", "{% if message.tags == 'error' %}error{% eli
                 </div>
 
                 <div x-show="!whatsappLoading && whatsappState === 'not_configured'" class="bg-gray-50 border border-gray-200 rounded-xl p-4 text-center">
-                    <p class="text-[13px] text-gray-500 mb-1">Preencha o nome da instancia e a chave de API</p>
-                    <p class="text-[11px] text-gray-400">Depois salve e gere o QR Code para conectar</p>
+                    <p class="text-[13px] text-gray-500 mb-1">Digite o nome da instancia e clique em "Gerar QR Code"</p>
+                    <p class="text-[11px] text-gray-400">Nao precisa salvar antes — o QR code sera gerado direto</p>
                 </div>
             </div>
         </div>
@@ -226,7 +226,7 @@ function configPage() {
             }
             this.whatsappLoading = true;
             try {
-                var resp = await fetch('{% url "dashboard:whatsapp_status" %}');
+                var resp = await fetch('{% url "dashboard:whatsapp_status" %}?instance=' + encodeURIComponent(instance));
                 if (!resp.ok) {
                     if (resp.status === 404) this.whatsappState = 'not_found';
                     else if (resp.status === 401) this.whatsappState = 'auth_error';
@@ -252,10 +252,15 @@ function configPage() {
         },
 
         async fetchQRCode() {
+            var instance = document.getElementById('whatsapp_instance_id')?.value?.trim();
+            if (!instance) {
+                this.whatsappError = 'Digite o nome da instancia primeiro.';
+                return;
+            }
             this.whatsappQrLoading = true;
             this.whatsappError = null;
             try {
-                var resp = await fetch('{% url "dashboard:whatsapp_qrcode" %}');
+                var resp = await fetch('{% url "dashboard:whatsapp_qrcode" %}?instance=' + encodeURIComponent(instance));
                 if (!resp.ok) {
                     var errData = await resp.json();
                     this.whatsappError = errData.error || 'Erro ao gerar QR Code.';

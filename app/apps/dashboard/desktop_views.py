@@ -119,7 +119,7 @@ def whatsapp_instance_status(request):
         AuthenticationError, ConnectionError,
     )
 
-    instance_id = tenant.whatsapp_instance_id or ''
+    instance_id = request.GET.get('instance') or tenant.whatsapp_instance_id or ''
     global_key = getattr(settings, 'WHATSAPP_API_KEY', '')
 
     if not instance_id:
@@ -135,14 +135,15 @@ def whatsapp_instance_status(request):
 
     try:
         client = WhatsappClient(
-            instance=tenant.whatsapp_instance_id,
+            instance=instance_id,
             api_key=global_key,
         )
         dados = client.create_or_get_qrcode()
         instance_key = dados.get('instance_api_key')
         if instance_key:
+            tenant.whatsapp_instance_id = instance_id
             tenant.whatsapp_token = instance_key
-            tenant.save(update_fields=['whatsapp_token'])
+            tenant.save(update_fields=['whatsapp_instance_id', 'whatsapp_token'])
         return JsonResponse({
             'connected': dados.get('state') == 'open',
             'state': dados.get('state'),
@@ -196,7 +197,7 @@ def whatsapp_connection_state(request):
         AuthenticationError, ConnectionError,
     )
 
-    instance_id = tenant.whatsapp_instance_id or ''
+    instance_id = request.GET.get('instance') or tenant.whatsapp_instance_id or ''
 
     if not instance_id:
         return JsonResponse({
