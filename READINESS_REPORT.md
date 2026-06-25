@@ -1,4 +1,4 @@
-# Relatório de Prontidão para Produção — QueroLink MVP
+# Relatório de Prontidão para Produção — VendaPay MVP
 
 > Data: 2026-06-20 | Versão: 1.0.0-MVP
 

@@ -2,7 +2,7 @@
 set -e
 
 # ============================================================
-# QueroLink — Deploy Script
+# VendaPay — Deploy Script
 # Uso: scripts/deploy.sh [staging|production]
 # ============================================================
 

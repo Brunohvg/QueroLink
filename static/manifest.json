@@ -1,6 +1,6 @@
 {
-    "name": "QueroLink — Comissões",
-    "short_name": "QueroLink",
+    "name": "VendaPay — Comissões",
+    "short_name": "VendaPay",
     "description": "App de gestão de comissões para vendedores",
     "start_url": "/dashboard/mobile/",
     "scope": "/dashboard/mobile/",

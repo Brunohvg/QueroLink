@@ -1,7 +1,7 @@
 {% comment %}Usage: include components/_sidebar.html — desktop sidebar, role-aware{% endcomment %}
 <aside class="w-64 bg-white border-r border-gray-200 flex flex-col flex-shrink-0 h-screen">
     <div class="p-5 border-b border-gray-100">
-        <a href="{% url 'dashboard:gestor_home' %}" class="font-display text-xl font-semibold text-brand-500">QueroLink</a>
+        <a href="{% url 'dashboard:gestor_home' %}" class="font-display text-xl font-semibold text-brand-500">VendaPay</a>
         <p class="text-xs text-gray-500 mt-0.5">{{ request.user.get_role_display }}</p>
     </div>
     <nav class="flex-1 p-3 space-y-1 overflow-y-auto">

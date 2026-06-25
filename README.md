@@ -1,4 +1,4 @@
-# QueroLink — Sistema de Comissões Multi-Tenant
+# VendaPay — Sistema de Comissões Multi-Tenant
 
 Sistema de gestão de comissões para vendedores de lojas. Tenant principal: Loja Bibelô (16 vendedores).
 

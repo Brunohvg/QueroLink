@@ -2,7 +2,7 @@
 set -e
 
 # ============================================================
-# QueroLink entrypoint — deploy automático
+# VendaPay entrypoint — deploy automático
 # ============================================================
 
 log() { echo "[$(date +%H:%M:%S)] $*"; }

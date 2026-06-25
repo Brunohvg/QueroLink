@@ -16,5 +16,5 @@ class UserAdmin(BaseUserAdmin):
     list_filter = ('role', 'tenant', 'is_active')
     search_fields = ('username', 'email')
     fieldsets = BaseUserAdmin.fieldsets + (
-        ('QueroLink', {'fields': ('role', 'tenant')}),
+        ('VendaPay', {'fields': ('role', 'tenant')}),
     )

@@ -214,7 +214,7 @@ REST_FRAMEWORK = {
 }
 
 SPECTACULAR_SETTINGS = {
-    'TITLE': 'QueroLink API',
+    'TITLE': 'VendaPay API',
     'DESCRIPTION': 'API de gestao de comissoes multi-tenant',
     'VERSION': '1.0.0',
     'SERVE_INCLUDE_SCHEMA': False,

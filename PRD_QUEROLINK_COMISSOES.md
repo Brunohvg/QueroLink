@@ -1,4 +1,4 @@
-# PRD — QueroLink Sistema de Comissões
+# PRD — VendaPay Sistema de Comissões
 
 > **Status geral:** MVP completo — Lotes 1 a 5 implementados. 55 testes passando.
 > **Versão:** 1.0.0-MVP | **Última atualização:** 2026-06-20
@@ -8,7 +8,7 @@
 
 ## 1. Visão Geral
 
-QueroLink é um sistema multi-tenant de gestão de comissões para vendedores de lojas.
+VendaPay é um sistema multi-tenant de gestão de comissões para vendedores de lojas.
 O tenant principal é a Loja Bibelô, com 16 vendedores reais.
 
 ## 2. Arquitetura

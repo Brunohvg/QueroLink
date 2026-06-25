@@ -49,7 +49,7 @@ self.addEventListener('fetch', function(event) {
     if (isAuthPath(url)) {
         event.respondWith(fetch(event.request).catch(function() {
             return new Response(
-                '<!DOCTYPE html><html lang="pt"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>QueroLink</title><style>body{font-family:-apple-system,sans-serif;display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0;background:#f8fafc;color:#2d3748;text-align:center;padding:20px}h1{color:#4361ee;font-size:1.5rem}p{color:#64748b;margin-top:.5rem}</style></head><body><div><h1>Sem conexao</h1><p>Pagina nao disponivel offline.</p></div></body></html>',
+                '<!DOCTYPE html><html lang="pt"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>VendaPay</title><style>body{font-family:-apple-system,sans-serif;display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0;background:#f8fafc;color:#2d3748;text-align:center;padding:20px}h1{color:#4361ee;font-size:1.5rem}p{color:#64748b;margin-top:.5rem}</style></head><body><div><h1>Sem conexao</h1><p>Pagina nao disponivel offline.</p></div></body></html>',
                 { status: 200, headers: { 'Content-Type': 'text/html' } }
             );
         }));
@@ -68,7 +68,7 @@ self.addEventListener('fetch', function(event) {
                 return response;
             }).catch(function() {
                 return cached || new Response(
-                    '<!DOCTYPE html><html lang="pt"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>QueroLink</title><style>body{font-family:-apple-system,sans-serif;display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0;background:#f8fafc;color:#2d3748;text-align:center;padding:20px}h1{color:#4361ee;font-size:1.5rem}p{color:#64748b;margin-top:.5rem}</style></head><body><div><h1>Sem conexao</h1><p>Verifique sua internet e tente novamente.</p></div></body></html>',
+                    '<!DOCTYPE html><html lang="pt"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>VendaPay</title><style>body{font-family:-apple-system,sans-serif;display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0;background:#f8fafc;color:#2d3748;text-align:center;padding:20px}h1{color:#4361ee;font-size:1.5rem}p{color:#64748b;margin-top:.5rem}</style></head><body><div><h1>Sem conexao</h1><p>Verifique sua internet e tente novamente.</p></div></body></html>',
                     { status: 200, headers: { 'Content-Type': 'text/html' } }
                 );
             });
