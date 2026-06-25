@@ -411,7 +411,7 @@ def gestor_links(request):
 
     import logging
     logger = logging.getLogger(__name__)
-    logger.info("gestor_links: tenant=%s orders_count=%d", tenant.id, orders.count())
+    logger.info("gestor_links: tenant=%s orders_count=%d", tenant.pk, orders.count())
 
     orders_data = []
     for o in orders:
