@@ -80,7 +80,8 @@
         <tbody>
           {% verbatim %}
           <template x-for="o in filteredOrders" :key="o.uuid">
-            <tr class="border-b border-gray-50 hover:bg-gray-50/50 transition-colors">
+            <tr class="border-b border-gray-50 hover:bg-gray-50/50 transition-colors cursor-pointer"
+                @click="window.location.href='/dashboard/gestor/links/' + o.uuid + '/'">
               <td class="px-4 py-3.5 text-[13px] text-gray-700 font-medium hidden lg:table-cell" x-text="o.seller_name"></td>
               <td class="px-4 py-3.5">
                 <div class="flex items-center gap-2">
@@ -89,7 +90,7 @@
                     <span x-text="(o.customer_name||'?')[0].toUpperCase()"></span>
                   </div>
                   <div>
-                    <p class="text-[14px] font-semibold text-gray-900 leading-tight" x-text="o.customer_name"></p>
+                    <p class="text-[14px] font-semibold text-gray-900 leading-tight brand-600-hover" x-text="o.customer_name"></p>
                     <p class="text-[11px] text-gray-400 lg:hidden" x-text="o.seller_name"></p>
                   </div>
                 </div>

@@ -19,6 +19,9 @@ urlpatterns = [
     path('gestor/configuracoes/whatsapp/disconnect/', desktop_views.whatsapp_disconnect, name='whatsapp_disconnect'),
     path('gestor/configuracoes/whatsapp/delete/', desktop_views.whatsapp_delete_instance, name='whatsapp_delete_instance'),
     path('gestor/links/', desktop_views.gestor_links, name='gestor_links'),
+    path('gestor/links/<uuid:order_uuid>/', desktop_views.gestor_link_detalhe, name='gestor_link_detalhe'),
+    path('gestor/links/<uuid:order_uuid>/cancelar/', desktop_views.gestor_link_cancelar, name='gestor_link_cancelar'),
+    path('gestor/links/<uuid:order_uuid>/estornar/', desktop_views.gestor_link_estornar, name='gestor_link_estornar'),
 
     path('financeiro/fila/', desktop_views.financeiro_fila, name='financeiro_fila'),
     path('financeiro/historico/', desktop_views.financeiro_historico, name='financeiro_historico'),

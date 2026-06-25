@@ -1,3 +1,5 @@
+"""Pagar.me gateway service."""
+
 import logging
 import unicodedata
 
@@ -15,8 +17,7 @@ class PagarMeError(Exception):
 
 class PagarMeGateway:
     """
-    Cliente generico para comunicacao com a API do Pagar.me
-    Suporta tenant isolation (passagem de api_key do Tenant).
+    Cliente para API do Pagar.me com suporte a multitenancy.
     """
 
     def __init__(self, api_key=None):
@@ -26,17 +27,11 @@ class PagarMeGateway:
                 "API_KEY_PAGAR_ME nao configurada. "
                 "Verifique as variaveis de ambiente."
             )
-        self.api_url_links = getattr(
-            settings, 'PAGARME_API_URL_LINKS',
-            "https://api.pagar.me/core/v5/paymentlinks",
-        )
-        self.api_url_orders = getattr(
-            settings, 'PAGARME_API_URL_ORDERS',
-            "https://api.pagar.me/core/v5/orders",
-        )
-        self.timeout = getattr(
-            settings, 'PAGARME_TIMEOUT', DEFAULT_TIMEOUT,
-        )
+        base = "https://api.pagar.me/core/v5"
+        self.api_url_links = f"{base}/paymentlinks"
+        self.api_url_orders = f"{base}/orders"
+        self.api_url_charges = f"{base}/charges"
+        self.timeout = getattr(settings, 'PAGARME_TIMEOUT', DEFAULT_TIMEOUT)
 
     def _sanitize_text(self, text):
         nfd = unicodedata.normalize('NFD', text)
@@ -49,6 +44,21 @@ class PagarMeGateway:
             "content-type": "application/json",
             "authorization": f"Basic {self.api_key}",
         }
+
+    def _request(self, method, url, **kwargs):
+        try:
+            response = requests.request(
+                method, url, headers=self._get_headers(),
+                timeout=self.timeout, **kwargs,
+            )
+            response.raise_for_status()
+            return response.json()
+        except requests.exceptions.Timeout:
+            raise PagarMeError("Timeout ao comunicar com Pagar.me. Tente novamente.")
+        except requests.exceptions.RequestException as e:
+            raise PagarMeError(f"Erro na comunicacao com Pagar.me: {e}")
+        except ValueError:
+            raise PagarMeError("Resposta invalida do Pagar.me.")
 
     def create_payment_link(
         self, total_amount, max_installments, name,
@@ -71,44 +81,46 @@ class PagarMeGateway:
                 "accepted_payment_methods": ["credit_card"],
             },
             "cart_settings": {
-                "items": [
-                    {
-                        "amount": total_amount,
-                        "name": "Vendas",
-                        "description": "Pedido de pagamento",
-                        "default_quantity": 1,
-                    }
-                ]
+                "items": [{
+                    "amount": total_amount,
+                    "name": "Vendas",
+                    "description": "Pedido de pagamento",
+                    "default_quantity": 1,
+                }]
             },
             "name": name,
             "type": "order",
             "expires_in": 1200,
             "max_paid_sessions": 1,
         }
-
         if order_code:
             payload["order_code"] = order_code
-
         if success_url:
-            if "flow_settings" not in payload:
-                payload["flow_settings"] = {}
-            payload["flow_settings"]["success_url"] = success_url
+            payload.setdefault("flow_settings", {})["success_url"] = success_url
 
         logger.info("Pagar.me create_payment_link: order_code=%s", order_code)
+        return self._request("POST", self.api_url_links, json=payload)
 
-        try:
-            response = requests.post(
-                self.api_url_links, json=payload, headers=self._get_headers(),
-                timeout=self.timeout,
-            )
-            response.raise_for_status()
-            return response.json()
-        except requests.exceptions.Timeout:
-            logger.error("Pagar.me timeout on create_payment_link (order_code=%s)", order_code)
-            raise PagarMeError("Timeout ao comunicar com Pagar.me. Tente novamente.")
-        except requests.exceptions.RequestException as e:
-            logger.error("Pagar.me request error: %s", e)
-            raise PagarMeError(f"Erro na comunicacao com Pagar.me: {e}")
-        except ValueError:
-            logger.error("Pagar.me response is not valid JSON")
-            raise PagarMeError("Resposta invalida do Pagar.me.")
+    def get_charge(self, charge_id):
+        """Fetch charge details from Pagar.me."""
+        logger.info("Pagar.me get_charge: charge_id=%s", charge_id)
+        return self._request("GET", f"{self.api_url_charges}/{charge_id}")
+
+    def get_order(self, order_id):
+        """Fetch order details from Pagar.me."""
+        logger.info("Pagar.me get_order: order_id=%s", order_id)
+        return self._request("GET", f"{self.api_url_orders}/{order_id}")
+
+    def cancel_charge(self, charge_id):
+        """Cancel/refund a charge (full refund)."""
+        logger.info("Pagar.me cancel_charge: charge_id=%s", charge_id)
+        return self._request("POST", f"{self.api_url_charges}/{charge_id}/cancel")
+
+    def partial_cancel_charge(self, charge_id, amount):
+        """Partial refund of a charge."""
+        logger.info("Pagar.me partial_cancel: charge_id=%s amount=%d", charge_id, amount)
+        return self._request(
+            "POST",
+            f"{self.api_url_charges}/{charge_id}/partial",
+            json={"amount": amount},
+        )

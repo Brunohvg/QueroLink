@@ -1,5 +1,7 @@
 import json
-from django.shortcuts import render, redirect
+import logging
+import uuid
+from django.shortcuts import render, redirect, get_object_or_404
 from django.http import JsonResponse
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
@@ -410,8 +412,6 @@ def gestor_links(request):
     if seller_uuid:
         orders = orders.filter(seller__uuid=seller_uuid)
 
-    import logging
-    logger = logging.getLogger(__name__)
     logger.info("gestor_links: tenant=%s orders_count=%d", tenant.pk, orders.count())
 
     orders_data = []
@@ -446,3 +446,106 @@ def gestor_links(request):
         'orders_json': json.dumps(orders_data),
         'sellers': sellers,
     })
+
+
+@login_required
+def gestor_link_detalhe(request, order_uuid):
+    if not _check_role(request, User.Role.MANAGER, User.Role.ADMIN):
+        return redirect('dashboard:home')
+
+    tenant = request.user.tenant
+    if not tenant:
+        return redirect('dashboard:home')
+
+    from app.apps.orders.models import Order, PaymentLink
+    from app.apps.payments.models import Payment
+
+    order = get_object_or_404(Order, uuid=order_uuid, tenant=tenant)
+    payment = order.payments.order_by('created_at').first()
+    payment_link = PaymentLink.objects.filter(order=order).first()
+
+    # Try to fetch fresh data from Pagar.me
+    charge_data = None
+    pagarme_error = None
+    if payment and payment.gateway_transaction_id:
+        try:
+            from app.services.gateway.pagar_me import PagarMeGateway
+            gw = PagarMeGateway(api_key=tenant.pagarme_api_key)
+            charge_data = gw.get_charge(payment.gateway_transaction_id)
+        except Exception as e:
+            pagarme_error = str(e)
+
+    return render(request, 'dashboard/gestor/link_detalhe.html', {
+        'order': order,
+        'payment': payment,
+        'payment_link': payment_link,
+        'charge_data': charge_data,
+        'pagarme_error': pagarme_error,
+    })
+
+
+@login_required
+def gestor_link_cancelar(request, order_uuid):
+    if not _check_role(request, User.Role.MANAGER, User.Role.ADMIN):
+        messages.error(request, 'Permissao negada.')
+        return redirect('dashboard:gestor_links')
+
+    tenant = request.user.tenant
+    from app.apps.orders.models import Order
+    order = get_object_or_404(Order, uuid=order_uuid, tenant=tenant)
+
+    if order.status != Order.Status.PENDING:
+        messages.error(request, 'So e possivel cancelar links pendentes.')
+        return redirect('dashboard:gestor_link_detalhe', order_uuid=order_uuid)
+
+    order.status = Order.Status.CANCELED
+    order.save(update_fields=['status'])
+    messages.success(request, 'Link cancelado com sucesso.')
+    return redirect('dashboard:gestor_link_detalhe', order_uuid=order_uuid)
+
+
+@login_required
+def gestor_link_estornar(request, order_uuid):
+    if not _check_role(request, User.Role.MANAGER, User.Role.ADMIN):
+        return JsonResponse({'error': 'Permissao negada.'}, status=403)
+
+    if request.method != 'POST':
+        return JsonResponse({'error': 'Metodo nao permitido.'}, status=405)
+
+    tenant = request.user.tenant
+    from app.apps.orders.models import Order
+    from app.apps.payments.models import Payment
+    order = get_object_or_404(Order, uuid=order_uuid, tenant=tenant)
+    payment = order.payments.order_by('created_at').first()
+
+    if not payment or payment.status != Payment.Status.PAID:
+        return JsonResponse({'error': 'Pagamento nao esta concluido.'}, status=400)
+
+    if not payment.gateway_transaction_id:
+        return JsonResponse({'error': 'Transacao nao encontrada no gateway.'}, status=400)
+
+    import json as json_module
+    try:
+        body = json_module.loads(request.body) if request.body else {}
+    except Exception:
+        body = {}
+    amount = body.get('amount')
+    is_partial = bool(amount and amount > 0)
+
+    from app.services.gateway.pagar_me import PagarMeGateway
+    try:
+        gw = PagarMeGateway(api_key=tenant.pagarme_api_key)
+        if is_partial:
+            gw.partial_cancel_charge(payment.gateway_transaction_id, amount)
+        else:
+            gw.cancel_charge(payment.gateway_transaction_id)
+    except Exception as e:
+        return JsonResponse({'error': f'Erro ao estornar: {e}'}, status=500)
+
+    payment.status = Payment.Status.REFUNDED if not is_partial else Payment.Status.REFUNDED
+    payment.save(update_fields=['status'])
+    order.status = Order.Status.CANCELED
+    order.save(update_fields=['status'])
+
+    msg = 'Estorno parcial' if is_partial else 'Estorno total'
+    return JsonResponse({'message': f'{msg} realizado com sucesso.'})

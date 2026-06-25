@@ -1,0 +1,183 @@
+{% extends 'dashboard/base_desktop.html' %}
+{% block title %}Link — {{ order.customer_name }} — QueroLink{% endblock %}
+{% block content %}
+<div x-data="linkDetailPage()" class="max-w-4xl mx-auto">
+
+  <div class="sticky top-0 z-10 -mx-6 px-6 py-4 bg-gray-50/90 backdrop-blur-lg border-b border-gray-200/60 mb-6">
+    <div class="flex items-center gap-3">
+      <a href="{% url 'dashboard:gestor_links' %}" class="flex items-center justify-center w-9 h-9 rounded-xl hover:bg-gray-200/60 transition-all active:scale-[0.97]">
+        <svg class="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
+      </a>
+      <div>
+        <h1 class="font-display text-[20px] font-bold text-gray-900 tracking-tight">Detalhe do Link</h1>
+        <p class="text-[13px] text-gray-500">Informacoes do pagamento</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="bg-white rounded-2xl border border-gray-100 shadow-[0_1px_3px_-1px_rgba(0,0,0,0.04),0_4px_16px_-4px_rgba(67,97,238,0.06)] p-6 mb-6">
+    <div class="flex items-start gap-4">
+      <div class="w-14 h-14 rounded-2xl flex items-center justify-center flex-shrink-0 shadow-sm" style="background: linear-gradient(135deg, #4361ee, #2540ad);">
+        <span class="text-[24px] font-bold text-white">{{ order.customer_name|first|upper }}</span>
+      </div>
+      <div class="flex-1 min-w-0">
+        <h2 class="text-[18px] font-bold text-gray-900">{{ order.customer_name }}</h2>
+        <p class="text-[13px] text-gray-400 mt-0.5">
+          {% if order.seller %}{{ order.seller.name }}{% else %}Sem vendedor{% endif %}
+          <span class="mx-1.5 text-gray-300">•</span>
+          {{ order.created_at|date:"d/m/Y H:i" }}
+        </p>
+      </div>
+      <div class="flex-shrink-0">
+        {% include 'components/_order_status_badge.html' with status=order.status %}
+      </div>
+    </div>
+  </div>
+
+  <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+    <div class="bg-white rounded-2xl border border-gray-100 shadow-[0_1px_3px_-1px_rgba(0,0,0,0.04),0_4px_16px_-4px_rgba(67,97,238,0.06)] p-6">
+      <h3 class="text-[13px] font-semibold text-gray-400 uppercase tracking-wider mb-4">Dados do Pedido</h3>
+      <dl class="space-y-3">
+        <div class="flex justify-between text-[14px]"><dt class="text-gray-500">Cliente</dt><dd class="font-semibold text-gray-800">{{ order.customer_name }}</dd></div>
+        <div class="flex justify-between text-[14px]"><dt class="text-gray-500">Vendedor</dt><dd class="font-semibold text-gray-800">{{ order.seller.name|default:'—' }}</dd></div>
+        <div class="flex justify-between text-[14px]"><dt class="text-gray-500">Valor</dt><dd class="font-semibold text-gray-900">R$ {{ order.total_amount|floatformat:2|cut:"," }}</dd></div>
+        <div class="flex justify-between text-[14px]"><dt class="text-gray-500">Parcelas</dt><dd class="font-semibold text-gray-800">{{ payment.installments|default:'—' }}x</dd></div>
+        <div class="flex justify-between text-[14px]"><dt class="text-gray-500">Criado em</dt><dd class="text-gray-800">{{ order.created_at|date:"d/m/Y H:i" }}</dd></div>
+        {% if payment_link and payment_link.gateway_url %}
+        <div class="pt-2">
+          <a href="{{ payment_link.gateway_url }}" target="_blank" class="inline-flex items-center gap-1.5 text-brand-600 hover:text-brand-700 text-[13px] font-medium">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg>
+            Abrir Link no Pagar.me
+          </a>
+        </div>
+        {% endif %}
+      </dl>
+    </div>
+
+    <div class="bg-white rounded-2xl border border-gray-100 shadow-[0_1px_3px_-1px_rgba(0,0,0,0.04),0_4px_16px_-4px_rgba(67,97,238,0.06)] p-6">
+      <h3 class="text-[13px] font-semibold text-gray-400 uppercase tracking-wider mb-4">Pagamento</h3>
+      {% if payment %}
+      <dl class="space-y-3">
+        <div class="flex justify-between text-[14px]"><dt class="text-gray-500">Status</dt><dd>{% include 'components/_payment_status_badge.html' with status=payment.status %}</dd></div>
+        <div class="flex justify-between text-[14px]"><dt class="text-gray-500">Gateway</dt><dd class="font-semibold text-gray-800">{{ payment.gateway_name|upper }}</dd></div>
+        <div class="flex justify-between text-[14px]"><dt class="text-gray-500">Metodo</dt><dd class="font-semibold text-gray-800">{{ payment.get_payment_method_display|default:'—' }}</dd></div>
+        <div class="flex justify-between text-[14px]"><dt class="text-gray-500">Transacao ID</dt><dd class="font-mono text-[12px] text-gray-600 truncate max-w-[200px] text-right">{{ payment.gateway_transaction_id|default:'—' }}</dd></div>
+        {% if charge_data %}
+        {% with last_txn=charge_data.last_transaction %}
+        {% if last_txn %}
+        <div class="border-t border-gray-100 pt-3 mt-3">
+          <p class="text-[12px] font-semibold text-gray-500 mb-2">Ultima transacao</p>
+          <div class="flex justify-between text-[13px]"><dt class="text-gray-400">Status</dt><dd class="font-semibold">{{ last_txn.status|default:'—' }}</dd></div>
+          {% if last_txn.refuse_reason %}<div class="flex justify-between text-[13px]"><dt class="text-gray-400">Motivo recusa</dt><dd class="font-semibold text-red-600">{{ last_txn.refuse_reason }}</dd></div>{% endif %}
+          {% if last_txn.acquirer_message %}<div class="flex justify-between text-[13px]"><dt class="text-gray-400">Mensagem</dt><dd class="font-semibold text-red-600">{{ last_txn.acquirer_message }}</dd></div>{% endif %}
+          {% if last_txn.card %}<div class="flex justify-between text-[13px]"><dt class="text-gray-400">Cartao</dt><dd class="font-semibold text-gray-700">{{ last_txn.card.brand|upper }} ****{{ last_txn.card.last_digits }}</dd></div>{% endif %}
+        </div>
+        {% endif %}
+        {% endwith %}
+        {% endif %}
+      </dl>
+      {% else %}
+      <div class="text-center py-8">
+        <div class="w-12 h-12 mx-auto mb-3 rounded-2xl bg-gray-50 flex items-center justify-center">
+          <svg class="w-6 h-6 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"/></svg>
+        </div>
+        <p class="text-[13px] text-gray-500">Pagamento ainda nao processado.</p>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="bg-white rounded-2xl border border-gray-100 shadow-[0_1px_3px_-1px_rgba(0,0,0,0.04),0_4px_16px_-4px_rgba(67,97,238,0.06)] p-6">
+    <h3 class="text-[13px] font-semibold text-gray-400 uppercase tracking-wider mb-4">Acoes</h3>
+    <div class="flex gap-3 flex-wrap">
+      {% if order.status == 'PENDING' %}
+      <form method="post" action="{% url 'dashboard:gestor_link_cancelar' order.uuid %}">
+        {% csrf_token %}
+        <button type="submit" class="inline-flex items-center gap-2 px-5 py-2.5 bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 font-semibold rounded-xl transition-all text-[14px] active:scale-[0.97]" onclick="return confirm('Cancelar este link?')">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+          Cancelar Link
+        </button>
+      </form>
+      {% endif %}
+      {% if payment and payment.status == 'PAID' and payment.gateway_transaction_id %}
+      <button type="button" @click="showRefundModal = true; refundType = 'full'" class="inline-flex items-center gap-2 px-5 py-2.5 bg-amber-50 hover:bg-amber-100 text-amber-600 border border-amber-200 font-semibold rounded-xl transition-all text-[14px] active:scale-[0.97]">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6"/></svg>
+        Estornar
+      </button>
+      {% endif %}
+    </div>
+  </div>
+
+  <div x-show="showRefundModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm" @click.self="showRefundModal=false">
+    <div class="bg-white rounded-2xl shadow-xl p-6 w-full max-w-sm mx-4" @click.stop>
+      <div class="flex items-center gap-3 mb-5">
+        <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-amber-400 to-amber-500 flex items-center justify-center shadow-sm">
+          <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6"/></svg>
+        </div>
+        <div><h3 class="text-[17px] font-bold text-gray-900">Estornar Pagamento</h3><p class="text-[12px] text-gray-400">Valor: <strong>R$ {{ order.total_amount|floatformat:2|cut:"," }}</strong></p></div>
+      </div>
+      <div class="space-y-4">
+        <div>
+          <label class="flex items-center gap-3 p-3 border border-gray-200 rounded-xl cursor-pointer hover:bg-gray-50">
+            <input type="radio" x-model="refundType" value="full" class="w-4 h-4 text-brand-500">
+            <div><p class="text-[14px] font-medium text-gray-800">Estorno total</p><p class="text-[12px] text-gray-400">Reembolsa o valor integral</p></div>
+          </label>
+        </div>
+        <div>
+          <label class="flex items-center gap-3 p-3 border border-gray-200 rounded-xl cursor-pointer hover:bg-gray-50">
+            <input type="radio" x-model="refundType" value="partial" class="w-4 h-4 text-brand-500">
+            <div><p class="text-[14px] font-medium text-gray-800">Estorno parcial</p><p class="text-[12px] text-gray-400">Reembolsa apenas parte do valor</p></div>
+          </label>
+        </div>
+        <div x-show="refundType === 'partial'">
+          <label class="block text-[13px] font-medium text-gray-700 mb-1.5">Valor do estorno (em centavos)</label>
+          <input type="number" x-model="refundAmount" class="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-[14px] outline-none transition-all focus:border-amber-400 focus:ring-2 focus:ring-amber-100" placeholder="Ex: 5000 = R$ 50,00">
+        </div>
+        <div x-show="refundStatus" class="text-[13px]" :class="refundStatus.includes('sucesso') ? 'text-emerald-600' : 'text-red-500'" x-text="refundStatus"></div>
+        <div class="flex gap-3 justify-end pt-2 border-t border-gray-100">
+          <button @click="showRefundModal=false; refundStatus=''" class="px-5 py-2.5 bg-white border border-gray-200 text-gray-700 font-medium rounded-xl transition-all text-[14px] hover:bg-gray-50 active:scale-[0.97]">Cancelar</button>
+          <button @click="doRefund()" :disabled="refundLoading" class="px-5 py-2.5 bg-amber-500 hover:bg-amber-600 disabled:bg-gray-300 text-white font-semibold rounded-xl transition-all text-[14px] shadow-sm active:scale-[0.97]">
+            <span x-show="!refundLoading">Confirmar Estorno</span>
+            <span x-show="refundLoading">Processando...</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+function linkDetailPage() {
+    return {
+        showRefundModal: false,
+        refundType: 'full',
+        refundAmount: 0,
+        refundLoading: false,
+        refundStatus: '',
+        async doRefund() {
+            this.refundLoading = true;
+            this.refundStatus = '';
+            try {
+                var body = {};
+                if (this.refundType === 'partial') body.amount = parseInt(this.refundAmount) || 0;
+                var r = await fetch('{% url "dashboard:gestor_link_estornar" order.uuid %}', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json', 'X-CSRFToken': getCSRFToken()},
+                    body: JSON.stringify(body),
+                });
+                var d = await r.json();
+                if (r.ok) {
+                    this.refundStatus = d.message || 'Estorno realizado com sucesso!';
+                    setTimeout(function() { location.reload(); }, 1500);
+                } else {
+                    this.refundStatus = d.error || 'Erro ao estornar.';
+                }
+            } catch (e) {
+                this.refundStatus = 'Erro de conexao.';
+            }
+            this.refundLoading = false;
+        },
+    }
+}
+</script>
+{% endblock %}
