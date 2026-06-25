@@ -1,178 +1,232 @@
 {% extends 'dashboard/base_desktop.html' %}
 {% block title %}{{ seller.name }} — QueroLink{% endblock %}
 {% block content %}
-<div x-data="sellerDetailPage()" x-init="init('{{ seller.uuid }}')">
+<div x-data="sellerDetailPage()" x-init="init('{{ seller.uuid }}')" class="max-w-7xl mx-auto">
 
-    <div class="flex items-center gap-3 mb-6">
-        <a href="{% url 'dashboard:gestor_vendedores' %}" class="tap-target flex items-center justify-center w-10 h-10 rounded-xl hover:bg-gray-100">
-            <svg class="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path></svg>
-        </a>
-        <h1 class="font-display text-[18px] font-semibold text-gray-900">Detalhe do Vendedor</h1>
+  <div class="sticky top-0 z-10 -mx-6 px-6 py-4 bg-gray-50/90 backdrop-blur-lg border-b border-gray-200/60 mb-6">
+    <div class="flex items-center gap-3">
+      <a href="{% url 'dashboard:gestor_vendedores' %}" class="flex items-center justify-center w-9 h-9 rounded-xl hover:bg-gray-200/60 transition-all active:scale-[0.97]">
+        <svg class="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path></svg>
+      </a>
+      <div>
+        <h1 class="font-display text-[20px] font-bold text-gray-900 tracking-tight">Detalhe do Vendedor</h1>
+        <p class="text-[13px] text-gray-500">Acompanhe vendas e comissoes</p>
+      </div>
     </div>
+  </div>
 
-    <div class="surface-card mb-6">
-        <div class="flex items-center gap-5">
-            <div class="w-16 h-16 rounded-full bg-brand-100 flex items-center justify-center flex-shrink-0">
-                <span class="text-[26px] font-bold text-brand-600">{{ seller.name|first|upper }}</span>
-            </div>
-            <div class="flex-1 min-w-0">
-                <div class="flex items-center gap-3 mb-1">
-                    <h2 class="font-display text-[20px] font-semibold text-gray-900" x-text="sellerData?.seller?.name || '{{ seller.name }}'"></h2>
-                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium"
-                          :class="sellerData?.seller?.is_active ? 'bg-success-50 text-success-700' : 'bg-gray-100 text-gray-600'"
-                          x-text="sellerData?.seller?.is_active ? 'Ativo' : 'Inativo'"></span>
-                </div>
-                <div class="grid grid-cols-2 md:grid-cols-4 gap-x-6 gap-y-1 text-[13px]">
-                    <div><span class="text-gray-500">Telefone:</span> <span class="font-medium text-gray-800" x-text="sellerData?.seller?.phone || '{{ seller.phone }}'"></span></div>
-                    <div><span class="text-gray-500">Usuario:</span> <span class="font-medium text-gray-800" x-text="sellerData?.seller?.username"></span></div>
-                    <div><span class="text-gray-500">Taxa:</span> <span class="font-medium text-brand-600" x-text="sellerData?.seller?.commission_rate ? (sellerData.seller.commission_rate*100).toFixed(2)+'%' : '-'"></span></div>
-                    <div><span class="text-gray-500">Cadastro:</span> <span class="font-medium text-gray-800" x-text="sellerData?.seller?.created_at ? new Date(sellerData.seller.created_at).toLocaleDateString('pt-BR') : '-'"></span></div>
-                </div>
-            </div>
+  <div class="bg-white rounded-2xl border border-gray-100 shadow-[0_1px_3px_-1px_rgba(0,0,0,0.04),0_4px_16px_-4px_rgba(67,97,238,0.06)] p-6 mb-6">
+    <div class="flex items-start gap-5">
+      <div class="w-16 h-16 rounded-full bg-gradient-to-br from-brand-400 to-brand-500 flex items-center justify-center flex-shrink-0 shadow-sm">
+        <span class="text-[26px] font-bold text-white">{{ seller.name|first|upper }}</span>
+      </div>
+      <div class="flex-1 min-w-0">
+        <div class="flex items-center gap-3 mb-2">
+          <h2 class="font-display text-[20px] font-bold text-gray-900" x-text="sellerData?.seller?.name || '{{ seller.name }}'"></h2>
+          <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-medium"
+                :class="sellerData?.seller?.is_active ? 'bg-emerald-50 text-emerald-700' : 'bg-gray-100 text-gray-600'">
+            <span class="w-1.5 h-1.5 rounded-full" :class="sellerData?.seller?.is_active ? 'bg-emerald-500' : 'bg-gray-400'"></span>
+            <span x-text="sellerData?.seller?.is_active ? 'Ativo' : 'Inativo'"></span>
+          </span>
         </div>
+        <div class="grid grid-cols-2 sm:grid-cols-4 gap-x-6 gap-y-2 text-[13px]">
+          <div><span class="text-gray-400">Telefone:</span> <span class="font-medium text-gray-800" x-text="sellerData?.seller?.phone || '{{ seller.phone }}'"></span></div>
+          <div><span class="text-gray-400">Usuario:</span> <span class="font-medium text-gray-800" x-text="sellerData?.seller?.username"></span></div>
+          <div><span class="text-gray-400">Taxa:</span> <span class="font-medium text-emerald-600" x-text="sellerData?.seller?.commission_rate ? (sellerData.seller.commission_rate*100).toFixed(2)+'%' : '-'"></span></div>
+          <div><span class="text-gray-400">Cadastro:</span> <span class="font-medium text-gray-800" x-text="sellerData?.seller?.created_at ? new Date(sellerData.seller.created_at).toLocaleDateString('pt-BR') : '-'"></span></div>
+        </div>
+      </div>
     </div>
+  </div>
 
-    <div class="bg-white rounded-2xl p-4 mb-6 border border-gray-200">
-        <div class="flex flex-wrap items-center gap-2">
-            <select x-model="month" @change="load()" class="px-3 py-2 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 bg-white">
-                <option value="1">01</option><option value="2">02</option><option value="3">03</option><option value="4">04</option><option value="5">05</option><option value="6">06</option><option value="7">07</option><option value="8">08</option><option value="9">09</option><option value="10">10</option><option value="11">11</option><option value="12">12</option>
-            </select>
-            <select x-model="year" @change="load()" class="px-3 py-2 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 bg-white">
-                <option value="2024">2024</option><option value="2025">2025</option><option value="2026">2026</option><option value="2027">2027</option><option value="2028">2028</option>
-            </select>
-            <span class="text-[13px] text-gray-400 mx-1">ou</span>
-            <input type="date" x-model="startDate" @change="load()" class="px-3 py-2 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
-            <span class="text-[13px] text-gray-400">ate</span>
-            <input type="date" x-model="endDate" @change="load()" class="px-3 py-2 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
-            <div class="flex items-center gap-1 ml-auto">
-                <span class="text-[13px] text-gray-500 mr-1">Exportar:</span>
-                <button @click="exportCsv()" class="px-3 py-2 bg-gray-100 hover:bg-brand-50 hover:text-brand-600 text-gray-700 rounded-xl text-sm font-medium transition flex items-center gap-1">
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
-                    CSV
-                </button>
-                <button @click="exportXlsx()" class="px-3 py-2 bg-gray-100 hover:bg-brand-50 hover:text-brand-600 text-gray-700 rounded-xl text-sm font-medium transition flex items-center gap-1">
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
-                    Excel
-                </button>
-                <button @click="exportPdf()" class="px-3 py-2 bg-gray-100 hover:bg-brand-50 hover:text-brand-600 text-gray-700 rounded-xl text-sm font-medium transition flex items-center gap-1">
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"></path></svg>
-                    PDF
-                </button>
-            </div>
-        </div>
+  <div class="bg-white rounded-2xl border border-gray-100 shadow-[0_1px_3px_-1px_rgba(0,0,0,0.04),0_4px_16px_-4px_rgba(67,97,238,0.06)] p-5 mb-6">
+    <div class="flex flex-col sm:flex-row flex-wrap items-start sm:items-center gap-3">
+      <div class="flex items-center gap-2">
+        <label class="text-[13px] font-medium text-gray-500">Mes:</label>
+        <select x-model="month" @change="load()" class="px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-[13px] outline-none transition-all focus:border-brand-400 focus:ring-2 focus:ring-brand-100">
+          <template x-for="m in 12" :key="m"><option :value="m" x-text="String(m).padStart(2,'0')"></option></template>
+        </select>
+        <select x-model="year" @change="load()" class="px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-[13px] outline-none transition-all focus:border-brand-400 focus:ring-2 focus:ring-brand-100">
+          <option value="2024">2024</option><option value="2025">2025</option><option value="2026">2026</option><option value="2027">2027</option><option value="2028">2028</option>
+        </select>
+      </div>
+      <span class="text-[13px] text-gray-300 hidden sm:inline">|</span>
+      <div class="flex items-center gap-2">
+        <label class="text-[13px] font-medium text-gray-500">De:</label>
+        <input type="date" x-model="startDate" @change="load()" class="px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-[13px] outline-none transition-all focus:border-brand-400 focus:ring-2 focus:ring-brand-100">
+        <label class="text-[13px] font-medium text-gray-500">ate:</label>
+        <input type="date" x-model="endDate" @change="load()" class="px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-[13px] outline-none transition-all focus:border-brand-400 focus:ring-2 focus:ring-brand-100">
+      </div>
+      <div class="flex items-center gap-1.5 sm:ml-auto">
+        <span class="text-[12px] text-gray-400 mr-1">Exportar:</span>
+        <button @click="exportCsv()" class="px-3 py-1.5 bg-gray-100 hover:bg-brand-50 hover:text-brand-600 text-gray-600 rounded-xl text-[12px] font-medium transition flex items-center gap-1.5">
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+          CSV
+        </button>
+        <button @click="exportXlsx()" class="px-3 py-1.5 bg-gray-100 hover:bg-brand-50 hover:text-brand-600 text-gray-600 rounded-xl text-[12px] font-medium transition flex items-center gap-1.5">
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+          Excel
+        </button>
+        <button @click="exportPdf()" class="px-3 py-1.5 bg-gray-100 hover:bg-brand-50 hover:text-brand-600 text-gray-600 rounded-xl text-[12px] font-medium transition flex items-center gap-1.5">
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"/></svg>
+          PDF
+        </button>
+      </div>
     </div>
+  </div>
 
-    {% verbatim %}
-    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-        <div class="surface-hero">
-            <p class="text-[13px] font-semibold text-gray-500 uppercase tracking-wide mb-2">Total vendido (manual)</p>
-            <p class="font-display text-[32px] font-semibold text-brand-500 leading-none" x-text="formatMoneyBRL(sellerData?.manual_total || 0)"></p>
-            <p class="text-[14px] text-gray-500 mt-2" x-text="(sellerData?.manual_sale_count || 0) + ' lançamento(s)'"></p>
-        </div>
-        <div class="surface-card">
-            <p class="text-[13px] font-semibold text-gray-500 uppercase tracking-wide mb-2">Comissao</p>
-            <p class="font-display text-[28px] font-semibold text-success-700 leading-none" x-text="formatMoneyBRL(sellerData?.commissions?.[0]?.commission_amount || 0)"></p>
-            <p class="text-[13px] text-gray-500 mt-1">Taxa: <span x-text="sellerData?.seller?.commission_rate ? (sellerData.seller.commission_rate*100).toFixed(2)+'%' : '-'"></span></p>
-        </div>
-        <div class="surface-card">
-            <p class="text-[13px] font-semibold text-gray-500 uppercase tracking-wide mb-2">Vendas por link</p>
-            <p class="font-display text-[28px] font-semibold text-gray-900 leading-none" x-text="formatMoneyBRL(sellerData?.link_total || 0)"></p>
-            <p class="text-[13px] text-gray-500 mt-1">Informativo — nao entra na comissao</p>
-        </div>
+  {% verbatim %}
+  <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
+    <div class="relative overflow-hidden bg-white rounded-2xl p-5 border border-gray-100 shadow-[0_1px_3px_-1px_rgba(0,0,0,0.04),0_4px_16px_-4px_rgba(67,97,238,0.06)]">
+      <div class="absolute top-0 right-0 w-32 h-32 bg-gradient-to-bl from-brand-50/50 to-transparent rounded-full -mr-8 -mt-8"></div>
+      <div class="relative">
+        <p class="text-[11px] font-semibold text-gray-400 uppercase tracking-[0.08em] mb-2">Total vendido (manual)</p>
+        <p class="font-display text-[32px] font-bold text-brand-600 leading-none" x-text="formatMoneyBRL(sellerData?.manual_total || 0)"></p>
+        <p class="text-[13px] text-gray-500 mt-2" x-text="(sellerData?.manual_sale_count || 0) + ' lançamento(s)'"></p>
+      </div>
     </div>
-
-    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-        <div class="surface-card" x-show="sellerData?.evolution?.length">
-            <h2 class="text-[13px] font-semibold text-gray-500 uppercase tracking-wide mb-4">Evolucao no periodo</h2>
-            <div class="h-64"><canvas id="evolutionChart"></canvas></div>
-        </div>
-        <div class="surface-card" x-show="sellerData?.comparison?.length">
-            <h2 class="text-[13px] font-semibold text-gray-500 uppercase tracking-wide mb-4">Comparacao mensal</h2>
-            <table class="w-full text-left text-[13px]">
-                <thead>
-                    <tr><th class="py-2 text-gray-500 font-semibold border-b border-gray-200">Mes</th><th class="py-2 text-gray-500 font-semibold border-b border-gray-200 text-right">Vendas</th><th class="py-2 text-gray-500 font-semibold border-b border-gray-200 text-right">Total</th><th class="py-2 text-gray-500 font-semibold border-b border-gray-200 text-right">Comissao</th></tr>
-                </thead>
-                <tbody>
-                    <template x-for="c in sellerData?.comparison" :key="c.month">
-                        <tr class="border-b border-gray-50 hover:bg-gray-50">
-                            <td class="py-3 font-medium" x-text="c.month"></td>
-                            <td class="py-3 text-right" x-text="c.sale_count"></td>
-                            <td class="py-3 text-right font-medium" x-text="formatMoneyBRL(c.total)"></td>
-                            <td class="py-3 text-right font-medium text-success-700" x-text="formatMoneyBRL(c.commission)"></td>
-                        </tr>
-                    </template>
-                </tbody>
-            </table>
-        </div>
+    <div class="relative overflow-hidden bg-white rounded-2xl p-5 border border-gray-100 shadow-[0_1px_3px_-1px_rgba(0,0,0,0.04),0_4px_16px_-4px_rgba(67,97,238,0.06)]">
+      <div class="absolute top-0 right-0 w-32 h-32 bg-gradient-to-bl from-emerald-50/60 to-transparent rounded-full -mr-8 -mt-8"></div>
+      <div class="relative">
+        <p class="text-[11px] font-semibold text-gray-400 uppercase tracking-[0.08em] mb-2">Comissao</p>
+        <p class="font-display text-[28px] font-bold text-emerald-600 leading-none" x-text="formatMoneyBRL(sellerData?.commissions?.[0]?.commission_amount || 0)"></p>
+        <p class="text-[13px] text-gray-500 mt-2">Taxa: <span class="font-medium text-emerald-600" x-text="sellerData?.seller?.commission_rate ? (sellerData.seller.commission_rate*100).toFixed(2)+'%' : '-'"></span></p>
+      </div>
     </div>
-
-    <div class="surface-card mb-6" x-show="sellerData?.manual_sales?.length">
-        <h2 class="text-[13px] font-semibold text-gray-500 uppercase tracking-wide mb-4">Vendas manuais do periodo</h2>
-        <table class="w-full text-left text-[14px]">
-            <thead>
-                <tr><th class="px-4 py-3 font-semibold text-gray-500 border-b border-gray-200 bg-gray-50 rounded-tl-xl">Data</th><th class="px-4 py-3 font-semibold text-gray-500 border-b border-gray-200 bg-gray-50">Valor</th><th class="px-4 py-3 font-semibold text-gray-500 border-b border-gray-200 bg-gray-50 rounded-tr-xl">Observacao</th></tr>
-            </thead>
-            <tbody>
-                <template x-for="s in sellerData?.manual_sales" :key="s.uuid">
-                    <tr class="hover:bg-gray-50">
-                        <td class="px-4 py-3 border-b border-gray-100 text-gray-500" x-text="new Date(s.sale_date).toLocaleDateString('pt-BR')"></td>
-                        <td class="px-4 py-3 border-b border-gray-100 font-semibold" x-text="formatMoneyBRL(s.amount)"></td>
-                        <td class="px-4 py-3 border-b border-gray-100 text-gray-500" x-text="s.notes || '—'"></td>
-                    </tr>
-                </template>
-            </tbody>
-        </table>
+    <div class="relative overflow-hidden bg-white rounded-2xl p-5 border border-gray-100 shadow-[0_1px_3px_-1px_rgba(0,0,0,0.04),0_4px_16px_-4px_rgba(67,97,238,0.06)]">
+      <div class="absolute top-0 right-0 w-32 h-32 bg-gradient-to-bl from-sky-50/60 to-transparent rounded-full -mr-8 -mt-8"></div>
+      <div class="relative">
+        <p class="text-[11px] font-semibold text-gray-400 uppercase tracking-[0.08em] mb-2">Vendas por link</p>
+        <p class="font-display text-[28px] font-bold text-sky-600 leading-none" x-text="formatMoneyBRL(sellerData?.link_total || 0)"></p>
+        <p class="text-[13px] text-gray-500 mt-2">Informativo — nao entra na comissao</p>
+      </div>
     </div>
+  </div>
 
-    <div class="surface-card mb-6" x-show="sellerData?.link_sales?.length">
-        <h2 class="text-[13px] font-semibold text-gray-500 uppercase tracking-wide mb-4">Vendas por link (informativo)</h2>
-        <p class="text-[12px] text-gray-400 mb-3">Links de pagamento sao informativos e nao entram automaticamente no calculo da comissao.</p>
-        <table class="w-full text-left text-[14px]">
-            <thead>
-                <tr><th class="px-4 py-3 font-semibold text-gray-500 border-b border-gray-200 bg-gray-50">Data</th><th class="px-4 py-3 font-semibold text-gray-500 border-b border-gray-200 bg-gray-50">Valor</th><th class="px-4 py-3 font-semibold text-gray-500 border-b border-gray-200 bg-gray-50">Observacao</th></tr>
-            </thead>
-            <tbody>
-                <template x-for="s in sellerData?.link_sales" :key="s.uuid">
-                    <tr class="hover:bg-gray-50">
-                        <td class="px-4 py-3 border-b border-gray-100 text-gray-500" x-text="new Date(s.sale_date).toLocaleDateString('pt-BR')"></td>
-                        <td class="px-4 py-3 border-b border-gray-100 font-semibold" x-text="formatMoneyBRL(s.amount)"></td>
-                        <td class="px-4 py-3 border-b border-gray-100 text-gray-500" x-text="s.notes || '—'"></td>
-                    </tr>
-                </template>
-            </tbody>
-        </table>
+  <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+    <div class="bg-white rounded-2xl border border-gray-100 shadow-[0_1px_3px_-1px_rgba(0,0,0,0.04),0_4px_16px_-4px_rgba(67,97,238,0.06)] p-6" x-show="sellerData?.evolution?.length">
+      <h3 class="text-[13px] font-semibold text-gray-400 uppercase tracking-wider mb-4">Evolucao no periodo</h3>
+      <div class="h-64"><canvas id="evolutionChart"></canvas></div>
     </div>
-
-    <div class="surface-card" x-show="sellerData?.commissions?.length">
-        <h2 class="text-[13px] font-semibold text-gray-500 uppercase tracking-wide mb-4">Historico de comissoes</h2>
-        <div class="space-y-1">
-            <template x-for="c in sellerData?.commissions" :key="c.period_month + '/' + c.period_year">
-                <div class="flex items-center justify-between py-3 px-3 rounded-xl hover:bg-gray-50 transition -mx-3">
-                    <span class="text-[14px] font-semibold text-gray-900 min-w-[80px]" x-text="String(c.period_month).padStart(2,'0')+'/'+c.period_year"></span>
-                    <span class="text-xs px-2.5 py-1 rounded-full font-medium"
-                          :class="{'bg-gray-100 text-gray-600': c.period_status==='ABERTA',
-                                   'bg-warning-50 text-warning-700': c.period_status==='FECHADA' || c.period_status==='PARCIALMENTE_FECHADA',
-                                   'bg-amber-50 text-amber-700': c.period_status==='AJUSTADA',
-                                   'bg-purple-50 text-purple-700': c.period_status==='REABERTA',
-                                   'bg-teal-50 text-teal-700': c.period_status==='PARCIALMENTE_PAGA',
-                                   'bg-danger-50 text-danger-700': c.period_status==='CANCELADA',
-                                   'bg-success-50 text-success-700': c.period_status==='PAGA'}"
-                          x-text="
-                            c.period_status==='ABERTA' ? 'Aberta' :
-                            c.period_status==='FECHADA' ? 'Fechada' :
-                            c.period_status==='PARCIALMENTE_FECHADA' ? 'Parcialmente fechada' :
-                            c.period_status==='AJUSTADA' ? 'Ajustada' :
-                            c.period_status==='REABERTA' ? 'Reaberta' :
-                            c.period_status==='PARCIALMENTE_PAGA' ? 'Parcialmente paga' :
-                            c.period_status==='CANCELADA' ? 'Cancelada' :
-                            c.period_status==='PAGA' ? 'Paga' : (c.period_status||'')"></span>
-                    <span class="text-[13px] text-gray-500" x-text="'Vendas: '+formatMoneyBRL(c.total_sold_amount)"></span>
-                    <span class="text-[14px] font-semibold text-success-700 min-w-[100px] text-right" x-text="formatMoneyBRL(c.commission_amount)"></span>
-                </div>
+    <div class="bg-white rounded-2xl border border-gray-100 shadow-[0_1px_3px_-1px_rgba(0,0,0,0.04),0_4px_16px_-4px_rgba(67,97,238,0.06)] p-6" x-show="sellerData?.comparison?.length">
+      <h3 class="text-[13px] font-semibold text-gray-400 uppercase tracking-wider mb-4">Comparacao mensal</h3>
+      <div class="overflow-x-auto">
+        <table class="w-full text-left text-[13px]">
+          <thead>
+            <tr class="bg-gray-50/80">
+              <th class="px-4 py-3 text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Mes</th>
+              <th class="px-4 py-3 text-[11px] font-semibold text-gray-500 uppercase tracking-wider text-right">Vendas</th>
+              <th class="px-4 py-3 text-[11px] font-semibold text-gray-500 uppercase tracking-wider text-right">Total</th>
+              <th class="px-4 py-3 text-[11px] font-semibold text-gray-500 uppercase tracking-wider text-right">Comissao</th>
+            </tr>
+          </thead>
+          <tbody>
+            <template x-for="c in sellerData?.comparison" :key="c.month">
+              <tr class="border-b border-gray-50 hover:bg-gray-50/50 transition-colors">
+                <td class="px-4 py-3.5 font-medium text-gray-900" x-text="c.month"></td>
+                <td class="px-4 py-3.5 text-right text-gray-700" x-text="c.sale_count"></td>
+                <td class="px-4 py-3.5 text-right font-semibold text-gray-900" x-text="formatMoneyBRL(c.total)"></td>
+                <td class="px-4 py-3.5 text-right font-semibold text-emerald-600" x-text="formatMoneyBRL(c.commission)"></td>
+              </tr>
             </template>
-        </div>
+          </tbody>
+        </table>
+      </div>
     </div>
-    {% endverbatim %}
+  </div>
+
+  <div class="bg-white rounded-2xl border border-gray-100 shadow-[0_1px_3px_-1px_rgba(0,0,0,0.04),0_4px_16px_-4px_rgba(67,97,238,0.06)] overflow-hidden mb-6" x-show="sellerData?.manual_sales?.length">
+    <div class="px-6 py-4 border-b border-gray-100">
+      <h3 class="text-[13px] font-semibold text-gray-400 uppercase tracking-wider">Vendas manuais do periodo</h3>
+    </div>
+    <div class="overflow-x-auto">
+      <table class="w-full text-left">
+        <thead>
+          <tr class="bg-gray-50/80">
+            <th class="px-4 py-3 text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Data</th>
+            <th class="px-4 py-3 text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Valor</th>
+            <th class="px-4 py-3 text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Observacao</th>
+          </tr>
+        </thead>
+        <tbody>
+          <template x-for="s in sellerData?.manual_sales" :key="s.uuid">
+            <tr class="border-b border-gray-50 hover:bg-gray-50/50 transition-colors">
+              <td class="px-4 py-3.5 text-[13px] text-gray-500" x-text="new Date(s.sale_date).toLocaleDateString('pt-BR')"></td>
+              <td class="px-4 py-3.5 font-semibold text-[14px] text-gray-900" x-text="formatMoneyBRL(s.amount)"></td>
+              <td class="px-4 py-3.5 text-[13px] text-gray-500" x-text="s.notes || '—'"></td>
+            </tr>
+          </template>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="bg-white rounded-2xl border border-gray-100 shadow-[0_1px_3px_-1px_rgba(0,0,0,0.04),0_4px_16px_-4px_rgba(67,97,238,0.06)] overflow-hidden mb-6" x-show="sellerData?.link_sales?.length">
+    <div class="px-6 py-4 border-b border-gray-100">
+      <h3 class="text-[13px] font-semibold text-gray-400 uppercase tracking-wider">Vendas por link</h3>
+      <p class="text-[12px] text-gray-400 mt-0.5">Links de pagamento sao informativos e nao entram no calculo da comissao.</p>
+    </div>
+    <div class="overflow-x-auto">
+      <table class="w-full text-left">
+        <thead>
+          <tr class="bg-gray-50/80">
+            <th class="px-4 py-3 text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Data</th>
+            <th class="px-4 py-3 text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Valor</th>
+            <th class="px-4 py-3 text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Observacao</th>
+          </tr>
+        </thead>
+        <tbody>
+          <template x-for="s in sellerData?.link_sales" :key="s.uuid">
+            <tr class="border-b border-gray-50 hover:bg-gray-50/50 transition-colors">
+              <td class="px-4 py-3.5 text-[13px] text-gray-500" x-text="new Date(s.sale_date).toLocaleDateString('pt-BR')"></td>
+              <td class="px-4 py-3.5 font-semibold text-[14px] text-gray-900" x-text="formatMoneyBRL(s.amount)"></td>
+              <td class="px-4 py-3.5 text-[13px] text-gray-500" x-text="s.notes || '—'"></td>
+            </tr>
+          </template>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="bg-white rounded-2xl border border-gray-100 shadow-[0_1px_3px_-1px_rgba(0,0,0,0.04),0_4px_16px_-4px_rgba(67,97,238,0.06)] p-6" x-show="sellerData?.commissions?.length">
+    <h3 class="text-[13px] font-semibold text-gray-400 uppercase tracking-wider mb-4">Historico de comissoes</h3>
+    <div class="space-y-1">
+      <template x-for="c in sellerData?.commissions" :key="c.period_month + '/' + c.period_year">
+        <div class="flex items-center justify-between py-3 px-4 rounded-xl hover:bg-gray-50 transition -mx-4">
+          <span class="text-[14px] font-semibold text-gray-900 min-w-[80px]" x-text="String(c.period_month).padStart(2,'0')+'/'+c.period_year"></span>
+          <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-medium"
+                :class="{'bg-gray-100 text-gray-600': c.period_status==='ABERTA',
+                         'bg-amber-50 text-amber-700': c.period_status==='FECHADA' || c.period_status==='PARCIALMENTE_FECHADA',
+                         'bg-sky-50 text-sky-700': c.period_status==='AJUSTADA',
+                         'bg-purple-50 text-purple-700': c.period_status==='REABERTA',
+                         'bg-teal-50 text-teal-700': c.period_status==='PARCIALMENTE_PAGA',
+                         'bg-red-50 text-red-700': c.period_status==='CANCELADA',
+                         'bg-emerald-50 text-emerald-700': c.period_status==='PAGA'}">
+            <span class="w-1.5 h-1.5 rounded-full"
+                  :class="{'bg-gray-400': c.period_status==='ABERTA',
+                           'bg-amber-500': c.period_status==='FECHADA' || c.period_status==='PARCIALMENTE_FECHADA',
+                           'bg-sky-500': c.period_status==='AJUSTADA',
+                           'bg-purple-500': c.period_status==='REABERTA',
+                           'bg-teal-500': c.period_status==='PARCIALMENTE_PAGA',
+                           'bg-red-500': c.period_status==='CANCELADA',
+                           'bg-emerald-500': c.period_status==='PAGA'}"></span>
+            <span x-text="
+              c.period_status==='ABERTA' ? 'Aberta' :
+              c.period_status==='FECHADA' ? 'Fechada' :
+              c.period_status==='PARCIALMENTE_FECHADA' ? 'Parcialmente fechada' :
+              c.period_status==='AJUSTADA' ? 'Ajustada' :
+              c.period_status==='REABERTA' ? 'Reaberta' :
+              c.period_status==='PARCIALMENTE_PAGA' ? 'Parcialmente paga' :
+              c.period_status==='CANCELADA' ? 'Cancelada' :
+              c.period_status==='PAGA' ? 'Paga' : (c.period_status||'')"></span>
+          </span>
+          <span class="text-[13px] text-gray-500 hidden sm:inline"><span class="text-gray-400">Vendas:</span> <span class="font-medium" x-text="formatMoneyBRL(c.total_sold_amount)"></span></span>
+          <span class="text-[15px] font-bold text-emerald-600 min-w-[100px] text-right" x-text="formatMoneyBRL(c.commission_amount)"></span>
+        </div>
+      </template>
+    </div>
+  </div>
+  {% endverbatim %}
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js" integrity="sha384-vsrfeLOOY6KuIYKDlmVH5UiBmgIdB1oEf7p01YgWHuqmOHfZr374+odEv96n9tNC" crossorigin="anonymous"></script>
@@ -186,27 +240,16 @@ function sellerDetailPage() {
         endDate: '',
         sellerId: '',
         chart: null,
-
-        init(sellerId) {
-            this.sellerId = sellerId;
-            this.load();
-        },
-
+        init(sellerId) { this.sellerId = sellerId; this.load(); },
         async load() {
-            var apiUrl = `/api/manager/seller/${this.sellerId}/`;
+            var apiUrl = '/api/manager/seller/' + this.sellerId + '/';
             var params = new URLSearchParams();
-            if (this.startDate && this.endDate) {
-                params.set('start', this.startDate);
-                params.set('end', this.endDate);
-            } else {
-                params.set('month', this.month);
-                params.set('year', this.year);
-            }
+            if (this.startDate && this.endDate) { params.set('start', this.startDate); params.set('end', this.endDate); }
+            else { params.set('month', this.month); params.set('year', this.year); }
             var r = await fetch(apiUrl + '?' + params.toString());
             this.sellerData = await r.json();
             this.$nextTick(() => this.drawChart());
         },
-
         drawChart() {
             if (this.chart) this.chart.destroy();
             var ctx = document.getElementById('evolutionChart');
@@ -220,10 +263,7 @@ function sellerDetailPage() {
                         data: this.sellerData.evolution.map(e => e.total / 100),
                         borderColor: '#4361ee',
                         backgroundColor: 'rgba(67, 97, 238, 0.08)',
-                        fill: true,
-                        tension: 0.3,
-                        pointRadius: 3,
-                        pointBackgroundColor: '#4361ee',
+                        fill: true, tension: 0.3, pointRadius: 3, pointBackgroundColor: '#4361ee',
                     }]
                 },
                 options: {
@@ -233,19 +273,12 @@ function sellerDetailPage() {
                 }
             });
         },
-
         buildParams() {
             var p = new URLSearchParams();
-            if (this.startDate && this.endDate) {
-                p.set('start', this.startDate);
-                p.set('end', this.endDate);
-            } else {
-                p.set('month', this.month);
-                p.set('year', this.year);
-            }
+            if (this.startDate && this.endDate) { p.set('start', this.startDate); p.set('end', this.endDate); }
+            else { p.set('month', this.month); p.set('year', this.year); }
             return p.toString();
         },
-
         exportCsv() { window.open('/api/manager/seller/' + this.sellerId + '/csv/?' + this.buildParams()); },
         exportXlsx() { window.open('/api/manager/seller/' + this.sellerId + '/xlsx/?' + this.buildParams()); },
         exportPdf() { window.open('/api/manager/seller/' + this.sellerId + '/pdf/?' + this.buildParams()); },
