@@ -1,6 +1,7 @@
 import logging
 
 from celery import shared_task
+from django.conf import settings
 from app.apps.notifications.models import Notification, MessageTemplate
 from app.services.messaging.whatsapp import WhatsappClient
 
@@ -24,7 +25,11 @@ def send_whatsapp_notification(self, notification_id):
         return
 
     try:
-        client = WhatsappClient()
+        tenant = notification.tenant
+        client = WhatsappClient(
+            instance=tenant.whatsapp_instance_id or getattr(settings, 'WHATSAPP_INSTANCE', ''),
+            api_key=tenant.whatsapp_token or getattr(settings, 'WHATSAPP_API_KEY', ''),
+        )
         client.send_message(notification.recipient, notification.message_body)
 
         notification.status = Notification.Status.SENT
