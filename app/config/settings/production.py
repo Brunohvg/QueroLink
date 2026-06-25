@@ -15,7 +15,7 @@ DATABASES = {
         default=config('DATABASE_URL'),
         conn_max_age=config('CONN_MAX_AGE', default=600, cast=int),
         conn_health_checks=True,
-        ssl_require=config('DB_SSL_REQUIRE', default=True, cast=bool),
+        ssl_require=config('DB_SSL_REQUIRE', default=False, cast=bool),
     )
 }
 
