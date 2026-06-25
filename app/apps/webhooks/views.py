@@ -1,11 +1,25 @@
 import json
+import hmac
+import hashlib
 import logging
+
+from django.conf import settings
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
+
 from app.apps.webhooks.models import WebhookEvent
 from app.apps.accounts.fields import scrub_payment_payload
 
 logger = logging.getLogger(__name__)
+
+
+def _verify_webhook_token(tenant_uuid, token):
+    expected = hmac.new(
+        settings.WHATSAPP_API_KEY.encode(),
+        str(tenant_uuid).encode(),
+        hashlib.sha256,
+    ).hexdigest()[:16]
+    return hmac.compare_digest(expected, token)
 
 
 @csrf_exempt
@@ -28,9 +42,13 @@ def pagarme_webhook(request):
 
 
 @csrf_exempt
-def evolution_webhook(request, instance_name, tenant_uuid):
+def evolution_webhook(request, instance_name, tenant_uuid, token):
     if request.method != "POST":
         return JsonResponse({"error": "Method not allowed"}, status=405)
+
+    if not _verify_webhook_token(tenant_uuid, token):
+        logger.warning("Evolution webhook invalid token: tenant=%s", tenant_uuid)
+        return JsonResponse({"error": "Forbidden"}, status=403)
 
     try:
         payload = json.loads(request.body)
@@ -51,8 +69,10 @@ def evolution_webhook(request, instance_name, tenant_uuid):
     event_type = payload.get('event', '')
     data = payload.get('data', {})
 
+    extra = {}
     if event_type == 'CONNECTION_UPDATE':
         state = data.get('state') or data.get('instance', {}).get('state', '')
+        extra['state'] = state
         if state == 'open':
             logger.info("WhatsApp connected for tenant %s", tenant_uuid)
 
@@ -64,8 +84,8 @@ def evolution_webhook(request, instance_name, tenant_uuid):
         payload={
             'event': event_type,
             'instance': instance_name,
-            'tenant_uuid': tenant_uuid,
-            'state': data.get('state', ''),
+            'tenant_uuid': str(tenant_uuid),
+            **extra,
         },
     )
 

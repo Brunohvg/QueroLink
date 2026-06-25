@@ -134,11 +134,20 @@ def whatsapp_instance_status(request):
         })
 
     try:
+        import hashlib, hmac
+        from urllib.parse import quote
+        from django.conf import settings
+        webhook_token = hmac.new(
+            settings.WHATSAPP_API_KEY.encode(),
+            str(tenant.uuid).encode(),
+            hashlib.sha256,
+        ).hexdigest()[:16]
+
         client = WhatsappClient(
             instance=instance_id,
             api_key=global_key,
             webhook_url=request.build_absolute_uri(
-                f'/api/webhooks/evolution/{instance_id}/{tenant.uuid}/'
+                f'/api/webhooks/evolution/{quote(instance_id, safe="")}/{tenant.uuid}/{webhook_token}/'
             ),
         )
         dados = client.create_or_get_qrcode()

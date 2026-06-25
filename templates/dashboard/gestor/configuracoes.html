@@ -366,37 +366,30 @@ function configPage() {
             }
         },
 
-        _pollTimer: null,
-        _pollCount: 0,
-
         _startPolling(instance) {
-            this._stopPolling();
             this._pollCount = 0;
-            this._pollTimer = setInterval(async () => {
-                this._pollCount++;
-                if (this._pollCount > 100) {
-                    this._stopPolling();
-                    return;
-                }
-                try {
-                    var resp = await fetch('{% url "dashboard:whatsapp_status" %}?instance=' + encodeURIComponent(instance));
-                    if (!resp.ok) return;
-                    var data = await resp.json();
-                    if (data.connected) {
-                        this.whatsappState = 'open';
-                        this.whatsappQrCode = null;
-                        this._stopPolling();
-                        showToast('WhatsApp conectado com sucesso!', 'success');
-                    }
-                } catch (e) {}
-            }, 3000);
-        },
-
-        _stopPolling() {
-            if (this._pollTimer) {
-                clearInterval(this._pollTimer);
-                this._pollTimer = null;
+            var self = this;
+            function poll() {
+                if (!self.$el || !self.$el.isConnected) return;
+                self._pollCount++;
+                if (self._pollCount > 100 || self.whatsappState === 'open') return;
+                fetch('{% url "dashboard:whatsapp_status" %}?instance=' + encodeURIComponent(instance))
+                    .then(function(r) { if (!r.ok) return null; return r.json(); })
+                    .then(function(data) {
+                        if (!data || !self.$el || !self.$el.isConnected) return;
+                        if (data.connected) {
+                            self.whatsappState = 'open';
+                            self.whatsappQrCode = null;
+                            showToast('WhatsApp conectado com sucesso!', 'success');
+                        } else {
+                            setTimeout(poll, 3000);
+                        }
+                    })
+                    .catch(function() {
+                        if (self.$el && self.$el.isConnected) setTimeout(poll, 3000);
+                    });
             }
+            setTimeout(poll, 3000);
         }
     }
 }
