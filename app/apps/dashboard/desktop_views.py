@@ -216,10 +216,17 @@ def whatsapp_connection_state(request):
             'error': 'Nome da instancia nao configurado.',
         })
 
+    api_key = tenant.whatsapp_token or getattr(settings, 'WHATSAPP_API_KEY', '')
+    if not api_key:
+        return JsonResponse({
+            'connected': False, 'state': 'not_configured',
+            'error': 'WHATSAPP_API_KEY nao configurada no servidor. Adicione a variavel no Coolify.',
+        })
+
     try:
         client = WhatsappClient(
             instance=instance_id,
-            api_key=tenant.whatsapp_token or getattr(settings, 'WHATSAPP_API_KEY', ''),
+            api_key=api_key,
         )
         data = client.get_connection_state()
         return JsonResponse({

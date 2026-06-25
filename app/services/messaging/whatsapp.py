@@ -141,10 +141,11 @@ class WhatsappClient:
                 code=data['error'].get('code'),
             )
 
+        msg_id = data.get('key', {}) if isinstance(data, dict) else {}
         logger.info(
             "Evolution API message sent: instance=%s message_id=%s",
             self.instance,
-            data.get('key', {}).get('id', 'unknown'),
+            msg_id.get('id', 'unknown') if isinstance(msg_id, dict) else 'unknown',
         )
 
         return data
