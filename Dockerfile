@@ -38,6 +38,7 @@ COPY --from=tailwind-build /app/static/css/tailwind.css ./static/css/tailwind.cs
 
 RUN chmod +x /app/entrypoint.sh \
     && useradd -m -u 1000 appuser \
+    && mkdir -p /app/celerybeat-schedule \
     && chown -R appuser:appuser /app
 
 USER appuser
