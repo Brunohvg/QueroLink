@@ -154,14 +154,17 @@ class SellerImportSerializer(serializers.Serializer):
     def _parse_csv(self, decoded):
         import csv
         import io
+        import logging
 
+        logger = logging.getLogger(__name__)
         delimiters = [',', ';', '\t', '|']
 
         for delim in delimiters:
             reader = csv.DictReader(io.StringIO(decoded), delimiter=delim)
             try:
                 rows = [row for row in reader]
-            except Exception:
+            except (csv.Error, UnicodeDecodeError) as e:
+                logger.debug("CSV parsing failed with delimiter %r: %s", delim, e)
                 continue
             if not rows:
                 continue

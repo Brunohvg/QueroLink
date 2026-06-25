@@ -2,6 +2,7 @@ from django.test import TestCase, Client
 from django.urls import reverse
 from django.core.cache import cache
 from app.apps.accounts.models import Tenant, User
+from app.apps.accounts.fields import compute_hash
 from app.apps.sellers.models import Seller
 from app.apps.sales.models import Sale
 
@@ -62,7 +63,7 @@ class TenantRegistrationFormTest(TestCase):
         Tenant.objects.create(company_name='Existente', cnpj=VALID_CNPJ)
         response = self._post()
         self.assertContains(response, 'CNPJ')
-        self.assertEqual(Tenant.objects.filter(cnpj=VALID_CNPJ).count(), 1)
+        self.assertEqual(Tenant.objects.filter(cnpj_hash=compute_hash(VALID_CNPJ)).count(), 1)
 
     def test_email_already_registered(self):
         existing_tenant = Tenant.objects.create(company_name='Outra Loja', cnpj='99999999000199')
@@ -74,7 +75,7 @@ class TenantRegistrationFormTest(TestCase):
             tenant=existing_tenant,
         )
         response = self._post()
-        self.assertContains(response, 'e-mail')
+        self.assertContains(response, 'email')
 
     def test_invalid_cnpj_wrong_check_digit(self):
         response = self._post(cnpj='11222333000182')
