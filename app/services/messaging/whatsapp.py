@@ -148,105 +148,69 @@ class WhatsappClient:
 
         return data
 
-    def get_connection_state(self):
-        url = f"{self.api_base_url}/instance/connectionState/{self.instance}"
-        headers = {"apikey": self.api_key}
-
-        try:
-            response = requests.get(url, headers=headers, timeout=self.timeout)
-        except requests.exceptions.RequestException as e:
-            logger.error("Evolution API connectionState error: %s", e)
-            raise ConnectionError(
-                f"Erro ao verificar estado da instancia: {e}",
-            )
-
-        if response.status_code == 404:
-            raise InstanceNotFoundError(
-                f"Instancia '{self.instance}' nao encontrada.",
-                http_status=404,
-            )
-        if response.status_code == 401:
-            raise AuthenticationError(
-                "Chave de API invalida.", http_status=401,
-            )
-
-        response.raise_for_status()
-
-        try:
-            data = response.json()
-        except ValueError:
-            raise WhatsAppError("Resposta invalida da Evolution API.")
-
-        if isinstance(data, dict) and data.get('error'):
-            raise ConnectionError(
-                data['error'].get('message', 'Erro desconhecido'),
-                code=data['error'].get('code'),
-            )
-
-        return data
-
-    def get_qrcode(self):
-        url = f"{self.api_base_url}/instance/connect/{self.instance}"
-        headers = {"apikey": self.api_key}
-
-        try:
-            response = requests.get(url, headers=headers, timeout=self.timeout)
-        except requests.exceptions.RequestException as e:
-            logger.error("Evolution API connect error: %s", e)
-            raise ConnectionError(
-                f"Erro ao gerar QR Code: {e}",
-            )
-
-        if response.status_code == 404:
-            raise InstanceNotFoundError(
-                f"Instancia '{self.instance}' nao encontrada.",
-                http_status=404,
-            )
-        if response.status_code == 401:
-            raise AuthenticationError(
-                "Chave de API invalida.", http_status=401,
-            )
-
-        response.raise_for_status()
-
-        try:
-            data = response.json()
-        except ValueError:
-            raise WhatsAppError("Resposta invalida da Evolution API.")
-
-        if isinstance(data, dict) and data.get('error'):
-            raise ConnectionError(
-                data['error'].get('message', 'Erro desconhecido'),
-                code=data['error'].get('code'),
-            )
-
-        state = None
-        if 'instance' in data and isinstance(data['instance'], dict):
-            state = data['instance'].get('state')
-
+    def create_or_get_qrcode(self):
+        dados = self._post(
+            "/instance/create",
+            {"instanceName": self.instance, "qrcode": True},
+        )
+        qrcode = dados.get('qrcode', {})
+        instance_key = (
+            dados.get('hash', {}).get('apikey')
+            or dados.get('instance', {}).get('token')
+        )
         return {
-            'qrcode_base64': data.get('base64'),
-            'pairing_code': data.get('pairingCode'),
-            'code': data.get('code'),
-            'count': data.get('count'),
-            'state': state,
-            'raw': data,
+            'qrcode_base64': qrcode.get('base64'),
+            'pairing_code': qrcode.get('pairingCode'),
+            'code': qrcode.get('code'),
+            'instance_api_key': instance_key,
+            'state': dados.get('instance', {}).get('state', 'connecting'),
+            'raw': dados,
         }
 
-    def _request(self, method, path):
+    def get_connection_state(self):
+        dados = self._get(f"/instance/connectionState/{self.instance}")
+        inst = dados.get('instance', {})
+        state = inst.get('state') or inst.get('connectionState') or 'unknown'
+        return {
+            'connected': state == 'open',
+            'state': state,
+            'instance_name': inst.get('instanceName'),
+            'owner': inst.get('owner'),
+            'raw': dados,
+        }
+
+    def _post(self, path, body):
+        url = f"{self.api_base_url}{path}"
+        headers = {"apikey": self.api_key, "Content-Type": "application/json"}
+        try:
+            response = requests.post(url, json=body, headers=headers, timeout=self.timeout)
+        except requests.exceptions.RequestException as e:
+            raise ConnectionError(f"Erro na requisicao: {e}")
+        return self._handle_response(response)
+
+    def _get(self, path):
         url = f"{self.api_base_url}{path}"
         headers = {"apikey": self.api_key}
         try:
-            response = requests.request(method, url, headers=headers, timeout=self.timeout)
+            response = requests.get(url, headers=headers, timeout=self.timeout)
         except requests.exceptions.RequestException as e:
             raise ConnectionError(f"Erro na requisicao: {e}")
+        return self._handle_response(response)
+
+    def _handle_response(self, response):
         if response.status_code == 404:
             raise InstanceNotFoundError(
                 f"Instancia '{self.instance}' nao encontrada.",
                 http_status=404,
             )
         if response.status_code == 401:
-            raise AuthenticationError("Chave de API invalida.", http_status=401)
+            raise AuthenticationError(
+                "Chave de API invalida.", http_status=401,
+            )
+        if response.status_code == 403:
+            raise AuthenticationError(
+                "Acesso negado pela Evolution API.", http_status=403,
+            )
         response.raise_for_status()
         try:
             data = response.json()

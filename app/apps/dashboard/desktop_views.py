@@ -127,12 +127,17 @@ def whatsapp_instance_status(request):
             instance=tenant.whatsapp_instance_id,
             api_key=tenant.whatsapp_token,
         )
-        qrcode = client.get_qrcode()
+        dados = client.create_or_get_qrcode()
+        instance_key = dados.get('instance_api_key')
+        if instance_key and instance_key != tenant.whatsapp_token:
+            tenant.whatsapp_token = instance_key
+            tenant.save(update_fields=['whatsapp_token'])
         return JsonResponse({
-            'connected': qrcode.get('state') == 'open',
-            'state': qrcode.get('state'),
-            'qrcode_base64': qrcode.get('qrcode_base64'),
-            'pairing_code': qrcode.get('pairing_code'),
+            'connected': dados.get('state') == 'open',
+            'state': dados.get('state'),
+            'qrcode_base64': dados.get('qrcode_base64'),
+            'pairing_code': dados.get('pairing_code'),
+            'instance_created': bool(instance_key),
         })
     except InstanceNotFoundError:
         return JsonResponse({
@@ -181,10 +186,10 @@ def whatsapp_connection_state(request):
         )
         data = client.get_connection_state()
         return JsonResponse({
-            'connected': data.get('instance', {}).get('state') == 'open',
-            'state': data.get('instance', {}).get('state'),
-            'instance_name': data.get('instance', {}).get('instanceName'),
-            'owner': data.get('instance', {}).get('owner'),
+            'connected': data.get('connected'),
+            'state': data.get('state'),
+            'instance_name': data.get('instance_name'),
+            'owner': data.get('owner'),
         })
     except Exception as e:
         return JsonResponse({
