@@ -368,7 +368,7 @@ function vendedoresPage() {
                     if (d.commissions && d.commissions.length) {
                         var c = d.commissions[0];
                         detail.commission_amount = c.commission_amount || 0;
-                        detail.financial_status = c.period_status || 'ABERTA';
+                        detail.financial_status = c.status || c.period_status || 'ABERTA';
                         detail.submitted_days = c.submitted_days_count || 0;
                         detail.expected_days = c.expected_working_days || 22;
                         detail.operational_status = c.operational_status || 'SEM_LANCAMENTO';
