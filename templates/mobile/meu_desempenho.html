@@ -2,6 +2,7 @@
 {% block title %}Desempenho — VendaPay{% endblock %}
 {% block content %}
 <div class="space-y-5 fade-up">
+
   <h1 class="font-display text-[22px] font-bold text-gray-900">Desempenho</h1>
 
   {% if error %}
@@ -9,23 +10,33 @@
   {% else %}
 
   <div class="relative overflow-hidden rounded-2xl p-6 text-white" style="background: linear-gradient(135deg, #4361ee, #2540ad);">
-    <div class="absolute top-0 right-0 w-40 h-40 bg-white/5 rounded-full -mr-12 -mt-12"></div>
-    <div class="absolute bottom-0 left-0 w-32 h-32 bg-white/5 rounded-full -ml-12 -mb-12"></div>
+    <div class="absolute top-0 right-0 w-48 h-48 bg-white/5 rounded-full -mr-16 -mt-16"></div>
+    <div class="absolute bottom-0 left-0 w-36 h-36 bg-white/5 rounded-full -ml-12 -mb-12"></div>
     <div class="relative">
-      <p class="text-[12px] font-semibold text-brand-100 uppercase tracking-wider mb-2">Total vendido em {{ current_month }}</p>
+      <p class="text-[12px] font-semibold text-brand-100 uppercase tracking-wider mb-1">{{ current_month }}</p>
+      <p class="text-[11px] text-brand-200/80 mb-2">Total vendido</p>
       <p class="font-display text-[36px] font-bold leading-none tracking-tight" x-text="formatMoneyBRL({{ month_total }})"></p>
     </div>
   </div>
 
-  <h2 class="font-display text-[18px] font-bold text-gray-900 pt-2">Comissoes</h2>
+  <div class="grid grid-cols-2 gap-3">
+    <div class="bg-white rounded-2xl p-4 card-shadow">
+      <p class="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-1.5">Comissao a receber</p>
+      <p class="font-display text-[20px] font-bold text-emerald-600" x-text="formatMoneyBRL({{ month_total }})"></p>
+    </div>
+    <div class="bg-white rounded-2xl p-4 card-shadow">
+      <p class="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-1.5">Lancamentos</p>
+      <p class="font-display text-[20px] font-bold text-gray-900">{{ commission_count|default:'0' }}</p>
+    </div>
+  </div>
 
   {% if commissions %}
   <div class="space-y-3">
     {% for sc in commissions %}
-    <div class="bg-white rounded-2xl p-5 card-shadow">
-      <div class="flex items-center justify-between mb-4">
+    <div class="bg-white rounded-2xl card-shadow overflow-hidden">
+      <div class="px-5 pt-5 pb-4 flex items-center justify-between">
         <span class="text-[16px] font-bold text-gray-900">{{ sc.period.month|stringformat:"02d" }}/{{ sc.period.year }}</span>
-        <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[12px] font-medium
+        <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-medium
             {% if sc.status == 'ABERTA' or sc.status == 'REABERTA' %}bg-indigo-50 text-indigo-700
             {% elif sc.status == 'FECHADA' %}bg-amber-50 text-amber-700
             {% elif sc.status == 'PAGA' %}bg-emerald-50 text-emerald-700
@@ -45,17 +56,17 @@
           {% else %}{{ sc.status }}{% endif %}
         </span>
       </div>
-      <div class="grid grid-cols-3 gap-2">
-        <div class="bg-gray-50 rounded-xl p-3 text-center">
-          <p class="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Vendas</p>
+      <div class="border-t border-gray-50 px-5 py-4 grid grid-cols-3 gap-3">
+        <div>
+          <p class="text-[9px] font-semibold text-gray-400 uppercase tracking-wider">Vendas</p>
           <p class="text-[16px] font-bold text-gray-800 mt-1" x-text="formatMoneyBRL({{ sc.total_sold_amount }})"></p>
         </div>
-        <div class="bg-gray-50 rounded-xl p-3 text-center">
-          <p class="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Taxa</p>
+        <div class="text-center">
+          <p class="text-[9px] font-semibold text-gray-400 uppercase tracking-wider">Taxa</p>
           <p class="text-[16px] font-bold text-gray-800 mt-1">{% widthratio sc.commission_rate 1 100 as rate_pct %}{{ rate_pct|floatformat:2 }}%</p>
         </div>
-        <div class="bg-emerald-50 rounded-xl p-3 text-center">
-          <p class="text-[10px] font-semibold text-emerald-600 uppercase tracking-wider">Comissao</p>
+        <div class="text-right">
+          <p class="text-[9px] font-semibold text-emerald-600 uppercase tracking-wider">Comissao</p>
           <p class="text-[16px] font-bold text-emerald-700 mt-1" x-text="formatMoneyBRL({{ sc.commission_amount }})"></p>
         </div>
       </div>
@@ -67,7 +78,8 @@
     <div class="w-16 h-16 rounded-2xl bg-gray-100 flex items-center justify-center mx-auto mb-4">
       <svg class="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
     </div>
-    <p class="text-gray-500 font-medium text-[15px]">Nenhuma competencia ainda.</p>
+    <p class="text-gray-500 font-medium text-[15px]">Nenhuma comissao ainda.</p>
+    <p class="text-[13px] text-gray-400 mt-1">Vendedores comissionados aparecerao aqui.</p>
   </div>
   {% endif %}
   {% endif %}
