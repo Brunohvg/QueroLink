@@ -136,7 +136,6 @@ def whatsapp_instance_status(request):
     try:
         import hashlib, hmac
         from urllib.parse import quote
-        from django.conf import settings
         webhook_token = hmac.new(
             settings.WHATSAPP_API_KEY.encode(),
             str(tenant.uuid).encode(),
