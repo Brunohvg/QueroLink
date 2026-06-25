@@ -160,18 +160,25 @@ class WhatsappClient:
     def _parse_qrcode_response(self, dados, is_new=False):
         if not isinstance(dados, dict):
             raise WhatsAppError("Resposta inesperada da Evolution API.")
+
+        # Create response: {"instance":..., "qrcode": {"base64":...}, "hash":...}
+        # Connect response: {"base64":..., "code":..., "pairingCode":...} (top-level)
         qrcode = dados.get('qrcode', {}) or {}
+        if not isinstance(qrcode, dict) or not qrcode.get('base64'):
+            qrcode = dados
+
         instance_key = (
             dados.get('hash')
             or dados.get('instance', {}).get('token')
         )
         inst = dados.get('instance', {}) or {}
+        state = inst.get('state') or inst.get('connectionState') or 'connecting'
         return {
             'qrcode_base64': qrcode.get('base64') if isinstance(qrcode, dict) else None,
             'pairing_code': qrcode.get('pairingCode') if isinstance(qrcode, dict) else None,
             'code': qrcode.get('code') if isinstance(qrcode, dict) else None,
             'instance_api_key': instance_key,
-            'state': inst.get('state') or inst.get('connectionState') or 'connecting',
+            'state': state,
             'instance_created': is_new,
             'raw': dados,
         }
