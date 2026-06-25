@@ -150,7 +150,28 @@ function sellerLinksPage() {
         filterStatus: '',
         form: { customer: '', value: '', installments: '1' },
 
-        init() { this.filterOrders(); },
+        init() {
+            this.filterOrders();
+            this.pollInterval = setInterval(() => this.pollOrders(), 15000);
+        },
+
+        destroy() {
+            if (this.pollInterval) clearInterval(this.pollInterval);
+        },
+
+        async pollOrders() {
+            if (this.showForm) return;
+            try {
+                var r = await fetch('/api/seller/links/', {
+                    headers: { 'X-CSRFToken': getCSRFToken() }
+                });
+                if (r.ok) {
+                    var data = await r.json();
+                    this.orders = data;
+                    this.filterOrders();
+                }
+            } catch (e) {}
+        },
 
         filterOrders() {
             var m = this.filterMonth;

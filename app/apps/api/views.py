@@ -1069,6 +1069,41 @@ class DashboardSummaryView(generics.GenericAPIView):
 class SellerLinkCreateView(generics.GenericAPIView):
     permission_classes = [IsAuthenticated, IsSellerOwner]
 
+    def get(self, request):
+        try:
+            seller = request.user.seller_profile
+        except Exception:
+            return Response({'error': 'Perfil de vendedor nao encontrado.'}, status=400)
+
+        from app.apps.orders.models import Order
+        orders = Order.objects.filter(
+            seller=seller, tenant=seller.tenant,
+        ).select_related('seller').prefetch_related(
+            'payments',
+        ).order_by('-created_at')[:50]
+
+        orders_data = []
+        for o in orders:
+            try:
+                link = o.payment_link
+                link_url = link.gateway_url if link else None
+            except Exception:
+                link_url = None
+            payment = o.payments.first()
+            refusal = payment.refusal_reason if payment else None
+            orders_data.append({
+                'uuid': str(o.uuid),
+                'customer_name': o.customer_name,
+                'total_amount': o.total_amount,
+                'status': o.status,
+                'status_display': o.get_status_display(),
+                'link_url': link_url,
+                'refusal_reason': refusal,
+                'created_at': o.created_at.isoformat(),
+            })
+
+        return Response(orders_data)
+
     def post(self, request):
         try:
             seller = request.user.seller_profile
