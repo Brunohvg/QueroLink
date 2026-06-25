@@ -1110,6 +1110,11 @@ class SellerLinkCreateView(generics.GenericAPIView):
             return Response({'error': 'Numero de parcelas invalido (1-12).'}, status=400)
 
         try:
+            if not tenant.pagarme_api_key:
+                return Response(
+                    {'error': 'Configure a chave do Pagar.me nas configuracoes.'}, status=400,
+                )
+
             from app.apps.orders.services import (
                 create_payment_link as make_link,
             )
@@ -1137,6 +1142,8 @@ class SellerLinkCreateView(generics.GenericAPIView):
             }, status=201)
 
         except Exception as e:
+            import logging
+            logging.getLogger(__name__).error("SellerLinkCreateView error: %s", e, exc_info=True)
             return Response({'error': str(e)}, status=500)
 
 
