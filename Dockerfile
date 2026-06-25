@@ -30,9 +30,7 @@ COPY requirements/base.txt ./requirements/base.txt
 COPY requirements/production.txt ./requirements/production.txt
 
 RUN pip install --no-cache-dir -r requirements/production.txt \
-    && apt-get purge -y gcc libffi-dev \
-    && apt-get autoremove -y \
-    && rm -rf /var/lib/apt/lists/*
+    && rm -rf /root/.cache/pip /var/lib/apt/lists/*
 
 COPY . .
 
