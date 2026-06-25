@@ -479,6 +479,7 @@ def gestor_link_detalhe(request, order_uuid):
                 logger.warning("Pagar.me charge fetch failed: %s", e)
 
         total_centavos = order.total_amount
+        valor_reais = f"{total_centavos // 100},{total_centavos % 100:02d}"
 
         return render(request, 'dashboard/gestor/link_detalhe.html', {
             'order': order,
@@ -486,6 +487,7 @@ def gestor_link_detalhe(request, order_uuid):
             'payment_link': payment_link,
             'charge_data': charge_data,
             'pagarme_error': pagarme_error,
+            'valor_reais': valor_reais,
         })
     except Exception as e:
         logger.error("gestor_link_detalhe error: %s", e, exc_info=True)
