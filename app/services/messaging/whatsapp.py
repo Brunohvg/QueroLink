@@ -149,21 +149,30 @@ class WhatsappClient:
         return data
 
     def create_or_get_qrcode(self):
-        dados = self._post(
-            "/instance/create",
-            {"instanceName": self.instance, "qrcode": True},
-        )
+        try:
+            dados = self._post(
+                "/instance/create",
+                {
+                    "instanceName": self.instance,
+                    "qrcode": True,
+                    "integration": "WHATSAPP-BAILEYS",
+                },
+            )
+        except WhatsAppError:
+            dados = self._get(f"/instance/connect/{self.instance}")
+
         qrcode = dados.get('qrcode', {})
         instance_key = (
             dados.get('hash', {}).get('apikey')
             or dados.get('instance', {}).get('token')
         )
+        inst = dados.get('instance', {})
         return {
             'qrcode_base64': qrcode.get('base64'),
             'pairing_code': qrcode.get('pairingCode'),
             'code': qrcode.get('code'),
             'instance_api_key': instance_key,
-            'state': dados.get('instance', {}).get('state', 'connecting'),
+            'state': inst.get('state') or inst.get('connectionState') or 'connecting',
             'raw': dados,
         }
 
