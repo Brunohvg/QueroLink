@@ -1,4 +1,5 @@
 from django.shortcuts import render, redirect
+from django.http import JsonResponse
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.utils import timezone
@@ -105,6 +106,92 @@ def gestor_configuracoes(request):
     return render(request, 'dashboard/gestor/configuracoes.html', {
         'tenant': tenant,
     })
+
+
+@login_required
+def whatsapp_instance_status(request):
+    if not _check_role(request, User.Role.ADMIN):
+        return JsonResponse({'error': 'Permissao negada.'}, status=403)
+
+    tenant = request.user.tenant
+    if not tenant:
+        return JsonResponse({'error': 'Tenant nao encontrado.'}, status=400)
+
+    from app.services.messaging.whatsapp import (
+        WhatsappClient, InstanceNotFoundError,
+        AuthenticationError, ConnectionError,
+    )
+
+    try:
+        client = WhatsappClient(
+            instance=tenant.whatsapp_instance_id,
+            api_key=tenant.whatsapp_token,
+        )
+        qrcode = client.get_qrcode()
+        return JsonResponse({
+            'connected': qrcode.get('state') == 'open',
+            'state': qrcode.get('state'),
+            'qrcode_base64': qrcode.get('qrcode_base64'),
+            'pairing_code': qrcode.get('pairing_code'),
+        })
+    except InstanceNotFoundError:
+        return JsonResponse({
+            'connected': False,
+            'state': 'not_found',
+            'error': 'Instancia nao encontrada. Verifique o nome da instancia.',
+        }, status=404)
+    except AuthenticationError:
+        return JsonResponse({
+            'connected': False,
+            'state': 'auth_error',
+            'error': 'Chave de API invalida. Verifique o token.',
+        }, status=401)
+    except ConnectionError as e:
+        return JsonResponse({
+            'connected': False,
+            'state': 'error',
+            'error': str(e),
+        }, status=500)
+    except Exception as e:
+        return JsonResponse({
+            'connected': False,
+            'state': 'error',
+            'error': f'Erro inesperado: {e}',
+        }, status=500)
+
+
+@login_required
+def whatsapp_connection_state(request):
+    if not _check_role(request, User.Role.ADMIN):
+        return JsonResponse({'error': 'Permissao negada.'}, status=403)
+
+    tenant = request.user.tenant
+    if not tenant:
+        return JsonResponse({'error': 'Tenant nao encontrado.'}, status=400)
+
+    from app.services.messaging.whatsapp import (
+        WhatsappClient, InstanceNotFoundError,
+        AuthenticationError, ConnectionError,
+    )
+
+    try:
+        client = WhatsappClient(
+            instance=tenant.whatsapp_instance_id,
+            api_key=tenant.whatsapp_token,
+        )
+        data = client.get_connection_state()
+        return JsonResponse({
+            'connected': data.get('instance', {}).get('state') == 'open',
+            'state': data.get('instance', {}).get('state'),
+            'instance_name': data.get('instance', {}).get('instanceName'),
+            'owner': data.get('instance', {}).get('owner'),
+        })
+    except Exception as e:
+        return JsonResponse({
+            'connected': False,
+            'state': 'error',
+            'error': str(e),
+        }, status=500)
 
 
 @login_required

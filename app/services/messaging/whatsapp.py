@@ -2,6 +2,7 @@ import logging
 
 import requests
 from django.conf import settings
+from django.core.cache import cache
 
 logger = logging.getLogger(__name__)
 
@@ -25,6 +26,10 @@ class AuthenticationError(WhatsAppError):
 
 
 class MessageSendError(WhatsAppError):
+    pass
+
+
+class ConnectionError(WhatsAppError):
     pass
 
 
@@ -141,6 +146,117 @@ class WhatsappClient:
             data.get('key', {}).get('id', 'unknown'),
         )
 
+        return data
+
+    def get_connection_state(self):
+        url = f"{self.api_base_url}/instance/connectionState/{self.instance}"
+        headers = {"apikey": self.api_key}
+
+        try:
+            response = requests.get(url, headers=headers, timeout=self.timeout)
+        except requests.exceptions.RequestException as e:
+            logger.error("Evolution API connectionState error: %s", e)
+            raise ConnectionError(
+                f"Erro ao verificar estado da instancia: {e}",
+            )
+
+        if response.status_code == 404:
+            raise InstanceNotFoundError(
+                f"Instancia '{self.instance}' nao encontrada.",
+                http_status=404,
+            )
+        if response.status_code == 401:
+            raise AuthenticationError(
+                "Chave de API invalida.", http_status=401,
+            )
+
+        response.raise_for_status()
+
+        try:
+            data = response.json()
+        except ValueError:
+            raise WhatsAppError("Resposta invalida da Evolution API.")
+
+        if isinstance(data, dict) and data.get('error'):
+            raise ConnectionError(
+                data['error'].get('message', 'Erro desconhecido'),
+                code=data['error'].get('code'),
+            )
+
+        return data
+
+    def get_qrcode(self):
+        url = f"{self.api_base_url}/instance/connect/{self.instance}"
+        headers = {"apikey": self.api_key}
+
+        try:
+            response = requests.get(url, headers=headers, timeout=self.timeout)
+        except requests.exceptions.RequestException as e:
+            logger.error("Evolution API connect error: %s", e)
+            raise ConnectionError(
+                f"Erro ao gerar QR Code: {e}",
+            )
+
+        if response.status_code == 404:
+            raise InstanceNotFoundError(
+                f"Instancia '{self.instance}' nao encontrada.",
+                http_status=404,
+            )
+        if response.status_code == 401:
+            raise AuthenticationError(
+                "Chave de API invalida.", http_status=401,
+            )
+
+        response.raise_for_status()
+
+        try:
+            data = response.json()
+        except ValueError:
+            raise WhatsAppError("Resposta invalida da Evolution API.")
+
+        if isinstance(data, dict) and data.get('error'):
+            raise ConnectionError(
+                data['error'].get('message', 'Erro desconhecido'),
+                code=data['error'].get('code'),
+            )
+
+        state = None
+        if 'instance' in data and isinstance(data['instance'], dict):
+            state = data['instance'].get('state')
+
+        return {
+            'qrcode_base64': data.get('base64'),
+            'pairing_code': data.get('pairingCode'),
+            'code': data.get('code'),
+            'count': data.get('count'),
+            'state': state,
+            'raw': data,
+        }
+
+    def _request(self, method, path):
+        url = f"{self.api_base_url}{path}"
+        headers = {"apikey": self.api_key}
+        try:
+            response = requests.request(method, url, headers=headers, timeout=self.timeout)
+        except requests.exceptions.RequestException as e:
+            raise ConnectionError(f"Erro na requisicao: {e}")
+        if response.status_code == 404:
+            raise InstanceNotFoundError(
+                f"Instancia '{self.instance}' nao encontrada.",
+                http_status=404,
+            )
+        if response.status_code == 401:
+            raise AuthenticationError("Chave de API invalida.", http_status=401)
+        response.raise_for_status()
+        try:
+            data = response.json()
+        except ValueError:
+            raise WhatsAppError("Resposta invalida da Evolution API.")
+        if isinstance(data, dict) and data.get('error'):
+            raise ConnectionError(
+                data['error'].get('message', 'Erro desconhecido'),
+                code=data['error'].get('code'),
+            )
         return data
 
     def _format_number(self, number):
