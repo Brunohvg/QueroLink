@@ -45,7 +45,7 @@
           {% else %}{{ sc.status }}{% endif %}
         </span>
       </div>
-      <div class="grid grid-cols-3 gap-3">
+      <div class="grid grid-cols-3 gap-2">
         <div class="bg-gray-50 rounded-xl p-3 text-center">
           <p class="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Vendas</p>
           <p class="text-[16px] font-bold text-gray-800 mt-1" x-text="formatMoneyBRL({{ sc.total_sold_amount }})"></p>
