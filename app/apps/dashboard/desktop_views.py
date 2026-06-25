@@ -76,14 +76,21 @@ def gestor_configuracoes(request):
     if not tenant:
         return redirect('dashboard:home')
 
+    from app.apps.notifications.models import MessageTemplate
+
+    LINK_EVENTS = [
+        ('link_created', 'Link criado'),
+        ('payment_paid', 'Link pago'),
+        ('link_canceled', 'Link cancelado'),
+        ('payment_expired', 'Link expirado'),
+        ('payment_refunded', 'Pagamento estornado'),
+        ('payment_failed', 'Pagamento falhou'),
+    ]
+
     if request.method == 'POST':
         pagarme_api_key = request.POST.get('pagarme_api_key', '').strip()
-        whatsapp_instance_id = request.POST.get(
-            'whatsapp_instance_id', '',
-        ).strip()
-        commission_rate = request.POST.get(
-            'default_commission_rate', '',
-        ).strip()
+        whatsapp_instance_id = request.POST.get('whatsapp_instance_id', '').strip()
+        commission_rate = request.POST.get('default_commission_rate', '').strip()
 
         if pagarme_api_key:
             tenant.pagarme_api_key = pagarme_api_key
@@ -96,17 +103,37 @@ def gestor_configuracoes(request):
                 )
             except ValueError:
                 messages.error(request, 'Taxa de comissao invalida.')
-                return render(
-                    request, 'dashboard/gestor/configuracoes.html',
-                    {'tenant': tenant},
-                )
+                return render(request, 'dashboard/gestor/configuracoes.html', {
+                    'tenant': tenant, 'link_events': LINK_EVENTS,
+                })
 
         tenant.save()
+
+        # Save WhatsApp notification templates
+        for event_type, _label in LINK_EVENTS:
+            body = request.POST.get(f'template_{event_type}', '').strip()
+            if body:
+                MessageTemplate.objects.update_or_create(
+                    tenant=tenant, event_type=event_type, channel='whatsapp',
+                    defaults={'body': body, 'is_active': True},
+                )
+
         messages.success(request, 'Configuracoes salvas com sucesso.')
         return redirect('dashboard:gestor_configuracoes')
 
+    # Load existing templates
+    templates = {
+        t.event_type: t.body
+        for t in MessageTemplate.objects.filter(
+            tenant=tenant, channel='whatsapp',
+            event_type__in=[e for e, _l in LINK_EVENTS],
+        )
+    }
+
     return render(request, 'dashboard/gestor/configuracoes.html', {
         'tenant': tenant,
+        'link_events': LINK_EVENTS,
+        'templates': templates,
     })
 
 
