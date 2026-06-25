@@ -24,6 +24,13 @@ def send_whatsapp_notification(self, notification_id):
         logger.info("Notification %s already processed, skipping", notification_id)
         return
 
+    if not notification.recipient:
+        logger.warning("Notification %s has no recipient, skipping", notification_id)
+        notification.status = Notification.Status.FAILED
+        notification.error_log = "Destinatario vazio (sem telefone)"
+        notification.save(update_fields=["status", "error_log", "updated_at"])
+        return
+
     try:
         tenant = notification.tenant
         client = WhatsappClient(
@@ -59,6 +66,13 @@ def send_whatsapp_notification(self, notification_id):
 
 
 def create_and_send_notification(*, tenant, event_type, channel, recipient, context, seller=None, order=None, commission_period=None):
+    if channel == MessageTemplate.Channel.WHATSAPP and not recipient:
+        logger.warning(
+            "WhatsApp notification skipped: %s no phone for tenant=%s seller=%s",
+            event_type, tenant.id, seller.id if seller else '?',
+        )
+        return None
+
     template = MessageTemplate.objects.filter(
         tenant=tenant, event_type=event_type, channel=channel, is_active=True
     ).first()
