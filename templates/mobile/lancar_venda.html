@@ -82,7 +82,7 @@
 
     {% if is_editable %}
     <button type="submit" x-bind:disabled="amountCents <= 0"
-            x-bind:class="amountCents > 0 ? 'w-full py-3.5 rounded-2xl bg-gray-900 hover:bg-gray-800 text-white font-semibold text-[15px] shadow-lg shadow-gray-200 active:scale-[0.97] transition-all' : 'w-full py-3.5 rounded-2xl bg-gray-100 text-gray-400 font-semibold cursor-not-allowed text-[15px]'"
+            x-bind:class="amountCents > 0 ? 'btn-primary' : 'w-full py-3.5 rounded-2xl bg-gray-100 text-gray-400 font-semibold cursor-not-allowed text-[15px]'"
             class="w-full py-3.5 rounded-2xl bg-gray-100 text-gray-400 font-semibold cursor-not-allowed text-[15px]">
       <span x-show="amountCents > 0">Registrar Venda</span>
       <span x-show="amountCents <= 0">Digite o valor</span>
