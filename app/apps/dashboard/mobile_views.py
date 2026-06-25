@@ -61,9 +61,16 @@ def mobile_forgot_password(request):
             from django.utils import timezone as tz
 
             try:
-                reset = PRR.objects.get(
-                    pin=pin, used=False, expires_at__gt=tz.now(),
-                )
+                resets = PRR.objects.filter(
+                    used=False, expires_at__gt=tz.now(),
+                ).order_by('-expires_at')
+                reset = None
+                for r in resets:
+                    if r.check_pin(pin):
+                        reset = r
+                        break
+                if not reset:
+                    raise PRR.DoesNotExist
             except PRR.DoesNotExist:
                 return render(request, 'mobile/forgot_password.html', {
                     'step': 'verify', 'identifier': identifier,
