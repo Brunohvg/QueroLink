@@ -13,6 +13,7 @@ from app.apps.commissions.models import (
 )
 from app.apps.accounts.models import User
 from app.apps.accounts.validators import clean_phone, validate_phone_br
+from app.apps.accounts.fields import compute_hash
 
 
 class SellerSerializer(serializers.ModelSerializer):
@@ -56,7 +57,7 @@ class SellerCreateSerializer(serializers.Serializer):
         request = self.context.get('request')
         if request and request.user.tenant:
             if Seller.objects.filter(
-                tenant=request.user.tenant, phone=cleaned
+                tenant=request.user.tenant, phone_hash=compute_hash(cleaned)
             ).exists():
                 raise serializers.ValidationError(
                     'Este telefone ja esta cadastrado para outro vendedor.'

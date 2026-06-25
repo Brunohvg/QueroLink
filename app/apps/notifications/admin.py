@@ -13,5 +13,5 @@ class MessageTemplateAdmin(admin.ModelAdmin):
 class NotificationAdmin(admin.ModelAdmin):
     list_display = ('uuid', 'tenant', 'event_type', 'channel', 'recipient', 'status', 'retry_count', 'created_at')
     list_filter = ('status', 'event_type', 'channel', 'tenant')
-    search_fields = ('recipient', 'message_body')
+    search_fields = ('uuid',)
     readonly_fields = ('created_at', 'updated_at')

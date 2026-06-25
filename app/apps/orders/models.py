@@ -1,6 +1,7 @@
 import uuid
 from django.db import models
 from app.apps.accounts.models import Tenant
+from app.apps.accounts.fields import EncryptedCharField
 from app.apps.sellers.models import Seller
 
 class Order(models.Model):
@@ -14,8 +15,8 @@ class Order(models.Model):
     uuid = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     tenant = models.ForeignKey(Tenant, on_delete=models.CASCADE, related_name='orders')
     seller = models.ForeignKey(Seller, on_delete=models.SET_NULL, null=True, related_name='orders')
-    customer_name = models.CharField(max_length=255)
-    customer_phone = models.CharField(max_length=20, blank=True, null=True)
+    customer_name = EncryptedCharField(max_length=600)
+    customer_phone = EncryptedCharField(max_length=600, blank=True, null=True)
     total_amount = models.PositiveIntegerField(help_text="Value in cents")
     status = models.CharField(max_length=20, choices=Status.choices, default=Status.PENDING)
     created_at = models.DateTimeField(auto_now_add=True)

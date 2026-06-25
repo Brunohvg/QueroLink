@@ -2,6 +2,7 @@ from django import forms
 from django.contrib.auth.password_validation import validate_password
 from app.apps.accounts.validators import clean_cnpj, validate_cnpj
 from app.apps.accounts.models import Tenant, User
+from app.apps.accounts.fields import compute_hash
 
 
 class TenantRegistrationForm(forms.Form):
@@ -87,7 +88,7 @@ class TenantRegistrationForm(forms.Form):
         if not validate_cnpj(cnpj):
             raise forms.ValidationError('CNPJ invalido. Verifique os digitos e tente novamente.')
 
-        if Tenant.objects.filter(cnpj=cnpj).exists():
+        if Tenant.objects.filter(cnpj_hash=compute_hash(cnpj)).exists():
             raise forms.ValidationError('Este CNPJ ja esta cadastrado no sistema.')
 
         return cnpj

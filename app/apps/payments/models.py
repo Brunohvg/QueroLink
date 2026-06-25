@@ -1,6 +1,7 @@
 import uuid
 from django.db import models
 from app.apps.orders.models import Order
+from app.apps.accounts.fields import scrub_payment_payload
 
 class Payment(models.Model):
     class Status(models.TextChoices):
@@ -36,6 +37,11 @@ class Payment(models.Model):
 
     def __str__(self):
         return f"Payment {self.uuid} - {self.status}"
+
+    def save(self, *args, **kwargs):
+        if self.raw_callback_payload and isinstance(self.raw_callback_payload, dict):
+            self.raw_callback_payload = scrub_payment_payload(self.raw_callback_payload)
+        super().save(*args, **kwargs)
 
     @property
     def refusal_reason(self):

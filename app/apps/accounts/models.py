@@ -2,7 +2,7 @@ import uuid
 from django.db import models
 from django.contrib.auth.models import AbstractUser
 from django.utils.text import slugify
-from .fields import EncryptedCharField
+from .fields import EncryptedCharField, compute_hash
 
 
 class Tenant(models.Model):
@@ -14,7 +14,8 @@ class Tenant(models.Model):
 
     uuid = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     company_name = models.CharField(max_length=255)
-    cnpj = models.CharField(max_length=14, unique=True, blank=True, null=True)
+    cnpj = EncryptedCharField(max_length=600, blank=True, null=True)
+    cnpj_hash = models.CharField(max_length=64, blank=True, null=True, unique=True, db_index=True)
     slug = models.SlugField(max_length=100, unique=True, blank=True)
     pagarme_api_key = EncryptedCharField(max_length=255, blank=True, null=True)
     whatsapp_instance_id = models.CharField(max_length=100, blank=True, null=True)
@@ -36,7 +37,18 @@ class Tenant(models.Model):
                 counter += 1
                 slug = f"{base_slug}-{counter}"
             self.slug = slug
+        if self.cnpj and (not self.cnpj_hash or self._cnpj_changed()):
+            self.cnpj_hash = compute_hash(self.cnpj)
         super().save(*args, **kwargs)
+
+    def _cnpj_changed(self):
+        if not self.pk:
+            return True
+        try:
+            old = Tenant.objects.get(pk=self.pk)
+            return old.cnpj != self.cnpj
+        except Tenant.DoesNotExist:
+            return True
 
     def __str__(self):
         return self.company_name

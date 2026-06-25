@@ -2,6 +2,7 @@ import uuid
 from django.db import models
 from django.template import Template, Context
 from app.apps.accounts.models import Tenant
+from app.apps.accounts.fields import EncryptedCharField, EncryptedTextField
 from app.apps.orders.models import Order
 from app.apps.sellers.models import Seller
 from app.apps.commissions.models import CommissionPeriod
@@ -59,8 +60,8 @@ class Notification(models.Model):
     commission_period = models.ForeignKey(CommissionPeriod, on_delete=models.CASCADE, related_name='notifications', null=True, blank=True)
     event_type = models.CharField(max_length=50, choices=MessageTemplate.EventType.choices, default=MessageTemplate.EventType.LINK_CREATED)
     channel = models.CharField(max_length=20, choices=MessageTemplate.Channel.choices)
-    recipient = models.CharField(max_length=255)
-    message_body = models.TextField()
+    recipient = EncryptedCharField(max_length=600)
+    message_body = EncryptedTextField()
     status = models.CharField(max_length=20, choices=Status.choices, default=Status.PENDING)
     retry_count = models.PositiveIntegerField(default=0)
     error_log = models.TextField(blank=True, null=True)
@@ -90,7 +91,7 @@ class Notification(models.Model):
 class PasswordResetRequest(models.Model):
     uuid = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     user = models.ForeignKey('accounts.User', on_delete=models.CASCADE, related_name='password_resets')
-    pin = models.CharField(max_length=6)
+    pin_hash = models.CharField(max_length=128, default='')
     expires_at = models.DateTimeField()
     used = models.BooleanField(default=False)
     attempts = models.PositiveSmallIntegerField(default=0)
@@ -99,8 +100,16 @@ class PasswordResetRequest(models.Model):
     class Meta:
         indexes = [
             models.Index(fields=['user', 'used']),
-            models.Index(fields=['pin', 'expires_at']),
+            models.Index(fields=['expires_at']),
         ]
+
+    def set_pin(self, raw_pin):
+        from django.contrib.auth.hashers import make_password
+        self.pin_hash = make_password(raw_pin)
+
+    def check_pin(self, raw_pin):
+        from django.contrib.auth.hashers import check_password
+        return check_password(raw_pin, self.pin_hash)
 
     def __str__(self):
         return f'Reset for {self.user.username}'
