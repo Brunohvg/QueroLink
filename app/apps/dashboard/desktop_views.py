@@ -1,3 +1,4 @@
+import json
 from django.shortcuts import render, redirect
 from django.http import JsonResponse
 from django.contrib import messages
@@ -442,6 +443,6 @@ def gestor_links(request):
     logger.info("gestor_links: returning %d orders, %d sellers", len(orders_data), len(sellers))
 
     return render(request, 'dashboard/gestor/links.html', {
-        'orders_json': orders_data,
+        'orders_json': json.dumps(orders_data),
         'sellers': sellers,
     })
