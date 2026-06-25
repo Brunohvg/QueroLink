@@ -26,8 +26,8 @@ SECRET_KEY = config('SECRET_KEY')
 
 # APIs e Integrações
 API_KEY_PAGAR_ME = config('API_KEY_PAGAR_ME', default='')
-API_KEY_INSTANCIA = config('API_KEY_INSTANCIA', default='')
-INSTANCE = config('INSTANCE', default='')
+WHATSAPP_API_KEY = config('WHATSAPP_API_KEY', default=config('API_KEY_INSTANCIA', default=''))
+WHATSAPP_INSTANCE = config('WHATSAPP_INSTANCE', default=config('INSTANCE', default=''))
 SERVICE_FQDN_WEB = config('SERVICE_FQDN_WEB', default='localhost')
 FERNET_KEY = config('FERNET_KEY', default='')
 
