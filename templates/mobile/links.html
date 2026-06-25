@@ -31,46 +31,67 @@
 
   {% verbatim %}
   <div x-show="showForm" class="bg-white rounded-2xl card-shadow overflow-hidden">
-    <div class="px-5 pt-5 pb-4 border-b border-gray-100">
-      <p class="text-[15px] font-bold text-gray-900">Novo Link de Pagamento</p>
+    <div class="px-5 pt-5 pb-4 border-b border-gray-100 flex items-center justify-between">
+      <p class="text-[15px] font-bold text-gray-900">Novo Link</p>
+      <button @click="showForm=false; formError=''; formSuccess=''" class="text-gray-400 hover:text-gray-600 tap-target p-1">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+      </button>
     </div>
     <div class="px-5 py-4 space-y-4">
-      <div>
-        <label class="block text-[11px] font-semibold text-gray-400 uppercase tracking-wider mb-2">Nome do cliente</label>
-        <input type="text" x-model="form.customer"
-               class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-[14px] outline-none transition-all focus:border-brand-400 focus:ring-2 focus:ring-brand-100"
-               placeholder="Nome do cliente">
-      </div>
-      <div>
-        <label class="block text-[11px] font-semibold text-gray-400 uppercase tracking-wider mb-2">Valor (R$)</label>
-        <input type="text" x-model="form.value"
-               class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-[14px] outline-none transition-all focus:border-brand-400 focus:ring-2 focus:ring-brand-100"
-               placeholder="100,00">
-      </div>
-      <div>
-        <label class="block text-[11px] font-semibold text-gray-400 uppercase tracking-wider mb-2">Parcelas</label>
-        <select x-model="form.installments"
-                class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-[14px] outline-none transition-all focus:border-brand-400 focus:ring-2 focus:ring-brand-100">
-          <option value="1">1x (a vista)</option>
-          <option value="2">2x</option>
-          <option value="3">3x</option>
-        </select>
-      </div>
-      <p x-show="formError" class="text-[13px] text-red-500" x-text="formError"></p>
-      <div x-show="formSuccess" class="bg-emerald-50 border border-emerald-100 text-emerald-700 px-4 py-3 rounded-xl text-[13px]" x-text="formSuccess"></div>
-      <div class="flex flex-col sm:flex-row gap-2 pt-1">
-        <button @click="createLink()" :disabled="creating"
-                class="flex-1 bg-gray-900 hover:bg-gray-800 disabled:bg-gray-300 text-white font-semibold py-3 rounded-xl transition-all text-[15px] tap-target shadow-sm active:scale-[0.97]">
-          <span x-show="!creating">Gerar Link</span>
-          <span x-show="creating">Gerando...</span>
+      <div x-show="formSuccess" class="flex items-center gap-3 p-4 bg-emerald-50 border border-emerald-100 rounded-xl">
+        <div class="w-10 h-10 rounded-full bg-emerald-100 flex items-center justify-center flex-shrink-0">
+          <svg class="w-5 h-5 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+        </div>
+        <div>
+          <p class="text-[14px] font-semibold text-emerald-800">Link criado!</p>
+          <p class="text-[12px] text-emerald-600 mt-0.5" x-text="formSuccess"></p>
+        </div>
+        <button @click="showForm=false; formSuccess=''" class="ml-auto text-emerald-500 hover:text-emerald-600 tap-target p-1">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
         </button>
-        <button @click="showForm=false; formError=''; formSuccess=''"
-                class="px-5 py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl text-[15px] font-medium transition tap-target">Cancelar</button>
       </div>
+      <template x-if="!formSuccess">
+      <div class="space-y-4">
+        <div>
+          <label class="block text-[11px] font-semibold text-gray-400 uppercase tracking-wider mb-2">Cliente</label>
+          <input type="text" x-model="form.customer"
+                 class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-[14px] outline-none transition-all focus:border-brand-400 focus:ring-2 focus:ring-brand-100"
+                 placeholder="Nome do cliente">
+        </div>
+        <div>
+          <label class="block text-[11px] font-semibold text-gray-400 uppercase tracking-wider mb-2">Valor (R$)</label>
+          <div class="relative">
+            <span class="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 font-semibold">R$</span>
+            <input type="text" x-model="form.value"
+                   class="w-full pl-10 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-[14px] outline-none transition-all focus:border-brand-400 focus:ring-2 focus:ring-brand-100"
+                   placeholder="100,00">
+          </div>
+        </div>
+        <div>
+          <label class="block text-[11px] font-semibold text-gray-400 uppercase tracking-wider mb-2">Parcelas</label>
+          <select x-model="form.installments"
+                  class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-[14px] outline-none transition-all focus:border-brand-400 focus:ring-2 focus:ring-brand-100">
+            <option value="1">1x (a vista)</option>
+            <option value="2">2x</option>
+            <option value="3">3x</option>
+          </select>
+        </div>
+        <p x-show="formError" class="text-[13px] text-red-500 flex items-center gap-1.5">
+          <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"/></svg>
+          <span x-text="formError"></span>
+        </p>
+        <button @click="createLink()" :disabled="creating"
+                class="w-full bg-gray-900 hover:bg-gray-800 disabled:bg-gray-300 text-white font-semibold py-3.5 rounded-xl transition-all text-[15px] tap-target shadow-sm active:scale-[0.97] flex items-center justify-center gap-2">
+          <svg x-show="!creating" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"/></svg>
+          <span x-show="!creating">Gerar Link</span>
+          <span x-show="creating" class="flex items-center gap-2"><span class="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>Gerando...</span>
+        </button>
+      </div>
+      </template>
     </div>
   </div>
 
-  <button @click="showForm=!showForm" x-show="!showForm"
+  <button @click="showForm=!showForm; formError=''; formSuccess=''" x-show="!showForm && !creating"
           class="w-full py-3.5 rounded-2xl bg-gray-900 hover:bg-gray-800 text-white font-semibold text-[15px] shadow-lg shadow-gray-200 active:scale-[0.97] transition-all flex items-center justify-center gap-2">
     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
     Novo Link
@@ -158,9 +179,9 @@ function sellerLinksPage() {
                 var d = await r.json();
                 if (r.ok) {
                     this.formSuccess = 'Link gerado!';
-                    this.showForm = false;
                     this.form = { customer: '', value: '', installments: '1' };
                     this.orders.unshift({ uuid: d.uuid, customer_name: d.customer_name, total_amount: d.total_amount, status: 'PENDING', status_display: 'Pendente', link_url: d.link_url, refusal_reason: null, created_at: new Date().toISOString() });
+                    this.filterOrders();
                     showToast('Link gerado com sucesso!', 'success');
                 } else {
                     this.formError = d.error || d.detail || 'Erro ao gerar link.';

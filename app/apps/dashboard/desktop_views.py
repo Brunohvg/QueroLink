@@ -106,7 +106,7 @@ def gestor_configuracoes(request):
         whatsapp_instance_id = request.POST.get('whatsapp_instance_id', '').strip()
         commission_rate = request.POST.get('default_commission_rate', '').strip()
 
-        if pagarme_api_key:
+        if pagarme_api_key and pagarme_api_key != '••••••••':
             tenant.pagarme_api_key = pagarme_api_key
         if whatsapp_instance_id:
             tenant.whatsapp_instance_id = whatsapp_instance_id
