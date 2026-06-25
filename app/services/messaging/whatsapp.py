@@ -223,23 +223,28 @@ class WhatsappClient:
     def disconnect(self):
         self._post(f"/instance/logout/{self.instance}", {})
 
-    def _post(self, path, body):
+    def delete_instance(self):
+        self._delete(f"/instance/delete/{self.instance}")
+
+    def _request(self, method, path, **kwargs):
         url = f"{self.api_base_url}{path}"
-        headers = {"apikey": self.api_key, "Content-Type": "application/json"}
+        headers = {"apikey": self.api_key}
+        if 'json' in kwargs:
+            headers["Content-Type"] = "application/json"
         try:
-            response = requests.post(url, json=body, headers=headers, timeout=self.timeout)
+            response = requests.request(method, url, headers=headers, timeout=self.timeout, **kwargs)
         except requests.exceptions.RequestException as e:
             raise ConnectionError(f"Erro na requisicao: {e}")
         return self._handle_response(response)
 
+    def _post(self, path, body):
+        return self._request("POST", path, json=body)
+
     def _get(self, path):
-        url = f"{self.api_base_url}{path}"
-        headers = {"apikey": self.api_key}
-        try:
-            response = requests.get(url, headers=headers, timeout=self.timeout)
-        except requests.exceptions.RequestException as e:
-            raise ConnectionError(f"Erro na requisicao: {e}")
-        return self._handle_response(response)
+        return self._request("GET", path)
+
+    def _delete(self, path):
+        return self._request("DELETE", path)
 
     def _handle_response(self, response):
         if response.status_code == 404:

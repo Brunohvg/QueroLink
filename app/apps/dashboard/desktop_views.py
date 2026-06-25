@@ -296,6 +296,40 @@ def whatsapp_disconnect(request):
 
 
 @login_required
+def whatsapp_delete_instance(request):
+    if not _check_role(request, User.Role.ADMIN):
+        return JsonResponse({'error': 'Permissao negada.'}, status=403)
+
+    tenant = request.user.tenant
+    if not tenant:
+        return JsonResponse({'error': 'Tenant nao encontrado.'}, status=400)
+
+    from app.services.messaging.whatsapp import (
+        WhatsappClient, WhatsAppError,
+    )
+
+    instance_id = request.GET.get('instance') or tenant.whatsapp_instance_id or ''
+    if not instance_id:
+        return JsonResponse({'error': 'Nome da instancia nao configurado.'}, status=400)
+
+    api_key = getattr(settings, 'WHATSAPP_API_KEY', '')
+    if not api_key:
+        return JsonResponse({'error': 'WHATSAPP_API_KEY nao configurada.'}, status=400)
+
+    try:
+        client = WhatsappClient(instance=instance_id, api_key=api_key)
+        client.delete_instance()
+        tenant.whatsapp_instance_id = ''
+        tenant.whatsapp_token = ''
+        tenant.save(update_fields=['whatsapp_instance_id', 'whatsapp_token'])
+        return JsonResponse({'deleted': True})
+    except WhatsAppError as e:
+        return JsonResponse({'error': str(e)}, status=500)
+    except Exception as e:
+        return JsonResponse({'error': f'Erro inesperado: {e}'}, status=500)
+
+
+@login_required
 def gestor_ranking(request):
     if not _check_role(request, User.Role.MANAGER, User.Role.ADMIN):
         return redirect('dashboard:home')
