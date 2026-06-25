@@ -6,7 +6,15 @@
   <div class="flex items-center justify-between">
     <div>
       <p class="text-[13px] text-gray-500 font-medium">Ola,</p>
-      <h1 class="text-[22px] font-bold text-gray-900 font-display">{{ seller.name|default:'Vendedor' }}</h1>
+      <div class="flex items-center gap-2">
+        <h1 class="text-[22px] font-bold text-gray-900 font-display">{{ seller.name|default:'Vendedor' }}</h1>
+        {% if not is_editable %}
+        <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-medium bg-amber-50 text-amber-600">
+          <span class="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
+          Bloqueado
+        </span>
+        {% endif %}
+      </div>
     </div>
     <div class="flex items-center gap-1">
       <a href="{% url 'dashboard:mobile_perfil' %}"
@@ -54,26 +62,16 @@
     </div>
   </div>
 
-  <div class="bg-white rounded-2xl p-5 card-shadow">
-    <div class="flex items-center justify-between">
-      <div>
-        <p class="text-[11px] font-semibold text-gray-400 uppercase tracking-wider">Vendas via link</p>
-        <p class="text-[12px] text-gray-400 mt-0.5">No mes</p>
-      </div>
-      <p class="text-[18px] font-bold text-gray-800">R$ {% widthratio month_link_total 100 1 %},{{ month_link_total|stringformat:"02d"|slice:"-2:" }}</p>
-    </div>
-  </div>
-
   {% if not is_editable %}
-  <div class="bg-amber-50/80 border border-amber-100 text-amber-700 px-5 py-4 rounded-2xl text-[14px] flex items-start gap-3">
-    <svg class="w-5 h-5 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"/></svg>
-    <span>{% if seller_commission_status == 'PAGA' %}Sua comissao deste mes foi paga.{% elif seller_commission_status == 'FECHADA' %}Sua comissao deste mes foi fechada.{% else %}Sua comissao esta bloqueada.{% endif %} Para ajustes, fale com o gestor.</span>
+  <div class="bg-amber-50/80 border border-amber-100 text-amber-700 px-4 py-3 rounded-2xl text-[13px] flex items-start gap-2.5">
+    <svg class="w-4 h-4 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"/></svg>
+    <span>{% if seller_commission_status == 'PAGA' %}Sua comissao deste mes foi paga.{% elif seller_commission_status == 'FECHADA' %}Sua comissao deste mes foi fechada.{% else %}Lancamentos bloqueados.{% endif %} Fale com o gestor.</span>
   </div>
   {% endif %}
 
   {% if not has_entry_today and is_editable %}
-  <div class="bg-amber-50/80 border border-amber-100 text-amber-700 px-5 py-4 rounded-2xl text-[14px] flex items-start gap-3">
-    <svg class="w-5 h-5 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"/></svg>
+  <div class="bg-amber-50/80 border border-amber-100 text-amber-700 px-4 py-2.5 rounded-2xl text-[12px] flex items-center gap-2">
+    <svg class="w-3.5 h-3.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"/></svg>
     <span>Voce ainda nao lancou o valor de hoje.</span>
   </div>
   {% endif %}

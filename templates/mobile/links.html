@@ -10,6 +10,23 @@
     <h1 class="font-display text-[20px] font-bold text-gray-900">Meus Links</h1>
   </div>
 
+  <div class="bg-white rounded-2xl p-4 card-shadow">
+    <div class="flex gap-2">
+      <select x-model="filterMonth" @change="filterOrders()" class="flex-1 px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-[13px] outline-none transition-all focus:border-brand-400 focus:ring-2 focus:ring-brand-100">
+        <option value="">Todos os meses</option>
+        <template x-for="m in 12" :key="m">
+          <option :value="m" x-text="String(m).padStart(2,'0')"></option>
+        </template>
+      </select>
+      <select x-model="filterStatus" @change="filterOrders()" class="flex-1 px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-[13px] outline-none transition-all focus:border-brand-400 focus:ring-2 focus:ring-brand-100">
+        <option value="">Todos</option>
+        <option value="PENDING">Pendente</option>
+        <option value="COMPLETED">Pago</option>
+        <option value="CANCELED">Cancelado</option>
+      </select>
+    </div>
+  </div>
+
   {% verbatim %}
   <div x-show="showForm" class="bg-white rounded-2xl p-5 card-shadow space-y-4">
     <p class="text-[15px] font-bold text-gray-900">Novo Link de Pagamento</p>
@@ -48,12 +65,12 @@
     <span class="text-[15px]">Novo Link</span>
   </button>
 
-  <div x-show="!orders.length && !showForm" class="text-center pt-8">
-    <p class="text-gray-500 font-medium text-[15px]">Nenhum link gerado ainda.</p>
+  <div x-show="!filteredOrders.length && !showForm" class="text-center pt-8">
+    <p class="text-gray-500 font-medium text-[15px]">Nenhum link encontrado.</p>
   </div>
 
   <div class="space-y-2">
-    <template x-for="o in orders" :key="o.uuid">
+    <template x-for="o in filteredOrders" :key="o.uuid">
       <div class="bg-white rounded-2xl p-4 card-shadow">
         <div class="flex items-start justify-between gap-2 mb-1.5">
           <span class="text-[15px] font-bold text-gray-900 truncate flex-1 min-w-0" x-text="o.customer_name"></span>
@@ -87,11 +104,29 @@
 function sellerLinksPage() {
     return {
         orders: {% if orders_json %}{{ orders_json|safe }}{% else %}[]{% endif %},
+        filteredOrders: [],
         showForm: false,
         creating: false,
         formError: '',
         formSuccess: '',
+        filterMonth: '',
+        filterStatus: '',
         form: { customer: '', value: '', installments: '1' },
+
+        init() { this.filterOrders(); },
+
+        filterOrders() {
+            var m = this.filterMonth;
+            var s = this.filterStatus;
+            this.filteredOrders = this.orders.filter(function(o) {
+                if (m) {
+                    var d = new Date(o.created_at);
+                    if (d.getMonth() + 1 !== parseInt(m)) return false;
+                }
+                if (s && o.status !== s) return false;
+                return true;
+            });
+        },
 
         async createLink() {
             this.formError = '';
