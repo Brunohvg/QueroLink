@@ -462,28 +462,34 @@ def gestor_link_detalhe(request, order_uuid):
     from app.apps.orders.models import Order, PaymentLink
     from app.apps.payments.models import Payment
 
-    order = get_object_or_404(Order, uuid=order_uuid, tenant=tenant)
-    payment = order.payments.order_by('created_at').first()
-    payment_link = PaymentLink.objects.filter(order=order).first()
+    try:
+        order = get_object_or_404(Order, uuid=order_uuid, tenant=tenant)
+        payment = order.payments.order_by('created_at').first()
+        payment_link = PaymentLink.objects.filter(order=order).first()
 
-    # Try to fetch fresh data from Pagar.me
-    charge_data = None
-    pagarme_error = None
-    if payment and payment.gateway_transaction_id:
-        try:
-            from app.services.gateway.pagar_me import PagarMeGateway
-            gw = PagarMeGateway(api_key=tenant.pagarme_api_key)
-            charge_data = gw.get_charge(payment.gateway_transaction_id)
-        except Exception as e:
-            pagarme_error = str(e)
+        charge_data = None
+        pagarme_error = None
+        if payment and payment.gateway_transaction_id:
+            try:
+                from app.services.gateway.pagar_me import PagarMeGateway
+                gw = PagarMeGateway(api_key=tenant.pagarme_api_key or '')
+                charge_data = gw.get_charge(payment.gateway_transaction_id)
+            except Exception as e:
+                pagarme_error = str(e)
+                logger.warning("Pagar.me charge fetch failed: %s", e)
 
-    return render(request, 'dashboard/gestor/link_detalhe.html', {
-        'order': order,
-        'payment': payment,
-        'payment_link': payment_link,
-        'charge_data': charge_data,
-        'pagarme_error': pagarme_error,
-    })
+        total_centavos = order.total_amount
+
+        return render(request, 'dashboard/gestor/link_detalhe.html', {
+            'order': order,
+            'payment': payment,
+            'payment_link': payment_link,
+            'charge_data': charge_data,
+            'pagarme_error': pagarme_error,
+        })
+    except Exception as e:
+        logger.error("gestor_link_detalhe error: %s", e, exc_info=True)
+        raise
 
 
 @login_required
