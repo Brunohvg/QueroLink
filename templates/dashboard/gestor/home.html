@@ -11,17 +11,17 @@
 </div>
 {% endif %}
 
-<div class="bg-white rounded-2xl p-4 mb-6 border border-gray-200 flex items-center gap-4 flex-wrap">
-    <div class="flex items-center gap-2">
-        <label class="text-[13px] text-gray-500 font-medium whitespace-nowrap">Periodo</label>
-        <div class="flex items-center gap-1">
-            <select x-model="filterMonth" @change="loadSummary()" class="px-3 py-2 border border-gray-200 rounded-xl text-[14px] bg-gray-50 hover:bg-white focus:bg-white focus:border-brand-400 focus:outline-none transition cursor-pointer appearance-none pr-8" style="background-image:url('data:image/svg+xml;utf8,<svg xmlns=%22http://www.w3.org/2000/svg%22 width=%2216%22 height=%2216%22 viewBox=%220 0 24 24%22 fill=%22none%22 stroke=%22%239ca3af%22 stroke-width=%222%22><path stroke-linecap=%22round%22 stroke-linejoin=%22round%22 d=%22M6 9l6 6 6-6%22/></svg>');background-repeat:no-repeat;background-position:right 8px center;">
+<div class="bg-white rounded-2xl p-4 mb-6 border border-gray-100 shadow-sm flex items-center gap-4 flex-wrap">
+    <div class="flex items-center gap-3">
+        <span class="text-[13px] text-gray-500 font-medium">Periodo</span>
+        <div class="flex items-center gap-2">
+            <select x-model="filterMonth" @change="loadSummary()" class="px-3 py-2.5 border border-gray-200 rounded-xl text-[14px] bg-gray-50/50 hover:border-brand-300 focus:border-brand-400 focus:outline-none focus:ring-2 focus:ring-brand-100 transition cursor-pointer appearance-none pr-8" style="background-image:url('data:image/svg+xml;utf8,<svg xmlns=%22http://www.w3.org/2000/svg%22 width=%2216%22 height=%2216%22 viewBox=%220 0 24 24%22 fill=%22none%22 stroke=%22%239ca3af%22 stroke-width=%222%22><path stroke-linecap=%22round%22 stroke-linejoin=%22round%22 d=%22M6 9l6 6 6-6%22/></svg>');background-repeat:no-repeat;background-position:right 8px center;">
                 <option value="">Mes atual</option>
                 <template x-for="m in 12" :key="m">
-                    <option :value="m" x-text="String(m).padStart(2,'0')"></option>
+                    <option :value="m" x-text="m < 10 ? '0' + m : m"></option>
                 </template>
             </select>
-            <select x-model="filterYear" @change="loadSummary()" class="px-3 py-2 border border-gray-200 rounded-xl text-[14px] bg-gray-50 hover:bg-white focus:bg-white focus:border-brand-400 focus:outline-none transition cursor-pointer appearance-none pr-8" style="background-image:url('data:image/svg+xml;utf8,<svg xmlns=%22http://www.w3.org/2000/svg%22 width=%2216%22 height=%2216%22 viewBox=%220 0 24 24%22 fill=%22none%22 stroke=%22%239ca3af%22 stroke-width=%222%22><path stroke-linecap=%22round%22 stroke-linejoin=%22round%22 d=%22M6 9l6 6 6-6%22/></svg>');background-repeat:no-repeat;background-position:right 8px center;">
+            <select x-model="filterYear" @change="loadSummary()" class="px-3 py-2.5 border border-gray-200 rounded-xl text-[14px] bg-gray-50/50 hover:border-brand-300 focus:border-brand-400 focus:outline-none focus:ring-2 focus:ring-brand-100 transition cursor-pointer appearance-none pr-8" style="background-image:url('data:image/svg+xml;utf8,<svg xmlns=%22http://www.w3.org/2000/svg%22 width=%2216%22 height=%2216%22 viewBox=%220 0 24 24%22 fill=%22none%22 stroke=%22%239ca3af%22 stroke-width=%222%22><path stroke-linecap=%22round%22 stroke-linejoin=%22round%22 d=%22M6 9l6 6 6-6%22/></svg>');background-repeat:no-repeat;background-position:right 8px center;">
                 <option value="">Ano atual</option>
                 <template x-for="y in [2024,2025,2026,2027,2028]" :key="y">
                     <option :value="y" x-text="y"></option>
@@ -29,23 +29,24 @@
             </select>
         </div>
     </div>
-    <div class="flex items-center gap-3">
-        <span class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium"
-              :class="{'bg-brand-50 text-brand-700': summary?.period_status === 'ABERTA',
-                       'bg-warning-50 text-warning-700': summary?.period_status === 'FECHADA',
-                       'bg-success-50 text-success-700': summary?.period_status === 'PAGA',
-                       'bg-gray-100 text-gray-500': !summary?.period_status}">
-            <span class="w-1.5 h-1.5 rounded-full"
-                  :class="{'bg-brand-500': summary?.period_status === 'ABERTA',
-                           'bg-warning-500': summary?.period_status === 'FECHADA',
-                           'bg-success-500': summary?.period_status === 'PAGA',
-                           'bg-gray-400': !summary?.period_status}"></span>
-            <span x-text="summary?.period_status ? summary.period_status.replace(/_/g,' ') : 'Sem periodo'"></span>
-        </span>
-    </div>
-    <button @click="loadSummary()" class="ml-auto bg-brand-500 hover:bg-brand-600 text-white font-medium py-2 px-5 rounded-xl transition tap-target text-[14px] flex items-center gap-2 shadow-sm hover:shadow-md">
+    <div class="h-5 w-px bg-gray-200 hidden md:block"></div>
+    <span class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium"
+          :class="{'bg-brand-50 text-brand-700': summary?.period_status === 'ABERTA',
+                   'bg-warning-50 text-warning-700': summary?.period_status === 'FECHADA' || summary?.period_status === 'PARCIALMENTE_FECHADA',
+                   'bg-success-50 text-success-700': summary?.period_status === 'PAGA' || summary?.period_status === 'PARCIALMENTE_PAGA',
+                   'bg-red-50 text-red-700': summary?.period_status === 'CANCELADA',
+                   'bg-gray-100 text-gray-500': !summary?.period_status}">
+        <span class="w-1.5 h-1.5 rounded-full"
+              :class="{'bg-brand-500': summary?.period_status === 'ABERTA',
+                       'bg-warning-500': summary?.period_status === 'FECHADA' || summary?.period_status === 'PARCIALMENTE_FECHADA',
+                       'bg-success-500': summary?.period_status === 'PAGA' || summary?.period_status === 'PARCIALMENTE_PAGA',
+                       'bg-red-500': summary?.period_status === 'CANCELADA',
+                       'bg-gray-400': !summary?.period_status}"></span>
+        <span x-text="summary?.period_status ? summary.period_status.replace(/_/g,' ') : 'Sem periodo'"></span>
+    </span>
+    <button @click="loadSummary()" class="ml-auto bg-brand-500 hover:bg-brand-600 text-white font-medium py-2.5 px-5 rounded-xl transition tap-target text-[14px] flex items-center gap-2 shadow-sm">
         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
-        Sincronizar
+        Atualizar
     </button>
 </div>
 
@@ -155,6 +156,8 @@
         </a>
     </div>
 </div>
+
+<div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
     <div class="surface-card">
         <div class="flex items-center gap-2 mb-2">
             <div class="w-8 h-8 rounded-lg bg-brand-50 flex items-center justify-center">
@@ -247,42 +250,45 @@
 </div>
 {% endverbatim %}
 
-<h2 class="font-display text-[18px] font-semibold text-gray-900 mb-4">Acesso rapido</h2>
-<div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-    <a href="{% url 'dashboard:gestor_ranking' %}" class="surface-card hover:border-brand-500 transition tap-target block hover:shadow-md">
+<h2 class="font-display text-[16px] font-semibold text-gray-900 mb-4 flex items-center gap-2">
+    <svg class="w-4 h-4 text-brand-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"></path></svg>
+    Acesso rapido
+</h2>
+<div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+    <a href="{% url 'dashboard:gestor_ranking' %}" class="surface-card hover:border-brand-300 hover:shadow-md transition-all tap-target block group">
         <div class="flex items-center gap-4">
-            <div class="w-10 h-10 rounded-xl bg-brand-50 flex items-center justify-center">
+            <div class="w-11 h-11 rounded-xl bg-brand-50 flex items-center justify-center group-hover:bg-brand-100 transition">
                 <svg class="w-5 h-5 text-brand-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path></svg>
             </div>
-            <div>
-                <p class="font-medium text-[14px] text-gray-900">Ranking</p>
-                <p class="text-[12px] text-gray-500">Desempenho dos vendedores</p>
+            <div class="flex-1">
+                <p class="font-medium text-[14px] text-gray-900 group-hover:text-brand-600 transition">Ranking</p>
+                <p class="text-[12px] text-gray-400">Desempenho dos vendedores</p>
             </div>
-            <svg class="w-5 h-5 text-gray-300 ml-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
+            <svg class="w-4 h-4 text-gray-300 group-hover:text-brand-400 transition" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
         </div>
     </a>
-    <a href="{% url 'dashboard:gestor_vendedores' %}" class="surface-card hover:border-brand-500 transition tap-target block hover:shadow-md">
+    <a href="{% url 'dashboard:gestor_vendedores' %}" class="surface-card hover:border-brand-300 hover:shadow-md transition-all tap-target block group">
         <div class="flex items-center gap-4">
-            <div class="w-10 h-10 rounded-xl bg-brand-50 flex items-center justify-center">
+            <div class="w-11 h-11 rounded-xl bg-brand-50 flex items-center justify-center group-hover:bg-brand-100 transition">
                 <svg class="w-5 h-5 text-brand-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"></path></svg>
             </div>
-            <div>
-                <p class="font-medium text-[14px] text-gray-900">Vendedores</p>
-                <p class="text-[12px] text-gray-500">Gerenciar cadastros</p>
+            <div class="flex-1">
+                <p class="font-medium text-[14px] text-gray-900 group-hover:text-brand-600 transition">Vendedores</p>
+                <p class="text-[12px] text-gray-400">Gerenciar cadastros</p>
             </div>
-            <svg class="w-5 h-5 text-gray-300 ml-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
+            <svg class="w-4 h-4 text-gray-300 group-hover:text-brand-400 transition" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
         </div>
     </a>
-    <a href="{% url 'dashboard:gestor_fechamento' %}" class="surface-card hover:border-brand-500 transition tap-target block hover:shadow-md">
+    <a href="{% url 'dashboard:gestor_fechamento' %}" class="surface-card hover:border-brand-300 hover:shadow-md transition-all tap-target block group">
         <div class="flex items-center gap-4">
-            <div class="w-10 h-10 rounded-xl bg-brand-50 flex items-center justify-center">
+            <div class="w-11 h-11 rounded-xl bg-brand-50 flex items-center justify-center group-hover:bg-brand-100 transition">
                 <svg class="w-5 h-5 text-brand-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
             </div>
-            <div>
-                <p class="font-medium text-[14px] text-gray-900">Fechamento</p>
-                <p class="text-[12px] text-gray-500">Competencias e comissoes</p>
+            <div class="flex-1">
+                <p class="font-medium text-[14px] text-gray-900 group-hover:text-brand-600 transition">Fechamento</p>
+                <p class="text-[12px] text-gray-400">Competencias e comissoes</p>
             </div>
-            <svg class="w-5 h-5 text-gray-300 ml-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
+            <svg class="w-4 h-4 text-gray-300 group-hover:text-brand-400 transition" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
         </div>
     </a>
 </div>

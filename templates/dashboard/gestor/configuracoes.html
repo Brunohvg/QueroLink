@@ -10,70 +10,141 @@ showToast("{{ message|escapejs }}", "{% if message.tags == 'error' %}error{% eli
 </script>
 {% endif %}
 
-<h1 class="font-display text-[18px] font-semibold text-gray-900 mb-6">Configuracoes da Loja</h1>
+<div class="flex items-center justify-between mb-6">
+    <div>
+        <h1 class="font-display text-[20px] font-semibold text-gray-900">Configuracoes</h1>
+        <p class="text-[13px] text-gray-500 mt-0.5">{{ tenant.company_name }}</p>
+    </div>
+    <button type="submit" form="config-form" class="bg-brand-500 hover:bg-brand-600 text-white font-semibold py-2.5 px-6 rounded-xl transition text-[14px] flex items-center gap-2 shadow-sm hover:shadow-md">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+        Salvar
+    </button>
+</div>
 
-<form method="post" action="{% url 'dashboard:gestor_configuracoes' %}" class="space-y-6">
+<div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+    <div class="surface-card">
+        <div class="flex items-center justify-between mb-2">
+            <p class="text-[12px] font-semibold text-gray-500 uppercase tracking-wider">Pagar.me</p>
+            <span class="w-2 h-2 rounded-full {% if tenant.pagarme_configured %}bg-success-500{% else %}bg-gray-300{% endif %}"></span>
+        </div>
+        <p class="text-[14px] font-medium {% if tenant.pagarme_configured %}text-success-700{% else %}text-gray-500{% endif %}">
+            {% if tenant.pagarme_configured %}Conectado{% else %}Pendente{% endif %}
+        </p>
+        <p class="text-[11px] text-gray-400 mt-0.5">Gateway de pagamento</p>
+    </div>
+    <div class="surface-card">
+        <div class="flex items-center justify-between mb-2">
+            <p class="text-[12px] font-semibold text-gray-500 uppercase tracking-wider">WhatsApp</p>
+            <span class="w-2 h-2 rounded-full {% if tenant.whatsapp_configured %}bg-success-500{% else %}bg-gray-300{% endif %}"></span>
+        </div>
+        <p class="text-[14px] font-medium {% if tenant.whatsapp_configured %}text-success-700{% else %}text-gray-500{% endif %}">
+            {% if tenant.whatsapp_configured %}Conectado{% else %}Pendente{% endif %}
+        </p>
+        <p class="text-[11px] text-gray-400 mt-0.5">Notificacoes</p>
+    </div>
+    <div class="surface-card">
+        <div class="flex items-center justify-between mb-2">
+            <p class="text-[12px] font-semibold text-gray-500 uppercase tracking-wider">Comissao padrao</p>
+        </div>
+        <p class="text-[14px] font-medium text-gray-800">{{ tenant.default_commission_rate|floatformat:2 }}%</p>
+        <p class="text-[11px] text-gray-400 mt-0.5">Para novos vendedores</p>
+    </div>
+</div>
+
+<form method="post" id="config-form" action="{% url 'dashboard:gestor_configuracoes' %}" class="space-y-5">
     {% csrf_token %}
 
     <div class="surface-card">
-        <div class="flex items-center justify-between mb-4">
-            <h2 class="text-[15px] font-semibold text-gray-900">Pagar.me</h2>
-            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium {% if tenant.pagarme_configured %}bg-success-50 text-success-700{% else %}bg-gray-100 text-gray-600{% endif %}">
+        <div class="flex items-center gap-3 mb-5">
+            <div class="w-10 h-10 rounded-xl bg-green-50 flex items-center justify-center">
+                <svg class="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"></path></svg>
+            </div>
+            <div>
+                <h2 class="text-[15px] font-semibold text-gray-900">Pagar.me</h2>
+                <p class="text-[12px] text-gray-400">Gateway de pagamento para gerar links</p>
+            </div>
+            <span class="ml-auto inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium {% if tenant.pagarme_configured %}bg-success-50 text-success-700{% else %}bg-gray-100 text-gray-600{% endif %}">
                 {% if tenant.pagarme_configured %}Configurado{% else %}Pendente{% endif %}
             </span>
         </div>
         <div>
-            <label for="pagarme_api_key" class="block text-[13px] text-gray-500 mb-1">Chave de API</label>
+            <label for="pagarme_api_key" class="block text-[13px] font-medium text-gray-700 mb-1.5">Chave de API</label>
             <input type="password" id="pagarme_api_key" name="pagarme_api_key"
-                   class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent"
+                   class="input-field"
                    placeholder="sk_test_xxxxxxxxxx"
                    value="{% if tenant.pagarme_api_key %}••••••••{% endif %}"
                    autocomplete="off">
-            <p class="text-xs text-gray-400 mt-1">A chave nao sera exibida apos salva. Deixe em branco para manter a atual.</p>
+            <p class="text-[11px] text-gray-400 mt-1.5 flex items-center gap-1">
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                A chave nao sera exibida apos salva. Deixe em branco para manter a atual.
+            </p>
         </div>
     </div>
 
     <div class="surface-card">
-        <div class="flex items-center justify-between mb-4">
-            <h2 class="text-[15px] font-semibold text-gray-900">WhatsApp</h2>
-            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium {% if tenant.whatsapp_configured %}bg-success-50 text-success-700{% else %}bg-gray-100 text-gray-600{% endif %}">
+        <div class="flex items-center gap-3 mb-5">
+            <div class="w-10 h-10 rounded-xl bg-success-50 flex items-center justify-center">
+                <svg class="w-5 h-5 text-success-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"></path></svg>
+            </div>
+            <div>
+                <h2 class="text-[15px] font-semibold text-gray-900">WhatsApp</h2>
+                <p class="text-[12px] text-gray-400">Envio de notificacoes para vendedores</p>
+            </div>
+            <span class="ml-auto inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium {% if tenant.whatsapp_configured %}bg-success-50 text-success-700{% else %}bg-gray-100 text-gray-600{% endif %}">
                 {% if tenant.whatsapp_configured %}Configurado{% else %}Pendente{% endif %}
             </span>
         </div>
         <div class="space-y-4">
             <div>
-                <label for="whatsapp_instance_id" class="block text-[13px] text-gray-500 mb-1">Instancia</label>
+                <label for="whatsapp_instance_id" class="block text-[13px] font-medium text-gray-700 mb-1.5">Instancia</label>
                 <input type="text" id="whatsapp_instance_id" name="whatsapp_instance_id"
-                       class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent"
+                       class="input-field"
                        placeholder="Nome da instancia"
                        value="{{ tenant.whatsapp_instance_id|default:'' }}">
             </div>
             <div>
-                <label for="whatsapp_token" class="block text-[13px] text-gray-500 mb-1">Token da API</label>
+                <label for="whatsapp_token" class="block text-[13px] font-medium text-gray-700 mb-1.5">Token da API</label>
                 <input type="password" id="whatsapp_token" name="whatsapp_token"
-                       class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent"
+                       class="input-field"
                        placeholder="Bearer xxxxxxxxxx"
                        value="{% if tenant.whatsapp_token %}••••••••{% endif %}"
                        autocomplete="off">
-                <p class="text-xs text-gray-400 mt-1">O token nao sera exibido apos salvo. Deixe em branco para manter o atual.</p>
+                <p class="text-[11px] text-gray-400 mt-1.5 flex items-center gap-1">
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                    O token nao sera exibido apos salvo. Deixe em branco para manter o atual.
+                </p>
             </div>
         </div>
     </div>
 
     <div class="surface-card">
+        <div class="flex items-center gap-3 mb-5">
+            <div class="w-10 h-10 rounded-xl bg-brand-50 flex items-center justify-center">
+                <svg class="w-5 h-5 text-brand-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+            </div>
+            <div>
+                <h2 class="text-[15px] font-semibold text-gray-900">Taxa de Comissao Padrao</h2>
+                <p class="text-[12px] text-gray-400">Aplicada automaticamente a novos vendedores</p>
+            </div>
+        </div>
         <div>
-            <h2 class="text-[15px] font-semibold text-gray-900 mb-4">Taxa de Comissao Padrao</h2>
-            <label for="default_commission_rate" class="block text-[13px] text-gray-500 mb-1">Percentual (%)</label>
-            <input type="text" id="default_commission_rate" name="default_commission_rate"
-                   class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent"
-                   placeholder="Ex: 1,00"
-                   value="{{ tenant.default_commission_rate|floatformat:2 }}">
-            <p class="text-xs text-gray-400 mt-1">Aplicado automaticamente a novos vendedores. Ex: 1,00 = 1%</p>
+            <label for="default_commission_rate" class="block text-[13px] font-medium text-gray-700 mb-1.5">Percentual (%)</label>
+            <div class="relative">
+                <input type="text" id="default_commission_rate" name="default_commission_rate"
+                       class="input-field pr-8"
+                       placeholder="1,00"
+                       value="{{ tenant.default_commission_rate|floatformat:2 }}">
+                <span class="absolute right-3 top-1/2 -translate-y-1/2 text-[14px] text-gray-400 font-medium">%</span>
+            </div>
+            <p class="text-[11px] text-gray-400 mt-1.5">Ex: 1,00 = 1% de comissao sobre as vendas.</p>
         </div>
     </div>
 
-    <button type="submit" class="bg-brand-500 hover:bg-brand-600 text-white font-medium py-3 px-6 rounded-xl transition text-[15px]">
-        Salvar Configuracoes
-    </button>
+    <div class="flex justify-end">
+        <button type="submit" form="config-form" class="bg-brand-500 hover:bg-brand-600 text-white font-semibold py-3 px-8 rounded-xl transition text-[15px] flex items-center gap-2 shadow-sm hover:shadow-md">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+            Salvar Configuracoes
+        </button>
+    </div>
 </form>
 {% endblock %}
