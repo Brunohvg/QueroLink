@@ -7,6 +7,11 @@ set -e
 
 log() { echo "[$(date +%H:%M:%S)] $*"; }
 
+# ── Validar variáveis obrigatórias ─────────────────────────
+[ -z "$SECRET_KEY" ] && log "FATAL: SECRET_KEY nao configurada." && exit 1
+[ -z "$DATABASE_URL" ] && log "FATAL: DATABASE_URL nao configurada." && exit 1
+[ -z "$FERNET_KEY" ] && log "FATAL: FERNET_KEY nao configurada. Gere com: python -c \"from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())\"" && exit 1
+
 # ── Esperar banco ──────────────────────────────────────────
 wait_for_db() {
     log "Aguardando banco de dados..."

@@ -15,9 +15,8 @@ services:
     stop_grace_period: 2m
     environment:
       - DJANGO_SETTINGS_MODULE=app.config.settings.production
-      - DEBUG=${DEBUG:-False}
-      - SECRET_KEY=${SECRET_KEY:?SECRET_KEY obrigatorio}
-      - DATABASE_URL=${DATABASE_URL:?DATABASE_URL obrigatorio}
+      - SECRET_KEY
+      - DATABASE_URL
       - REDIS_URL=redis://:${REDIS_PASSWORD:-}@querolink-redis:6379/0
       - ALLOWED_HOSTS=${ALLOWED_HOSTS:-}
       - CSRF_TRUSTED_ORIGINS=${CSRF_TRUSTED_ORIGINS:-}
@@ -30,7 +29,7 @@ services:
       - SEED_ON_START=${SEED_ON_START:-false}
       - DJANGO_SUPERUSER_EMAIL=${DJANGO_SUPERUSER_EMAIL:-}
       - DJANGO_SUPERUSER_PASSWORD=${DJANGO_SUPERUSER_PASSWORD:-}
-      - FERNET_KEY=${FERNET_KEY:?FERNET_KEY obrigatorio - gere com: python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"}
+      - FERNET_KEY
       - GUNICORN_WORKERS=${GUNICORN_WORKERS:-3}
       - GUNICORN_TIMEOUT=${GUNICORN_TIMEOUT:-120}
       - SERVICE_URL_WEB=${SERVICE_URL_WEB:-}
@@ -95,14 +94,13 @@ services:
     stop_grace_period: 5m
     environment:
       - DJANGO_SETTINGS_MODULE=app.config.settings.production
-      - DEBUG=${DEBUG:-False}
-      - SECRET_KEY=${SECRET_KEY:?}
-      - DATABASE_URL=${DATABASE_URL:?}
+      - SECRET_KEY
+      - DATABASE_URL
       - REDIS_URL=redis://:${REDIS_PASSWORD:-}@querolink-redis:6379/0
       - API_KEY_PAGAR_ME=${API_KEY_PAGAR_ME:-}
       - API_KEY_INSTANCIA=${API_KEY_INSTANCIA:-}
       - INSTANCE=${INSTANCE:-}
-      - FERNET_KEY=${FERNET_KEY:-}
+      - FERNET_KEY
     depends_on:
       querolink-redis:
         condition: service_healthy
@@ -135,14 +133,13 @@ services:
     stop_grace_period: 1m
     environment:
       - DJANGO_SETTINGS_MODULE=app.config.settings.production
-      - DEBUG=${DEBUG:-False}
-      - SECRET_KEY=${SECRET_KEY:?}
-      - DATABASE_URL=${DATABASE_URL:?}
+      - SECRET_KEY
+      - DATABASE_URL
       - REDIS_URL=redis://:${REDIS_PASSWORD:-}@querolink-redis:6379/0
       - API_KEY_PAGAR_ME=${API_KEY_PAGAR_ME:-}
       - API_KEY_INSTANCIA=${API_KEY_INSTANCIA:-}
       - INSTANCE=${INSTANCE:-}
-      - FERNET_KEY=${FERNET_KEY:-}
+      - FERNET_KEY
     depends_on:
       querolink-redis:
         condition: service_healthy
