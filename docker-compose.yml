@@ -13,31 +13,14 @@ services:
       dockerfile: Dockerfile
     restart: always
     stop_grace_period: 2m
+    env_file:
+      - .env
     environment:
       - DJANGO_SETTINGS_MODULE=app.config.settings.production
-      - SECRET_KEY
-      - DATABASE_URL
       - REDIS_URL=redis://:${REDIS_PASSWORD:-}@querolink-redis:6379/0
-      - ALLOWED_HOSTS=${ALLOWED_HOSTS:-}
-      - CSRF_TRUSTED_ORIGINS=${CSRF_TRUSTED_ORIGINS:-}
-      - CORS_ALLOWED_ORIGINS=${CORS_ALLOWED_ORIGINS:-}
-      - API_KEY_PAGAR_ME=${API_KEY_PAGAR_ME:-}
-      - API_KEY_INSTANCIA=${API_KEY_INSTANCIA:-}
-      - INSTANCE=${INSTANCE:-}
       - JWT_ACCESS_TOKEN_LIFETIME_MINUTES=${JWT_ACCESS_TOKEN_LIFETIME_MINUTES:-30}
       - JWT_REFRESH_TOKEN_LIFETIME_DAYS=${JWT_REFRESH_TOKEN_LIFETIME_DAYS:-7}
-      - SEED_ON_START=${SEED_ON_START:-false}
-      - DJANGO_SUPERUSER_EMAIL=${DJANGO_SUPERUSER_EMAIL:-}
-      - DJANGO_SUPERUSER_PASSWORD=${DJANGO_SUPERUSER_PASSWORD:-}
-      - FERNET_KEY
-      - GUNICORN_WORKERS=${GUNICORN_WORKERS:-3}
-      - GUNICORN_TIMEOUT=${GUNICORN_TIMEOUT:-120}
-      - SERVICE_URL_WEB=${SERVICE_URL_WEB:-}
-      - SERVICE_FQDN_WEB=${SERVICE_FQDN_WEB:-}
-      - EMAIL_HOST=${EMAIL_HOST:-}
       - EMAIL_PORT=${EMAIL_PORT:-587}
-      - EMAIL_HOST_USER=${EMAIL_HOST_USER:-}
-      - EMAIL_HOST_PASSWORD=${EMAIL_HOST_PASSWORD:-}
       - EMAIL_BACKEND=${EMAIL_BACKEND:-django.core.mail.backends.smtp.EmailBackend}
       - CONN_MAX_AGE=${CONN_MAX_AGE:-600}
       - LOG_LEVEL=${LOG_LEVEL:-WARNING}
@@ -92,15 +75,11 @@ services:
     command: celery -A app.config worker --loglevel=info --concurrency=2 --time-limit=600 --soft-time-limit=540
     restart: always
     stop_grace_period: 5m
+    env_file:
+      - .env
     environment:
       - DJANGO_SETTINGS_MODULE=app.config.settings.production
-      - SECRET_KEY
-      - DATABASE_URL
       - REDIS_URL=redis://:${REDIS_PASSWORD:-}@querolink-redis:6379/0
-      - API_KEY_PAGAR_ME=${API_KEY_PAGAR_ME:-}
-      - API_KEY_INSTANCIA=${API_KEY_INSTANCIA:-}
-      - INSTANCE=${INSTANCE:-}
-      - FERNET_KEY
     depends_on:
       querolink-redis:
         condition: service_healthy
@@ -131,15 +110,11 @@ services:
     command: celery -A app.config beat --loglevel=info --schedule=/app/celerybeat-schedule/celerybeat-schedule
     restart: always
     stop_grace_period: 1m
+    env_file:
+      - .env
     environment:
       - DJANGO_SETTINGS_MODULE=app.config.settings.production
-      - SECRET_KEY
-      - DATABASE_URL
       - REDIS_URL=redis://:${REDIS_PASSWORD:-}@querolink-redis:6379/0
-      - API_KEY_PAGAR_ME=${API_KEY_PAGAR_ME:-}
-      - API_KEY_INSTANCIA=${API_KEY_INSTANCIA:-}
-      - INSTANCE=${INSTANCE:-}
-      - FERNET_KEY
     depends_on:
       querolink-redis:
         condition: service_healthy
