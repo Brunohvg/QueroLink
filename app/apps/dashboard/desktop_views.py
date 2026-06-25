@@ -410,7 +410,7 @@ def gestor_links(request):
     seller_uuid = request.GET.get('seller')
     orders = Order.objects.filter(
         tenant=tenant,
-    ).select_related('seller').order_by('-created_at')[:100]
+    ).select_related('seller', 'payment_link').order_by('-created_at')[:100]
     if seller_uuid:
         orders = orders.filter(seller__uuid=seller_uuid)
 
@@ -420,6 +420,8 @@ def gestor_links(request):
     for o in orders:
         payment = o.payments.first()
         refusal = payment.refusal_reason if payment else None
+        link = o.payment_link if hasattr(o, 'payment_link') else None
+        link_url = link.gateway_url if link else None
         try:
             customer_name = o.customer_name
         except Exception as e:
@@ -435,6 +437,7 @@ def gestor_links(request):
             'seller_uuid': str(o.seller.uuid) if o.seller else '',
             'refusal_reason': refusal,
             'created_at': o.created_at.isoformat(),
+            'link_url': link_url or '',
         })
 
     from app.apps.sellers.models import Seller as SellerModel
@@ -501,12 +504,22 @@ def gestor_link_cancelar(request, order_uuid):
         return redirect('dashboard:gestor_links')
 
     tenant = request.user.tenant
-    from app.apps.orders.models import Order
+    from app.apps.orders.models import Order, PaymentLink
     order = get_object_or_404(Order, uuid=order_uuid, tenant=tenant)
 
     if order.status != Order.Status.PENDING:
         messages.error(request, 'So e possivel cancelar links pendentes.')
         return redirect('dashboard:gestor_link_detalhe', order_uuid=order_uuid)
+
+    # Cancel on Pagar.me first
+    payment_link = PaymentLink.objects.filter(order=order).first()
+    if payment_link and payment_link.gateway_link_id:
+        try:
+            from app.services.gateway.pagar_me import PagarMeGateway
+            gw = PagarMeGateway(api_key=tenant.pagarme_api_key or '')
+            gw.cancel_payment_link(payment_link.gateway_link_id)
+        except Exception as e:
+            logger.warning("Pagar.me cancel failed (link already invalid?): %s", e)
 
     order.status = Order.Status.CANCELED
     order.save(update_fields=['status'])

@@ -124,3 +124,8 @@ class PagarMeGateway:
             f"{self.api_url_charges}/{charge_id}/partial",
             json={"amount": amount},
         )
+
+    def cancel_payment_link(self, link_id):
+        """Cancel a payment link on Pagar.me."""
+        logger.info("Pagar.me cancel_payment_link: link_id=%s", link_id)
+        return self._request("POST", f"{self.api_url_links}/{link_id}/cancel")
