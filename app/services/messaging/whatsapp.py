@@ -150,8 +150,8 @@ class WhatsappClient:
 
     def instance_exists(self):
         try:
-            self._get(f"/instance/connectionState/{self.instance}")
-            return True
+            dados = self._get(f"/instance/connectionState/{self.instance}")
+            return isinstance(dados, dict)
         except InstanceNotFoundError:
             return False
 
@@ -170,16 +170,19 @@ class WhatsappClient:
             },
         )
 
-        qrcode = dados.get('qrcode', {})
+        if not isinstance(dados, dict):
+            raise WhatsAppError("Resposta inesperada ao criar instancia.")
+
+        qrcode = dados.get('qrcode', {}) or {}
         instance_key = (
             dados.get('hash', {}).get('apikey')
             or dados.get('instance', {}).get('token')
         )
-        inst = dados.get('instance', {})
+        inst = dados.get('instance', {}) or {}
         return {
-            'qrcode_base64': qrcode.get('base64'),
-            'pairing_code': qrcode.get('pairingCode'),
-            'code': qrcode.get('code'),
+            'qrcode_base64': qrcode.get('base64') if isinstance(qrcode, dict) else None,
+            'pairing_code': qrcode.get('pairingCode') if isinstance(qrcode, dict) else None,
+            'code': qrcode.get('code') if isinstance(qrcode, dict) else None,
             'instance_api_key': instance_key,
             'state': inst.get('state') or inst.get('connectionState') or 'connecting',
             'raw': dados,
@@ -187,7 +190,9 @@ class WhatsappClient:
 
     def get_connection_state(self):
         dados = self._get(f"/instance/connectionState/{self.instance}")
-        inst = dados.get('instance', {})
+        if not isinstance(dados, dict):
+            raise WhatsAppError("Resposta inesperada ao consultar instancia.")
+        inst = dados.get('instance', {}) or {}
         state = inst.get('state') or inst.get('connectionState') or 'unknown'
         return {
             'connected': state == 'open',
@@ -234,7 +239,10 @@ class WhatsappClient:
             data = response.json()
         except ValueError:
             raise WhatsAppError("Resposta invalida da Evolution API.")
-        if isinstance(data, dict) and data.get('error'):
+        if not isinstance(data, dict):
+            logger.warning("Evolution API returned non-dict response: %s", type(data).__name__)
+            raise WhatsAppError("Resposta inesperada da Evolution API.")
+        if data.get('error'):
             raise ConnectionError(
                 data['error'].get('message', 'Erro desconhecido'),
                 code=data['error'].get('code'),

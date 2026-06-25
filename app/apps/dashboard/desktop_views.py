@@ -151,12 +151,6 @@ def whatsapp_instance_status(request):
             'pairing_code': dados.get('pairing_code'),
             'instance_created': bool(instance_key),
         })
-    except WhatsAppError as e:
-        return JsonResponse({
-            'connected': False,
-            'state': 'name_taken' if 'ja esta em uso' in str(e) else 'error',
-            'error': str(e),
-        }, status=400)
     except InstanceNotFoundError:
         return JsonResponse({
             'connected': False,
@@ -175,6 +169,12 @@ def whatsapp_instance_status(request):
             'state': 'error',
             'error': str(e),
         }, status=500)
+    except WhatsAppError as e:
+        return JsonResponse({
+            'connected': False,
+            'state': 'name_taken' if 'ja esta em uso' in str(e) else 'error',
+            'error': str(e),
+        }, status=400)
     except Exception as e:
         return JsonResponse({
             'connected': False,
@@ -217,11 +217,30 @@ def whatsapp_connection_state(request):
             'instance_name': data.get('instance_name'),
             'owner': data.get('owner'),
         })
+    except InstanceNotFoundError:
+        return JsonResponse({
+            'connected': False, 'state': 'not_found',
+            'error': 'Instancia nao encontrada. Verifique o nome.',
+        }, status=404)
+    except AuthenticationError:
+        return JsonResponse({
+            'connected': False, 'state': 'auth_error',
+            'error': 'Chave de API invalida.',
+        }, status=401)
+    except ConnectionError as e:
+        return JsonResponse({
+            'connected': False, 'state': 'error',
+            'error': str(e),
+        }, status=500)
+    except WhatsAppError as e:
+        return JsonResponse({
+            'connected': False, 'state': 'error',
+            'error': str(e),
+        }, status=400)
     except Exception as e:
         return JsonResponse({
-            'connected': False,
-            'state': 'error',
-            'error': str(e),
+            'connected': False, 'state': 'error',
+            'error': f'Erro inesperado: {e}',
         }, status=500)
 
 
