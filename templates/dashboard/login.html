@@ -40,11 +40,14 @@
             </form>
 
             <p style="text-align: center; margin-top: 24px; color: var(--text-secondary); font-size: 0.875rem;">
-                Ainda não tem uma conta?
-                <a href="{% url 'accounts:sobre' %}" style="color: var(--primary-color); font-weight: 500;">Conheca o QueroLink</a>
+                <a href="{% url 'accounts:mobile_forgot_password' %}" style="color: var(--primary-color); font-weight: 500; text-decoration: none;">
+                    <svg style="width: 14px; height: 14px; vertical-align: middle; margin-right: 4px;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"/></svg>
+                    Esqueci minha senha
+                </a>
             </p>
-            <p style="text-align: center; margin-top: 8px;">
-                <a href="{% url 'accounts:signup' %}" style="color: var(--text-secondary); font-size: 0.8rem;">Cadastre sua loja</a>
+            <p style="text-align: center; margin-top: 8px; color: var(--text-secondary); font-size: 0.875rem;">
+                Ainda nao tem uma conta?
+                <a href="{% url 'accounts:signup' %}" style="color: var(--primary-color); font-weight: 500;">Cadastre-se</a>
             </p>
         </div>
     </div>

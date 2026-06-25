@@ -78,7 +78,9 @@ def gestor_configuracoes(request):
 
     from app.apps.notifications.models import MessageTemplate
 
-    LINK_EVENTS = [
+    TEMPLATE_EVENTS = [
+        ('seller_credentials', 'Credenciais do vendedor'),
+        ('commission_paid', 'Comissao paga'),
         ('link_created', 'Link criado'),
         ('payment_paid', 'Link pago'),
         ('link_canceled', 'Link cancelado'),
@@ -91,12 +93,12 @@ def gestor_configuracoes(request):
         t.event_type: t.body
         for t in MessageTemplate.objects.filter(
             tenant=tenant, channel='whatsapp',
-            event_type__in=[e for e, _l in LINK_EVENTS],
+            event_type__in=[e for e, _l in TEMPLATE_EVENTS],
         )
     }
-    link_events_with_body = [
+    template_events_with_body = [
         (e, l, templates_dict.get(e, ''))
-        for e, l in LINK_EVENTS
+        for e, l in TEMPLATE_EVENTS
     ]
 
     if request.method == 'POST':
@@ -116,12 +118,12 @@ def gestor_configuracoes(request):
             except ValueError:
                 messages.error(request, 'Taxa de comissao invalida.')
                 return render(request, 'dashboard/gestor/configuracoes.html', {
-                    'tenant': tenant, 'link_events': link_events_with_body,
+                    'tenant': tenant, 'link_events': template_events_with_body,
                 })
 
         tenant.save()
 
-        for event_type, _label in LINK_EVENTS:
+        for event_type, _label in TEMPLATE_EVENTS:
             body = request.POST.get(f'template_{event_type}', '').strip()
             if body:
                 MessageTemplate.objects.update_or_create(
@@ -134,7 +136,7 @@ def gestor_configuracoes(request):
 
     return render(request, 'dashboard/gestor/configuracoes.html', {
         'tenant': tenant,
-        'link_events': link_events_with_body,
+        'link_events': template_events_with_body,
     })
 
 
@@ -553,8 +555,11 @@ def gestor_link_cancelar(request, order_uuid):
     order.save(update_fields=['status'])
 
     if order.seller:
-        from app.apps.notifications.tasks import notify_seller_link_status
-        notify_seller_link_status(order.seller, order, 'link_canceled')
+        try:
+            from app.apps.notifications.tasks import notify_seller_link_status
+            notify_seller_link_status(order.seller, order, 'link_canceled')
+        except Exception:
+            pass
 
     messages.success(request, 'Link cancelado com sucesso.')
     return redirect('dashboard:gestor_link_detalhe', order_uuid=order_uuid)
