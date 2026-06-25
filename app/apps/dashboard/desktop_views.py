@@ -76,7 +76,6 @@ def gestor_configuracoes(request):
         whatsapp_instance_id = request.POST.get(
             'whatsapp_instance_id', '',
         ).strip()
-        whatsapp_token = request.POST.get('whatsapp_token', '').strip()
         commission_rate = request.POST.get(
             'default_commission_rate', '',
         ).strip()
@@ -85,8 +84,6 @@ def gestor_configuracoes(request):
             tenant.pagarme_api_key = pagarme_api_key
         if whatsapp_instance_id:
             tenant.whatsapp_instance_id = whatsapp_instance_id
-        if whatsapp_token:
-            tenant.whatsapp_token = whatsapp_token
         if commission_rate:
             try:
                 tenant.default_commission_rate = float(
@@ -125,7 +122,7 @@ def whatsapp_instance_status(request):
     try:
         client = WhatsappClient(
             instance=tenant.whatsapp_instance_id,
-            api_key=tenant.whatsapp_token,
+            api_key=getattr(settings, 'WHATSAPP_API_KEY', ''),
         )
         dados = client.create_or_get_qrcode()
         instance_key = dados.get('instance_api_key')
