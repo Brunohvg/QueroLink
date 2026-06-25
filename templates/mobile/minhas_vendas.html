@@ -14,7 +14,7 @@
   <script>showToast("{{ error|escapejs }}", "error");</script>
   {% endif %}
 
-  <div class="bg-white rounded-2xl p-4 card-shadow space-y-3">
+  <div class="bg-white rounded-2xl p-4 card-shadow">
     <div class="flex gap-2">
       <select x-model="filterMonth" @change="filterSales()"
               class="flex-1 px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-[13px] outline-none transition-all focus:border-brand-400 focus:ring-2 focus:ring-brand-100">
@@ -23,10 +23,7 @@
         <option value="{{ m.value }}">{{ m.label }}</option>
         {% endfor %}
       </select>
-      <input type="text" x-model="search" @input="filterSales()" placeholder="Buscar..."
-             class="flex-1 px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-[13px] outline-none transition-all focus:border-brand-400 focus:ring-2 focus:ring-brand-100">
     </div>
-    <p class="text-[12px] text-gray-400 font-medium" x-show="sales.length" x-text="filteredSales.length + ' de ' + sales.length + ' venda' + (sales.length !== 1 ? 's' : '')"></p>
   </div>
 
   {% if not sales %}
@@ -86,7 +83,6 @@ function minhasVendas() {
         sales: {{ sales_json|safe }},
         filteredSales: [],
         filterMonth: '',
-        search: '',
         _confirmIds: {},
 
         init() { this.filterSales(); },
@@ -106,16 +102,11 @@ function minhasVendas() {
 
         filterSales() {
             var m = this.filterMonth;
-            var q = this.search.toLowerCase().trim();
             this.filteredSales = this.sales.filter(function(s) {
                 if (m) {
                     var parts = s.date.split('/');
                     var saleMonth = parseInt(parts[1], 10);
                     if (saleMonth !== parseInt(m, 10)) return false;
-                }
-                if (q) {
-                    var match = s.notes.toLowerCase().includes(q) || s.amount.toString().includes(q);
-                    if (!match) return false;
                 }
                 return true;
             });
