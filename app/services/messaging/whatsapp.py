@@ -180,7 +180,7 @@ class WhatsappClient:
 
         qrcode = dados.get('qrcode', {}) or {}
         instance_key = (
-            dados.get('hash', {}).get('apikey')
+            dados.get('hash')
             or dados.get('instance', {}).get('token')
         )
         inst = dados.get('instance', {}) or {}
