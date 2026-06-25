@@ -1,6 +1,7 @@
 import json
 
 from django.shortcuts import render, redirect
+from django.views.decorators.csrf import csrf_exempt
 from django.contrib.auth import (
     authenticate, login as auth_login, logout as auth_logout,
 )
@@ -33,6 +34,7 @@ def mobile_logout(request):
 
 
 @ratelimit(key='post:identifier', rate='3/h', method='POST', block=True)
+@csrf_exempt
 def mobile_forgot_password(request):
     if request.method == 'POST':
         identifier = request.POST.get('identifier', '').strip()
