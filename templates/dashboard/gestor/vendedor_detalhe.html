@@ -151,11 +151,21 @@
                     <span class="text-[14px] font-semibold text-gray-900 min-w-[80px]" x-text="String(c.period_month).padStart(2,'0')+'/'+c.period_year"></span>
                     <span class="text-xs px-2.5 py-1 rounded-full font-medium"
                           :class="{'bg-gray-100 text-gray-600': c.period_status==='ABERTA',
-                                   'bg-warning-50 text-warning-700': c.period_status==='FECHADA',
+                                   'bg-warning-50 text-warning-700': c.period_status==='FECHADA' || c.period_status==='PARCIALMENTE_FECHADA',
                                    'bg-amber-50 text-amber-700': c.period_status==='AJUSTADA',
+                                   'bg-purple-50 text-purple-700': c.period_status==='REABERTA',
+                                   'bg-teal-50 text-teal-700': c.period_status==='PARCIALMENTE_PAGA',
                                    'bg-danger-50 text-danger-700': c.period_status==='CANCELADA',
                                    'bg-success-50 text-success-700': c.period_status==='PAGA'}"
-                          x-text="c.period_status.replace(/_/g,' ')"></span>
+                          x-text="
+                            c.period_status==='ABERTA' ? 'Aberta' :
+                            c.period_status==='FECHADA' ? 'Fechada' :
+                            c.period_status==='PARCIALMENTE_FECHADA' ? 'Parcialmente fechada' :
+                            c.period_status==='AJUSTADA' ? 'Ajustada' :
+                            c.period_status==='REABERTA' ? 'Reaberta' :
+                            c.period_status==='PARCIALMENTE_PAGA' ? 'Parcialmente paga' :
+                            c.period_status==='CANCELADA' ? 'Cancelada' :
+                            c.period_status==='PAGA' ? 'Paga' : (c.period_status||'')"></span>
                     <span class="text-[13px] text-gray-500" x-text="'Vendas: '+formatMoneyBRL(c.total_sold_amount)"></span>
                     <span class="text-[14px] font-semibold text-success-700 min-w-[100px] text-right" x-text="formatMoneyBRL(c.commission_amount)"></span>
                 </div>

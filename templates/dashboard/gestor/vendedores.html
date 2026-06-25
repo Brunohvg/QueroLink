@@ -28,28 +28,32 @@
     </div>
   </div>
 
-  <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4 mb-8">
-    <div class="relative overflow-hidden bg-white rounded-2xl p-5 border border-gray-100 shadow-[0_1px_3px_-1px_rgba(0,0,0,0.04),0_4px_16px_-4px_rgba(67,97,238,0.06)]">
-      <div class="absolute top-0 right-0 w-32 h-32 bg-gradient-to-bl from-brand-50/50 to-transparent rounded-full -mr-8 -mt-8"></div>
-      <div class="relative"><p class="text-[11px] font-semibold text-gray-400 uppercase tracking-[0.08em] mb-2">Total</p><p class="text-[26px] font-bold text-gray-900" x-text="stats.total"></p></div>
+    <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4 mb-8">
+      <div class="relative overflow-hidden bg-white rounded-2xl p-5 border border-gray-100 shadow-[0_1px_3px_-1px_rgba(0,0,0,0.04),0_4px_16px_-4px_rgba(67,97,238,0.06)]">
+        <div class="absolute top-0 right-0 w-32 h-32 bg-gradient-to-bl from-brand-50/50 to-transparent rounded-full -mr-8 -mt-8"></div>
+        <div class="relative"><p class="text-[11px] font-semibold text-gray-400 uppercase tracking-[0.08em] mb-2">Total</p><p class="text-[26px] font-bold text-gray-900" x-text="stats.total"></p></div>
+      </div>
+      <div class="relative overflow-hidden bg-white rounded-2xl p-5 border border-gray-100 shadow-[0_1px_3px_-1px_rgba(0,0,0,0.04),0_4px_16px_-4px_rgba(67,97,238,0.06)]">
+        <div class="absolute top-0 right-0 w-32 h-32 bg-gradient-to-bl from-emerald-50/60 to-transparent rounded-full -mr-8 -mt-8"></div>
+        <div class="relative"><p class="text-[11px] font-semibold text-gray-400 uppercase tracking-[0.08em] mb-2">Ativos</p><p class="text-[26px] font-bold text-emerald-600" x-text="stats.ativos"></p></div>
+      </div>
+      <div class="relative overflow-hidden bg-white rounded-2xl p-5 border border-gray-100 shadow-[0_1px_3px_-1px_rgba(0,0,0,0.04),0_4px_16px_-4px_rgba(67,97,238,0.06)]">
+        <div class="absolute top-0 right-0 w-32 h-32 bg-gradient-to-bl from-sky-50/60 to-transparent rounded-full -mr-8 -mt-8"></div>
+        <div class="relative"><p class="text-[11px] font-semibold text-gray-400 uppercase tracking-[0.08em] mb-2">Com venda</p><p class="text-[26px] font-bold text-sky-600" x-text="stats.comVendaNoMes"></p></div>
+      </div>
+      <div class="relative overflow-hidden bg-white rounded-2xl p-5 border border-gray-100 shadow-[0_1px_3px_-1px_rgba(0,0,0,0.04),0_4px_16px_-4px_rgba(67,97,238,0.06)]">
+        <div class="absolute top-0 right-0 w-32 h-32 bg-gradient-to-bl from-amber-50/60 to-transparent rounded-full -mr-8 -mt-8"></div>
+        <div class="relative"><p class="text-[11px] font-semibold text-gray-400 uppercase tracking-[0.08em] mb-2">Pendentes</p><p class="text-[26px] font-bold text-amber-600" x-text="stats.pendentes"></p></div>
+      </div>
+      <div class="relative overflow-hidden bg-white rounded-2xl p-5 border border-gray-100 shadow-[0_1px_3px_-1px_rgba(0,0,0,0.04),0_4px_16px_-4px_rgba(67,97,238,0.06)]">
+        <div class="absolute top-0 right-0 w-32 h-32 bg-gradient-to-bl from-rose-50/60 to-transparent rounded-full -mr-8 -mt-8"></div>
+        <div class="relative"><p class="text-[11px] font-semibold text-gray-400 uppercase tracking-[0.08em] mb-2">Sem lanc.</p><p class="text-[26px] font-bold text-rose-500" x-text="stats.semLancamento"></p></div>
+      </div>
+      <div class="relative overflow-hidden bg-white rounded-2xl p-5 border border-gray-100 shadow-[0_1px_3px_-1px_rgba(0,0,0,0.04),0_4px_16px_-4px_rgba(67,97,238,0.06)]">
+        <div class="absolute top-0 right-0 w-32 h-32 bg-gradient-to-bl from-red-50/60 to-transparent rounded-full -mr-8 -mt-8"></div>
+        <div class="relative"><p class="text-[11px] font-semibold text-gray-400 uppercase tracking-[0.08em] mb-2">Cancelados</p><p class="text-[26px] font-bold text-red-500" x-text="stats.cancelados"></p></div>
+      </div>
     </div>
-    <div class="relative overflow-hidden bg-white rounded-2xl p-5 border border-gray-100 shadow-[0_1px_3px_-1px_rgba(0,0,0,0.04),0_4px_16px_-4px_rgba(67,97,238,0.06)]">
-      <div class="absolute top-0 right-0 w-32 h-32 bg-gradient-to-bl from-emerald-50/60 to-transparent rounded-full -mr-8 -mt-8"></div>
-      <div class="relative"><p class="text-[11px] font-semibold text-gray-400 uppercase tracking-[0.08em] mb-2">Ativos</p><p class="text-[26px] font-bold text-emerald-600" x-text="stats.ativos"></p></div>
-    </div>
-    <div class="relative overflow-hidden bg-white rounded-2xl p-5 border border-gray-100 shadow-[0_1px_3px_-1px_rgba(0,0,0,0.04),0_4px_16px_-4px_rgba(67,97,238,0.06)]">
-      <div class="absolute top-0 right-0 w-32 h-32 bg-gradient-to-bl from-sky-50/60 to-transparent rounded-full -mr-8 -mt-8"></div>
-      <div class="relative"><p class="text-[11px] font-semibold text-gray-400 uppercase tracking-[0.08em] mb-2">Com venda no mes</p><p class="text-[26px] font-bold text-sky-600" x-text="stats.comVendaNoMes"></p></div>
-    </div>
-    <div class="relative overflow-hidden bg-white rounded-2xl p-5 border border-gray-100 shadow-[0_1px_3px_-1px_rgba(0,0,0,0.04),0_4px_16px_-4px_rgba(67,97,238,0.06)]">
-      <div class="absolute top-0 right-0 w-32 h-32 bg-gradient-to-bl from-amber-50/60 to-transparent rounded-full -mr-8 -mt-8"></div>
-      <div class="relative"><p class="text-[11px] font-semibold text-gray-400 uppercase tracking-[0.08em] mb-2">Pendentes</p><p class="text-[26px] font-bold text-amber-600" x-text="stats.pendentes"></p></div>
-    </div>
-    <div class="relative overflow-hidden bg-white rounded-2xl p-5 border border-gray-100 shadow-[0_1px_3px_-1px_rgba(0,0,0,0.04),0_4px_16px_-4px_rgba(67,97,238,0.06)]">
-      <div class="absolute top-0 right-0 w-32 h-32 bg-gradient-to-bl from-rose-50/60 to-transparent rounded-full -mr-8 -mt-8"></div>
-      <div class="relative"><p class="text-[11px] font-semibold text-gray-400 uppercase tracking-[0.08em] mb-2">Sem lancamento</p><p class="text-[26px] font-bold text-rose-500" x-text="stats.semLancamento"></p></div>
-    </div>
-  </div>
 
   <div class="bg-white rounded-2xl border border-gray-100 shadow-[0_1px_3px_-1px_rgba(0,0,0,0.04),0_4px_16px_-4px_rgba(67,97,238,0.06)] overflow-hidden">
     <div class="px-5 py-4 border-b border-gray-100 flex flex-col sm:flex-row sm:items-center gap-3">
@@ -101,17 +105,43 @@
                       :class="{'bg-emerald-50 text-emerald-700': s.operational_status==='PRONTO', 'bg-amber-50 text-amber-700': s.operational_status==='PENDENTE', 'bg-gray-100 text-gray-600': s.operational_status==='SEM_LANCAMENTO'}">
                   <span class="w-1.5 h-1.5 rounded-full"
                         :class="{'bg-emerald-500': s.operational_status==='PRONTO', 'bg-amber-500': s.operational_status==='PENDENTE', 'bg-gray-400': s.operational_status==='SEM_LANCAMENTO'}"></span>
-                  <span x-text="s.operational_status || '—'"></span>
+                  <span x-text="s.operational_status==='PRONTO' ? 'Pronto' : s.operational_status==='PENDENTE' ? 'Pendente' : s.operational_status==='SEM_LANCAMENTO' ? 'Sem lanc.' : s.operational_status || '—'"></span>
                 </span>
               </td>
               <td class="px-4 py-3.5 font-semibold text-[14px] text-gray-900" x-text="formatMoneyBRL(s.month_total || 0)"></td>
               <td class="px-4 py-3.5 font-semibold text-[14px] text-brand-600 hidden sm:table-cell" x-text="formatMoneyBRL(s.commission_amount || 0)"></td>
               <td class="px-4 py-3.5 hidden lg:table-cell">
                 <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-medium"
-                      :class="{'bg-emerald-50 text-emerald-700': s.financial_status==='PAGA', 'bg-amber-50 text-amber-700': s.financial_status==='FECHADA', 'bg-sky-50 text-sky-700': s.financial_status==='AJUSTADA', 'bg-gray-100 text-gray-600': s.financial_status==='ABERTA'}">
+                      :class="{
+                        'bg-emerald-50 text-emerald-700': s.financial_status==='PAGA',
+                        'bg-amber-50 text-amber-700': s.financial_status==='FECHADA',
+                        'bg-orange-50 text-orange-700': s.financial_status==='PARCIALMENTE_FECHADA',
+                        'bg-teal-50 text-teal-700': s.financial_status==='PARCIALMENTE_PAGA',
+                        'bg-sky-50 text-sky-700': s.financial_status==='AJUSTADA',
+                        'bg-purple-50 text-purple-700': s.financial_status==='REABERTA',
+                        'bg-red-50 text-red-700': s.financial_status==='CANCELADA',
+                        'bg-gray-100 text-gray-600': s.financial_status==='ABERTA'
+                      }">
                   <span class="w-1.5 h-1.5 rounded-full"
-                        :class="{'bg-emerald-500': s.financial_status==='PAGA', 'bg-amber-500': s.financial_status==='FECHADA', 'bg-sky-500': s.financial_status==='AJUSTADA', 'bg-gray-400': s.financial_status==='ABERTA'}"></span>
-                  <span x-text="s.financial_status || 'ABERTA'"></span>
+                        :class="{
+                          'bg-emerald-500': s.financial_status==='PAGA',
+                          'bg-amber-500': s.financial_status==='FECHADA',
+                          'bg-orange-500': s.financial_status==='PARCIALMENTE_FECHADA',
+                          'bg-teal-500': s.financial_status==='PARCIALMENTE_PAGA',
+                          'bg-sky-500': s.financial_status==='AJUSTADA',
+                          'bg-purple-500': s.financial_status==='REABERTA',
+                          'bg-red-500': s.financial_status==='CANCELADA',
+                          'bg-gray-400': s.financial_status==='ABERTA'
+                        }"></span>
+                  <span x-text="
+                    s.financial_status==='PAGA' ? 'Paga' :
+                    s.financial_status==='FECHADA' ? 'Fechada' :
+                    s.financial_status==='PARCIALMENTE_FECHADA' ? 'Parcialmente fechada' :
+                    s.financial_status==='PARCIALMENTE_PAGA' ? 'Parcialmente paga' :
+                    s.financial_status==='AJUSTADA' ? 'Ajustada' :
+                    s.financial_status==='REABERTA' ? 'Reaberta' :
+                    s.financial_status==='CANCELADA' ? 'Cancelada' :
+                    s.financial_status || 'Aberta'"></span>
                 </span>
               </td>
               <td class="px-4 py-3.5 text-[13px] text-gray-500 hidden lg:table-cell">
@@ -303,7 +333,7 @@ function vendedoresPage() {
         dragOver: false,
         passwordResult: {}, passwordAction: '',
         form: { name: '', phone: '', commission_rate: '1.00' },
-        stats: { total: 0, ativos: 0, comVendaNoMes: 0, semLancamento: 0, semLancamentoHoje: 0, prontos: 0, pendentes: 0, comissaoAberta: 0, comissaoPaga: 0 },
+        stats: { total: 0, ativos: 0, comVendaNoMes: 0, semLancamento: 0, semLancamentoHoje: 0, prontos: 0, pendentes: 0, cancelados: 0, comissaoAberta: 0, comissaoPaga: 0, comissaoCancelada: 0, comissaoFechada: 0 },
 
         get filteredSellers() {
             var list = this.sellers;
@@ -358,9 +388,12 @@ function vendedoresPage() {
             this.stats.prontos = enriched.filter(s => s.operational_status === 'PRONTO').length;
             this.stats.pendentes = enriched.filter(s => s.operational_status === 'PENDENTE').length;
             this.stats.semLancamento = enriched.filter(s => s.operational_status === 'SEM_LANCAMENTO').length;
+            this.stats.cancelados = enriched.filter(s => s.financial_status === 'CANCELADA').length;
             this.stats.semLancamentoHoje = enriched.filter(s => s.is_active && !s.has_sale_today).length;
             this.stats.comissaoAberta = enriched.reduce((a, s) => s.financial_status === 'ABERTA' ? a + (s.commission_amount || 0) : a, 0);
             this.stats.comissaoPaga = enriched.reduce((a, s) => s.financial_status === 'PAGA' ? a + (s.commission_amount || 0) : a, 0);
+            this.stats.comissaoFechada = enriched.reduce((a, s) => s.financial_status === 'FECHADA' || s.financial_status === 'PARCIALMENTE_FECHADA' ? a + (s.commission_amount || 0) : a, 0);
+            this.stats.comissaoCancelada = enriched.reduce((a, s) => s.financial_status === 'CANCELADA' ? a + (s.commission_amount || 0) : a, 0);
         },
         openCreateModal() { this.editing = false; this.form = { name: '', phone: '', commission_rate: '1.00' }; this.showModal = true; },
         openEditModal(s) { this.editing = true; this.form = { uuid: s.uuid, name: s.name, phone: s.phone, commission_rate: String(parseFloat(s.commission_rate)*100) }; this.showModal = true; },
