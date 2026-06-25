@@ -157,28 +157,9 @@ class WhatsappClient:
         except InstanceNotFoundError:
             return False
 
-    def create_or_get_qrcode(self):
-        if self.instance_exists():
-            raise WhatsAppError(
-                f"O nome '{self.instance}' ja esta em uso. Escolha outro nome."
-            )
-
-        payload = {
-            "instanceName": self.instance,
-            "qrcode": True,
-            "integration": "WHATSAPP-BAILEYS",
-        }
-        if self.webhook_url:
-            payload["webhook"] = {
-                "url": self.webhook_url,
-                "events": ["CONNECTION_UPDATE", "QRCODE_UPDATE"],
-            }
-
-        dados = self._post("/instance/create", payload)
-
+    def _parse_qrcode_response(self, dados, is_new=False):
         if not isinstance(dados, dict):
-            raise WhatsAppError("Resposta inesperada ao criar instancia.")
-
+            raise WhatsAppError("Resposta inesperada da Evolution API.")
         qrcode = dados.get('qrcode', {}) or {}
         instance_key = (
             dados.get('hash')
@@ -191,8 +172,39 @@ class WhatsappClient:
             'code': qrcode.get('code') if isinstance(qrcode, dict) else None,
             'instance_api_key': instance_key,
             'state': inst.get('state') or inst.get('connectionState') or 'connecting',
+            'instance_created': is_new,
             'raw': dados,
         }
+
+    def create_or_get_qrcode(self):
+        # 1. Check if instance exists
+        try:
+            state = self.get_connection_state()
+            if state['connected']:
+                raise WhatsAppError(
+                    f"Instancia '{self.instance}' ja esta conectada. "
+                    "Nao e necessario gerar QR Code."
+                )
+            # Exists but disconnected → reconnect
+            dados = self._get(f"/instance/connect/{self.instance}")
+            return self._parse_qrcode_response(dados, is_new=False)
+        except InstanceNotFoundError:
+            pass
+
+        # 2. Instance doesn't exist → create new
+        payload = {
+            "instanceName": self.instance,
+            "qrcode": True,
+            "integration": "WHATSAPP-BAILEYS",
+        }
+        if self.webhook_url:
+            payload["webhook"] = {
+                "url": self.webhook_url,
+                "events": ["CONNECTION_UPDATE", "QRCODE_UPDATE"],
+            }
+
+        dados = self._post("/instance/create", payload)
+        return self._parse_qrcode_response(dados, is_new=True)
 
     def get_connection_state(self):
         dados = self._get(f"/instance/connectionState/{self.instance}")

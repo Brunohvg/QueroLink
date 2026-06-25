@@ -160,7 +160,7 @@ def whatsapp_instance_status(request):
             'state': dados.get('state'),
             'qrcode_base64': dados.get('qrcode_base64'),
             'pairing_code': dados.get('pairing_code'),
-            'instance_created': bool(instance_key),
+            'instance_created': dados.get('instance_created', False),
         })
     except InstanceNotFoundError:
         return JsonResponse({
@@ -181,11 +181,13 @@ def whatsapp_instance_status(request):
             'error': str(e),
         }, status=500)
     except WhatsAppError as e:
+        msg = str(e)
+        state = 'already_connected' if 'ja esta conectada' in msg else 'error'
         return JsonResponse({
             'connected': False,
-            'state': 'name_taken' if 'ja esta em uso' in str(e) else 'error',
-            'error': str(e),
-        }, status=400)
+            'state': state,
+            'error': msg,
+        }, status=400 if state == 'error' else 200)
     except Exception as e:
         return JsonResponse({
             'connected': False,

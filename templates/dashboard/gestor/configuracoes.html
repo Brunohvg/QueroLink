@@ -216,7 +216,26 @@ showToast("{{ message|escapejs }}", "{% if message.tags == 'error' %}error{% eli
               </div>
             </div>
 
-            <div x-show="!whatsappLoading && (whatsappState === 'disconnected' || whatsappState === 'not_found' || whatsappState === 'error' || whatsappState === 'auth_error')"
+            <div x-show="!whatsappLoading && whatsappState === 'disconnected'"
+                 class="bg-gradient-to-br from-gray-50 to-gray-50/50 border border-gray-200 rounded-2xl p-5">
+              <div class="flex items-center gap-4">
+                <div class="w-12 h-12 rounded-full bg-gray-100 flex items-center justify-center flex-shrink-0">
+                  <svg class="w-6 h-6 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
+                </div>
+                <div class="flex-1">
+                  <p class="text-[15px] font-semibold text-gray-700">Instancia desconectada</p>
+                  <p class="text-[12px] text-gray-500 mt-0.5" x-text="'Instancia: ' + (whatsappInstance || 'desconhecida')"></p>
+                </div>
+                <button @click="fetchQRCode()" :disabled="whatsappQrLoading"
+                        class="inline-flex items-center gap-2 bg-amber-500 hover:bg-amber-600 disabled:bg-gray-300 text-white font-semibold py-2 px-4 rounded-xl transition-all text-[13px] shadow-sm active:scale-[0.97]">
+                  <svg x-show="whatsappQrLoading" class="w-4 h-4 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
+                  <svg x-show="!whatsappQrLoading" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
+                  <span x-text="whatsappQrLoading ? 'Reconectando...' : 'Reconectar'"></span>
+                </button>
+              </div>
+            </div>
+
+            <div x-show="!whatsappLoading && (whatsappState === 'not_found' || whatsappState === 'error' || whatsappState === 'auth_error')"
                  class="bg-gradient-to-br from-gray-50 to-gray-50/50 border border-gray-200 rounded-2xl p-6">
               <div class="text-center max-w-sm mx-auto">
                 <div class="w-14 h-14 mx-auto mb-4 rounded-2xl bg-gray-100 flex items-center justify-center">
