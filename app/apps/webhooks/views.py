@@ -50,6 +50,12 @@ def evolution_webhook(request, instance_name, tenant_uuid, token):
         logger.warning("Evolution webhook invalid token: tenant=%s", tenant_uuid)
         return JsonResponse({"error": "Forbidden"}, status=403)
 
+
+@csrf_exempt
+def evolution_webhook_legacy(request, instance_name, tenant_uuid):
+    logger.info("Legacy webhook (no token): instance=%s tenant=%s", instance_name, tenant_uuid)
+    return JsonResponse({"status": "ignored"}, status=200)
+
     try:
         payload = json.loads(request.body)
     except json.JSONDecodeError:
