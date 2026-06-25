@@ -265,6 +265,37 @@ def whatsapp_connection_state(request):
 
 
 @login_required
+def whatsapp_disconnect(request):
+    if not _check_role(request, User.Role.ADMIN):
+        return JsonResponse({'error': 'Permissao negada.'}, status=403)
+
+    tenant = request.user.tenant
+    if not tenant:
+        return JsonResponse({'error': 'Tenant nao encontrado.'}, status=400)
+
+    from app.services.messaging.whatsapp import (
+        WhatsappClient, WhatsAppError,
+    )
+
+    instance_id = request.GET.get('instance') or tenant.whatsapp_instance_id or ''
+    if not instance_id:
+        return JsonResponse({'error': 'Nome da instancia nao configurado.'}, status=400)
+
+    api_key = tenant.whatsapp_token or getattr(settings, 'WHATSAPP_API_KEY', '')
+    if not api_key:
+        return JsonResponse({'error': 'WHATSAPP_API_KEY nao configurada.'}, status=400)
+
+    try:
+        client = WhatsappClient(instance=instance_id, api_key=api_key)
+        client.disconnect()
+        return JsonResponse({'disconnected': True})
+    except WhatsAppError as e:
+        return JsonResponse({'error': str(e)}, status=500)
+    except Exception as e:
+        return JsonResponse({'error': f'Erro inesperado: {e}'}, status=500)
+
+
+@login_required
 def gestor_ranking(request):
     if not _check_role(request, User.Role.MANAGER, User.Role.ADMIN):
         return redirect('dashboard:home')

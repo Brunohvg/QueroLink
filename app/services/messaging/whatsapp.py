@@ -220,6 +220,9 @@ class WhatsappClient:
             'raw': dados,
         }
 
+    def disconnect(self):
+        self._post(f"/instance/logout/{self.instance}", {})
+
     def _post(self, path, body):
         url = f"{self.api_base_url}{path}"
         headers = {"apikey": self.api_key, "Content-Type": "application/json"}

@@ -179,13 +179,20 @@ showToast("{{ message|escapejs }}", "{% if message.tags == 'error' %}error{% eli
                 <div class="w-12 h-12 rounded-full bg-emerald-100 flex items-center justify-center flex-shrink-0">
                   <svg class="w-6 h-6 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
                 </div>
-                <div>
+                <div class="flex-1">
                   <p class="text-[15px] font-semibold text-emerald-800">WhatsApp conectado</p>
                   <p class="text-[12px] text-emerald-600 mt-0.5" x-text="'Instancia: ' + (whatsappOwner || whatsappInstance)"></p>
                 </div>
-                <div class="ml-auto flex items-center gap-1.5 px-2.5 py-1 bg-emerald-100 rounded-full">
-                  <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
-                  <span class="text-[11px] font-medium text-emerald-700">Online</span>
+                <div class="flex items-center gap-2">
+                  <div class="flex items-center gap-1.5 px-2.5 py-1 bg-emerald-100 rounded-full">
+                    <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
+                    <span class="text-[11px] font-medium text-emerald-700">Online</span>
+                  </div>
+                  <button @click="disconnectWhatsApp()" :disabled="whatsappQrLoading"
+                          class="flex items-center gap-1.5 px-2.5 py-1 bg-red-100 hover:bg-red-200 text-red-600 rounded-full transition-all text-[11px] font-medium">
+                    <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 12H4m0 0l6-6m-6 6l6 6"/></svg>
+                    Desconectar
+                  </button>
                 </div>
               </div>
             </div>
@@ -350,6 +357,28 @@ function configPage() {
             }
         },
 
+        async disconnectWhatsApp() {
+            var instance = document.getElementById('whatsapp_instance_id')?.value?.trim();
+            if (!instance) return;
+            if (!confirm('Desconectar o WhatsApp? Voce precisara escanear o QR Code novamente para conectar.')) return;
+            this.whatsappQrLoading = true;
+            try {
+                var resp = await fetch('{% url "dashboard:whatsapp_disconnect" %}?instance=' + encodeURIComponent(instance));
+                if (resp.ok) {
+                    this.whatsappState = 'disconnected';
+                    this.whatsappQrCode = null;
+                    showToast('WhatsApp desconectado. Gere um novo QR Code para conectar.', 'warning');
+                } else {
+                    var d = await resp.json();
+                    showToast(d.error || 'Erro ao desconectar.', 'error');
+                }
+            } catch (e) {
+                showToast('Erro de rede ao desconectar.', 'error');
+            } finally {
+                this.whatsappQrLoading = false;
+            }
+        },
+
         async fetchQRCode() {
             var instance = document.getElementById('whatsapp_instance_id')?.value?.trim();
             if (!instance) {
@@ -369,13 +398,17 @@ function configPage() {
                     return;
                 }
                 var data = await resp.json();
-                if (data.connected) {
+                if (data.state === 'already_connected') {
+                    this.whatsappState = 'open';
+                    this.whatsappQrCode = null;
+                    showToast('Instancia ja esta conectada.', 'info');
+                } else if (data.connected) {
                     this.whatsappState = 'open';
                     this.whatsappQrCode = null;
                 } else {
                     this.whatsappState = 'connecting';
                     this.whatsappQrCode = data.qrcode_base64 || null;
-                    this._startPolling(instance);
+                    if (this.whatsappQrCode) this._startPolling(instance);
                 }
             } catch (e) {
                 this.whatsappState = 'error';

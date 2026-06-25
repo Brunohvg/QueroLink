@@ -16,6 +16,7 @@ urlpatterns = [
     path('gestor/configuracoes/', desktop_views.gestor_configuracoes, name='gestor_configuracoes'),
     path('gestor/configuracoes/whatsapp/qrcode/', desktop_views.whatsapp_instance_status, name='whatsapp_qrcode'),
     path('gestor/configuracoes/whatsapp/status/', desktop_views.whatsapp_connection_state, name='whatsapp_status'),
+    path('gestor/configuracoes/whatsapp/disconnect/', desktop_views.whatsapp_disconnect, name='whatsapp_disconnect'),
     path('gestor/links/', desktop_views.gestor_links, name='gestor_links'),
 
     path('financeiro/fila/', desktop_views.financeiro_fila, name='financeiro_fila'),
