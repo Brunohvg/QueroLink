@@ -18,7 +18,6 @@ def login_view(request):
         password = request.POST.get('password', '')
 
         user = authenticate(request, username=identifier, password=password)
-        # If not found by username, try by email
         if user is None and '@' in identifier:
             from app.apps.accounts.models import User as UserModel
             try:
@@ -29,6 +28,13 @@ def login_view(request):
 
         if user is not None:
             auth_login(request, user)
+
+            # "Manter conectado" — 30 dias de sessao
+            if request.POST.get('remember_me'):
+                request.session.set_expiry(60 * 60 * 24 * 30)
+            else:
+                request.session.set_expiry(0)
+
             next_url = request.POST.get('next', '')
             if not next_url or next_url == 'dashboard:home':
                 if user.role in (User.Role.MANAGER, User.Role.ADMIN):
