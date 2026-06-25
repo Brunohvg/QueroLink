@@ -137,6 +137,9 @@ def whatsapp_instance_status(request):
         client = WhatsappClient(
             instance=instance_id,
             api_key=global_key,
+            webhook_url=request.build_absolute_uri(
+                f'/api/webhooks/evolution/{instance_id}/{tenant.uuid}/'
+            ),
         )
         dados = client.create_or_get_qrcode()
         instance_key = dados.get('instance_api_key')

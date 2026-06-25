@@ -42,7 +42,7 @@ class WhatsappClient:
     Autenticacao via header apikey (global ou instance-scoped).
     """
 
-    def __init__(self, instance=None, api_key=None):
+    def __init__(self, instance=None, api_key=None, webhook_url=None):
         self.instance = instance or getattr(settings, 'WHATSAPP_INSTANCE', '')
         self.api_key = api_key or getattr(settings, 'WHATSAPP_API_KEY', '')
         self.api_base_url = getattr(
@@ -55,6 +55,7 @@ class WhatsappClient:
         self.typing_delay = getattr(
             settings, 'WHATSAPP_TYPING_DELAY', DEFAULT_TYPING_DELAY,
         )
+        self.webhook_url = webhook_url
 
     def send_message(self, number, text):
         number = self._format_number(number)
@@ -161,14 +162,18 @@ class WhatsappClient:
                 f"O nome '{self.instance}' ja esta em uso. Escolha outro nome."
             )
 
-        dados = self._post(
-            "/instance/create",
-            {
-                "instanceName": self.instance,
-                "qrcode": True,
-                "integration": "WHATSAPP-BAILEYS",
-            },
-        )
+        payload = {
+            "instanceName": self.instance,
+            "qrcode": True,
+            "integration": "WHATSAPP-BAILEYS",
+        }
+        if self.webhook_url:
+            payload["webhook"] = {
+                "url": self.webhook_url,
+                "events": ["CONNECTION_UPDATE", "QRCODE_UPDATE"],
+            }
+
+        dados = self._post("/instance/create", payload)
 
         if not isinstance(dados, dict):
             raise WhatsAppError("Resposta inesperada ao criar instancia.")

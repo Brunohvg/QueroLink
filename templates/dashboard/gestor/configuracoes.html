@@ -356,12 +356,46 @@ function configPage() {
                 } else {
                     this.whatsappState = 'connecting';
                     this.whatsappQrCode = data.qrcode_base64 || null;
+                    this._startPolling(instance);
                 }
             } catch (e) {
                 this.whatsappState = 'error';
                 this.whatsappError = 'Erro de rede ao gerar QR Code.';
             } finally {
                 this.whatsappQrLoading = false;
+            }
+        },
+
+        _pollTimer: null,
+        _pollCount: 0,
+
+        _startPolling(instance) {
+            this._stopPolling();
+            this._pollCount = 0;
+            this._pollTimer = setInterval(async () => {
+                this._pollCount++;
+                if (this._pollCount > 100) {
+                    this._stopPolling();
+                    return;
+                }
+                try {
+                    var resp = await fetch('{% url "dashboard:whatsapp_status" %}?instance=' + encodeURIComponent(instance));
+                    if (!resp.ok) return;
+                    var data = await resp.json();
+                    if (data.connected) {
+                        this.whatsappState = 'open';
+                        this.whatsappQrCode = null;
+                        this._stopPolling();
+                        showToast('WhatsApp conectado com sucesso!', 'success');
+                    }
+                } catch (e) {}
+            }, 3000);
+        },
+
+        _stopPolling() {
+            if (this._pollTimer) {
+                clearInterval(this._pollTimer);
+                this._pollTimer = null;
             }
         }
     }

@@ -1,8 +1,11 @@
 import json
+import logging
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 from app.apps.webhooks.models import WebhookEvent
 from app.apps.accounts.fields import scrub_payment_payload
+
+logger = logging.getLogger(__name__)
 
 
 @csrf_exempt
@@ -22,3 +25,48 @@ def pagarme_webhook(request):
         except json.JSONDecodeError:
             return JsonResponse({"error": "Invalid JSON"}, status=400)
     return JsonResponse({"error": "Method not allowed"}, status=405)
+
+
+@csrf_exempt
+def evolution_webhook(request, instance_name, tenant_uuid):
+    if request.method != "POST":
+        return JsonResponse({"error": "Method not allowed"}, status=405)
+
+    try:
+        payload = json.loads(request.body)
+    except json.JSONDecodeError:
+        return JsonResponse({"error": "Invalid JSON"}, status=400)
+
+    logger.info(
+        "Evolution webhook: instance=%s tenant=%s event=%s",
+        instance_name, tenant_uuid, payload.get('event'),
+    )
+
+    from app.apps.accounts.models import Tenant
+    tenant = Tenant.objects.filter(uuid=tenant_uuid).first()
+    if not tenant:
+        logger.warning("Tenant %s not found for webhook", tenant_uuid)
+        return JsonResponse({"status": "ignored"}, status=200)
+
+    event_type = payload.get('event', '')
+    data = payload.get('data', {})
+
+    if event_type == 'CONNECTION_UPDATE':
+        state = data.get('state') or data.get('instance', {}).get('state', '')
+        if state == 'open':
+            logger.info("WhatsApp connected for tenant %s", tenant_uuid)
+
+    elif event_type == 'QRCODE_UPDATE':
+        logger.info("QR code updated for tenant %s", tenant_uuid)
+
+    WebhookEvent.objects.create(
+        gateway='evolution',
+        payload={
+            'event': event_type,
+            'instance': instance_name,
+            'tenant_uuid': tenant_uuid,
+            'state': data.get('state', ''),
+        },
+    )
+
+    return JsonResponse({"status": "received"}, status=200)
