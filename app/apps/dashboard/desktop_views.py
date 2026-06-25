@@ -87,6 +87,18 @@ def gestor_configuracoes(request):
         ('payment_failed', 'Pagamento falhou'),
     ]
 
+    templates_dict = {
+        t.event_type: t.body
+        for t in MessageTemplate.objects.filter(
+            tenant=tenant, channel='whatsapp',
+            event_type__in=[e for e, _l in LINK_EVENTS],
+        )
+    }
+    link_events_with_body = [
+        (e, l, templates_dict.get(e, ''))
+        for e, l in LINK_EVENTS
+    ]
+
     if request.method == 'POST':
         pagarme_api_key = request.POST.get('pagarme_api_key', '').strip()
         whatsapp_instance_id = request.POST.get('whatsapp_instance_id', '').strip()
@@ -104,12 +116,11 @@ def gestor_configuracoes(request):
             except ValueError:
                 messages.error(request, 'Taxa de comissao invalida.')
                 return render(request, 'dashboard/gestor/configuracoes.html', {
-                    'tenant': tenant, 'link_events': LINK_EVENTS,
+                    'tenant': tenant, 'link_events': link_events_with_body,
                 })
 
         tenant.save()
 
-        # Save WhatsApp notification templates
         for event_type, _label in LINK_EVENTS:
             body = request.POST.get(f'template_{event_type}', '').strip()
             if body:
@@ -121,19 +132,9 @@ def gestor_configuracoes(request):
         messages.success(request, 'Configuracoes salvas com sucesso.')
         return redirect('dashboard:gestor_configuracoes')
 
-    # Load existing templates
-    templates = {
-        t.event_type: t.body
-        for t in MessageTemplate.objects.filter(
-            tenant=tenant, channel='whatsapp',
-            event_type__in=[e for e, _l in LINK_EVENTS],
-        )
-    }
-
     return render(request, 'dashboard/gestor/configuracoes.html', {
         'tenant': tenant,
-        'link_events': LINK_EVENTS,
-        'templates': templates,
+        'link_events': link_events_with_body,
     })
 
 
