@@ -43,10 +43,12 @@ class EncryptedCharField(models.CharField):
             return _get_fernet().decrypt(value.encode()).decode()
         except InvalidToken:
             logger.warning('Failed to decrypt EncryptedCharField value')
-            return value
+            return ''
 
     def to_python(self, value):
         if value is None:
+            return value
+        if isinstance(value, str):
             return value
         return value
 
@@ -69,10 +71,12 @@ class EncryptedTextField(models.TextField):
             return _get_fernet().decrypt(value.encode()).decode()
         except InvalidToken:
             logger.warning('Failed to decrypt EncryptedTextField value')
-            return value
+            return ''
 
     def to_python(self, value):
         if value is None:
+            return value
+        if isinstance(value, str):
             return value
         return value
 

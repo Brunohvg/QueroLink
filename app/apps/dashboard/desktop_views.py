@@ -115,7 +115,7 @@ def whatsapp_instance_status(request):
         return JsonResponse({'error': 'Tenant nao encontrado.'}, status=400)
 
     from app.services.messaging.whatsapp import (
-        WhatsappClient, InstanceNotFoundError,
+        WhatsappClient, WhatsAppError, InstanceNotFoundError,
         AuthenticationError, ConnectionError,
     )
 
@@ -140,7 +140,7 @@ def whatsapp_instance_status(request):
         )
         dados = client.create_or_get_qrcode()
         instance_key = dados.get('instance_api_key')
-        if instance_key and instance_key != tenant.whatsapp_token:
+        if instance_key:
             tenant.whatsapp_token = instance_key
             tenant.save(update_fields=['whatsapp_token'])
         return JsonResponse({
@@ -150,6 +150,12 @@ def whatsapp_instance_status(request):
             'pairing_code': dados.get('pairing_code'),
             'instance_created': bool(instance_key),
         })
+    except WhatsAppError as e:
+        return JsonResponse({
+            'connected': False,
+            'state': 'name_taken' if 'ja esta em uso' in str(e) else 'error',
+            'error': str(e),
+        }, status=400)
     except InstanceNotFoundError:
         return JsonResponse({
             'connected': False,

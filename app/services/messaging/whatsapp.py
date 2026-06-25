@@ -148,18 +148,27 @@ class WhatsappClient:
 
         return data
 
-    def create_or_get_qrcode(self):
+    def instance_exists(self):
         try:
-            dados = self._post(
-                "/instance/create",
-                {
-                    "instanceName": self.instance,
-                    "qrcode": True,
-                    "integration": "WHATSAPP-BAILEYS",
-                },
+            self._get(f"/instance/connectionState/{self.instance}")
+            return True
+        except InstanceNotFoundError:
+            return False
+
+    def create_or_get_qrcode(self):
+        if self.instance_exists():
+            raise WhatsAppError(
+                f"O nome '{self.instance}' ja esta em uso. Escolha outro nome."
             )
-        except WhatsAppError:
-            dados = self._get(f"/instance/connect/{self.instance}")
+
+        dados = self._post(
+            "/instance/create",
+            {
+                "instanceName": self.instance,
+                "qrcode": True,
+                "integration": "WHATSAPP-BAILEYS",
+            },
+        )
 
         qrcode = dados.get('qrcode', {})
         instance_key = (
