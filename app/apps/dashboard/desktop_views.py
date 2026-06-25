@@ -409,13 +409,22 @@ def gestor_links(request):
     if seller_uuid:
         orders = orders.filter(seller__uuid=seller_uuid)
 
+    import logging
+    logger = logging.getLogger(__name__)
+    logger.info("gestor_links: tenant=%s orders_count=%d", tenant.id, orders.count())
+
     orders_data = []
     for o in orders:
         payment = o.payments.first()
         refusal = payment.refusal_reason if payment else None
+        try:
+            customer_name = o.customer_name
+        except Exception as e:
+            customer_name = '[erro: %s]' % e
+            logger.error("gestor_links order=%s customer_name error: %s", o.uuid, e)
         orders_data.append({
             'uuid': str(o.uuid),
-            'customer_name': o.customer_name,
+            'customer_name': customer_name,
             'amount': o.total_amount,
             'status': o.status,
             'status_display': o.get_status_display(),
@@ -429,6 +438,8 @@ def gestor_links(request):
     sellers = list(SellerModel.objects.filter(
         tenant=tenant, is_active=True,
     ).values('uuid', 'name'))
+
+    logger.info("gestor_links: returning %d orders, %d sellers", len(orders_data), len(sellers))
 
     return render(request, 'dashboard/gestor/links.html', {
         'orders_json': orders_data,
