@@ -80,7 +80,7 @@ class PagarMeGateway:
                     }
                 ]
             },
-            "name": self._sanitize_text(name),
+            "name": name,
             "type": "order",
             "expires_in": 1200,
             "max_paid_sessions": 1,
@@ -90,7 +90,9 @@ class PagarMeGateway:
             payload["order_code"] = order_code
 
         if success_url:
-            payload["success_url"] = success_url
+            if "flow_settings" not in payload:
+                payload["flow_settings"] = {}
+            payload["flow_settings"]["success_url"] = success_url
 
         logger.info("Pagar.me create_payment_link: order_code=%s", order_code)
 

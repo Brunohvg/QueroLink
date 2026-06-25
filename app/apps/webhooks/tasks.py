@@ -37,8 +37,13 @@ def process_pagarme_webhook(event_id):
         data = payload.get('data', {})
         logger.info("Processing webhook event %s type=%s", event_id, event_type)
 
-        if event_type == 'order.paid':
+        if event_type in ('order.paid', 'charge.paid'):
             order_uuid = data.get('code')
+            charge_data = data if event_type == 'charge.paid' else None
+
+            if event_type == 'charge.paid' and not order_uuid:
+                order_obj = data.get('order', {})
+                order_uuid = order_obj.get('code')
 
             if not order_uuid:
                 raise ValueError(
@@ -63,33 +68,29 @@ def process_pagarme_webhook(event_id):
                 if gateway_order_id:
                     payment.gateway_order_id = gateway_order_id
 
-                status = data.get('status')
+                if payment.status == Payment.Status.PAID:
+                    logger.info(
+                        "Payment %s already PAID, skipping duplicate webhook",
+                        payment.id,
+                    )
+                else:
+                    payment.status = Payment.Status.PAID
+                    payment.raw_callback_payload = payload
+                    payment.save()
 
-                if status == 'paid':
-                    if payment.status == Payment.Status.PAID:
-                        logger.info(
-                            "Payment %s already PAID, skipping duplicate webhook",
-                            payment.id,
-                        )
-                    else:
-                        payment.status = Payment.Status.PAID
-                        payment.raw_callback_payload = payload
-                        payment.save()
+                    order.status = Order.Status.COMPLETED
+                    order.save()
 
-                        order = payment.order
-                        order.status = Order.Status.COMPLETED
-                        order.save()
-
-                        Sale.objects.get_or_create(
-                            order=order,
-                            defaults={
-                                'tenant': order.tenant,
-                                'seller': order.seller,
-                                'origin': Sale.Origin.LINK,
-                                'amount': order.total_amount,
-                                'sale_date': timezone.localdate(),
-                            },
-                        )
+                    Sale.objects.get_or_create(
+                        order=order,
+                        defaults={
+                            'tenant': order.tenant,
+                            'seller': order.seller,
+                            'origin': Sale.Origin.LINK,
+                            'amount': order.total_amount,
+                            'sale_date': timezone.localdate(),
+                        },
+                    )
 
         event.processed = True
         event.save()
