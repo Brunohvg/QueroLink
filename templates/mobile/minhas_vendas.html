@@ -47,7 +47,7 @@
           </span>
           <p class="font-bold text-gray-800 text-[16px] mt-1.5" x-text="formatMoneyBRL({{ sale.amount }})"></p>
           {% if sale.notes %}
-          <p class="text-[12px] text-gray-400 truncate mt-0.5">{{ sale.notes }}</p>
+          <p class="text-[12px] text-gray-400 truncate max-w-[200px] mt-0.5">{{ sale.notes|truncatechars:40 }}</p>
           {% endif %}
         </div>
         <button x-on:click="deleteSale('{{ sale.uuid }}', '{{ sale.sale_date|date:"Y-m-d" }}')"

@@ -76,6 +76,7 @@ function lancarVenda() {
     return {
         amountCents: 0,
         lastAmount: {{ request.session.last_venda_amount|default:0 }},
+        init() { this.$refs.saleDate.value = new Date().toISOString().split('T')[0]; },
         formatInput() {
             var raw = this.$refs.valorDisplay.value.replace(/\D/g, '');
             if (!raw) { this.$refs.valorDisplay.value = ''; this.amountCents = 0; this.$refs.amountCents.value = '0'; return; }

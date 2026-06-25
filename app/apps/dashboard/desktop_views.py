@@ -420,6 +420,7 @@ def gestor_links(request):
             'status': o.status,
             'status_display': o.get_status_display(),
             'seller_name': o.seller.name if o.seller else '-',
+            'seller_uuid': str(o.seller.uuid) if o.seller else '',
             'refusal_reason': refusal,
             'created_at': o.created_at.isoformat(),
         })

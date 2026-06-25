@@ -29,16 +29,19 @@
             {% if sc.status == 'ABERTA' or sc.status == 'REABERTA' %}bg-indigo-50 text-indigo-700
             {% elif sc.status == 'FECHADA' %}bg-amber-50 text-amber-700
             {% elif sc.status == 'PAGA' %}bg-emerald-50 text-emerald-700
+            {% elif sc.status == 'CANCELADA' %}bg-red-50 text-red-700
             {% else %}bg-gray-100 text-gray-600{% endif %}">
           <span class="w-1.5 h-1.5 rounded-full
               {% if sc.status == 'ABERTA' or sc.status == 'REABERTA' %}bg-indigo-500
               {% elif sc.status == 'FECHADA' %}bg-amber-500
               {% elif sc.status == 'PAGA' %}bg-emerald-500
+              {% elif sc.status == 'CANCELADA' %}bg-red-500
               {% else %}bg-gray-400{% endif %}"></span>
           {% if sc.status == 'FECHADA' %}Aguardando pagamento
           {% elif sc.status == 'PAGA' %}Paga
           {% elif sc.status == 'REABERTA' %}Reaberta
           {% elif sc.status == 'ABERTA' %}Aberta
+          {% elif sc.status == 'CANCELADA' %}Cancelada
           {% else %}{{ sc.status }}{% endif %}
         </span>
       </div>
