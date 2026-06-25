@@ -2,6 +2,8 @@ import json
 import logging
 import uuid
 from django.shortcuts import render, redirect, get_object_or_404
+
+logger = logging.getLogger(__name__)
 from django.http import JsonResponse
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
