@@ -52,26 +52,26 @@
 
     <div class="bg-white rounded-2xl card-shadow overflow-hidden">
       <div class="px-5 pt-5 pb-4">
-        <label class="block text-[13px] font-medium text-gray-500 uppercase tracking-wider mb-4">Valor da Venda</label>
+        <label class="block text-[11px] font-semibold text-gray-400 uppercase tracking-wider mb-3">Valor da Venda</label>
         <div class="relative">
           <span class="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300 text-lg font-bold">R$</span>
           <input type="text" id="valor_display" x-ref="valorDisplay" x-on:input="formatInput()"
-                 class="w-full pl-12 pr-4 py-4 bg-gray-50 border-2 border-gray-100 rounded-2xl focus:border-brand-400 focus:outline-none transition-all font-display text-[26px] font-bold text-gray-800 text-center"
-                 placeholder="0,00" style="font-size:26px!important"
+                 class="w-full pl-12 pr-4 py-4 bg-gray-50 border-2 border-gray-100 rounded-2xl focus:border-brand-400 focus:outline-none transition-all font-display text-[24px] font-bold text-gray-800 text-center"
+                 placeholder="0,00" style="font-size:24px!important"
                  {% if existing_sale %}value="{{ existing_sale.amount|default:0 }}"{% endif %}>
         </div>
         <input type="hidden" name="amount_cents" x-ref="amountCents" value="{{ existing_sale.amount|default:0 }}">
       </div>
 
-      <div class="border-t border-gray-50 px-5 py-4 space-y-4">
+      <div class="border-t border-gray-100 px-5 py-4 space-y-4">
         <div>
-          <label for="sale_date" class="block text-[13px] font-medium text-gray-700 mb-1.5">Data</label>
+          <label for="sale_date" class="block text-[11px] font-semibold text-gray-400 uppercase tracking-wider mb-2">Data</label>
           <input type="date" id="sale_date" name="sale_date" x-ref="saleDate"
-                 class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-[14px] outline-none transition-all focus:border-brand-400 focus:ring-2 focus:ring-brand-100"
+                 class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-[14px] outline-none transition-all focus:border-brand-400 focus:ring-2 focus:ring-brand-100 appearance-none"
                  value="{% if existing_sale %}{{ existing_sale.sale_date|date:'Y-m-d' }}{% else %}{% now 'Y-m-d' %}{% endif %}">
         </div>
         <div>
-          <label for="notes" class="block text-[13px] font-medium text-gray-700 mb-1.5">Observacao</label>
+          <label for="notes" class="block text-[11px] font-semibold text-gray-400 uppercase tracking-wider mb-2">Observacao</label>
           <input type="text" id="notes" name="notes"
                  class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-[14px] outline-none transition-all focus:border-brand-400 focus:ring-2 focus:ring-brand-100"
                  placeholder="Ex: Cliente pagou no PIX"
