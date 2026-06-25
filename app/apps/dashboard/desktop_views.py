@@ -119,10 +119,24 @@ def whatsapp_instance_status(request):
         AuthenticationError, ConnectionError,
     )
 
+    instance_id = tenant.whatsapp_instance_id or ''
+    global_key = getattr(settings, 'WHATSAPP_API_KEY', '')
+
+    if not instance_id:
+        return JsonResponse({
+            'connected': False, 'state': 'not_configured',
+            'error': 'Nome da instancia nao configurado.',
+        })
+    if not global_key:
+        return JsonResponse({
+            'connected': False, 'state': 'not_configured',
+            'error': 'WHATSAPP_API_KEY nao configurada no servidor.',
+        })
+
     try:
         client = WhatsappClient(
             instance=tenant.whatsapp_instance_id,
-            api_key=getattr(settings, 'WHATSAPP_API_KEY', ''),
+            api_key=global_key,
         )
         dados = client.create_or_get_qrcode()
         instance_key = dados.get('instance_api_key')
@@ -176,10 +190,18 @@ def whatsapp_connection_state(request):
         AuthenticationError, ConnectionError,
     )
 
+    instance_id = tenant.whatsapp_instance_id or ''
+
+    if not instance_id:
+        return JsonResponse({
+            'connected': False, 'state': 'not_configured',
+            'error': 'Nome da instancia nao configurado.',
+        })
+
     try:
         client = WhatsappClient(
-            instance=tenant.whatsapp_instance_id,
-            api_key=tenant.whatsapp_token,
+            instance=instance_id,
+            api_key=tenant.whatsapp_token or getattr(settings, 'WHATSAPP_API_KEY', ''),
         )
         data = client.get_connection_state()
         return JsonResponse({
