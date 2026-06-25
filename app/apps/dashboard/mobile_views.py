@@ -149,16 +149,22 @@ def mobile_forgot_password(request):
 
             try:
                 from app.apps.notifications.models import Notification
-                seller = user.seller_profile
-                Notification.objects.create(
-                    tenant=seller.tenant, seller=seller,
-                    event_type='seller_credentials', channel='whatsapp',
-                    recipient=seller.phone,
-                    message_body=(
-                        f'Seu PIN de recuperacao de senha QueroLink: '
-                        f'{pin}. Valido por 10 minutos.'
-                    ),
+                from app.apps.notifications.tasks import (
+                    send_whatsapp_notification,
                 )
+                seller = user.seller_profile
+                if seller and seller.phone:
+                    notif = Notification.objects.create(
+                        tenant=seller.tenant, seller=seller,
+                        event_type='seller_credentials',
+                        channel='whatsapp',
+                        recipient=seller.phone,
+                        message_body=(
+                            f'Seu PIN de recuperacao de senha QueroLink: '
+                            f'{pin}. Valido por 10 minutos.'
+                        ),
+                    )
+                    send_whatsapp_notification.delay(notif.uuid)
             except Exception:
                 pass
 
