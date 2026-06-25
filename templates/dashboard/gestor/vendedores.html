@@ -85,7 +85,8 @@
             <tr class="border-b border-gray-50 hover:bg-gray-50/50 transition-colors">
               <td class="px-4 py-3.5">
                 <div class="flex items-center gap-3">
-                  <div class="w-9 h-9 rounded-full bg-gradient-to-br" :class="s.is_active ? 'from-emerald-400 to-emerald-500' : 'from-gray-300 to-gray-400'" flex items-center justify-center text-white font-semibold text-[13px] shadow-sm">
+                  <div class="w-9 h-9 rounded-full bg-gradient-to-br flex items-center justify-center text-white font-semibold text-[13px] shadow-sm flex-shrink-0"
+                       :class="s.is_active ? 'from-emerald-400 to-emerald-500' : 'from-gray-300 to-gray-400'">
                     <span x-text="(s.name||'?')[0].toUpperCase()"></span>
                   </div>
                   <div>
