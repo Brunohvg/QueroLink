@@ -130,10 +130,11 @@
   </div>
 </div>
 
+<script>var ORDERS_DATA = {{ orders_json|safe }};</script>
 <script>
 function gestorLinksPage() {
     return {
-        orders: {{ orders_json|safe }},
+        orders: [],
         filteredOrders: [],
         search: '',
         sellerFilter: '',
@@ -141,7 +142,12 @@ function gestorLinksPage() {
         dateStart: '',
         dateEnd: '',
 
-        init() { this.filter(); },
+        init() {
+            try {
+                this.orders = typeof ORDERS_DATA !== 'undefined' ? ORDERS_DATA : [];
+            } catch(e) { this.orders = []; }
+            this.filter();
+        },
 
         filter() {
             var q = this.search.toLowerCase().trim();
