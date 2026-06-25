@@ -1,6 +1,6 @@
 import calendar
 from datetime import date
-from decimal import Decimal
+from decimal import Decimal, ROUND_HALF_UP
 
 from django.utils import timezone
 from django.db import transaction
@@ -20,6 +20,7 @@ def get_manual_sales_total(seller, month, year):
     last_day = calendar.monthrange(year, month)[1]
     end = date(year, month, last_day)
     total = Sale.objects.filter(
+        tenant=seller.tenant,
         seller=seller,
         origin=Sale.Origin.MANUAL,
         sale_date__gte=start,
@@ -33,6 +34,7 @@ def get_manual_sales_by_day(seller, month, year):
     last_day = calendar.monthrange(year, month)[1]
     end = date(year, month, last_day)
     sales = Sale.objects.filter(
+        tenant=seller.tenant,
         seller=seller,
         origin=Sale.Origin.MANUAL,
         sale_date__gte=start,
@@ -53,7 +55,7 @@ def get_commission_rate(seller):
 def calculate_estimated_commission(seller, month, year):
     total = get_manual_sales_total(seller, month, year)
     rate = get_commission_rate(seller)
-    commission = int(float(total) * float(rate) + 0.5)
+    commission = int((total * rate).quantize(Decimal('1'), rounding=ROUND_HALF_UP))
     return commission, total
 
 
@@ -87,19 +89,20 @@ def sync_period_seller_commissions(period):
     all_sellers = (sellers | sellers_with_manual).distinct()
 
     created_count = 0
-    for seller in all_sellers:
-        sc, created = SellerCommission.objects.get_or_create(
-            period=period,
-            seller=seller,
-            defaults={
-                'commission_rate': get_commission_rate(seller),
-                'expected_working_days': period.expected_working_days or 22,
-            },
-        )
-        if created:
-            created_count += 1
-        if sc.is_editable:
-            sc.recalculate(commit=True)
+    with transaction.atomic():
+        for seller in all_sellers:
+            sc, created = SellerCommission.objects.get_or_create(
+                period=period,
+                seller=seller,
+                defaults={
+                    'commission_rate': get_commission_rate(seller),
+                    'expected_working_days': period.expected_working_days or 22,
+                },
+            )
+            if created:
+                created_count += 1
+            if sc.is_editable:
+                sc.recalculate(commit=True)
 
     return created_count
 
@@ -120,6 +123,7 @@ def get_seller_commission(period, seller):
 
 def calculate_seller_working_days(period, seller):
     sales_dates = Sale.objects.filter(
+        tenant=period.tenant,
         seller=seller,
         origin=Sale.Origin.MANUAL,
         sale_date__year=period.year,
@@ -305,10 +309,16 @@ def pay_seller_commissions(period, seller_commission_ids, user, payment_data):
 
     for sc in commissions:
         try:
+            if sc.status == SellerCommission.Status.PAGA:
+                continue
             from app.apps.notifications.tasks import notify_commission_paid
             notify_commission_paid(sc)
         except Exception:
-            pass
+            import logging
+            logging.getLogger(__name__).error(
+                'Failed to send payment notification for commission %s', sc.id,
+                exc_info=True,
+            )
 
     return list(commissions)
 
@@ -398,9 +408,6 @@ def get_dashboard_data(tenant, month=None, year=None):
     ).first()
 
     if period:
-        sync_period_seller_commissions(period)
-
-    if period:
         summary = calculate_period_summary(period)
         period_status = period.status
     else:
@@ -409,7 +416,7 @@ def get_dashboard_data(tenant, month=None, year=None):
         for s in sellers_ativos:
             total = get_manual_sales_total(s, month, year)
             rate = get_commission_rate(s)
-            comissao_estimada += int(float(total) * float(rate) + 0.5)
+            comissao_estimada += int((total * rate).quantize(Decimal('1'), rounding=ROUND_HALF_UP))
 
         summary = {
             'commission_aberta': comissao_estimada,
@@ -659,14 +666,15 @@ def update_period(period, data, user):
     period.save(update_fields=changed_fields + ['updated_at'])
 
     if 'expected_working_days' in changed_fields:
-        for sc in SellerCommission.objects.filter(
-            period=period,
-            status__in=[
-                SellerCommission.Status.ABERTA,
-                SellerCommission.Status.REABERTA,
-            ],
-        ):
-            sc.recalculate(commit=True)
+        with transaction.atomic():
+            for sc in SellerCommission.objects.filter(
+                period=period,
+                status__in=[
+                    SellerCommission.Status.ABERTA,
+                    SellerCommission.Status.REABERTA,
+                ],
+            ):
+                sc.recalculate(commit=True)
 
     return period, changed_fields
 
@@ -678,10 +686,11 @@ def delete_period(period, user):
 
     from app.apps.audit.utils import log_action
 
-    sc_count = SellerCommission.objects.filter(period=period).count()
-    SellerCommission.objects.filter(period=period).delete()
+    with transaction.atomic():
+        sc_count = SellerCommission.objects.filter(period=period).count()
+        SellerCommission.objects.filter(period=period).delete()
 
-    period.delete()
+        period.delete()
 
     return sc_count
 
@@ -694,19 +703,20 @@ def cancel_period(period, reason, user):
     if not can:
         raise ValueError(msg)
 
-    period.status = CommissionPeriod.Status.CANCELADA
-    period.cancelled_by = user
-    period.cancelled_at = __import__('django').utils.timezone.now()
-    period.cancel_reason = reason
-    period.save(update_fields=[
-        'status', 'cancelled_by', 'cancelled_at',
-        'cancel_reason', 'updated_at',
-    ])
+    with transaction.atomic():
+        period.status = CommissionPeriod.Status.CANCELADA
+        period.cancelled_by = user
+        period.cancelled_at = timezone.now()
+        period.cancel_reason = reason
+        period.save(update_fields=[
+            'status', 'cancelled_by', 'cancelled_at',
+            'cancel_reason', 'updated_at',
+        ])
 
-    SellerCommission.objects.filter(period=period).exclude(
-        status=SellerCommission.Status.PAGA,
-    ).update(
-        status=SellerCommission.Status.CANCELADA,
-    )
+        SellerCommission.objects.filter(period=period).exclude(
+            status=SellerCommission.Status.PAGA,
+        ).update(
+            status=SellerCommission.Status.CANCELADA,
+        )
 
     return period

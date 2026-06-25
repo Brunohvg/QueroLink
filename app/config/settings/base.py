@@ -21,8 +21,8 @@ BASE_DIR = Path(__file__).resolve().parent.parent.parent.parent
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/5.1/howto/deployment/checklist/
 
-# SECURITY WARNING: keep the secret key used in production secret!  
-SECRET_KEY = config('SECRET_KEY', default='dev-insecure-key-change-in-production')
+# SECURITY WARNING: keep the secret key used in production secret!
+SECRET_KEY = config('SECRET_KEY')
 
 # APIs e Integrações
 API_KEY_PAGAR_ME = config('API_KEY_PAGAR_ME', default='')
@@ -150,9 +150,8 @@ STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage" 
 # Configurações para Whitenoise (servidor de arquivos estáticos em produção)
 # Já incluído no MIDDLEWARE, não há mais ajustes necessários aqui
 
-# E-mail (SMTP)
-# Descomente e configure para envio de e-mails transacionais (confirmacao de cadastro, redefinicao de senha, etc.)
-EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+# E-mail (console no dev, SMTP em producao)
+EMAIL_BACKEND = config('EMAIL_BACKEND', default='django.core.mail.backends.console.EmailBackend')
 EMAIL_HOST = config('EMAIL_HOST', default='')
 EMAIL_PORT = config('EMAIL_PORT', default=587, cast=int)
 EMAIL_HOST_USER = config('EMAIL_HOST_USER', default='')
@@ -178,7 +177,7 @@ LOGOUT_REDIRECT_URL = 'dashboard:login'
 # CSRF
 CSRF_TRUSTED_ORIGINS = config(
     'CSRF_TRUSTED_ORIGINS',
-    default='https://querolink.lojabibelo.com.br,https://www.querolink.lojabibelo.com.br',
+    default='',
     cast=lambda v: [s.strip() for s in v.split(',') if s.strip()],
 )
 
@@ -189,6 +188,11 @@ CORS_ALLOWED_ORIGINS = config(
 )
 CORS_ALLOW_CREDENTIALS = True
 
+# Security headers
+SECURE_CONTENT_TYPE_NOSNIFF = True
+SECURE_BROWSER_XSS_FILTER = True
+SECURE_REFERRER_POLICY = 'same-origin'
+
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': [
         'rest_framework.authentication.SessionAuthentication',
@@ -198,6 +202,14 @@ REST_FRAMEWORK = {
     'DEFAULT_PERMISSION_CLASSES': [
         'rest_framework.permissions.IsAuthenticated',
     ],
+    'DEFAULT_THROTTLE_CLASSES': [
+        'rest_framework.throttling.UserRateThrottle',
+        'rest_framework.throttling.AnonRateThrottle',
+    ],
+    'DEFAULT_THROTTLE_RATES': {
+        'user': '1000/hour',
+        'anon': '100/hour',
+    },
     'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
 }
 
@@ -216,4 +228,6 @@ SIMPLE_JWT = {
     'ROTATE_REFRESH_TOKENS': True,
     'BLACKLIST_AFTER_ROTATION': True,
     'AUTH_HEADER_TYPES': ('Bearer',),
+    'ALGORITHM': 'HS256',
+    'SIGNING_KEY': config('JWT_SIGNING_KEY', default=None) or SECRET_KEY,
 }

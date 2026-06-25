@@ -1,6 +1,10 @@
+import logging
+
 from celery import shared_task
 from app.apps.notifications.models import Notification, MessageTemplate
 from app.services.messaging.whatsapp import WhatsappClient
+
+logger = logging.getLogger(__name__)
 
 MAX_RETRIES = 3
 
@@ -12,15 +16,11 @@ def send_whatsapp_notification(self, notification_id):
             "tenant", "seller", "commission_period"
         ).get(uuid=notification_id)
     except Notification.DoesNotExist:
+        logger.warning("Notification %s not found", notification_id)
         return
 
     if notification.status != Notification.Status.PENDING:
-        return
-
-    if notification.retry_count >= MAX_RETRIES:
-        notification.status = Notification.Status.FAILED
-        notification.error_log = f"Max retries ({MAX_RETRIES}) exceeded."
-        notification.save(update_fields=["status", "error_log", "updated_at"])
+        logger.info("Notification %s already processed, skipping", notification_id)
         return
 
     try:
@@ -35,12 +35,22 @@ def send_whatsapp_notification(self, notification_id):
         notification.error_log = str(e)[:1000]
         notification.save(update_fields=["retry_count", "error_log", "updated_at"])
 
-        if notification.retry_count < MAX_RETRIES:
-            countdown = 60 * (2 ** (notification.retry_count - 1))
-            raise self.retry(countdown=countdown)
+        retry_count = notification.retry_count
+        logger.warning(
+            "WhatsApp notification %s failed (attempt %d/%d): %s",
+            notification_id, retry_count, MAX_RETRIES, e,
+        )
+
+        if retry_count < MAX_RETRIES:
+            countdown = 60 * (2 ** (retry_count - 1))
+            try:
+                raise self.retry(countdown=countdown)
+            except Exception:
+                raise
         else:
             notification.status = Notification.Status.FAILED
-            notification.save(update_fields=["status", "updated_at"])
+            notification.error_log = f"Max retries ({MAX_RETRIES}) exceeded. Last error: {str(e)[:800]}"
+            notification.save(update_fields=["status", "error_log", "updated_at"])
 
 
 def create_and_send_notification(*, tenant, event_type, channel, recipient, context, seller=None, order=None, commission_period=None):
@@ -86,7 +96,9 @@ def notify_seller_credentials(seller, password):
 def notify_commission_paid(seller_commission):
     seller = seller_commission.seller
     period = seller_commission.period
-    valor = f"R$ {seller_commission.commission_amount / 100:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+    from decimal import Decimal
+    amount = Decimal(str(seller_commission.commission_amount)) / Decimal('100')
+    valor = f"R$ {amount:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
 
     create_and_send_notification(
         tenant=seller.tenant,
@@ -110,7 +122,7 @@ def _fallback_body(event_type, context):
             f"Seu acesso ao sistema de comissoes foi criado.\n"
             f"Usuario: {context.get('usuario', '')}\n"
             f"Senha temporaria: {context.get('senha', '')}\n"
-            f"Acesse e troque sua senha no primeiro login."
+            f"Acesse e altere sua senha imediatamente."
         )
     if event_type == MessageTemplate.EventType.COMMISSION_PAID:
         return (

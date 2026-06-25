@@ -74,7 +74,7 @@ class SellerViewSet(viewsets.ModelViewSet):
         except Exception:
             pass
         log_action(request, 'seller.password_reset', instance=seller)
-        return Response({'password': password, 'username': seller.user.username})
+        return Response({'message': 'Senha redefinida com sucesso.'})
 
     @action(detail=False, methods=['post'])
     def import_sellers(self, request):
@@ -396,6 +396,7 @@ class RankingView(generics.GenericAPIView):
         from app.apps.commissions.services import (
             calculate_estimated_commission, get_commission_rate,
         )
+        from decimal import Decimal, ROUND_HALF_UP
 
         tenant = request.user.tenant
         month = int(request.query_params.get(
@@ -404,6 +405,10 @@ class RankingView(generics.GenericAPIView):
         year = int(request.query_params.get(
             'year', timezone.localdate().year,
         ))
+        if month < 1 or month > 12:
+            return Response({'error': 'Mes invalido (1-12).'}, status=400)
+        if year < 2020:
+            return Response({'error': 'Ano invalido.'}, status=400)
 
         sales = Sale.objects.filter(
             tenant=tenant,
@@ -416,19 +421,24 @@ class RankingView(generics.GenericAPIView):
         ).order_by('-total_sold')
 
         ranking = []
+        seller_uuids = [s['seller__uuid'] for s in sales]
+        sellers_map = {
+            str(s.uuid): s
+            for s in Seller.objects.filter(uuid__in=seller_uuids, tenant=tenant)
+        }
+
         for s in sales:
             seller_uuid = s['seller__uuid']
             total_sold = s['total_sold']
             sale_count = s['sale_count']
             ticket_medio = round(total_sold / sale_count) if sale_count > 0 else 0
 
-            from app.apps.sellers.models import Seller
-            try:
-                seller_obj = Seller.objects.get(uuid=seller_uuid)
+            seller_obj = sellers_map.get(str(seller_uuid))
+            if seller_obj:
                 rate = get_commission_rate(seller_obj)
-                commission_estimada = int(float(total_sold) * float(rate) + 0.5)
-            except Seller.DoesNotExist:
-                rate = 0
+                commission_estimada = int((Decimal(str(total_sold)) * Decimal(str(rate))).quantize(Decimal('1'), rounding=ROUND_HALF_UP))
+            else:
+                rate = Decimal('0')
                 commission_estimada = 0
 
             ranking.append({

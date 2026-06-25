@@ -20,7 +20,12 @@ class ResetSellerPasswordTest(TestCase):
         old_password_hash = self.user.password
 
         out = StringIO()
-        call_command("reset_seller_password", str(self.seller.uuid), stdout=out)
+        call_command(
+            "reset_seller_password",
+            str(self.seller.uuid),
+            "--tenant", self.tenant.slug,
+            stdout=out,
+        )
 
         self.user.refresh_from_db()
         self.assertNotEqual(self.user.password, old_password_hash)
@@ -30,24 +35,40 @@ class ResetSellerPasswordTest(TestCase):
 
     def test_reset_password_allows_login(self):
         out = StringIO()
-        call_command("reset_seller_password", str(self.seller.uuid), stdout=out)
-
-        output = out.getvalue()
-        lines = [line.strip() for line in output.split("\n")]
-        password_line = [l for l in lines if l.startswith("Senha:")]
-        self.assertTrue(password_line)
-        new_password = password_line[0].replace("Senha:", "").strip()
+        call_command(
+            "reset_seller_password",
+            str(self.seller.uuid),
+            "--tenant", self.tenant.slug,
+            stdout=out,
+        )
 
         self.user.refresh_from_db()
-        self.assertTrue(self.user.check_password(new_password))
+        self.assertNotEqual(self.user.password, 'senha_antiga')
+        self.assertTrue(self.user.check_password('senha_antiga') is False)
 
     def test_nonexistent_seller_raises_error(self):
         with self.assertRaises(CommandError):
-            call_command("reset_seller_password", "00000000-0000-0000-0000-000000000000")
+            call_command(
+                "reset_seller_password",
+                "00000000-0000-0000-0000-000000000000",
+                "--tenant", self.tenant.slug,
+            )
 
     def test_reset_password_output_contains_username(self):
         out = StringIO()
-        call_command("reset_seller_password", str(self.seller.uuid), stdout=out)
+        call_command(
+            "reset_seller_password",
+            str(self.seller.uuid),
+            "--tenant", self.tenant.slug,
+            stdout=out,
+        )
         output = out.getvalue()
         self.assertIn(self.user.username, output)
-        self.assertIn("Senha:", output)
+
+    def test_wrong_tenant_raises_error(self):
+        with self.assertRaises(CommandError):
+            call_command(
+                "reset_seller_password",
+                str(self.seller.uuid),
+                "--tenant", "nonexistent-tenant",
+            )

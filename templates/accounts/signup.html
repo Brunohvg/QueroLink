@@ -28,7 +28,8 @@
                 duration=duration||(type==='error'?6000:4000);
                 var el=document.createElement('div');
                 el.className='pointer-events-auto flex items-start gap-3 px-4 py-3 rounded-xl border shadow-lg toast-enter '+s.bg+' '+s.border;
-                el.innerHTML='<div class="flex-shrink-0 mt-0.5">'+s.icon+'</div><div class="flex-1 min-w-0"><p class="text-sm font-medium '+s.text+'">'+message+'</p></div><button onclick="this.parentElement.remove()" class="flex-shrink-0 text-gray-400 hover:text-gray-600 transition"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg></button><div class="absolute bottom-0 left-0 h-0.5 rounded-full '+s.dot+'" style="width:100%;animation:shrink '+duration+'ms linear forwards;"></div>';
+                el.innerHTML='<div class="flex-shrink-0 mt-0.5">'+s.icon+'</div><div class="flex-1 min-w-0"><p class="text-sm font-medium '+s.text+'"></p></div><button onclick="this.parentElement.remove()" class="flex-shrink-0 text-gray-400 hover:text-gray-600 transition"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg></button><div class="absolute bottom-0 left-0 h-0.5 rounded-full '+s.dot+'" style="width:100%;animation:shrink '+duration+'ms linear forwards;"></div>';
+                el.querySelector('p').textContent = message;
                 document.getElementById('toast-container').appendChild(el);
                 setTimeout(function(){if(el.parentNode)el.parentNode.removeChild(el);},duration+300);
             }

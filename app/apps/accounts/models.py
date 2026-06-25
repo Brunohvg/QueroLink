@@ -64,3 +64,9 @@ class User(AbstractUser):
     
     def __str__(self):
         return self.username
+
+    class Meta:
+        indexes = [
+            models.Index(fields=['tenant', 'role'], name='user_tenant_role_idx'),
+            models.Index(fields=['role'], name='user_role_idx'),
+        ]

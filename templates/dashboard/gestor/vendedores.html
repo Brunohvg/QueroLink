@@ -79,13 +79,9 @@
     <div x-show="showPasswordModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40" @click.self="showPasswordModal=false">
         <div class="bg-white rounded-2xl shadow-xl p-6 w-full max-w-md mx-4 text-center">
             <div class="w-12 h-12 bg-success-50 rounded-full flex items-center justify-center mx-auto mb-3"><svg class="w-6 h-6 text-success-700" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg></div>
-            <h3 class="text-[16px] font-semibold mb-1" x-text="passwordAction=='create'?'Criado!':'Senha resetada!'"></h3>
-            <p class="text-[12px] text-gray-500 mb-3">A senha foi enviada por WhatsApp.</p>
-            <div class="bg-gray-50 rounded-xl p-3 mb-3 text-[13px]">
-                <p><span class="text-gray-500">Usuario:</span> <strong x-text="passwordResult.username"></strong></p>
-                <p><span class="text-gray-500">Senha:</span> <code class="bg-white px-2 py-0.5 rounded text-brand-500 font-mono" x-text="passwordResult.password"></code></p>
-            </div>
-            <p class="text-xs text-danger-500 mb-3">Guarde esta senha.</p>
+            <h3 class="text-[16px] font-semibold mb-1" x-text="passwordAction=='create'?'Vendedor criado!':'Senha redefinida!'"></h3>
+            <p class="text-[12px] text-gray-500 mb-3">As credenciais foram enviadas por WhatsApp.</p>
+            <p class="text-[12px] text-gray-500 mb-4">Usuario: <strong x-text="passwordResult.username"></strong></p>
             <button @click="showPasswordModal=false" class="w-full bg-brand-500 text-white font-medium py-2 px-4 rounded-xl transition text-[14px]">Entendi</button>
         </div>
     </div>

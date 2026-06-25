@@ -7,7 +7,7 @@ COPY static/css/input.css ./static/css/
 COPY templates/ ./templates/
 RUN npm run build:css
 
-FROM python:3.12.3-slim
+FROM python:3.12-slim
 
 ENV PYTHONUNBUFFERED=1
 ENV PYTHONDONTWRITEBYTECODE=1
@@ -29,13 +29,20 @@ RUN apt-get update \
 COPY requirements/base.txt ./requirements/base.txt
 COPY requirements/production.txt ./requirements/production.txt
 
-RUN pip install --no-cache-dir -r requirements/production.txt
+RUN pip install --no-cache-dir -r requirements/production.txt \
+    && apt-get purge -y gcc libffi-dev \
+    && apt-get autoremove -y \
+    && rm -rf /var/lib/apt/lists/*
 
 COPY . .
 
 COPY --from=tailwind-build /app/static/css/tailwind.css ./static/css/tailwind.css
 
-RUN chmod +x /app/entrypoint.sh
+RUN chmod +x /app/entrypoint.sh \
+    && useradd -m -u 1000 appuser \
+    && chown -R appuser:appuser /app
+
+USER appuser
 
 EXPOSE 8000
 

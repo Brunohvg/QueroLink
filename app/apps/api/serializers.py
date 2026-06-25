@@ -1,6 +1,7 @@
 from datetime import date
 
 from rest_framework import serializers
+from django.db import transaction
 from django.utils import timezone
 
 from app.apps.sales.models import Sale
@@ -75,20 +76,21 @@ class SellerCreateSerializer(serializers.Serializer):
 
         password = get_random_string(12)
 
-        user = User.objects.create_user(
-            username=username,
-            password=password,
-            role=User.Role.SELLER,
-            tenant=tenant,
-        )
+        with transaction.atomic():
+            user = User.objects.create_user(
+                username=username,
+                password=password,
+                role=User.Role.SELLER,
+                tenant=tenant,
+            )
 
-        seller = Seller.objects.create(
-            tenant=tenant,
-            user=user,
-            name=validated_data['name'],
-            phone=validated_data['phone'],
-            commission_rate=tenant.default_commission_rate,
-        )
+            seller = Seller.objects.create(
+                tenant=tenant,
+                user=user,
+                name=validated_data['name'],
+                phone=validated_data['phone'],
+                commission_rate=tenant.default_commission_rate,
+            )
 
         try:
             from app.apps.notifications.tasks import notify_seller_credentials
@@ -101,7 +103,7 @@ class SellerCreateSerializer(serializers.Serializer):
             'name': seller.name,
             'phone': seller.phone,
             'username': username,
-            'password': password,
+            'message': 'Vendedor criado com sucesso. As credenciais serao enviadas via WhatsApp.',
         }
 
 

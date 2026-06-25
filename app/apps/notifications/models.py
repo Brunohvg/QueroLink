@@ -82,6 +82,8 @@ class Notification(models.Model):
                 self.tenant = self.order.tenant
             elif self.seller_id:
                 self.tenant = self.seller.tenant
+            elif self.commission_period_id:
+                self.tenant = self.commission_period.tenant
         super().save(*args, **kwargs)
 
 

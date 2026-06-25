@@ -42,14 +42,20 @@ fi
 # ── 4. Backup (produção) ───────────────────────────────────
 if [ "$ENV" = "production" ] && [ -n "$DATABASE_URL" ]; then
     log "===== BACKUP (produção) ====="
+    mkdir -p backups
     BACKUP_FILE="backup_$(date +%Y%m%d_%H%M%S).sql"
-    python3 -c "
+    if python -c "
 import os, subprocess
-url = os.environ.get('DATABASE_URL','')
+url = os.environ.get('DATABASE_URL', '')
 if url and 'postgres' in url:
-    subprocess.run(['pg_dump', os.environ['DATABASE_URL'], '-f', 'backups/$BACKUP_FILE'], check=True)
-    print('Backup salvo em backups/$BACKUP_FILE')
-" 2>/dev/null || log "AVISO: Backup automático falhou. Faça backup manual."
+    subprocess.run(['pg_dump', os.environ['DATABASE_URL'], '-f', 'backups/${BACKUP_FILE}'], check=True)
+    print('Backup salvo em backups/${BACKUP_FILE}')
+"; then
+        log "Backup salvo em backups/$BACKUP_FILE"
+        find backups -name 'backup_*.sql' -type f -mtime +30 -delete 2>/dev/null || true
+    else
+        error "Backup automático falhou. Corrija o erro antes de continuar."
+    fi
 fi
 
 # ── 5. Build + Deploy ──────────────────────────────────────
