@@ -666,6 +666,16 @@ def delete_period(period, user):
 
         period.delete()
 
+        log_action(
+            user, 'commission_period.deleted',
+            changes={
+                'period_id': str(period.uuid),
+                'month': period.month,
+                'year': period.year,
+                'sc_count': sc_count,
+            }
+        )
+
     return sc_count
 
 

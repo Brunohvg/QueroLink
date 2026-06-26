@@ -138,6 +138,10 @@ class SellerImportSerializer(serializers.Serializer):
             raise serializers.ValidationError(
                 'Formato de arquivo invalido. Envie um arquivo .csv ou .xlsx.'
             )
+        if value.size > 5 * 1024 * 1024:
+            raise serializers.ValidationError(
+                'Arquivo muito grande. Tamanho maximo permitido: 5MB.'
+            )
         return value
 
     def _parse_file(self, file):
