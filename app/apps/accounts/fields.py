@@ -26,11 +26,6 @@ def _get_fernet():
     return Fernet(_derive_fernet_key())
 
 
-def _reset_fernet_cache():
-    _derive_fernet_key.cache_clear()
-    _get_fernet.cache_clear()
-
-
 class EncryptedCharField(models.CharField):
     def __init__(self, *args, **kwargs):
         kwargs.setdefault('max_length', 600)
