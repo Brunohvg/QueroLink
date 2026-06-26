@@ -15,6 +15,25 @@ from app.apps.accounts.models import User
 from app.apps.accounts.validators import clean_phone, validate_phone_br
 from app.apps.accounts.fields import compute_hash
 
+PLAN_LIMITS = {
+    'ESSENCIAL': 5,
+    'PROFISSIONAL': 15,
+    'PLUS': 30,
+    'ENTERPRISE': None,  # ilimitado
+}
+
+
+def _check_seller_limit(tenant):
+    limit = PLAN_LIMITS.get(tenant.plan)
+    if limit is None:
+        return
+    current = Seller.objects.filter(tenant=tenant, is_active=True).count()
+    if current >= limit:
+        raise serializers.ValidationError(
+            f'Limite de vendedores do plano {tenant.plan} atingido ({limit}). '
+            f'Faca upgrade para adicionar mais vendedores.'
+        )
+
 
 class SellerSerializer(serializers.ModelSerializer):
     username = serializers.CharField(source='user.username', read_only=True)
@@ -67,6 +86,8 @@ class SellerCreateSerializer(serializers.Serializer):
     def create(self, validated_data):
         request = self.context['request']
         tenant = request.user.tenant
+
+        _check_seller_limit(tenant)
 
         base = slugify(validated_data['name'])
         username = base
@@ -181,6 +202,28 @@ class SellerImportSerializer(serializers.Serializer):
 
         request = self.context['request']
         tenant = request.user.tenant
+
+        _check_seller_limit(tenant)
+
+        limit = PLAN_LIMITS.get(tenant.plan)
+        if limit is not None:
+            valid_count = 0
+            for row in rows:
+                name = (row.get('nome') or row.get('name') or '').strip()
+                phone = (row.get('telefone') or row.get('phone') or '').strip()
+                if not name or not phone:
+                    continue
+                cleaned_phone = clean_phone(phone)
+                if not validate_phone_br(cleaned_phone):
+                    continue
+                valid_count += 1
+            current = Seller.objects.filter(tenant=tenant, is_active=True).count()
+            if current + valid_count > limit:
+                raise serializers.ValidationError(
+                    f'Limite de vendedores do plano {tenant.plan} atingido ({limit}). '
+                    f'Voce tem {current} vendedores ativos e esta tentando importar '
+                    f'{valid_count}. Faca upgrade para adicionar mais vendedores.'
+                )
 
         created = []
         errors = []

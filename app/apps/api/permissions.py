@@ -46,6 +46,9 @@ class IsSellerOwner(BasePermission):
     def has_object_permission(self, request, view, obj):
         if not self.has_permission(request, view):
             return False
+        obj_tenant = getattr(obj, 'tenant', None)
+        if obj_tenant is not None and obj_tenant != request.user.tenant:
+            return False
         try:
             seller_profile = request.user.seller_profile
         except Exception:

@@ -1,6 +1,7 @@
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib import messages
 from django.http import HttpResponse
+from django_ratelimit.decorators import ratelimit
 from app.apps.orders.models import Order
 from app.apps.accounts.models import Tenant
 from app.apps.sellers.models import Seller
@@ -19,6 +20,7 @@ def index(request, tenant_slug):
     })
 
 
+@ratelimit(key='ip', rate='10/m', method='POST', block=True)
 def create_link(request, tenant_slug):
     tenant = get_object_or_404(Tenant, slug=tenant_slug, is_active=True)
 
@@ -33,8 +35,14 @@ def create_link(request, tenant_slug):
             return redirect("orders:index", tenant_slug=tenant_slug)
 
         try:
-            valor_formatado = float(link_value.replace("R$", "").replace(",", ".").strip())
-            total_amount = int(valor_formatado * 100)
+            from decimal import Decimal, ROUND_HALF_UP
+            valor_str = link_value.replace("R$", "").replace(",", ".").strip()
+            total_amount = int(
+                Decimal(valor_str).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP) * 100
+            )
+            if total_amount < 100:
+                messages.error(request, "Valor minimo e R$ 1,00.")
+                return redirect("orders:index", tenant_slug=tenant_slug)
 
             session_data = request.session.get("generated_link_data", {})
             if session_data.get("link_name") == link_name and session_data.get("link_value") == link_value and session_data.get("vendedor") == vendedor_uuid:
