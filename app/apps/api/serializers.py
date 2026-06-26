@@ -53,7 +53,7 @@ class SellerSerializer(serializers.ModelSerializer):
                 'Telefone invalido. Informe um numero com DDD (10 ou 11 digitos).'
             )
         tenant = self.context['request'].user.tenant
-        qs = Seller.objects.filter(tenant=tenant, phone=cleaned)
+        qs = Seller.objects.filter(tenant=tenant, phone_hash=compute_hash(cleaned))
         if self.instance:
             qs = qs.exclude(pk=self.instance.pk)
         if qs.exists():
@@ -234,7 +234,7 @@ class SellerImportSerializer(serializers.Serializer):
         used_usernames = set()
         used_phones = set(
             Seller.objects.filter(tenant=tenant)
-            .values_list('phone', flat=True)
+            .values_list('phone_hash', flat=True)
         )
 
         for i, row in enumerate(rows, start=2):
@@ -253,7 +253,7 @@ class SellerImportSerializer(serializers.Serializer):
                 errors.append({'linha': i, 'erro': f'Telefone invalido: {phone}'})
                 continue
 
-            if cleaned_phone in used_phones:
+            if compute_hash(cleaned_phone) in used_phones:
                 errors.append({'linha': i, 'erro': f'Telefone ja cadastrado: {phone}'})
                 continue
 
@@ -289,7 +289,7 @@ class SellerImportSerializer(serializers.Serializer):
                     pass
 
                 used_usernames.add(username)
-                used_phones.add(cleaned_phone)
+                used_phones.add(compute_hash(cleaned_phone))
                 created.append({
                     'linha': i,
                     'nome': name,

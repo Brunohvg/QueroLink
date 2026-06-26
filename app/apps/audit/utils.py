@@ -12,8 +12,11 @@ def log_action(request, action, instance=None, changes=None):
         ip_address = None
 
         if request is not None:
-            user = request.user if request.user.is_authenticated else None
-            ip_address = request.META.get('REMOTE_ADDR')
+            if hasattr(request, 'user'):
+                user = request.user if request.user.is_authenticated else None
+                ip_address = request.META.get('REMOTE_ADDR')
+            elif hasattr(request, 'tenant_id'):
+                user = request
             if user and user.tenant_id:
                 tenant = user.tenant
 
@@ -27,4 +30,4 @@ def log_action(request, action, instance=None, changes=None):
             ip_address=ip_address,
         )
     except Exception:
-        logger.exception('Failed to write audit log')
+        logger.exception('Erro ao registrar audit log')

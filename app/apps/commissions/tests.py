@@ -7,6 +7,7 @@ from django.utils import timezone
 from django.contrib.auth import get_user_model
 
 from app.apps.accounts.models import Tenant
+from app.apps.audit.models import AuditLog
 from app.apps.sellers.models import Seller
 from app.apps.sales.models import Sale
 from app.apps.commissions.models import (
@@ -615,6 +616,16 @@ class TestDeletePeriod(BaseTest):
         period = self._create_period()
         delete_period(period, self.admin)
         self.assertTrue(Sale.objects.filter(pk=sale.pk).exists())
+
+    def test_delete_creates_audit_log(self):
+        period = self._create_period()
+        delete_period(period, self.admin)
+        log = AuditLog.objects.filter(
+            action='commission_period.deleted',
+            user=self.admin,
+        ).first()
+        self.assertIsNotNone(log)
+        self.assertEqual(log.changes.get('period_id'), str(period.uuid))
 
     def test_cannot_delete_with_closed_seller(self):
         self._create_manual_sale(self.seller, 100000, 15)

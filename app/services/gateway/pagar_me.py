@@ -68,7 +68,7 @@ class PagarMeGateway:
     def create_payment_link(
         self, total_amount, max_installments, name,
         free_installments, interest_rate=2,
-        order_code=None, success_url=None,
+        success_url=None,
     ):
         payload = {
             "is_building": False,
