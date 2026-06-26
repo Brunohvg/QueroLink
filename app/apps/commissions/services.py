@@ -1,4 +1,5 @@
 import calendar
+import logging
 from datetime import date
 from decimal import Decimal, ROUND_HALF_UP
 
@@ -13,6 +14,8 @@ from app.apps.commissions.models import (
     SellerCommission,
     CommissionAdjustment,
 )
+
+logger = logging.getLogger(__name__)
 
 
 def get_manual_sales_total(seller, month, year):
@@ -281,13 +284,12 @@ def pay_seller_commissions(period, seller_commission_ids, user, payment_data):
 
     for sc in commissions:
         try:
-            if sc.status == SellerCommission.Status.PAGA:
+            if sc.status != SellerCommission.Status.PAGA:
                 continue
             from app.apps.notifications.tasks import notify_commission_paid
             notify_commission_paid(sc)
         except Exception:
-            import logging
-            logging.getLogger(__name__).error(
+            logger.error(
                 'Failed to send payment notification for commission %s', sc.id,
                 exc_info=True,
             )

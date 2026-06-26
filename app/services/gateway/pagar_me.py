@@ -1,5 +1,6 @@
 """Pagar.me gateway service."""
 
+import base64
 import logging
 import unicodedata
 
@@ -39,13 +40,12 @@ class PagarMeGateway:
         return ascii_text.encode('ascii', errors='ignore').decode('ascii')
 
     def _get_headers(self):
-        key = self.api_key or ''
-        if isinstance(key, str):
-            key = key.encode('ascii', errors='ignore').decode('ascii')
+        key = (self.api_key or '').strip()
+        encoded = base64.b64encode(f"{key}:".encode()).decode()
         return {
             "accept": "application/json",
             "content-type": "application/json",
-            "authorization": f"Basic {key}",
+            "authorization": f"Basic {encoded}",
         }
 
     def _request(self, method, url, **kwargs):
@@ -98,12 +98,8 @@ class PagarMeGateway:
             "expires_in": 1200,
             "max_paid_sessions": 1,
         }
-        if order_code:
-            payload["order_code"] = order_code
         if success_url:
             payload.setdefault("flow_settings", {})["success_url"] = success_url
-
-        logger.info("Pagar.me create_payment_link: order_code=%s", order_code)
         return self._request("POST", self.api_url_links, json=payload)
 
     def get_charge(self, charge_id):
