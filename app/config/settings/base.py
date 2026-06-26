@@ -56,7 +56,6 @@ INSTALLED_APPS = [
     "app.apps.audit",
     "app.apps.dashboard",
     "app.apps.api",
-    "app.apps.analytics",
 
     'rest_framework',
     'rest_framework.authtoken',

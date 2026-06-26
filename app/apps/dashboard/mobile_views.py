@@ -1,4 +1,5 @@
 import json
+import logging
 
 from django.shortcuts import render, redirect
 from django.views.decorators.csrf import csrf_exempt
@@ -17,6 +18,8 @@ from app.apps.accounts.models import User
 from app.apps.sales.models import Sale
 from app.apps.commissions.models import CommissionPeriod, SellerCommission
 from app.apps.audit.utils import log_action
+
+logger = logging.getLogger(__name__)
 
 
 def mobile_login(request):
@@ -166,7 +169,10 @@ def mobile_forgot_password(request):
                     )
                     send_whatsapp_notification.delay(notif.uuid)
             except Exception:
-                pass
+                logger.error(
+                    'Failed to send forgot-password notification to user %s',
+                    user.id, exc_info=True
+                )
 
             return render(request, 'mobile/forgot_password.html', {
                 'step': 'verify', 'identifier': identifier,

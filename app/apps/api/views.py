@@ -1182,7 +1182,10 @@ class SellerLinkCreateView(generics.GenericAPIView):
                 from app.apps.notifications.tasks import notify_seller_link_status
                 notify_seller_link_status(seller, order, 'link_created')
             except Exception:
-                pass
+                logger.error(
+                    'Failed to send link_created notification for order %s',
+                    order.uuid, exc_info=True
+                )
 
             return Response({
                 'uuid': str(order.uuid),

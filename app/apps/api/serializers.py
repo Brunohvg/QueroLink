@@ -1,4 +1,5 @@
 from datetime import date
+import logging
 
 from rest_framework import serializers
 from django.db import transaction
@@ -14,6 +15,8 @@ from app.apps.commissions.models import (
 from app.apps.accounts.models import User
 from app.apps.accounts.validators import clean_phone, validate_phone_br
 from app.apps.accounts.fields import compute_hash
+
+logger = logging.getLogger(__name__)
 
 PLAN_LIMITS = {
     'ESSENCIAL': 5,
@@ -118,7 +121,10 @@ class SellerCreateSerializer(serializers.Serializer):
             from app.apps.notifications.tasks import notify_seller_credentials
             notify_seller_credentials(seller, password)
         except Exception:
-            pass
+            logger.error(
+                'Failed to send credentials notification for seller %s',
+                seller.uuid, exc_info=True
+            )
 
         return {
             'uuid': str(seller.uuid),
@@ -286,7 +292,10 @@ class SellerImportSerializer(serializers.Serializer):
                     from app.apps.notifications.tasks import notify_seller_credentials
                     notify_seller_credentials(seller, password)
                 except Exception:
-                    pass
+                    logger.error(
+                        'Failed to send credentials notification for seller %s',
+                        seller.uuid, exc_info=True
+                    )
 
                 used_usernames.add(username)
                 used_phones.add(compute_hash(cleaned_phone))
