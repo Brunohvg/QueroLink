@@ -12,6 +12,13 @@ from app.apps.sales.models import Sale
 logger = logging.getLogger(__name__)
 
 
+def _skip_foreign_event(event, reason):
+    """Marca evento como processado sem erro — evita retry de webhooks de outras plataformas."""
+    logger.warning("Webhook %s ignorado: %s", event.id, reason)
+    event.processed = True
+    event.save(update_fields=['processed'])
+
+
 @shared_task(
     autoretry_for=(Exception,),
     max_retries=3,
@@ -46,9 +53,11 @@ def process_pagarme_webhook(event_id):
                     )
                     order = payment_link.order
                 except PaymentLink.DoesNotExist:
-                    raise ValueError(
-                        f"PaymentLink nao encontrado para gateway_link_id={link_id}"
+                    _skip_foreign_event(
+                        event,
+                        f"PaymentLink nao encontrado (gateway_link_id={link_id}, plataforma externa)",
                     )
+                    return
 
             elif event_type == 'charge.paid':
                 order_data = data.get('order', {})
@@ -70,19 +79,21 @@ def process_pagarme_webhook(event_id):
                         )
                         order = payment.order
                     except Payment.DoesNotExist:
-                        raise ValueError(
-                            f"Nao foi possivel identificar Order para charge.paid "
-                            f"(gateway_transaction_id={gateway_txn_id})"
+                        _skip_foreign_event(
+                            event,
+                            f"Payment nao encontrado para charge.paid "
+                            f"(gateway_transaction_id={gateway_txn_id}, plataforma externa)",
                         )
+                        return
 
             if not order:
-                raise ValueError("Order nao encontrada para o webhook")
+                _skip_foreign_event(event, "Order nao encontrada (plataforma externa)")
+                return
 
             payment = order.payments.order_by('created_at').first()
             if not payment:
-                raise ValueError(
-                    f"Payment nao encontrado para a Order {order.uuid}",
-                )
+                _skip_foreign_event(event, f"Payment ausente na Order {order.uuid}")
+                return
 
             if event_type == 'order.paid':
                 payment.gateway_order_id = data.get('id')
@@ -143,10 +154,12 @@ def process_pagarme_webhook(event_id):
                     except PaymentLink.DoesNotExist:
                         pass
             if not order:
-                raise ValueError("Order nao encontrada para payment_failed")
+                _skip_foreign_event(event, "Order nao encontrada para payment_failed (plataforma externa)")
+                return
             payment = order.payments.order_by('created_at').first()
             if not payment:
-                raise ValueError(f"Payment nao encontrado para Order {order.uuid}")
+                _skip_foreign_event(event, f"Payment ausente na Order {order.uuid}")
+                return
             payment.gateway_transaction_id = data.get('id')
             payment.status = Payment.Status.FAILED
             payment.raw_callback_payload = payload
@@ -173,12 +186,15 @@ def process_pagarme_webhook(event_id):
                     )
                     order = payment.order
                 except Payment.DoesNotExist:
-                    raise ValueError(
+                    _skip_foreign_event(
+                        event,
                         f"Payment nao encontrado para charge.refunded "
-                        f"(gateway_transaction_id={gateway_txn_id})"
+                        f"(gateway_transaction_id={gateway_txn_id}, plataforma externa)",
                     )
+                    return
             if not order:
-                raise ValueError("Order nao encontrada para charge.refunded")
+                _skip_foreign_event(event, "Order nao encontrada para charge.refunded")
+                return
             payment.status = Payment.Status.REFUNDED
             payment.raw_callback_payload = payload
             payment.save()
@@ -203,7 +219,7 @@ def process_pagarme_webhook(event_id):
                     event.save(update_fields=['processed'])
                     return
             else:
-                raise ValueError(f"{event_type}: gateway_link_id ausente no payload")
+                _skip_foreign_event(event, f"{event_type}: gateway_link_id ausente no payload")
 
             if event_type == 'payment-link.expired':
                 if order.status == Order.Status.EXPIRED:
@@ -243,7 +259,8 @@ def process_pagarme_webhook(event_id):
                     event.save(update_fields=['processed'])
                     return
             if not order:
-                raise ValueError("Order nao encontrada para charge.chargedback")
+                _skip_foreign_event(event, "Order nao encontrada para charge.chargedback")
+                return
             if payment.status == Payment.Status.CHARGEBACK:
                 logger.info("Payment %s already CHARGEBACK, skipping", payment.id)
             else:
