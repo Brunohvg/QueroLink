@@ -121,5 +121,62 @@ def process_pagarme_webhook(event_id):
                     from app.apps.notifications.tasks import notify_seller_link_status
                     notify_seller_link_status(order.seller, order, 'payment_paid')
 
+        elif event_type in ('charge.failed', 'order.payment_failed'):
+            order = None
+            gateway_txn_id = data.get('id')
+            if gateway_txn_id:
+                try:
+                    payment = Payment.objects.select_related('order').get(
+                        gateway_transaction_id=gateway_txn_id
+                    )
+                    order = payment.order
+                except Payment.DoesNotExist:
+                    pass
+            if not order:
+                link_id = data.get('order', {}).get('payment_link', {}).get('id')
+                if link_id:
+                    try:
+                        payment_link = PaymentLink.objects.select_related('order').get(
+                            gateway_link_id=link_id
+                        )
+                        order = payment_link.order
+                    except PaymentLink.DoesNotExist:
+                        pass
+            if not order:
+                raise ValueError("Order nao encontrada para payment_failed")
+            payment = order.payments.order_by('created_at').first()
+            if not payment:
+                raise ValueError(f"Payment nao encontrado para Order {order.uuid}")
+            payment.gateway_transaction_id = data.get('id')
+            payment.status = Payment.Status.FAILED
+            payment.raw_callback_payload = payload
+            payment.save()
+            if order.seller:
+                from app.apps.notifications.tasks import notify_seller_link_status
+                notify_seller_link_status(order.seller, order, 'payment_failed')
+
+        elif event_type == 'charge.refunded':
+            gateway_txn_id = data.get('id')
+            order = None
+            if gateway_txn_id:
+                try:
+                    payment = Payment.objects.select_related('order').get(
+                        gateway_transaction_id=gateway_txn_id
+                    )
+                    order = payment.order
+                except Payment.DoesNotExist:
+                    raise ValueError(
+                        f"Payment nao encontrado para charge.refunded "
+                        f"(gateway_transaction_id={gateway_txn_id})"
+                    )
+            if not order:
+                raise ValueError("Order nao encontrada para charge.refunded")
+            payment.status = Payment.Status.REFUNDED
+            payment.raw_callback_payload = payload
+            payment.save()
+            if order.seller:
+                from app.apps.notifications.tasks import notify_seller_link_status
+                notify_seller_link_status(order.seller, order, 'payment_refunded')
+
         event.processed = True
         event.save(update_fields=['processed'])
