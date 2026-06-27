@@ -166,39 +166,15 @@ showToast("{{ message|escapejs }}", "{% if message.tags == 'error' %}error{% eli
 
         <div class="border-t border-gray-50 pt-4">
           <p class="text-[12px] font-semibold text-gray-600 mb-2.5">Eventos para marcar no Pagar.me:</p>
-          <div class="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
-            <div class="flex items-center gap-2 text-[12px] text-gray-600">
-              <svg class="w-3.5 h-3.5 text-emerald-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
-              <span>order.paid</span>
-            </div>
-            <div class="flex items-center gap-2 text-[12px] text-gray-600">
-              <svg class="w-3.5 h-3.5 text-emerald-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
-              <span>charge.paid</span>
-            </div>
-            <div class="flex items-center gap-2 text-[12px] text-gray-600">
-              <svg class="w-3.5 h-3.5 text-emerald-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
-              <span>charge.failed</span>
-            </div>
-            <div class="flex items-center gap-2 text-[12px] text-gray-600">
-              <svg class="w-3.5 h-3.5 text-emerald-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
-              <span>order.payment_failed</span>
-            </div>
-            <div class="flex items-center gap-2 text-[12px] text-gray-600">
-              <svg class="w-3.5 h-3.5 text-emerald-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
-              <span>charge.refunded</span>
-            </div>
-            <div class="flex items-center gap-2 text-[12px] text-gray-600">
-              <svg class="w-3.5 h-3.5 text-emerald-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
-              <span>payment-link.expired</span>
-            </div>
-            <div class="flex items-center gap-2 text-[12px] text-gray-600">
-              <svg class="w-3.5 h-3.5 text-emerald-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
-              <span>payment-link.cancelled</span>
-            </div>
-            <div class="flex items-center gap-2 text-[12px] text-gray-600">
-              <svg class="w-3.5 h-3.5 text-emerald-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
-              <span>charge.chargedback</span>
-            </div>
+          <div class="flex flex-wrap gap-x-3 gap-y-1 text-[12px] text-gray-600">
+            <span class="flex items-center gap-1"><svg class="w-3.5 h-3.5 text-emerald-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>order.paid</span>
+            <span class="flex items-center gap-1"><svg class="w-3.5 h-3.5 text-emerald-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>charge.paid</span>
+            <span class="flex items-center gap-1"><svg class="w-3.5 h-3.5 text-emerald-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>charge.payment_failed</span>
+            <span class="flex items-center gap-1"><svg class="w-3.5 h-3.5 text-emerald-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>order.payment_failed</span>
+            <span class="flex items-center gap-1"><svg class="w-3.5 h-3.5 text-emerald-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>charge.refunded</span>
+            <span class="flex items-center gap-1"><svg class="w-3.5 h-3.5 text-emerald-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>payment-link.expired</span>
+            <span class="flex items-center gap-1"><svg class="w-3.5 h-3.5 text-emerald-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>payment-link.cancelled</span>
+            <span class="flex items-center gap-1"><svg class="w-3.5 h-3.5 text-emerald-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>charge.chargedback</span>
           </div>
         </div>
 
@@ -416,7 +392,7 @@ showToast("{{ message|escapejs }}", "{% if message.tags == 'error' %}error{% eli
             <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/></svg>
           </div>
           <div>
-            <h2 class="text-[15px] font-semibold text-gray-900">Notificacoes WhatsApp</h2>
+            <h2 class="text-[15px] font-semibold text-gray-900">Templates de Mensagem</h2>
             <p class="text-[12px] text-gray-400">Mensagens enviadas automaticamente aos vendedores</p>
           </div>
         </div>
