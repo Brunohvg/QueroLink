@@ -271,5 +271,39 @@ def process_pagarme_webhook(event_id):
                     from app.apps.notifications.tasks import notify_seller_link_status
                     notify_seller_link_status(order.seller, order, 'payment_refunded')
 
+        elif event_type in ('charge.antifraud_approved', 'charge.antifraud_reproved',
+                            'charge.antifraud_manual', 'charge.antifraud_pending'):
+            gateway_txn_id = data.get('id')
+            antifraud = (data.get('last_transaction') or {}).get('antifraud_response') or {}
+            antifraud_status = antifraud.get('status', '')
+            antifraud_score = antifraud.get('score', '')
+            logger.info(
+                "Antifraud webhook: type=%s txn=%s status=%s score=%s",
+                event_type, gateway_txn_id, antifraud_status, antifraud_score,
+            )
+
+            if event_type == 'charge.antifraud_reproved':
+                order = None
+                if gateway_txn_id:
+                    try:
+                        payment = Payment.objects.select_related('order__seller').get(
+                            gateway_transaction_id=gateway_txn_id
+                        )
+                        order = payment.order
+                    except Payment.DoesNotExist:
+                        pass
+                if not order:
+                    _skip_foreign_event(event, f"Order nao encontrada para {event_type}")
+                    return
+                payment.status = Payment.Status.FAILED
+                payment.raw_callback_payload = payload
+                payment.save(update_fields=['status', 'raw_callback_payload'])
+                if order.seller:
+                    motivo = f"Antifraude: {antifraud_status} (score: {antifraud_score})"
+                    from app.apps.notifications.tasks import notify_seller_link_status
+                    notify_seller_link_status(
+                        order.seller, order, 'payment_failed', motivo=motivo,
+                    )
+
         event.processed = True
         event.save(update_fields=['processed'])
