@@ -1,4 +1,5 @@
 {% extends 'mobile/base_mobile.html' %}
+{% load currency_filters %}
 {% block title %}Inicio — VendaPay{% endblock %}
 {% block content %}
 <div class="space-y-5 fade-up">
@@ -37,7 +38,7 @@
     <div class="absolute bottom-0 left-0 w-32 h-32 bg-white/5 rounded-full -ml-12 -mb-12"></div>
     <div class="relative">
       <p class="text-[12px] font-semibold text-brand-100 uppercase tracking-wider mb-2">Total de hoje</p>
-      <p class="font-display text-[36px] font-bold leading-none tracking-tight">R$ {% widthratio today_total 100 1 %},{{ today_total|stringformat:"02d"|slice:"-2:" }}</p>
+      <p class="font-display text-[36px] font-bold leading-none tracking-tight">{{ today_total|brl }}</p>
       <p class="text-[14px] text-brand-100 mt-3 flex items-center gap-1.5">
         <span>{% if has_entry_today %}Registrado{% else %}Nenhum lancamento hoje{% endif %}</span>
         <span class="opacity-30">•</span>
@@ -50,14 +51,14 @@
     <div class="bg-white rounded-2xl p-5 card-shadow">
       <p class="text-[11px] font-semibold text-gray-400 uppercase tracking-wider mb-1.5">Comissao</p>
       <p class="font-display text-[22px] font-bold text-emerald-600 leading-tight">
-        R$ {% if comissao_estimada > 0 %}{% widthratio comissao_estimada 100 1 %},{{ comissao_estimada|stringformat:"02d"|slice:"-2:" }}{% else %}0,00{% endif %}
+        {{ comissao_estimada|brl }}
       </p>
       {% if comissao_label %}<p class="text-[11px] text-gray-400 mt-1">{{ comissao_label }}</p>{% endif %}
     </div>
     <div class="bg-white rounded-2xl p-5 card-shadow">
       <p class="text-[11px] font-semibold text-gray-400 uppercase tracking-wider mb-1.5">Total do mes</p>
       <p class="font-display text-[22px] font-bold text-gray-900 leading-tight">
-        R$ {% widthratio month_total 100 1 %},{{ month_total|stringformat:"02d"|slice:"-2:" }}
+        {{ month_total|brl }}
       </p>
     </div>
   </div>

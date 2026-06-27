@@ -1,3 +1,4 @@
+{% load currency_filters %}
 <!DOCTYPE html>
 <html lang="pt-br">
 <head>
@@ -34,7 +35,7 @@
         <p><strong>Fechamento:</strong> {{ commission.closed_at|date:"d/m/Y H:i" }}</p>
         {% endif %}
         {% if commission.paid_at %}
-        <p><strong>Pagamento:</strong> {{ commission.paid_at|date:"d/m/Y" }}{% if commission.paid_amount %} — R$ {% widthratio commission.paid_amount 100 1 %},{{ commission.paid_amount|stringformat:"02d"|slice:"-2:" }}{% endif %}</p>
+        <p><strong>Pagamento:</strong> {{ commission.paid_at|date:"d/m/Y" }}{% if commission.paid_amount %} — {{ commission.paid_amount|brl }}{% endif %}</p>
         {% endif %}
         {% endif %}
     </div>
@@ -52,7 +53,7 @@
             {% for s in sales %}
             <tr>
                 <td>{{ s.sale_date|date:"d/m/Y" }}</td>
-                <td>R$ {% widthratio s.amount 100 1 %},{{ s.amount|stringformat:"02d"|slice:"-2:" }}</td>
+                <td>{{ s.amount|brl }}</td>
                 <td>{{ s.notes|default:"—" }}</td>
             </tr>
             {% endfor %}
