@@ -890,7 +890,7 @@ class TestMissingDaysFunction(BaseTest):
 
             missing = get_missing_days_before_today(self.seller, 6, 2026)
 
-            self.assertEqual(len(missing), 25)
+            self.assertEqual(len(missing), 22)
             self.assertNotIn(date(2026, 6, 26), missing)
 
     def test_missing_days_before_today_does_not_include_future(self):

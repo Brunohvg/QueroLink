@@ -542,7 +542,8 @@ def get_missing_days_before_today(seller, month, year):
     current = start
     while current <= end:
         if current not in submitted_dates:
-            missing.append(current)
+            if current.weekday() != 6:
+                missing.append(current)
         current += timedelta(days=1)
     return missing
 

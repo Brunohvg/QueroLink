@@ -115,11 +115,12 @@ def gestor_configuracoes(request):
             try:
                 tenant.default_commission_rate = float(
                     commission_rate.replace(',', '.'),
-                )
+                ) / 100
             except ValueError:
                 messages.error(request, 'Taxa de comissao invalida.')
                 return render(request, 'dashboard/gestor/configuracoes.html', {
                     'tenant': tenant, 'link_events': template_events_with_body,
+                    'commission_rate_display': float(tenant.default_commission_rate) * 100,
                 })
 
         tenant.save()
@@ -138,6 +139,7 @@ def gestor_configuracoes(request):
     return render(request, 'dashboard/gestor/configuracoes.html', {
         'tenant': tenant,
         'link_events': template_events_with_body,
+        'commission_rate_display': float(tenant.default_commission_rate) * 100,
     })
 
 

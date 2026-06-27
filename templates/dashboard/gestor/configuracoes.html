@@ -78,10 +78,10 @@ showToast("{{ message|escapejs }}", "{% if message.tags == 'error' %}error{% eli
           <p class="text-[11px] font-semibold text-gray-400 uppercase tracking-[0.08em]">Comissao</p>
           <span class="flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[11px] font-medium bg-brand-50 text-brand-600">
             <span class="w-1.5 h-1.5 rounded-full bg-brand-500"></span>
-            {{ tenant.default_commission_rate|floatformat:2 }}%
+            {{ commission_rate_display|floatformat:2 }}%
           </span>
         </div>
-        <p class="text-[22px] font-bold text-gray-900">{{ tenant.default_commission_rate|floatformat:1 }}<span class="text-[14px] font-medium text-gray-400">%</span></p>
+        <p class="text-[22px] font-bold text-gray-900">{{ commission_rate_display|floatformat:1 }}<span class="text-[14px] font-medium text-gray-400">%</span></p>
         <p class="text-[12px] text-gray-400 mt-1">Taxa padrao para novos vendedores</p>
       </div>
     </div>
@@ -308,7 +308,7 @@ showToast("{{ message|escapejs }}", "{% if message.tags == 'error' %}error{% eli
           <input type="text" id="default_commission_rate" name="default_commission_rate"
                  class="w-full pl-4 pr-10 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-[14px] outline-none transition-all focus:border-brand-400 focus:ring-2 focus:ring-brand-100 focus:bg-white"
                  placeholder="1,00"
-                 value="{{ tenant.default_commission_rate|floatformat:2 }}">
+                 value="{{ commission_rate_display|floatformat:2 }}">
           <span class="absolute right-3 top-1/2 -translate-y-1/2 text-[14px] text-gray-400 font-medium">%</span>
         </div>
         <p class="text-[12px] text-gray-400 mt-2 flex items-center gap-1.5">
