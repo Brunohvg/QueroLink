@@ -121,7 +121,7 @@ def process_pagarme_webhook(event_id):
                     from app.apps.notifications.tasks import notify_seller_link_status
                     notify_seller_link_status(order.seller, order, 'payment_paid')
 
-        elif event_type in ('charge.failed', 'order.payment_failed'):
+        elif event_type in ('charge.payment_failed', 'order.payment_failed'):
             order = None
             gateway_txn_id = data.get('id')
             if gateway_txn_id:
