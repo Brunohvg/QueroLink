@@ -47,6 +47,7 @@ def pagarme_webhook(request, tenant_slug=None):
 
     from django.conf import settings
     from app.apps.accounts.models import Tenant
+    from app.services.gateway.pagar_me import _normalize_api_key
 
     api_key = getattr(settings, 'API_KEY_PAGAR_ME', '')
 
@@ -58,6 +59,8 @@ def pagarme_webhook(request, tenant_slug=None):
                 api_key = tenant_key
         except Tenant.DoesNotExist:
             logger.warning("Pagarme webhook: tenant slug=%s not found", tenant_slug)
+
+    api_key = _normalize_api_key(api_key)
 
     if not _verify_pagarme_signature(raw_body, api_key, received_sig):
         logger.warning("Pagarme webhook signature verification failed")

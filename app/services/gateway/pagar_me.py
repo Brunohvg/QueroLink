@@ -12,6 +12,22 @@ logger = logging.getLogger(__name__)
 DEFAULT_TIMEOUT = 30
 
 
+def _normalize_api_key(key):
+    """Aceita chave raw (sk_xxx) ou base64 (c2tf...) e retorna sempre raw."""
+    key = (key or '').strip()
+    if not key:
+        return key
+    if key.startswith('sk_'):
+        return key
+    try:
+        decoded = base64.b64decode(key).decode('utf-8')
+        if decoded.startswith('sk_'):
+            return decoded.rstrip(':')
+    except Exception:
+        pass
+    return key
+
+
 class PagarMeError(Exception):
     pass
 
@@ -40,7 +56,7 @@ class PagarMeGateway:
         return ascii_text.encode('ascii', errors='ignore').decode('ascii')
 
     def _get_headers(self):
-        key = (self.api_key or '').strip()
+        key = _normalize_api_key(self.api_key)
         encoded = base64.b64encode(f"{key}:".encode()).decode()
         return {
             "accept": "application/json",
