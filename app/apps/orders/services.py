@@ -25,12 +25,15 @@ def create_payment_link(tenant, seller, customer_name, amount_cents, installment
 
         success_url = f"https://{settings.SERVICE_FQDN_WEB}/pago/{order.uuid}/"
         gateway = PagarMeGateway(api_key=tenant.pagarme_api_key)
+        expires_in = getattr(tenant, 'link_expires_in', None) or 1200
         response = gateway.create_payment_link(
             total_amount=amount_cents,
             max_installments=installments,
             name=safe_name,
             free_installments=installments,
             success_url=success_url,
+            order_code=str(order.uuid),
+            expires_in=expires_in,
         )
 
         link_url = response.get("url", "")

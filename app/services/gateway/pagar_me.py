@@ -84,7 +84,8 @@ class PagarMeGateway:
     def create_payment_link(
         self, total_amount, max_installments, name,
         free_installments, interest_rate=2,
-        success_url=None,
+        success_url=None, order_code=None,
+        expires_in=1200, pix_expires_in=1800,
     ):
         payload = {
             "is_building": False,
@@ -99,7 +100,10 @@ class PagarMeGateway:
                     },
                     "operation_type": "auth_and_capture",
                 },
-                "accepted_payment_methods": ["credit_card"],
+                "accepted_payment_methods": ["credit_card", "pix"],
+                "pix_settings": {
+                    "expires_in": pix_expires_in,
+                },
             },
             "cart_settings": {
                 "items": [{
@@ -111,9 +115,14 @@ class PagarMeGateway:
             },
             "name": name,
             "type": "order",
-            "expires_in": 1200,
+            "expires_in": expires_in,
             "max_paid_sessions": 1,
+            "layout_settings": {
+                "primary_color": "#4361ee",
+            },
         }
+        if order_code:
+            payload["order_code"] = order_code
         if success_url:
             payload.setdefault("flow_settings", {})["success_url"] = success_url
         return self._request("POST", self.api_url_links, json=payload)

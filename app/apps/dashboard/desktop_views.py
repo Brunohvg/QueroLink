@@ -123,6 +123,13 @@ def gestor_configuracoes(request):
                     'commission_rate_display': float(tenant.default_commission_rate) * 100,
                 })
 
+        link_expires = request.POST.get('link_expires_in', '').strip()
+        if link_expires:
+            try:
+                tenant.link_expires_in = int(link_expires)
+            except ValueError:
+                pass
+
         tenant.save()
 
         for event_type, _label in TEMPLATE_EVENTS:

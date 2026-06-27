@@ -21,6 +21,10 @@ class Tenant(models.Model):
     whatsapp_instance_id = models.CharField(max_length=100, blank=True, null=True)
     whatsapp_token = EncryptedCharField(max_length=600, blank=True, null=True)
     default_commission_rate = models.DecimalField(max_digits=5, decimal_places=4, default=0.01)
+    link_expires_in = models.PositiveIntegerField(
+        default=1200,
+        help_text="Tempo de expiracao do link de pagamento em minutos (padrao 1200 = 20h)",
+    )
     is_active = models.BooleanField(default=True)
     plan = models.CharField(max_length=20, choices=Plan.choices, default=Plan.ESSENCIAL)
     trial_ends_at = models.DateTimeField(null=True, blank=True)
