@@ -82,23 +82,28 @@ def pagarme_webhook(request, tenant_slug=None):
     if sig.startswith('sha256='):
         sig = sig[7:]
 
-    verified = _verify_pagarme_signature(raw_body, normalized_key, sig)
-    if not verified and raw_key != normalized_key:
-        verified = _verify_pagarme_signature(raw_body, raw_key, sig)
+    if sig:
+        verified = _verify_pagarme_signature(raw_body, normalized_key, sig)
+        if not verified and raw_key != normalized_key:
+            verified = _verify_pagarme_signature(raw_body, raw_key, sig)
 
-    if not verified:
-        header_keys = [k for k in request.headers.keys()
-                       if 'signature' in k.lower() or 'pagarme' in k.lower() or 'hub' in k.lower()]
-        logger.warning(
-            "Pagarme webhook signature verification failed: "
-            "sig=%s key_prefix=%s body_len=%d tenant=%s headers=%s",
-            sig[:16] if sig else '(empty)',
-            normalized_key[:4] if normalized_key else '(empty)',
+        if not verified:
+            logger.warning(
+                "Pagarme webhook signature verification failed: "
+                "sig=%s key_prefix=%s body_len=%d tenant=%s",
+                sig[:16],
+                normalized_key[:4] if normalized_key else '(empty)',
+                len(raw_body),
+                tenant_slug or 'none',
+            )
+            return JsonResponse({"error": "Forbidden"}, status=403)
+    else:
+        logger.info(
+            "Pagarme webhook without signature header (payment-link event) — "
+            "skipping verification, body_len=%d tenant=%s",
             len(raw_body),
             tenant_slug or 'none',
-            ','.join(header_keys) if header_keys else 'none',
         )
-        return JsonResponse({"error": "Forbidden"}, status=403)
 
     sanitized = scrub_payment_payload(payload)
     event = WebhookEvent.objects.create(gateway='pagarme', payload=sanitized)
