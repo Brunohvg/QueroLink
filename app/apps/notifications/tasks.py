@@ -155,6 +155,29 @@ def notify_commission_paid(seller_commission):
     )
 
 
+def notify_commission_adjusted(seller_commission, adjustment):
+    seller = seller_commission.seller
+    period = seller_commission.period
+    from decimal import Decimal
+    diff = Decimal(str(adjustment.difference)) / Decimal('100')
+    sinal = '-' if adjustment.difference < 0 else ''
+    valor = f"{sinal}R$ {abs(diff):,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+
+    create_and_send_notification(
+        tenant=seller.tenant,
+        event_type=MessageTemplate.EventType.COMMISSION_ADJUSTED,
+        channel=MessageTemplate.Channel.WHATSAPP,
+        recipient=seller.phone,
+        seller=seller,
+        commission_period=period,
+        context={
+            "vendedor": seller.name,
+            "periodo": f"{period.month:02d}/{period.year}",
+            "valor": valor,
+        },
+    )
+
+
 def _fallback_body(event_type, context):
     v = context.get('vendedor', '')
     val = context.get('valor', '')
@@ -174,6 +197,12 @@ def _fallback_body(event_type, context):
             f"Sua comissao de {context.get('periodo', '')} "
             f"no valor de {val} foi paga. "
             f"Confira os detalhes no app."
+        )
+    if event_type == MessageTemplate.EventType.COMMISSION_ADJUSTED:
+        return (
+            f"Sua comissao do periodo {context.get('periodo', '')} "
+            f"recebeu um ajuste de {val}. "
+            f"Acesse o sistema para conferir os detalhes."
         )
     if event_type in (MessageTemplate.EventType.LINK_CREATED,):
         return f"Ola {v}! Seu link de {val} para {cli} foi gerado com sucesso."

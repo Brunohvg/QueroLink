@@ -69,6 +69,29 @@
   </div>
   {% endif %}
 
+  {% if has_missing_past_days and is_editable %}
+  <div class="bg-red-50 border border-red-100 text-red-700 px-4 py-3 rounded-2xl text-[12px] flex items-start gap-2.5">
+    <svg class="w-4 h-4 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"/></svg>
+    <div>
+      <p class="font-semibold text-[13px] mb-1">Voce possui lancamentos pendentes de dias anteriores.</p>
+      <p class="text-[11px] leading-relaxed">Revise os dias sem lancamento e registre o valor vendido em cada dia.</p>
+      {% if missing_past_days|length <= 5 %}
+      <p class="text-[11px] mt-1.5 font-medium">
+        Dias pendentes:
+        {% for d in missing_past_days %}{{ d|date:"d/m" }}{% if not forloop.last %}, {% endif %}{% endfor %}
+      </p>
+      {% else %}
+      <p class="text-[11px] mt-1.5 font-medium">
+        {{ missing_past_days|length }} dias pendentes entre {{ missing_past_days.0|date:"d/m" }} e {% with missing_past_days|last as last_day %}{{ last_day|date:"d/m" }}{% endwith %}.
+      </p>
+      {% endif %}
+      <a href="{% url 'dashboard:mobile_lancar_venda' %}" class="inline-block mt-2 text-[11px] font-semibold text-red-600 underline hover:text-red-800">
+        Registrar dias pendentes →
+      </a>
+    </div>
+  </div>
+  {% endif %}
+
   {% if not has_entry_today and is_editable %}
   <div class="bg-amber-50/80 border border-amber-100 text-amber-700 px-4 py-2.5 rounded-2xl text-[12px] flex items-center gap-2">
     <svg class="w-3.5 h-3.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"/></svg>

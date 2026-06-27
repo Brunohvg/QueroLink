@@ -382,7 +382,7 @@ class SaleCreateSerializer(serializers.ModelSerializer):
                 ):
                     raise serializers.ValidationError({
                         'sale_date': (
-                            'Nao e possivel lancar ou editar vendas de meses '
+                            'Nao e possivel lancar vendas de competencias '
                             'anteriores. Entre em contato com seu gestor.'
                         ),
                     })

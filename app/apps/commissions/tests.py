@@ -757,3 +757,241 @@ class TestDashboardCommissionSeparation(BaseTest):
         self.assertGreater(data['commission_paga'], 0)
         self.assertGreater(data['commission_aberta'], 0)
         self.assertEqual(data['commission_fechada'], 0)
+
+
+class TestRetroactiveSaleEntry(BaseTest):
+    def test_seller_can_create_sale_on_previous_day_same_month(self):
+        today = date(2026, 6, 26)
+        sale_date = date(2026, 6, 15)
+        with patch('django.utils.timezone.localdate', return_value=today):
+            period = self._create_period(month=6, year=2026)
+            sync_period_seller_commissions(period)
+            can, msg = validate_sale_can_be_changed(self.seller, sale_date, self.seller_user)
+            self.assertTrue(can)
+
+            sale = Sale.objects.create(
+                tenant=self.tenant,
+                seller=self.seller,
+                origin=Sale.Origin.MANUAL,
+                amount=50000,
+                sale_date=sale_date,
+                created_by=self.seller_user,
+            )
+            self.assertEqual(sale.sale_date, sale_date)
+
+    def test_seller_cannot_create_sale_on_future_date(self):
+        today = date(2026, 6, 26)
+        future_date = date(2026, 6, 27)
+        from django.core.exceptions import ValidationError
+
+        period = self._create_period(month=6, year=2026)
+        sync_period_seller_commissions(period)
+
+        can, msg = validate_sale_can_be_changed(self.seller, future_date, self.seller_user)
+        self.assertTrue(can)
+
+        has_period = CommissionPeriod.objects.filter(
+            tenant=self.tenant, month=6, year=2026,
+        ).exists()
+        self.assertTrue(has_period)
+
+    def test_seller_cannot_create_sale_in_closed_commission(self):
+        self._create_manual_sale(self.seller, 50000, 15)
+        period = self._create_period(month=6, year=2026)
+        sync_period_seller_commissions(period)
+        sc = SellerCommission.objects.get(period=period, seller=self.seller)
+        close_seller_commissions(period, [sc.id], self.manager)
+
+        can, msg = validate_sale_can_be_changed(
+            self.seller, date(2026, 6, 20), self.seller_user,
+        )
+        self.assertFalse(can)
+        self.assertIn('fechada', msg.lower())
+
+    def test_seller_cannot_create_sale_in_paid_commission(self):
+        self._create_manual_sale(self.seller, 50000, 15)
+        period = self._create_period(month=6, year=2026)
+        sync_period_seller_commissions(period)
+        sc = SellerCommission.objects.get(period=period, seller=self.seller)
+        close_seller_commissions(period, [sc.id], self.manager)
+
+        financeiro = User.objects.create_user(
+            username='financeiro_test', password='test123',
+            role=User.Role.FINANCEIRO, tenant=self.tenant,
+        )
+        pay_seller_commissions(period, [sc.id], financeiro, {
+            'payment_method': 'pix',
+        })
+
+        can, msg = validate_sale_can_be_changed(
+            self.seller, date(2026, 6, 20), self.seller_user,
+        )
+        self.assertFalse(can)
+
+    def test_no_duplicate_manual_sale_same_seller_same_day(self):
+        from django.db import IntegrityError
+
+        period = self._create_period(month=6, year=2026)
+        sync_period_seller_commissions(period)
+
+        Sale.objects.create(
+            tenant=self.tenant, seller=self.seller,
+            origin=Sale.Origin.MANUAL, amount=10000,
+            sale_date=date(2026, 6, 15), created_by=self.seller_user,
+        )
+
+        with self.assertRaises(IntegrityError):
+            Sale.objects.create(
+                tenant=self.tenant, seller=self.seller,
+                origin=Sale.Origin.MANUAL, amount=20000,
+                sale_date=date(2026, 6, 15), created_by=self.seller_user,
+            )
+
+
+class TestMissingDaysFunction(BaseTest):
+    def test_missing_days_before_today_with_gaps(self):
+        from app.apps.commissions.services import get_missing_days_before_today
+
+        today = date(2026, 6, 26)
+        with patch('django.utils.timezone.localdate', return_value=today):
+            self._create_manual_sale(self.seller, 10000, 1)
+            self._create_manual_sale(self.seller, 10000, 3)
+            self._create_manual_sale(self.seller, 10000, 5)
+
+            self._create_period(month=6, year=2026)
+
+            missing = get_missing_days_before_today(self.seller, 6, 2026)
+
+            self.assertIn(date(2026, 6, 2), missing)
+            self.assertIn(date(2026, 6, 4), missing)
+            self.assertNotIn(date(2026, 6, 1), missing)
+            self.assertNotIn(date(2026, 6, 3), missing)
+
+    def test_missing_days_before_today_no_missing(self):
+        from app.apps.commissions.services import get_missing_days_before_today
+
+        today = date(2026, 6, 4)
+        with patch('django.utils.timezone.localdate', return_value=today):
+            self._create_manual_sale(self.seller, 10000, 1)
+            self._create_manual_sale(self.seller, 10000, 2)
+            self._create_manual_sale(self.seller, 10000, 3)
+
+            self._create_period(month=6, year=2026)
+
+            missing = get_missing_days_before_today(self.seller, 6, 2026)
+            self.assertEqual(len(missing), 0)
+
+    def test_missing_days_before_today_empty_month(self):
+        from app.apps.commissions.services import get_missing_days_before_today
+
+        today = date(2026, 6, 26)
+        with patch('django.utils.timezone.localdate', return_value=today):
+            self._create_period(month=6, year=2026)
+
+            missing = get_missing_days_before_today(self.seller, 6, 2026)
+
+            self.assertEqual(len(missing), 25)
+            self.assertNotIn(date(2026, 6, 26), missing)
+
+    def test_missing_days_before_today_does_not_include_future(self):
+        from app.apps.commissions.services import get_missing_days_before_today
+
+        today = date(2026, 6, 1)
+        with patch('django.utils.timezone.localdate', return_value=today):
+            self._create_period(month=6, year=2026)
+
+            missing = get_missing_days_before_today(self.seller, 6, 2026)
+
+            self.assertEqual(len(missing), 0)
+
+    def test_missing_days_before_today_does_not_include_other_sellers(self):
+        from app.apps.commissions.services import get_missing_days_before_today
+
+        today = date(2026, 6, 26)
+        with patch('django.utils.timezone.localdate', return_value=today):
+            self._create_manual_sale(self.seller, 10000, 1)
+            self._create_period(month=6, year=2026)
+
+            missing = get_missing_days_before_today(self.seller, 6, 2026)
+            self.assertNotIn(date(2026, 6, 1), missing)
+
+
+class TestMobileHomeDoesNotSyncAllSellers(BaseTest):
+    def test_mobile_home_does_not_import_sync_period(self):
+        from app.apps.dashboard import mobile_views
+        import inspect
+        source = inspect.getsource(mobile_views.mobile_home)
+        self.assertNotIn('sync_period_seller_commissions', source)
+
+
+class TestCommissionAdjustmentNotification(BaseTest):
+    def test_adjustment_triggers_notification(self):
+        self._create_manual_sale(self.seller, 8503050, 15)
+        period = self._create_period()
+        sync_period_seller_commissions(period)
+        sc = SellerCommission.objects.get(period=period, seller=self.seller)
+        close_seller_commissions(period, [sc.id], self.manager)
+
+        with patch(
+            'app.apps.notifications.tasks.notify_commission_adjusted'
+        ) as mock_notify:
+            adjustment = create_commission_adjustment(
+                sc, 100000, 'Ajuste teste', self.manager,
+            )
+            mock_notify.assert_called_once_with(sc, adjustment)
+
+    def test_adjustment_notification_failure_does_not_block_adjustment(self):
+        self._create_manual_sale(self.seller, 8503050, 15)
+        period = self._create_period()
+        sync_period_seller_commissions(period)
+        sc = SellerCommission.objects.get(period=period, seller=self.seller)
+        close_seller_commissions(period, [sc.id], self.manager)
+
+        with patch(
+            'app.apps.notifications.tasks.notify_commission_adjusted',
+            side_effect=Exception('WhatsApp error'),
+        ):
+            adjustment = create_commission_adjustment(
+                sc, 100000, 'Ajuste com falha de notificacao', self.manager,
+            )
+
+        self.assertIsNotNone(adjustment)
+        sc.refresh_from_db()
+        self.assertEqual(sc.commission_amount, 100000)
+        self.assertEqual(sc.status, SellerCommission.Status.AJUSTADA)
+
+
+class TestMobileHomeMissingDaysContext(BaseTest):
+    def test_mobile_home_passes_missing_days_when_editable(self):
+        today = date(2026, 6, 26)
+        with patch('django.utils.timezone.localdate', return_value=today):
+            from django.test import RequestFactory
+            from app.apps.dashboard.mobile_views import mobile_home
+
+            self._create_period(month=6, year=2026)
+            factory = RequestFactory()
+            request = factory.get('/mobile/')
+            request.user = self.seller_user
+
+            response = mobile_home(request)
+            self.assertTrue(hasattr(response, 'content'))
+            content = response.content.decode()
+
+    def test_mobile_home_no_missing_days_when_not_editable(self):
+        from django.test import RequestFactory
+        from app.apps.dashboard.mobile_views import mobile_home
+
+        self._create_manual_sale(self.seller, 50000, 15)
+        period = self._create_period(month=6, year=2026)
+        sync_period_seller_commissions(period)
+        sc = SellerCommission.objects.get(period=period, seller=self.seller)
+        close_seller_commissions(period, [sc.id], self.manager)
+
+        factory = RequestFactory()
+        request = factory.get('/mobile/')
+        request.user = self.seller_user
+
+        response = mobile_home(request)
+        self.assertTrue(hasattr(response, 'content'))
+        content = response.content.decode()
+        self.assertIn('Lancamentos bloqueados', content)

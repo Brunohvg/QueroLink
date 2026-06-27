@@ -37,6 +37,13 @@
       Lancar primeira venda
     </a>
   </div>
+  {% else %}
+  <div class="bg-brand-50/60 border border-brand-100 text-brand-800 px-4 py-3 rounded-2xl text-[12px] flex items-start gap-2.5 mb-2">
+    <svg class="w-4 h-4 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+    <div>
+      <p class="text-[11px] leading-relaxed">Voce so pode excluir o lancamento de hoje. Para corrigir lancamentos de dias anteriores, registre o valor correto na data correspondente ou fale com o gestor.</p>
+    </div>
+  </div>
   {% endif %}
 
   <div id="sales-list" class="space-y-5">
