@@ -1210,3 +1210,38 @@ class ChangePasswordView(generics.GenericAPIView):
         serializer.save()
         log_action(request, 'user.password_changed')
         return Response({'message': 'Senha alterada com sucesso.'})
+
+
+class WebhookStatusView(generics.GenericAPIView):
+    permission_classes = [IsAuthenticated, IsManagerOrAdmin]
+
+    def get(self, request):
+        from django.conf import settings
+        from app.apps.webhooks.models import WebhookEvent
+
+        tenant = request.user.tenant
+        webhook_url = (
+            f"https://{settings.SERVICE_FQDN_WEB}"
+            f"/api/webhooks/pagarme/{tenant.slug}/"
+        )
+
+        last_event = (
+            WebhookEvent.objects.filter(gateway='pagarme')
+            .order_by('-received_at')
+            .first()
+        )
+
+        status_data = {
+            'webhook_url': webhook_url,
+            'tenant_slug': tenant.slug,
+            'last_event': None,
+        }
+
+        if last_event:
+            status_data['last_event'] = {
+                'received_at': last_event.received_at.isoformat(),
+                'processed': last_event.processed,
+                'error': last_event.processing_error,
+            }
+
+        return Response(status_data)

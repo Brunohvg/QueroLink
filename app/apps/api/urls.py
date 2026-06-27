@@ -21,6 +21,7 @@ urlpatterns = [
     path('manager/ranking/', views.RankingView.as_view(), name='api-ranking'),
     path('manager/ranking/annual/', views.AnnualRankingView.as_view(), name='api-ranking-annual'),
     path('manager/dashboard/summary/', views.DashboardSummaryView.as_view(), name='api-dashboard-summary'),
+    path('manager/webhook-status/', views.WebhookStatusView.as_view(), name='api-webhook-status'),
     path('manager/seller/<uuid:seller_id>/', views.SellerDetailView.as_view(), name='api-seller-detail'),
     path('manager/seller/<uuid:seller_id>/csv/', views.SellerReportCsvView.as_view(), name='api-seller-report-csv'),
     path('manager/seller/<uuid:seller_id>/xlsx/', views.SellerReportExcelView.as_view(), name='api-seller-report-xlsx'),

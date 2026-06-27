@@ -33,7 +33,7 @@ def _verify_pagarme_signature(body: bytes, api_key: str, received_sig: str) -> b
 
 
 @csrf_exempt
-def pagarme_webhook(request):
+def pagarme_webhook(request, tenant_slug=None):
     if request.method != "POST":
         return JsonResponse({"error": "Method not allowed"}, status=405)
 
@@ -46,7 +46,18 @@ def pagarme_webhook(request):
         return JsonResponse({"error": "Invalid JSON"}, status=400)
 
     from django.conf import settings
+    from app.apps.accounts.models import Tenant
+
     api_key = getattr(settings, 'API_KEY_PAGAR_ME', '')
+
+    if tenant_slug:
+        try:
+            tenant = Tenant.objects.get(slug=tenant_slug, is_active=True)
+            tenant_key = tenant.pagarme_api_key
+            if tenant_key:
+                api_key = tenant_key
+        except Tenant.DoesNotExist:
+            logger.warning("Pagarme webhook: tenant slug=%s not found", tenant_slug)
 
     if not _verify_pagarme_signature(raw_body, api_key, received_sig):
         logger.warning("Pagarme webhook signature verification failed")
