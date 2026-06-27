@@ -26,10 +26,21 @@ def _verify_webhook_token(tenant_uuid, token):
 def _verify_pagarme_signature(body: bytes, api_key: str, received_sig: str) -> bool:
     if not received_sig:
         return False
-    expected = hmac.new(
-        api_key.encode(), body, hashlib.sha256
-    ).hexdigest()
-    return hmac.compare_digest(expected, received_sig)
+    key_bytes = api_key.encode()
+    body_hmac = hmac.new(key_bytes, body, hashlib.sha256).hexdigest()
+    if hmac.compare_digest(body_hmac, received_sig):
+        return True
+    body_hmac_sha1 = hmac.new(key_bytes, body, hashlib.sha1).hexdigest()
+    if hmac.compare_digest(body_hmac_sha1, received_sig):
+        return True
+    key_with_colon = f"{api_key}:"
+    body_hmac_colon = hmac.new(key_with_colon.encode(), body, hashlib.sha256).hexdigest()
+    if hmac.compare_digest(body_hmac_colon, received_sig):
+        return True
+    body_hash = hashlib.sha256(key_bytes + body).hexdigest()
+    if hmac.compare_digest(body_hash, received_sig):
+        return True
+    return False
 
 
 @csrf_exempt
@@ -38,7 +49,12 @@ def pagarme_webhook(request, tenant_slug=None):
         return JsonResponse({"error": "Method not allowed"}, status=405)
 
     raw_body = request.body
-    received_sig = request.headers.get('x-pagarme-signature', '')
+    received_sig = (
+        request.headers.get('x-pagarme-signature', '')
+        or request.headers.get('X-Hub-Signature-256', '')
+        or request.headers.get('X-Hub-Signature', '')
+        or ''
+    )
 
     try:
         payload = json.loads(raw_body)
@@ -71,13 +87,16 @@ def pagarme_webhook(request, tenant_slug=None):
         verified = _verify_pagarme_signature(raw_body, raw_key, sig)
 
     if not verified:
+        header_keys = [k for k in request.headers.keys()
+                       if 'signature' in k.lower() or 'pagarme' in k.lower() or 'hub' in k.lower()]
         logger.warning(
             "Pagarme webhook signature verification failed: "
-            "sig=%s key_prefix=%s body_len=%d tenant=%s",
+            "sig=%s key_prefix=%s body_len=%d tenant=%s headers=%s",
             sig[:16] if sig else '(empty)',
             normalized_key[:4] if normalized_key else '(empty)',
             len(raw_body),
             tenant_slug or 'none',
+            ','.join(header_keys) if header_keys else 'none',
         )
         return JsonResponse({"error": "Forbidden"}, status=403)
 
