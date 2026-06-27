@@ -1,7 +1,8 @@
 {% extends 'mobile/base_mobile.html' %}
+{% load currency_filters %}
 {% block title %}Minhas Vendas — VendaPay{% endblock %}
 {% block content %}
-<div class="space-y-5 fade-up" x-data="minhasVendas()">
+<div class="space-y-4 fade-up" x-data="minhasVendas()">
   <div class="flex items-center gap-3">
     <a href="{% url 'dashboard:mobile_home' %}"
        class="w-10 h-10 bg-white rounded-xl card-shadow flex items-center justify-center tap-target text-gray-400 hover:text-brand-500 transition-all active:scale-[0.95]">
@@ -14,16 +15,15 @@
   <script>showToast("{{ error|escapejs }}", "error");</script>
   {% endif %}
 
-  <div class="bg-white rounded-2xl p-4 card-shadow">
-    <div class="flex gap-2">
-      <select x-model="filterMonth" @change="filterSales()"
-              class="flex-1 px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-[13px] outline-none transition-all focus:border-brand-400 focus:ring-2 focus:ring-brand-100">
-        <option value="">Todos os meses</option>
-        {% for m in months %}
-        <option value="{{ m.value }}">{{ m.label }}</option>
-        {% endfor %}
-      </select>
-    </div>
+  <div class="bg-white rounded-2xl p-3 card-shadow">
+    <select x-model="filterMonth" @change="resetPagination()"
+            class="w-full px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-[13px] outline-none transition-all focus:border-brand-400 focus:ring-2 focus:ring-brand-100 appearance-none"
+            style="background-image:url('data:image/svg+xml;utf8,<svg xmlns=%22http://www.w3.org/2000/svg%22 width=%2216%22 height=%2216%22 viewBox=%220 0 24 24%22 fill=%22none%22 stroke=%22%239ca3af%22 stroke-width=%222%22><path stroke-linecap=%22round%22 stroke-linejoin=%22round%22 d=%22M6 9l6 6 6-6%22/></svg>');background-repeat:no-repeat;background-position:right 10px center;">
+      <option value="">Todos os meses</option>
+      {% for m in months %}
+      <option value="{{ m.value }}">{{ m.label }}</option>
+      {% endfor %}
+    </select>
   </div>
 
   {% if not sales %}
@@ -38,85 +38,182 @@
     </a>
   </div>
   {% else %}
-  <div class="bg-brand-50/60 border border-brand-100 text-brand-800 px-4 py-3 rounded-2xl text-[12px] flex items-start gap-2.5 mb-2">
+  <div class="bg-brand-50/60 border border-brand-100 text-brand-800 px-3.5 py-2.5 rounded-2xl text-[12px] flex items-start gap-2">
     <svg class="w-4 h-4 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-    <div>
-      <p class="text-[11px] leading-relaxed">Voce so pode excluir o lancamento de hoje. Para corrigir lancamentos de dias anteriores, registre o valor correto na data correspondente ou fale com o gestor.</p>
-    </div>
+    <p class="text-[11px] leading-relaxed">Voce pode editar ou excluir lancamentos manuais enquanto a comissao estiver aberta.</p>
   </div>
   {% endif %}
 
-  <div id="sales-list" class="space-y-5">
-    <template x-for="(group, gIdx) in filteredGroups" :key="gIdx">
-      <div>
-        <div class="flex items-center justify-between mb-3 px-1">
-          <h3 class="text-[13px] font-bold text-gray-500" x-text="group.date"></h3>
-          <span class="text-[12px] text-gray-400 font-medium" x-text="group.sales.length + ' venda' + (group.sales.length !== 1 ? 's' : '')"></span>
-        </div>
-        <div class="space-y-2">
-          <template x-for="sale in group.sales" :key="sale.uuid">
-            <div class="bg-white rounded-2xl p-4 card-shadow flex items-center justify-between"
-                 x-show="!sale._deleted">
-              <div class="flex-1 min-w-0">
-                <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-medium"
-                      :class="sale.origin === 'LINK' ? 'bg-brand-50 text-brand-600' : 'bg-emerald-50 text-emerald-600'">
-                  <span class="w-1.5 h-1.5 rounded-full" :class="sale.origin === 'LINK' ? 'bg-brand-500' : 'bg-emerald-500'"></span>
-                  <span x-text="sale.origin_display"></span>
-                </span>
-                <p class="font-bold text-gray-800 text-[16px] mt-1.5" x-text="formatMoneyBRL(sale.amount)"></p>
-                <p x-show="sale.notes" class="text-[12px] text-gray-400 truncate max-w-[200px] mt-0.5" x-text="sale.notes"></p>
-              </div>
-              <button x-on:click="deleteSale(sale)"
-                      x-show="sale.canDelete"
-                      class="tap-target flex items-center justify-center w-10 h-10 text-gray-300 hover:text-red-500 transition ml-2 rounded-xl hover:bg-red-50">
-                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
-              </button>
+  <div id="sales-list" class="space-y-3">
+    <template x-for="(week, wIdx) in visibleWeeks" :key="week.key">
+      <div class="bg-white rounded-2xl card-shadow overflow-hidden">
+        <div @click="toggleWeek(week.key)"
+             class="flex items-center justify-between px-4 py-3 cursor-pointer hover:bg-gray-50/50 transition-colors">
+          <div class="flex items-center gap-2.5 min-w-0">
+            <svg class="w-4 h-4 text-gray-400 flex-shrink-0 transition-transform duration-200"
+                 :class="expandedWeeks[week.key] ? 'rotate-90' : ''"
+                 fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+            <div class="min-w-0">
+              <p class="text-[13px] font-semibold text-gray-700 truncate" x-text="week.label"></p>
+              <p class="text-[11px] text-gray-400" x-text="week.range + ' · ' + week.sales.length + ' venda' + (week.sales.length !== 1 ? 's' : '')"></p>
             </div>
-          </template>
+          </div>
+          <p class="text-[13px] font-bold text-gray-800 flex-shrink-0 ml-3" x-text="formatMoneyBRL(week.total)"></p>
+        </div>
+
+        <div x-show="expandedWeeks[week.key]">
+          <div class="border-t border-gray-50">
+            <template x-for="sale in week.sales" :key="sale.uuid">
+              <div class="flex items-center justify-between px-4 py-2.5 border-b border-gray-50 last:border-0 hover:bg-gray-50/30 transition-colors"
+                   x-show="!sale._deleted">
+                <div class="flex items-center gap-2.5 min-w-0 flex-1">
+                  <span class="text-[12px] font-medium text-gray-500 w-7 flex-shrink-0 text-right" x-text="sale.day"></span>
+                  <span class="text-[10px] text-gray-400 w-7 flex-shrink-0" x-text="sale.weekday"></span>
+                  <span class="w-1.5 h-1.5 rounded-full flex-shrink-0"
+                        :class="sale.origin === 'LINK' ? 'bg-brand-400' : 'bg-emerald-400'"></span>
+                  <span class="font-semibold text-[14px] text-gray-800 truncate" x-text="formatMoneyBRL(sale.amount)"></span>
+                  <span x-show="sale.notes" class="text-[11px] text-gray-400 truncate hidden sm:inline" x-text="'— ' + sale.notes"></span>
+                </div>
+                <div class="flex items-center gap-0.5 flex-shrink-0 ml-2">
+                  <a :href="'/dashboard/mobile/lancar/?date=' + sale.date_iso"
+                     x-show="sale.canEdit"
+                     class="tap-target flex items-center justify-center w-9 h-9 text-gray-300 hover:text-brand-500 transition rounded-lg hover:bg-brand-50">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
+                  </a>
+                  <button @click="deleteSale(sale)"
+                          x-show="sale.canDelete"
+                          class="tap-target flex items-center justify-center w-9 h-9 text-gray-300 hover:text-red-500 transition rounded-lg hover:bg-red-50">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+                  </button>
+                </div>
+              </div>
+            </template>
+          </div>
         </div>
       </div>
     </template>
+
+    <button @click="showMore()"
+            x-show="hasMore"
+            class="w-full py-3 bg-white rounded-2xl card-shadow text-[13px] font-medium text-brand-600 hover:text-brand-700 hover:bg-brand-50/50 transition tap-target">
+      <span x-text="'Mostrar mais ' + hiddenWeeksCount + ' semana' + (hiddenWeeksCount !== 1 ? 's' : '')"></span>
+    </button>
+
     <template x-if="filteredSales.length === 0 && sales.length > 0">
       <div class="text-center py-10">
-        <p class="text-gray-500 font-medium">Nenhuma venda encontrada.</p>
+        <p class="text-gray-400 text-[13px] font-medium">Nenhuma venda neste periodo.</p>
       </div>
     </template>
   </div>
 </div>
 
 <script>
+var WEEKDAYS = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sab'];
+
+function getWeekNumber(day) {
+    return Math.ceil(day / 7);
+}
+
+function getWeekRange(weekNum, monthSales) {
+    if (!monthSales.length) return '';
+    var days = monthSales.map(function(s) { return parseInt(s.day, 10); });
+    var minDay = Math.min.apply(null, days.filter(function(d) {
+        return getWeekNumber(d) === weekNum;
+    }));
+    var maxDay = Math.max.apply(null, days.filter(function(d) {
+        return getWeekNumber(d) === weekNum;
+    }));
+    var month = monthSales[0].month;
+    return String(minDay).padStart(2,'0') + '/' + month + ' - ' + String(maxDay).padStart(2,'0') + '/' + month;
+}
+
 function minhasVendas() {
     return {
         sales: {{ sales_json|safe }},
-        filteredSales: [],
-        filterMonth: '',
+        currentMonth: {{ current_month }},
+        filterMonth: {{ current_month }},
+        visibleWeeksCount: 3,
+        expandedWeeks: {},
         _confirmIds: {},
+        WEEKDAYS: WEEKDAYS,
 
-        init() { this.filterSales(); },
+        init() {
+            this.filterMonth = this.currentMonth;
+            this.filterSales();
+        },
 
-        get filteredGroups() {
+        get filteredSales() {
+            var m = this.filterMonth;
+            if (!m) return this.sales;
+            return this.sales.filter(function(s) {
+                var parts = s.date.split('/');
+                return parseInt(parts[1], 10) === parseInt(m, 10);
+            });
+        },
+
+        get monthGroupedSales() {
+            var sales = this.filteredSales;
             var groups = {};
-            this.filteredSales.forEach(function(s) {
-                var key = s.date;
-                if (!groups[key]) groups[key] = { date: key, sales: [] };
+            sales.forEach(function(s) {
+                var parts = s.date.split('/');
+                var day = parseInt(parts[0], 10);
+                var month = parts[1];
+                s.day = day;
+                s.month = month;
+                var d = new Date(s.date_iso + 'T00:00:00');
+                s.weekday = WEEKDAYS[d.getDay()];
+                var wn = getWeekNumber(day);
+                var key = month + '-W' + wn;
+                if (!groups[key]) groups[key] = { key: key, weekNum: wn, month: month, sales: [], total: 0 };
                 groups[key].sales.push(s);
+                groups[key].total += s.amount;
             });
             var result = [];
-            var keys = Object.keys(groups).sort(function(a, b) { return new Date(b.split('/').reverse().join('-')) - new Date(a.split('/').reverse().join('-')); });
-            keys.forEach(function(k) { result.push(groups[k]); });
+            Object.keys(groups).forEach(function(k) {
+                var g = groups[k];
+                g.range = getWeekRange(g.weekNum, g.sales);
+                g.label = 'Semana ' + g.weekNum;
+                g.sales.sort(function(a, b) { return parseInt(b.day, 10) - parseInt(a.day, 10); });
+                result.push(g);
+            });
+            result.sort(function(a, b) {
+                if (a.month !== b.month) return parseInt(b.month, 10) - parseInt(a.month, 10);
+                return b.weekNum - a.weekNum;
+            });
             return result;
         },
 
+        get visibleWeeks() {
+            return this.monthGroupedSales.slice(0, this.visibleWeeksCount);
+        },
+
+        get hiddenWeeksCount() {
+            return Math.max(0, this.monthGroupedSales.length - this.visibleWeeksCount);
+        },
+
+        get hasMore() {
+            return this.hiddenWeeksCount > 0;
+        },
+
         filterSales() {
-            var m = this.filterMonth;
-            this.filteredSales = this.sales.filter(function(s) {
-                if (m) {
-                    var parts = s.date.split('/');
-                    var saleMonth = parseInt(parts[1], 10);
-                    if (saleMonth !== parseInt(m, 10)) return false;
-                }
-                return true;
-            });
+            this.visibleWeeksCount = 3;
+            var weeks = this.monthGroupedSales;
+            this.expandedWeeks = {};
+            if (weeks.length > 0) {
+                this.expandedWeeks[weeks[0].key] = true;
+            }
+        },
+
+        resetPagination() {
+            this.filterSales();
+        },
+
+        toggleWeek(key) {
+            this.expandedWeeks[key] = !this.expandedWeeks[key];
+        },
+
+        showMore() {
+            this.visibleWeeksCount += 3;
         },
 
         deleteSale(sale) {

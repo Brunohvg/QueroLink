@@ -324,18 +324,6 @@ def mobile_lancar_venda(request):
                     'Nao e possivel lancar vendas em data futura.',
                 )
 
-            if (
-                sale_date.year < today.year
-                or (
-                    sale_date.year == today.year
-                    and sale_date.month < today.month
-                )
-            ):
-                raise ValueError(
-                    'Nao e possivel lancar vendas de competencias '
-                    'anteriores. Entre em contato com seu gestor.',
-                )
-
             from app.apps.commissions.services import validate_sale_can_be_changed
             can_change, error_msg = validate_sale_can_be_changed(seller, sale_date, request.user)
             if not can_change:
@@ -395,10 +383,11 @@ def mobile_lancar_venda(request):
                 pass
 
     today = timezone.localdate()
+    reference_date = existing_sale.sale_date if existing_sale else today
     sc = SellerCommission.objects.filter(
         seller=seller,
-        period__month=today.month,
-        period__year=today.year,
+        period__month=reference_date.month,
+        period__year=reference_date.year,
     ).first()
     is_editable = sc.is_editable if sc else True
     sc_status = sc.status if sc else None
@@ -427,10 +416,25 @@ def mobile_minhas_vendas(request):
         '-sale_date', '-created_at',
     )
 
+    from app.apps.commissions.models import SellerCommission
+
+    locked_months = set(
+        SellerCommission.objects.filter(
+            seller=seller,
+            status__in=[
+                SellerCommission.Status.FECHADA,
+                SellerCommission.Status.PAGA,
+                SellerCommission.Status.AJUSTADA,
+                SellerCommission.Status.CANCELADA,
+            ],
+        ).values_list('period__month', 'period__year')
+    )
+
     import json as json_module
     today = timezone.localdate()
     sales_data = []
     for s in sales:
+        is_locked = (s.sale_date.month, s.sale_date.year) in locked_months
         sales_data.append({
             'uuid': str(s.uuid),
             'amount': s.amount,
@@ -438,13 +442,17 @@ def mobile_minhas_vendas(request):
             'origin': s.origin,
             'origin_display': s.get_origin_display(),
             'date': s.sale_date.strftime('%d/%m/%Y'),
-            'canDelete': s.sale_date == today,
+            'date_iso': s.sale_date.isoformat(),
+            'canDelete': s.origin == Sale.Origin.MANUAL and not is_locked,
+            'canEdit': s.origin == Sale.Origin.MANUAL and not is_locked,
         })
 
     return render(request, 'mobile/minhas_vendas.html', {
         'seller': seller,
         'sales': sales,
         'sales_json': json_module.dumps(sales_data),
+        'current_month': today.month,
+        'current_year': today.year,
         'months': [
             {'value': i, 'label': f'{i:02d}'} for i in range(1, 13)
         ],

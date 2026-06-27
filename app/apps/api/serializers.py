@@ -375,18 +375,6 @@ class SaleCreateSerializer(serializers.ModelSerializer):
         origin = attrs.get('origin', Sale.Origin.MANUAL)
 
         if origin == Sale.Origin.MANUAL:
-            if user.role == User.Role.SELLER:
-                if sale_date.year < today.year or (
-                    sale_date.year == today.year
-                    and sale_date.month < today.month
-                ):
-                    raise serializers.ValidationError({
-                        'sale_date': (
-                            'Nao e possivel lancar vendas de competencias '
-                            'anteriores. Entre em contato com seu gestor.'
-                        ),
-                    })
-
             from app.apps.commissions.services import validate_sale_can_be_changed
             can_change, error_msg = validate_sale_can_be_changed(seller, sale_date, user)
             if not can_change:

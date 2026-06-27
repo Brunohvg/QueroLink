@@ -100,9 +100,16 @@
 <script>
 function lancarVenda() {
     return {
-        amountCents: 0,
+        amountCents: {{ existing_sale.amount|default:0 }},
         lastAmount: {{ request.session.last_venda_amount|default:0 }},
-        init() { this.$refs.saleDate.value = new Date().toISOString().split('T')[0]; },
+        init() {
+            if (this.amountCents > 0) {
+                this.$refs.valorDisplay.value = Math.floor(this.amountCents/100) + ',' + String(this.amountCents%100).padStart(2,'0');
+            }
+            if (!{{ existing_sale|yesno:"true,false" }}) {
+                this.$refs.saleDate.value = new Date().toISOString().split('T')[0];
+            }
+        },
         formatInput() {
             var raw = this.$refs.valorDisplay.value.replace(/\D/g, '');
             if (!raw) { this.$refs.valorDisplay.value = ''; this.amountCents = 0; this.$refs.amountCents.value = '0'; return; }
