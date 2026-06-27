@@ -1,10 +1,11 @@
 import calendar
+import logging
 from datetime import date
 from decimal import Decimal, ROUND_HALF_UP
 
 from django.utils import timezone
 from django.db import transaction
-from django.db.models import Sum, Q
+from django.db.models import Sum
 
 from app.apps.sales.models import Sale
 from app.apps.sellers.models import Seller
@@ -13,6 +14,8 @@ from app.apps.commissions.models import (
     SellerCommission,
     CommissionAdjustment,
 )
+
+logger = logging.getLogger(__name__)
 
 
 def get_manual_sales_total(seller, month, year):
@@ -27,20 +30,6 @@ def get_manual_sales_total(seller, month, year):
         sale_date__lte=end,
     ).aggregate(t=Sum('amount'))['t'] or 0
     return total
-
-
-def get_manual_sales_by_day(seller, month, year):
-    start = date(year, month, 1)
-    last_day = calendar.monthrange(year, month)[1]
-    end = date(year, month, last_day)
-    sales = Sale.objects.filter(
-        tenant=seller.tenant,
-        seller=seller,
-        origin=Sale.Origin.MANUAL,
-        sale_date__gte=start,
-        sale_date__lte=end,
-    ).order_by('sale_date')
-    return sales
 
 
 def get_commission_rate(seller):
@@ -105,20 +94,6 @@ def sync_period_seller_commissions(period):
                 sc.recalculate(commit=True)
 
     return created_count
-
-
-def get_seller_commission(period, seller):
-    sc, _ = SellerCommission.objects.get_or_create(
-        period=period,
-        seller=seller,
-        defaults={
-            'commission_rate': get_commission_rate(seller),
-            'expected_working_days': period.expected_working_days or 22,
-        },
-    )
-    if sc.is_editable:
-        sc.recalculate(commit=True)
-    return sc
 
 
 def calculate_seller_working_days(period, seller):
@@ -309,13 +284,12 @@ def pay_seller_commissions(period, seller_commission_ids, user, payment_data):
 
     for sc in commissions:
         try:
-            if sc.status == SellerCommission.Status.PAGA:
+            if sc.status != SellerCommission.Status.PAGA:
                 continue
             from app.apps.notifications.tasks import notify_commission_paid
             notify_commission_paid(sc)
         except Exception:
-            import logging
-            logging.getLogger(__name__).error(
+            logger.error(
                 'Failed to send payment notification for commission %s', sc.id,
                 exc_info=True,
             )
@@ -691,6 +665,16 @@ def delete_period(period, user):
         SellerCommission.objects.filter(period=period).delete()
 
         period.delete()
+
+        log_action(
+            user, 'commission_period.deleted',
+            changes={
+                'period_id': str(period.uuid),
+                'month': period.month,
+                'year': period.year,
+                'sc_count': sc_count,
+            }
+        )
 
     return sc_count
 

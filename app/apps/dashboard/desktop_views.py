@@ -559,7 +559,10 @@ def gestor_link_cancelar(request, order_uuid):
             from app.apps.notifications.tasks import notify_seller_link_status
             notify_seller_link_status(order.seller, order, 'link_canceled')
         except Exception:
-            pass
+            logger.error(
+                'Failed to send link_canceled notification for order %s',
+                order.uuid, exc_info=True
+            )
 
     messages.success(request, 'Link cancelado com sucesso.')
     return redirect('dashboard:gestor_link_detalhe', order_uuid=order_uuid)

@@ -26,13 +26,6 @@ def validate_cnpj(cnpj):
     return int(cnpj[12]) == d1 and int(cnpj[13]) == d2
 
 
-def format_cnpj(cnpj):
-    digits = clean_cnpj(cnpj)
-    if len(digits) != 14:
-        return cnpj
-    return f'{digits[:2]}.{digits[2:5]}.{digits[5:8]}/{digits[8:12]}-{digits[12:]}'
-
-
 def clean_phone(phone):
     return re.sub(r'[^0-9]', '', phone)
 
@@ -66,10 +59,4 @@ def validate_phone_br(phone):
     return False
 
 
-def format_phone_br(phone):
-    digits = clean_phone(phone)
-    if len(digits) == 10:
-        return f'({digits[:2]}) {digits[2:6]}-{digits[6:]}'
-    elif len(digits) == 11:
-        return f'({digits[:2]}) {digits[2:7]}-{digits[7:]}'
-    return phone
+

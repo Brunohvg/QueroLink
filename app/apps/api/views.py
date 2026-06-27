@@ -1,4 +1,5 @@
 from datetime import date, timedelta
+import logging
 
 from rest_framework import viewsets, status, generics, serializers as drf_serializers
 from rest_framework.decorators import action
@@ -33,6 +34,8 @@ from .serializers import (
 )
 from .permissions import IsManagerOrAdmin, IsFinancialOrAdmin, IsSellerOwner
 from app.apps.audit.utils import log_action
+
+logger = logging.getLogger(__name__)
 
 
 class SellerViewSet(viewsets.ModelViewSet):
@@ -71,10 +74,22 @@ class SellerViewSet(viewsets.ModelViewSet):
         try:
             from app.apps.notifications.tasks import notify_seller_credentials
             notify_seller_credentials(seller, password)
-        except Exception:
-            pass
+            whatsapp_sent = True
+            whatsapp_error = None
+        except Exception as e:
+            whatsapp_sent = False
+            whatsapp_error = str(e)
+            logger.error(
+                'WhatsApp failed on reset_password for seller %s: %s',
+                seller.uuid, e, exc_info=True
+            )
         log_action(request, 'seller.password_reset', instance=seller)
-        return Response({'message': 'Senha redefinida com sucesso.'})
+        return Response({
+            'message': 'Senha redefinida com sucesso.',
+            'whatsapp_sent': whatsapp_sent,
+            'temp_password': password if not whatsapp_sent else None,
+            'whatsapp_error': whatsapp_error,
+        })
 
     @action(detail=False, methods=['post'])
     def import_sellers(self, request):
@@ -1167,7 +1182,10 @@ class SellerLinkCreateView(generics.GenericAPIView):
                 from app.apps.notifications.tasks import notify_seller_link_status
                 notify_seller_link_status(seller, order, 'link_created')
             except Exception:
-                pass
+                logger.error(
+                    'Failed to send link_created notification for order %s',
+                    order.uuid, exc_info=True
+                )
 
             return Response({
                 'uuid': str(order.uuid),

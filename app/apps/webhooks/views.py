@@ -23,19 +23,40 @@ def _verify_webhook_token(tenant_uuid, token):
     return hmac.compare_digest(expected, token)
 
 
+def _verify_pagarme_signature(body: bytes, api_key: str, received_sig: str) -> bool:
+    if not received_sig:
+        return False
+    expected = hmac.new(
+        api_key.encode(), body, hashlib.sha256
+    ).hexdigest()
+    return hmac.compare_digest(expected, received_sig)
+
+
 @csrf_exempt
 def pagarme_webhook(request):
-    if request.method == "POST":
-        try:
-            payload = json.loads(request.body)
-            sanitized = scrub_payment_payload(payload)
-            event = WebhookEvent.objects.create(gateway='pagarme', payload=sanitized)
-            from app.apps.webhooks.tasks import process_pagarme_webhook
-            process_pagarme_webhook.delay(event.id)
-            return JsonResponse({"status": "received"}, status=200)
-        except json.JSONDecodeError:
-            return JsonResponse({"error": "Invalid JSON"}, status=400)
-    return JsonResponse({"error": "Method not allowed"}, status=405)
+    if request.method != "POST":
+        return JsonResponse({"error": "Method not allowed"}, status=405)
+
+    raw_body = request.body
+    received_sig = request.headers.get('x-pagarme-signature', '')
+
+    try:
+        payload = json.loads(raw_body)
+    except json.JSONDecodeError:
+        return JsonResponse({"error": "Invalid JSON"}, status=400)
+
+    from django.conf import settings
+    api_key = getattr(settings, 'API_KEY_PAGAR_ME', '')
+
+    if not _verify_pagarme_signature(raw_body, api_key, received_sig):
+        logger.warning("Pagarme webhook signature verification failed")
+        return JsonResponse({"error": "Forbidden"}, status=403)
+
+    sanitized = scrub_payment_payload(payload)
+    event = WebhookEvent.objects.create(gateway='pagarme', payload=sanitized)
+    from app.apps.webhooks.tasks import process_pagarme_webhook
+    process_pagarme_webhook.delay(event.id)
+    return JsonResponse({"status": "received"}, status=200)
 
 
 @csrf_exempt

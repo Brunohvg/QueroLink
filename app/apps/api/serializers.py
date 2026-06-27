@@ -1,4 +1,5 @@
 from datetime import date
+import logging
 
 from rest_framework import serializers
 from django.db import transaction
@@ -14,6 +15,27 @@ from app.apps.commissions.models import (
 from app.apps.accounts.models import User
 from app.apps.accounts.validators import clean_phone, validate_phone_br
 from app.apps.accounts.fields import compute_hash
+
+logger = logging.getLogger(__name__)
+
+PLAN_LIMITS = {
+    'ESSENCIAL': 5,
+    'PROFISSIONAL': 15,
+    'PLUS': 30,
+    'ENTERPRISE': None,  # ilimitado
+}
+
+
+def _check_seller_limit(tenant):
+    limit = PLAN_LIMITS.get(tenant.plan)
+    if limit is None:
+        return
+    current = Seller.objects.filter(tenant=tenant, is_active=True).count()
+    if current >= limit:
+        raise serializers.ValidationError(
+            f'Limite de vendedores do plano {tenant.plan} atingido ({limit}). '
+            f'Faca upgrade para adicionar mais vendedores.'
+        )
 
 
 class SellerSerializer(serializers.ModelSerializer):
@@ -34,7 +56,7 @@ class SellerSerializer(serializers.ModelSerializer):
                 'Telefone invalido. Informe um numero com DDD (10 ou 11 digitos).'
             )
         tenant = self.context['request'].user.tenant
-        qs = Seller.objects.filter(tenant=tenant, phone=cleaned)
+        qs = Seller.objects.filter(tenant=tenant, phone_hash=compute_hash(cleaned))
         if self.instance:
             qs = qs.exclude(pk=self.instance.pk)
         if qs.exists():
@@ -68,6 +90,8 @@ class SellerCreateSerializer(serializers.Serializer):
         request = self.context['request']
         tenant = request.user.tenant
 
+        _check_seller_limit(tenant)
+
         base = slugify(validated_data['name'])
         username = base
         n = 2
@@ -97,7 +121,10 @@ class SellerCreateSerializer(serializers.Serializer):
             from app.apps.notifications.tasks import notify_seller_credentials
             notify_seller_credentials(seller, password)
         except Exception:
-            pass
+            logger.error(
+                'Failed to send credentials notification for seller %s',
+                seller.uuid, exc_info=True
+            )
 
         return {
             'uuid': str(seller.uuid),
@@ -116,6 +143,10 @@ class SellerImportSerializer(serializers.Serializer):
         if not (name.endswith('.csv') or name.endswith('.xlsx')):
             raise serializers.ValidationError(
                 'Formato de arquivo invalido. Envie um arquivo .csv ou .xlsx.'
+            )
+        if value.size > 5 * 1024 * 1024:
+            raise serializers.ValidationError(
+                'Arquivo muito grande. Tamanho maximo permitido: 5MB.'
             )
         return value
 
@@ -182,12 +213,34 @@ class SellerImportSerializer(serializers.Serializer):
         request = self.context['request']
         tenant = request.user.tenant
 
+        _check_seller_limit(tenant)
+
+        limit = PLAN_LIMITS.get(tenant.plan)
+        if limit is not None:
+            valid_count = 0
+            for row in rows:
+                name = (row.get('nome') or row.get('name') or '').strip()
+                phone = (row.get('telefone') or row.get('phone') or '').strip()
+                if not name or not phone:
+                    continue
+                cleaned_phone = clean_phone(phone)
+                if not validate_phone_br(cleaned_phone):
+                    continue
+                valid_count += 1
+            current = Seller.objects.filter(tenant=tenant, is_active=True).count()
+            if current + valid_count > limit:
+                raise serializers.ValidationError(
+                    f'Limite de vendedores do plano {tenant.plan} atingido ({limit}). '
+                    f'Voce tem {current} vendedores ativos e esta tentando importar '
+                    f'{valid_count}. Faca upgrade para adicionar mais vendedores.'
+                )
+
         created = []
         errors = []
         used_usernames = set()
         used_phones = set(
             Seller.objects.filter(tenant=tenant)
-            .values_list('phone', flat=True)
+            .values_list('phone_hash', flat=True)
         )
 
         for i, row in enumerate(rows, start=2):
@@ -206,7 +259,7 @@ class SellerImportSerializer(serializers.Serializer):
                 errors.append({'linha': i, 'erro': f'Telefone invalido: {phone}'})
                 continue
 
-            if cleaned_phone in used_phones:
+            if compute_hash(cleaned_phone) in used_phones:
                 errors.append({'linha': i, 'erro': f'Telefone ja cadastrado: {phone}'})
                 continue
 
@@ -239,10 +292,13 @@ class SellerImportSerializer(serializers.Serializer):
                     from app.apps.notifications.tasks import notify_seller_credentials
                     notify_seller_credentials(seller, password)
                 except Exception:
-                    pass
+                    logger.error(
+                        'Failed to send credentials notification for seller %s',
+                        seller.uuid, exc_info=True
+                    )
 
                 used_usernames.add(username)
-                used_phones.add(cleaned_phone)
+                used_phones.add(compute_hash(cleaned_phone))
                 created.append({
                     'linha': i,
                     'nome': name,

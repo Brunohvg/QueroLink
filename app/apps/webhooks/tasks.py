@@ -6,7 +6,7 @@ from django.utils import timezone
 
 from app.apps.webhooks.models import WebhookEvent
 from app.apps.payments.models import Payment
-from app.apps.orders.models import Order
+from app.apps.orders.models import Order, PaymentLink
 from app.apps.sales.models import Sale
 
 logger = logging.getLogger(__name__)
@@ -18,17 +18,15 @@ logger = logging.getLogger(__name__)
     default_retry_delay=30,
 )
 def process_pagarme_webhook(event_id):
-    try:
-        event = WebhookEvent.objects.get(id=event_id)
-    except WebhookEvent.DoesNotExist:
-        logger.warning("Webhook event %s not found", event_id)
-        return
+    with transaction.atomic():
+        try:
+            event = WebhookEvent.objects.select_for_update(nowait=True).get(
+                id=event_id, processed=False
+            )
+        except WebhookEvent.DoesNotExist:
+            logger.info("Webhook %s already processed or not found", event_id)
+            return
 
-    if event.processed:
-        logger.info("Webhook event %s already processed, skipping", event_id)
-        return
-
-    try:
         payload = event.payload
         if not isinstance(payload, dict):
             raise ValueError("Payload is not a dictionary")
@@ -38,80 +36,90 @@ def process_pagarme_webhook(event_id):
         logger.info("Processing webhook event %s type=%s", event_id, event_type)
 
         if event_type in ('order.paid', 'charge.paid'):
-            order_uuid = data.get('code')
+            order = None
 
-            if event_type == 'charge.paid' and not order_uuid:
-                order_obj = data.get('order', {})
-                order_uuid = order_obj.get('code')
-
-            if not order_uuid:
-                raise ValueError(
-                    "order_code nao encontrado no payload (campo 'code')",
-                )
-
-            try:
-                order = Order.objects.get(uuid=order_uuid)
-            except Order.DoesNotExist:
-                raise ValueError(
-                    f"Order nao encontrada para o code {order_uuid}",
-                )
-
-            with transaction.atomic():
-                payment = order.payments.order_by('created_at').first()
-                if not payment:
+            if event_type == 'order.paid':
+                link_id = data.get('id')
+                try:
+                    payment_link = PaymentLink.objects.select_related('order').get(
+                        gateway_link_id=link_id
+                    )
+                    order = payment_link.order
+                except PaymentLink.DoesNotExist:
                     raise ValueError(
-                        f"Payment nao encontrado para a Order {order_uuid}",
+                        f"PaymentLink nao encontrado para gateway_link_id={link_id}"
                     )
 
-                if event_type == 'order.paid':
-                    payment.gateway_order_id = data.get('id')
-                    charges = data.get('charges', [])
-                    if charges and isinstance(charges, list):
-                        payment.gateway_transaction_id = charges[0].get('id')
-                elif event_type == 'charge.paid':
-                    payment.gateway_transaction_id = data.get('id')
-                    payment.gateway_order_id = data.get('order', {}).get('id')
+            elif event_type == 'charge.paid':
+                order_data = data.get('order', {})
+                link_id = order_data.get('payment_link', {}).get('id') or data.get('payment_link_id')
+                if link_id:
+                    try:
+                        payment_link = PaymentLink.objects.select_related('order').get(
+                            gateway_link_id=link_id
+                        )
+                        order = payment_link.order
+                    except PaymentLink.DoesNotExist:
+                        pass
 
-                if payment.status == Payment.Status.PAID:
-                    logger.info(
-                        "Payment %s already PAID, skipping duplicate webhook",
-                        payment.id,
-                    )
-                else:
-                    payment.status = Payment.Status.PAID
-                    payment.raw_callback_payload = payload
-                    payment.save()
+                if not order:
+                    gateway_txn_id = data.get('id')
+                    try:
+                        payment = Payment.objects.select_related('order').get(
+                            gateway_transaction_id=gateway_txn_id
+                        )
+                        order = payment.order
+                    except Payment.DoesNotExist:
+                        raise ValueError(
+                            f"Nao foi possivel identificar Order para charge.paid "
+                            f"(gateway_transaction_id={gateway_txn_id})"
+                        )
 
-                    order.status = Order.Status.COMPLETED
-                    order.save()
+            if not order:
+                raise ValueError("Order nao encontrada para o webhook")
 
-                    Sale.objects.get_or_create(
-                        order=order,
-                        defaults={
-                            'tenant': order.tenant,
-                            'seller': order.seller,
-                            'origin': Sale.Origin.LINK,
-                            'amount': order.total_amount,
-                            'sale_date': timezone.localdate(),
-                        },
-                    )
+            payment = order.payments.order_by('created_at').first()
+            if not payment:
+                raise ValueError(
+                    f"Payment nao encontrado para a Order {order.uuid}",
+                )
 
-                    if order.seller:
-                        from app.apps.notifications.tasks import notify_seller_link_status
-                        notify_seller_link_status(order.seller, order, 'payment_paid')
+            if event_type == 'order.paid':
+                payment.gateway_order_id = data.get('id')
+                charges = data.get('charges', [])
+                if charges and isinstance(charges, list):
+                    payment.gateway_transaction_id = charges[0].get('id')
+            elif event_type == 'charge.paid':
+                payment.gateway_transaction_id = data.get('id')
+                payment.gateway_order_id = data.get('order', {}).get('id')
+
+            if payment.status == Payment.Status.PAID:
+                logger.info(
+                    "Payment %s already PAID, skipping duplicate webhook",
+                    payment.id,
+                )
+            else:
+                payment.status = Payment.Status.PAID
+                payment.raw_callback_payload = payload
+                payment.save()
+
+                order.status = Order.Status.COMPLETED
+                order.save()
+
+                Sale.objects.get_or_create(
+                    order=order,
+                    defaults={
+                        'tenant': order.tenant,
+                        'seller': order.seller,
+                        'origin': Sale.Origin.LINK,
+                        'amount': order.total_amount,
+                        'sale_date': timezone.localdate(),
+                    },
+                )
+
+                if order.seller:
+                    from app.apps.notifications.tasks import notify_seller_link_status
+                    notify_seller_link_status(order.seller, order, 'payment_paid')
 
         event.processed = True
-        event.save()
-
-    except Exception as e:
-        logger.error("Webhook processing error for event %s: %s", event_id, e,
-                      exc_info=True)
-        try:
-            event.processing_error = str(e)
-            event.save(update_fields=['processing_error'])
-        except Exception as save_error:
-            logger.critical(
-                "Failed to save webhook error for event %s: %s",
-                event_id, save_error,
-            )
-        raise
+        event.save(update_fields=['processed'])

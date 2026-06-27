@@ -30,7 +30,6 @@ def create_payment_link(tenant, seller, customer_name, amount_cents, installment
             max_installments=installments,
             name=safe_name,
             free_installments=installments,
-            order_code=str(order.uuid),
             success_url=success_url,
         )
 
