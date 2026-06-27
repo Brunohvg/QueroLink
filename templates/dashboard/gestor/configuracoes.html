@@ -134,6 +134,17 @@ showToast("{{ message|escapejs }}", "{% if message.tags == 'error' %}error{% eli
           </select>
           <p class="text-[12px] text-gray-400 mt-2">Tempo maximo para o cliente pagar apos a geracao do link.</p>
         </div>
+        <div class="border-t border-gray-100 mt-4 pt-4">
+          <label class="flex items-center gap-3 cursor-pointer">
+            <input type="checkbox" name="pix_enabled" value="1"
+                   class="w-5 h-5 rounded border-gray-300 text-brand-500 focus:ring-brand-500"
+                   {% if tenant.pix_enabled %}checked{% endif %}>
+            <div>
+              <span class="text-[13px] font-medium text-gray-700">Habilitar PIX</span>
+              <p class="text-[12px] text-gray-400">Oferecer PIX como metodo de pagamento nos links. Desative se o PIX nao estiver configurado no Pagar.me.</p>
+            </div>
+          </label>
+        </div>
       </div>
     </div>
 

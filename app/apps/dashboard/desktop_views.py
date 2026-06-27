@@ -130,6 +130,8 @@ def gestor_configuracoes(request):
             except ValueError:
                 pass
 
+        tenant.pix_enabled = request.POST.get('pix_enabled') == '1'
+
         tenant.save()
 
         for event_type, _label in TEMPLATE_EVENTS:

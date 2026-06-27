@@ -25,6 +25,10 @@ class Tenant(models.Model):
         default=1200,
         help_text="Tempo de expiracao do link de pagamento em minutos (padrao 1200 = 20h)",
     )
+    pix_enabled = models.BooleanField(
+        default=True,
+        help_text="Incluir PIX como metodo de pagamento nos links",
+    )
     is_active = models.BooleanField(default=True)
     plan = models.CharField(max_length=20, choices=Plan.choices, default=Plan.ESSENCIAL)
     trial_ends_at = models.DateTimeField(null=True, blank=True)

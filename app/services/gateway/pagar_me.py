@@ -85,8 +85,12 @@ class PagarMeGateway:
         self, total_amount, max_installments, name,
         free_installments, interest_rate=2,
         success_url=None, order_code=None,
-        expires_in=1200, pix_expires_in=1800,
+        expires_in=1200, pix_enabled=True, pix_expires_in=1800,
     ):
+        accepted_methods = ["credit_card"]
+        if pix_enabled:
+            accepted_methods.append("pix")
+
         payload = {
             "is_building": False,
             "payment_settings": {
@@ -100,10 +104,7 @@ class PagarMeGateway:
                     },
                     "operation_type": "auth_and_capture",
                 },
-                "accepted_payment_methods": ["credit_card", "pix"],
-                "pix_settings": {
-                    "expires_in": pix_expires_in,
-                },
+                "accepted_payment_methods": accepted_methods,
             },
             "cart_settings": {
                 "items": [{
@@ -121,6 +122,10 @@ class PagarMeGateway:
                 "primary_color": "#4361ee",
             },
         }
+        if pix_enabled:
+            payload["payment_settings"]["pix_settings"] = {
+                "expires_in": pix_expires_in,
+            }
         if order_code:
             payload["order_code"] = order_code
         if success_url:
