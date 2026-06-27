@@ -112,7 +112,7 @@ def notify_seller_credentials(seller, password):
     )
 
 
-def notify_seller_link_status(seller, order, event_type):
+def notify_seller_link_status(seller, order, event_type, motivo=''):
     if not seller or not seller.phone:
         logger.warning("Seller %s has no phone, skipping link notification", seller.id if seller else '?')
         return None
@@ -129,6 +129,7 @@ def notify_seller_link_status(seller, order, event_type):
             "cliente": order.customer_name or 'cliente',
             "valor": valor,
             "link": order.payment_link.gateway_url if hasattr(order, 'payment_link') and order.payment_link else '',
+            "motivo": motivo,
         },
     )
 
@@ -213,7 +214,10 @@ def _fallback_body(event_type, context):
     if event_type in (MessageTemplate.EventType.PAYMENT_EXPIRED,):
         return f"Ola {v}! O link de {val} do(a) {cli} expirou."
     if event_type in (MessageTemplate.EventType.PAYMENT_FAILED,):
-        return f"Ola {v}! O pagamento de {val} do(a) {cli} falhou."
+        return (
+            f"Ola {v}! O pagamento de {val} do(a) {cli} falhou."
+            + (f" Motivo: {context.get('motivo', '')}." if context.get('motivo') else '')
+        )
     if event_type in (MessageTemplate.EventType.PAYMENT_REFUNDED,):
         return f"Ola {v}! O pagamento de {val} do(a) {cli} foi estornado."
     return ""

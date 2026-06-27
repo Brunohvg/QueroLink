@@ -152,8 +152,16 @@ def process_pagarme_webhook(event_id):
             payment.raw_callback_payload = payload
             payment.save()
             if order.seller:
+                last_txn = data.get('last_transaction') or {}
+                motivo = (
+                    last_txn.get('acquirer_message')
+                    or last_txn.get('refusal_reason')
+                    or ''
+                )
                 from app.apps.notifications.tasks import notify_seller_link_status
-                notify_seller_link_status(order.seller, order, 'payment_failed')
+                notify_seller_link_status(
+                    order.seller, order, 'payment_failed', motivo=motivo,
+                )
 
         elif event_type == 'charge.refunded':
             gateway_txn_id = data.get('id')
@@ -177,6 +185,74 @@ def process_pagarme_webhook(event_id):
             if order.seller:
                 from app.apps.notifications.tasks import notify_seller_link_status
                 notify_seller_link_status(order.seller, order, 'payment_refunded')
+
+        elif event_type in ('payment-link.expired', 'payment-link.cancelled'):
+            link_id = data.get('id')
+            if link_id:
+                try:
+                    payment_link = PaymentLink.objects.select_related('order__seller').get(
+                        gateway_link_id=link_id
+                    )
+                    order = payment_link.order
+                except PaymentLink.DoesNotExist:
+                    logger.warning(
+                        "PaymentLink nao encontrado para %s gateway_link_id=%s",
+                        event_type, link_id,
+                    )
+                    event.processed = True
+                    event.save(update_fields=['processed'])
+                    return
+            else:
+                raise ValueError(f"{event_type}: gateway_link_id ausente no payload")
+
+            if event_type == 'payment-link.expired':
+                if order.status == Order.Status.EXPIRED:
+                    logger.info("Order %s already EXPIRED, skipping", order.uuid)
+                else:
+                    order.status = Order.Status.EXPIRED
+                    order.save(update_fields=['status'])
+                    if order.seller:
+                        from app.apps.notifications.tasks import notify_seller_link_status
+                        notify_seller_link_status(order.seller, order, 'payment_expired')
+
+            elif event_type == 'payment-link.cancelled':
+                if order.status == Order.Status.CANCELED:
+                    logger.info("Order %s already CANCELED, skipping", order.uuid)
+                else:
+                    order.status = Order.Status.CANCELED
+                    order.save(update_fields=['status'])
+                    if order.seller:
+                        from app.apps.notifications.tasks import notify_seller_link_status
+                        notify_seller_link_status(order.seller, order, 'link_canceled')
+
+        elif event_type == 'charge.chargedback':
+            gateway_txn_id = data.get('id')
+            order = None
+            if gateway_txn_id:
+                try:
+                    payment = Payment.objects.select_related('order__seller').get(
+                        gateway_transaction_id=gateway_txn_id
+                    )
+                    order = payment.order
+                except Payment.DoesNotExist:
+                    logger.warning(
+                        "Payment nao encontrado para charge.chargedback "
+                        "gateway_transaction_id=%s", gateway_txn_id,
+                    )
+                    event.processed = True
+                    event.save(update_fields=['processed'])
+                    return
+            if not order:
+                raise ValueError("Order nao encontrada para charge.chargedback")
+            if payment.status == Payment.Status.CHARGEBACK:
+                logger.info("Payment %s already CHARGEBACK, skipping", payment.id)
+            else:
+                payment.status = Payment.Status.CHARGEBACK
+                payment.raw_callback_payload = payload
+                payment.save(update_fields=['status', 'raw_callback_payload'])
+                if order.seller:
+                    from app.apps.notifications.tasks import notify_seller_link_status
+                    notify_seller_link_status(order.seller, order, 'payment_refunded')
 
         event.processed = True
         event.save(update_fields=['processed'])
