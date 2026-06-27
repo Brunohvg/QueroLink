@@ -91,6 +91,9 @@ def sync_period_seller_commissions(period):
             if created:
                 created_count += 1
             if sc.is_editable:
+                current_rate = get_commission_rate(seller)
+                if sc.commission_rate != current_rate:
+                    sc.commission_rate = current_rate
                 sc.recalculate(commit=True)
 
     return created_count

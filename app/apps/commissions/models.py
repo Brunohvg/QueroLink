@@ -250,11 +250,11 @@ class SellerCommission(models.Model):
             sale_date__range=(start, end),
         ).aggregate(t=Sum('amount'))['t'] or 0
         self.total_sold_amount = total
-        rate = self.commission_rate
-        if rate is None or rate <= 0:
-            rate = self.seller.commission_rate
+        rate = self.seller.commission_rate
         if rate is None or rate <= 0:
             rate = self.seller.tenant.default_commission_rate
+        if rate is None or rate <= 0:
+            rate = self.commission_rate
         if rate is None or rate <= 0:
             rate = Decimal('0.01')
         self.commission_amount = int((Decimal(str(total)) * Decimal(str(rate))).quantize(Decimal('1'), rounding=ROUND_HALF_UP))
