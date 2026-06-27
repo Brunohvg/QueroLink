@@ -49,25 +49,33 @@ def pagarme_webhook(request, tenant_slug=None):
     from app.apps.accounts.models import Tenant
     from app.services.gateway.pagar_me import _normalize_api_key
 
-    api_key = getattr(settings, 'API_KEY_PAGAR_ME', '')
+    raw_key = getattr(settings, 'API_KEY_PAGAR_ME', '')
 
     if tenant_slug:
         try:
             tenant = Tenant.objects.get(slug=tenant_slug, is_active=True)
             tenant_key = tenant.pagarme_api_key
             if tenant_key:
-                api_key = tenant_key
+                raw_key = tenant_key
         except Tenant.DoesNotExist:
             logger.warning("Pagarme webhook: tenant slug=%s not found", tenant_slug)
 
-    api_key = _normalize_api_key(api_key)
+    normalized_key = _normalize_api_key(raw_key)
 
-    if not _verify_pagarme_signature(raw_body, api_key, received_sig):
+    sig = received_sig
+    if sig.startswith('sha256='):
+        sig = sig[7:]
+
+    verified = _verify_pagarme_signature(raw_body, normalized_key, sig)
+    if not verified and raw_key != normalized_key:
+        verified = _verify_pagarme_signature(raw_body, raw_key, sig)
+
+    if not verified:
         logger.warning(
             "Pagarme webhook signature verification failed: "
             "sig=%s key_prefix=%s body_len=%d tenant=%s",
-            received_sig[:16] if received_sig else '(empty)',
-            api_key[:4] if api_key else '(empty)',
+            sig[:16] if sig else '(empty)',
+            normalized_key[:4] if normalized_key else '(empty)',
             len(raw_body),
             tenant_slug or 'none',
         )
