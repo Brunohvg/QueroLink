@@ -21,6 +21,7 @@ class MessageTemplate(models.Model):
         PAYMENT_CHARGEBACK = 'payment_chargeback', 'Payment Chargeback'
         SELLER_CREDENTIALS = 'seller_credentials', 'Seller Credentials'
         COMMISSION_PAID = 'commission_paid', 'Commission Paid'
+        COMMISSION_ADJUSTED = 'commission_adjusted', 'Commission Adjusted'
 
     class Channel(models.TextChoices):
         WHATSAPP = 'whatsapp', 'WhatsApp'

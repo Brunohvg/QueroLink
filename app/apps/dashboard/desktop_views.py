@@ -81,6 +81,7 @@ def gestor_configuracoes(request):
     TEMPLATE_EVENTS = [
         ('seller_credentials', 'Credenciais do vendedor'),
         ('commission_paid', 'Comissao paga'),
+        ('commission_adjusted', 'Comissao ajustada'),
         ('link_created', 'Link criado'),
         ('payment_paid', 'Link pago'),
         ('link_canceled', 'Link cancelado'),

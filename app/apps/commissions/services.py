@@ -314,6 +314,15 @@ def create_commission_adjustment(seller_commission, new_amount, reason, user):
     seller_commission.status = SellerCommission.Status.AJUSTADA
     seller_commission.save(update_fields=['commission_amount', 'status'])
 
+    try:
+        from app.apps.notifications.tasks import notify_commission_adjusted
+        notify_commission_adjusted(seller_commission, adjustment)
+    except Exception:
+        logger.error(
+            'Failed to send adjustment notification for commission %s',
+            seller_commission.id, exc_info=True,
+        )
+
     return adjustment
 
 
@@ -505,6 +514,37 @@ def get_dashboard_data(tenant, month=None, year=None):
         'evolution': evolution,
         'comparison_prev': prev_total,
     }
+
+
+def get_missing_days_before_today(seller, month, year):
+    today = timezone.localdate()
+    from datetime import timedelta
+    import calendar as cal_mod
+
+    last_day = cal_mod.monthrange(year, month)[1]
+    start = date(year, month, 1)
+    end = min(today - timedelta(days=1), date(year, month, last_day))
+
+    if start > end:
+        return []
+
+    submitted_dates = set(
+        Sale.objects.filter(
+            tenant=seller.tenant,
+            seller=seller,
+            origin=Sale.Origin.MANUAL,
+            sale_date__gte=start,
+            sale_date__lte=end,
+        ).values_list('sale_date', flat=True).distinct()
+    )
+
+    missing = []
+    current = start
+    while current <= end:
+        if current not in submitted_dates:
+            missing.append(current)
+        current += timedelta(days=1)
+    return missing
 
 
 def validate_sale_can_be_changed(seller, sale_date, user):

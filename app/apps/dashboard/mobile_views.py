@@ -217,7 +217,7 @@ def mobile_home(request):
         ).aggregate(total=Sum('amount'))['total'] or 0
 
         from app.apps.commissions.services import (
-            calculate_estimated_commission, sync_period_seller_commissions,
+            calculate_estimated_commission,
         )
 
         period = CommissionPeriod.objects.filter(
@@ -225,9 +225,6 @@ def mobile_home(request):
             month=today.month,
             year=today.year,
         ).first()
-
-        if period:
-            sync_period_seller_commissions(period)
 
         sc = SellerCommission.objects.filter(
             seller=seller,
@@ -264,6 +261,15 @@ def mobile_home(request):
 
         periodo_status = period.status if period else None
 
+        missing_past_days = []
+        has_missing_past_days = False
+        if is_editable and period:
+            from app.apps.commissions.services import get_missing_days_before_today
+            missing_past_days = get_missing_days_before_today(
+                seller, today.month, today.year,
+            )
+            has_missing_past_days = len(missing_past_days) > 0
+
         return render(request, 'mobile/home.html', {
             'seller': seller,
             'today_total': today_total,
@@ -275,6 +281,8 @@ def mobile_home(request):
             'periodo_status': periodo_status,
             'is_editable': is_editable,
             'seller_commission_status': sc_status,
+            'missing_past_days': missing_past_days,
+            'has_missing_past_days': has_missing_past_days,
         })
     except Exception as e:
         return render(request, 'mobile/home.html', {
@@ -324,7 +332,7 @@ def mobile_lancar_venda(request):
                 )
             ):
                 raise ValueError(
-                    'Nao e possivel lancar ou editar vendas de meses '
+                    'Nao e possivel lancar vendas de competencias '
                     'anteriores. Entre em contato com seu gestor.',
                 )
 
@@ -386,6 +394,15 @@ def mobile_lancar_venda(request):
             except (ValueError, Exception):
                 pass
 
+    today = timezone.localdate()
+    sc = SellerCommission.objects.filter(
+        seller=seller,
+        period__month=today.month,
+        period__year=today.year,
+    ).first()
+    is_editable = sc.is_editable if sc else True
+    sc_status = sc.status if sc else None
+
     return render(request, 'mobile/lancar_venda.html', {
         'seller': seller,
         'success': success,
@@ -393,6 +410,8 @@ def mobile_lancar_venda(request):
         'existing_sale': existing_sale,
         'last_amount': last_amount if success else 0,
         'was_update': was_update if success else False,
+        'is_editable': is_editable,
+        'seller_commission_status': sc_status,
     })
 
 
