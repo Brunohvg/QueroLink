@@ -252,11 +252,12 @@ class SellerCommission(models.Model):
         self.total_sold_amount = total
         from app.apps.commissions.services import get_commission_rate
         rate = get_commission_rate(self.seller)
+        self.commission_rate = rate
         self.commission_amount = int((Decimal(str(total)) * Decimal(str(rate))).quantize(Decimal('1'), rounding=ROUND_HALF_UP))
         self.update_operational_status(commit=False)
         if commit:
             self.save(update_fields=[
-                'total_sold_amount', 'commission_amount',
+                'total_sold_amount', 'commission_rate', 'commission_amount',
                 'submitted_days_count', 'expected_working_days',
                 'missing_days_count', 'operational_status',
             ])
