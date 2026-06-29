@@ -1,9 +1,12 @@
 #!/bin/bash
 # ============================================================
 # QueroLink — setup-rclone.sh
-# Guia de configuracao unica do rclone com Google Drive
+# Configuracao unica do rclone com Google Drive para backup
+#
+# Guia completo: docs/GOOGLE_DRIVE_CREDENTIALS.md
+#
 # Execute UMA VEZ no servidor, dentro do container web:
-#   docker exec -it querolink-web bash
+#   docker exec -it <container> bash
 #   ./scripts/setup-rclone.sh
 # ============================================================
 

@@ -127,6 +127,8 @@ docker exec -it <container-web> ./scripts/setup-rclone.sh
 
 O sistema faz backup diário do PostgreSQL para o Google Drive via **rclone**.
 
+**Guia completo:** [`docs/GOOGLE_DRIVE_CREDENTIALS.md`](docs/GOOGLE_DRIVE_CREDENTIALS.md)
+
 | Característica | Detalhe |
 |----------------|---------|
 | Frequência | Diário às 02:00 (Celery beat) |
@@ -134,7 +136,7 @@ O sistema faz backup diário do PostgreSQL para o Google Drive via **rclone**.
 | Retenção Drive | 30 dias |
 | Retenção local | 2 dias |
 | Custo | R$ 0 (15 GB grátis Google Drive) |
-| Setup | 1 vez: `./scripts/setup-rclone.sh` (OAuth) |
+| Setup | 1 vez: `./scripts/setup-rclone.sh` (OAuth, 3 min) |
 
 **Restaurar:** `./scripts/restore.sh latest` ou `./scripts/restore.sh 2026-06-29`
 
