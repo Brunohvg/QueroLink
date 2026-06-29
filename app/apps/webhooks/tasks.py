@@ -42,10 +42,10 @@ def process_pagarme_webhook(event_id):
         data = payload.get('data', {})
         logger.info("Processing webhook event %s type=%s", event_id, event_type)
 
-        if event_type in ('order.paid', 'charge.paid'):
+        if event_type in ('order.paid', 'charge.paid', 'payment-link.finished'):
             order = None
 
-            if event_type == 'order.paid':
+            if event_type in ('order.paid', 'payment-link.finished'):
                 link_id = data.get('id')
                 try:
                     payment_link = PaymentLink.objects.select_related('order').get(
