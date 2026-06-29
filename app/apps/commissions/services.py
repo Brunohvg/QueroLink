@@ -321,7 +321,7 @@ def create_commission_adjustment(seller_commission, new_amount, reason, user):
 
     seller_commission.commission_amount = new_amount
     seller_commission.status = SellerCommission.Status.AJUSTADA
-    seller_commission.save(update_fields=['commission_amount', 'status'])
+    seller_commission.save(update_fields=['commission_amount', 'status', 'updated_at'])
 
     try:
         from app.apps.notifications.tasks import notify_commission_adjusted

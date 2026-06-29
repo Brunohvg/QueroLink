@@ -287,7 +287,7 @@ def process_pagarme_webhook(event_id):
                     logger.info("Order %s already EXPIRED, skipping", order.uuid)
                 else:
                     order.status = Order.Status.EXPIRED
-                    order.save(update_fields=['status'])
+                    order.save(update_fields=['status', 'updated_at'])
                     if order.seller:
                         from app.apps.notifications.tasks import notify_seller_link_status
                         notify_seller_link_status(order.seller, order, 'payment_expired')
@@ -297,7 +297,7 @@ def process_pagarme_webhook(event_id):
                     logger.info("Order %s already CANCELED, skipping", order.uuid)
                 else:
                     order.status = Order.Status.CANCELED
-                    order.save(update_fields=['status'])
+                    order.save(update_fields=['status', 'updated_at'])
                     if order.seller:
                         from app.apps.notifications.tasks import notify_seller_link_status
                         notify_seller_link_status(order.seller, order, 'link_canceled')
@@ -327,11 +327,11 @@ def process_pagarme_webhook(event_id):
             else:
                 payment.status = Payment.Status.CHARGEBACK
                 payment.raw_callback_payload = payload
-                payment.save(update_fields=['status', 'raw_callback_payload'])
+                payment.save(update_fields=['status', 'raw_callback_payload', 'updated_at'])
                 Sale.objects.filter(order=order).delete()
                 if order.seller:
                     from app.apps.notifications.tasks import notify_seller_link_status
-                    notify_seller_link_status(order.seller, order, 'payment_refunded')
+                    notify_seller_link_status(order.seller, order, 'payment_chargeback')
 
         elif event_type in ('charge.antifraud_approved', 'charge.antifraud_reproved',
                             'charge.antifraud_manual', 'charge.antifraud_pending'):
@@ -359,7 +359,7 @@ def process_pagarme_webhook(event_id):
                     return
                 payment.status = Payment.Status.FAILED
                 payment.raw_callback_payload = payload
-                payment.save(update_fields=['status', 'raw_callback_payload'])
+                payment.save(update_fields=['status', 'raw_callback_payload', 'updated_at'])
                 if order.seller:
                     motivo = f"Antifraude: {antifraud_status} (score: {antifraud_score})"
                     from app.apps.notifications.tasks import notify_seller_link_status

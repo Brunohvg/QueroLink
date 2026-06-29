@@ -285,17 +285,14 @@ class WhatsappClient:
     def _format_number(self, number):
         cleaned = ''.join(filter(str.isdigit, str(number)))
 
-        if len(cleaned) == 11:
-            if not cleaned.startswith('55'):
+        if cleaned.startswith('55'):
+            if len(cleaned) in (12, 13):
+                pass
+        else:
+            if len(cleaned) in (10, 11):
                 cleaned = '55' + cleaned
-        elif len(cleaned) == 13 and cleaned.startswith('55'):
-            pass
-        elif len(cleaned) == 10:
-            cleaned = '55' + cleaned
-        elif 10 < len(cleaned) < 13:
-            cleaned = '55' + cleaned
-        elif not cleaned.startswith('55'):
-            cleaned = '55' + cleaned
+            elif len(cleaned) == 12:
+                cleaned = '55' + cleaned
 
         if len(cleaned) < 12:
             logger.warning(

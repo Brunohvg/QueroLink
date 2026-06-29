@@ -110,7 +110,10 @@ def gestor_configuracoes(request):
         if pagarme_api_key and pagarme_api_key != '••••••••':
             tenant.pagarme_api_key = pagarme_api_key
         if whatsapp_instance_id:
-            tenant.whatsapp_instance_id = whatsapp_instance_id
+            base = whatsapp_instance_id.strip().lower().replace(' ', '-')
+            if not base.startswith(f"{tenant.slug}-"):
+                base = f"{tenant.slug}-{base}"
+            tenant.whatsapp_instance_id = base
         if commission_rate:
             try:
                 tenant.default_commission_rate = float(
@@ -152,6 +155,16 @@ def gestor_configuracoes(request):
     })
 
 
+def _validate_tenant_instance(tenant, instance_id):
+    """Garante que o instance_id pertence ao tenant. Retorna o ID ou None."""
+    if not instance_id:
+        return None
+    prefix = f"{tenant.slug}-"
+    if not instance_id.startswith(prefix):
+        return None
+    return instance_id
+
+
 @login_required
 def whatsapp_instance_status(request):
     if not _check_role(request, User.Role.ADMIN):
@@ -174,6 +187,11 @@ def whatsapp_instance_status(request):
             'connected': False, 'state': 'not_configured',
             'error': 'Nome da instancia nao configurado.',
         })
+    if not _validate_tenant_instance(tenant, instance_id):
+        return JsonResponse({
+            'connected': False, 'state': 'forbidden',
+            'error': 'Esta instancia pertence a outro lojista.',
+        }, status=403)
     if not global_key:
         return JsonResponse({
             'connected': False, 'state': 'not_configured',
@@ -264,6 +282,11 @@ def whatsapp_connection_state(request):
             'connected': False, 'state': 'not_configured',
             'error': 'Nome da instancia nao configurado.',
         })
+    if not _validate_tenant_instance(tenant, instance_id):
+        return JsonResponse({
+            'connected': False, 'state': 'forbidden',
+            'error': 'Esta instancia pertence a outro lojista.',
+        }, status=403)
 
     api_key = tenant.whatsapp_token or getattr(settings, 'WHATSAPP_API_KEY', '')
     if not api_key:
@@ -327,6 +350,8 @@ def whatsapp_disconnect(request):
     instance_id = request.GET.get('instance') or tenant.whatsapp_instance_id or ''
     if not instance_id:
         return JsonResponse({'error': 'Nome da instancia nao configurado.'}, status=400)
+    if not _validate_tenant_instance(tenant, instance_id):
+        return JsonResponse({'error': 'Esta instancia pertence a outro lojista.'}, status=403)
 
     api_key = tenant.whatsapp_token or getattr(settings, 'WHATSAPP_API_KEY', '')
     if not api_key:
@@ -338,6 +363,8 @@ def whatsapp_disconnect(request):
         return JsonResponse({'disconnected': True})
     except WhatsAppError as e:
         return JsonResponse({'error': str(e)}, status=500)
+    except Exception as e:
+        return JsonResponse({'error': f'Erro inesperado: {e}'}, status=500)
     except Exception as e:
         return JsonResponse({'error': f'Erro inesperado: {e}'}, status=500)
 
@@ -358,6 +385,8 @@ def whatsapp_delete_instance(request):
     instance_id = request.GET.get('instance') or tenant.whatsapp_instance_id or ''
     if not instance_id:
         return JsonResponse({'error': 'Nome da instancia nao configurado.'}, status=400)
+    if not _validate_tenant_instance(tenant, instance_id):
+        return JsonResponse({'error': 'Esta instancia pertence a outro lojista.'}, status=403)
 
     api_key = getattr(settings, 'WHATSAPP_API_KEY', '')
     if not api_key:

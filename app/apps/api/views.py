@@ -512,7 +512,7 @@ class CommissionPeriodCsvView(generics.GenericAPIView):
                 f'{sc.total_sold_amount / 100:.2f}',
                 f'{float(sc.commission_rate) * 100:.2f}',
                 f'{sc.commission_amount / 100:.2f}',
-                period.get_status_display(),
+                sc.get_status_display(),
             ])
         response = HttpResponse(
             buf.getvalue(), content_type='text/csv; charset=utf-8',

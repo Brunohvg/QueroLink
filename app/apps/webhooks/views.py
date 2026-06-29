@@ -74,12 +74,14 @@ def evolution_webhook(request, instance_name, tenant_uuid, token):
                 **extra,
             },
         )
+
+        return JsonResponse({"status": "received"}, status=200)
     except json.JSONDecodeError:
         logger.warning("Evolution webhook invalid JSON from %s", instance_name)
+        return JsonResponse({"error": "Invalid JSON"}, status=400)
     except Exception as e:
         logger.error("Evolution webhook error: %s", e)
-
-    return JsonResponse({"status": "received"}, status=200)
+        return JsonResponse({"error": "Internal error"}, status=500)
 
 
 @csrf_exempt

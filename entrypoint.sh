@@ -19,14 +19,15 @@ wait_for_db() {
     local last_error=""
     while [ $retries -gt 0 ]; do
         last_error=$(python -c "
-import dj_database_url, os, psycopg2
-url = dj_database_url.parse(os.environ['DATABASE_URL'])
+import urllib.parse, os, psycopg2
+url = os.environ['DATABASE_URL']
+parsed = urllib.parse.urlparse(url)
 conn = psycopg2.connect(
-    host=url.get('HOST', ''),
-    port=url.get('PORT', 5432),
-    user=url.get('USER', ''),
-    password=url.get('PASSWORD', ''),
-    dbname=url.get('NAME', ''),
+    host=parsed.hostname or 'localhost',
+    port=parsed.port or 5432,
+    user=parsed.username or 'postgres',
+    password=parsed.password or '',
+    dbname=parsed.path.lstrip('/') or 'postgres',
 )
 conn.close()
 print('OK')

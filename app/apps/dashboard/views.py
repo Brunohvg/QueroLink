@@ -2,6 +2,7 @@ from django.shortcuts import render, redirect
 from django.contrib.auth import authenticate, login as auth_login, logout as auth_logout
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
+from django.utils.http import url_has_allowed_host_and_scheme
 from app.apps.orders.models import Order
 from app.apps.accounts.models import Tenant, User
 from django.db.models import Sum
@@ -11,6 +12,8 @@ def login_view(request):
     next_url = request.GET.get('next', 'dashboard:home')
 
     if request.user.is_authenticated:
+        if not url_has_allowed_host_and_scheme(next_url, allowed_hosts=None):
+            next_url = 'dashboard:home'
         return redirect(next_url)
 
     if request.method == 'POST':
@@ -36,7 +39,7 @@ def login_view(request):
                 request.session.set_expiry(0)
 
             next_url = request.POST.get('next', '')
-            if not next_url or next_url == 'dashboard:home':
+            if not next_url or not url_has_allowed_host_and_scheme(next_url, allowed_hosts=None):
                 if user.role in (User.Role.MANAGER, User.Role.ADMIN):
                     next_url = 'dashboard:gestor_home'
                 elif user.role == User.Role.FINANCEIRO:

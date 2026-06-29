@@ -52,7 +52,10 @@ mkdir -p "$BACKUP_DIR"
 
 # ── pg_dump ─────────────────────────────────────────────────
 log "Executando pg_dump de ${DB_NAME}@${DB_HOST}:${DB_PORT} ..."
-export PGPASSWORD="$DB_PASS"
+TMP_PGPASS=$(mktemp)
+chmod 600 "$TMP_PGPASS"
+echo "${DB_HOST}:${DB_PORT}:${DB_NAME}:${DB_USER}:${DB_PASS}" > "$TMP_PGPASS"
+export PGPASSFILE="$TMP_PGPASS"
 pg_dump \
     -h "$DB_HOST" \
     -p "$DB_PORT" \
@@ -61,6 +64,7 @@ pg_dump \
     -Fc \
     -Z9 \
     -f "$BACKUP_FILE"
+rm -f "$TMP_PGPASS"
 
 SIZE=$(du -h "$BACKUP_FILE" | cut -f1)
 log "Dump criado: $BACKUP_FILE ($SIZE)"
