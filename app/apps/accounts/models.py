@@ -63,7 +63,11 @@ class Tenant(models.Model):
 
     @property
     def pagarme_configured(self):
-        return bool(self.pagarme_api_key)
+        if not self.pagarme_api_key:
+            return False
+        from app.services.gateway.pagar_me import _normalize_api_key
+        key = _normalize_api_key(self.pagarme_api_key)
+        return bool(key and key.startswith('sk_'))
 
     @property
     def whatsapp_configured(self):
