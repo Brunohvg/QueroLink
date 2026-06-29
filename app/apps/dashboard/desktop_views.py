@@ -512,27 +512,25 @@ def gestor_link_detalhe(request, order_uuid):
         payment = order.payments.order_by('created_at').first()
         payment_link = PaymentLink.objects.filter(order=order).first()
 
-        charge_data = None
-        pagarme_error = None
-        if payment and payment.gateway_transaction_id:
-            try:
-                from app.services.gateway.pagar_me import PagarMeGateway
-                gw = PagarMeGateway(api_key=tenant.pagarme_api_key or '')
-                charge_data = gw.get_charge(payment.gateway_transaction_id)
-            except Exception as e:
-                pagarme_error = str(e)
-                logger.warning("Pagar.me charge fetch failed: %s", e)
-
         total_centavos = order.total_amount
         valor_reais = f"{total_centavos // 100},{total_centavos % 100:02d}"
+
+        raw_payload = (payment.raw_callback_payload or {}) if payment else {}
+        last_txn = raw_payload.get('last_transaction') or {}
 
         return render(request, 'dashboard/gestor/link_detalhe.html', {
             'order': order,
             'payment': payment,
             'payment_link': payment_link,
-            'charge_data': charge_data,
-            'pagarme_error': pagarme_error,
             'valor_reais': valor_reais,
+            'paid_at': payment.paid_at if payment else None,
+            'card_brand': payment.card_brand if payment else '',
+            'card_last4': payment.card_last4 if payment else '',
+            'acquirer_message': last_txn.get('acquirer_message', '') if payment else '',
+            'acquirer_name': last_txn.get('acquirer_name', '') if payment else '',
+            'clicks_count': payment_link.clicks_count if payment_link else 0,
+            'opened_at': payment_link.opened_at if payment_link else None,
+            'expires_at': payment_link.expires_at if payment_link else None,
         })
     except Exception as e:
         logger.error("gestor_link_detalhe error: %s", e, exc_info=True)

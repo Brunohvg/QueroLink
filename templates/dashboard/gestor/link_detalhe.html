@@ -54,6 +54,15 @@
         <div class="flex justify-between text-[14px]"><dt class="text-gray-500">Valor</dt><dd class="font-semibold text-gray-900">R$ {{ valor_reais }}</dd></div>
         <div class="flex justify-between text-[14px]"><dt class="text-gray-500">Parcelas</dt><dd class="font-semibold text-gray-800">{{ payment.installments|default:'—' }}x</dd></div>
         <div class="flex justify-between text-[14px]"><dt class="text-gray-500">Criado em</dt><dd class="text-gray-800">{{ order.created_at|date:"d/m/Y H:i" }}</dd></div>
+        {% if opened_at %}
+        <div class="flex justify-between text-[14px]"><dt class="text-gray-500">Aberto em</dt><dd class="text-gray-800">{{ opened_at|date:"d/m/Y H:i" }}</dd></div>
+        {% endif %}
+        {% if clicks_count %}
+        <div class="flex justify-between text-[14px]"><dt class="text-gray-500">Cliques</dt><dd class="font-semibold text-gray-800">{{ clicks_count }}</dd></div>
+        {% endif %}
+        {% if expires_at %}
+        <div class="flex justify-between text-[14px]"><dt class="text-gray-500">Expira em</dt><dd class="text-gray-800">{{ expires_at|date:"d/m/Y H:i" }}</dd></div>
+        {% endif %}
         {% if payment_link and payment_link.gateway_url %}
         <div class="pt-2">
           <a href="{{ payment_link.gateway_url }}" target="_blank" class="inline-flex items-center gap-1.5 text-brand-600 hover:text-brand-700 text-[13px] font-medium">
@@ -89,6 +98,18 @@
         <div class="flex justify-between text-[14px]"><dt class="text-gray-500">Metodo</dt><dd class="font-semibold text-gray-800">{{ payment.get_payment_method_display|default:'—' }}</dd></div>
         <div class="flex justify-between text-[14px]"><dt class="text-gray-500">Transacao ID</dt><dd class="font-mono text-[12px] text-gray-600 truncate max-w-[200px] text-right">{{ payment.gateway_transaction_id|default:'—' }}</dd></div>
         <div class="flex justify-between text-[14px]"><dt class="text-gray-500">Parcelas</dt><dd class="font-semibold text-gray-800">{{ payment.installments }}x</dd></div>
+        {% if card_brand and card_last4 %}
+        <div class="flex justify-between text-[14px]"><dt class="text-gray-500">Cartao</dt><dd class="font-semibold text-gray-800">{{ card_brand }} **** {{ card_last4 }}</dd></div>
+        {% endif %}
+        {% if paid_at %}
+        <div class="flex justify-between text-[14px]"><dt class="text-gray-500">Pago em</dt><dd class="text-gray-800">{{ paid_at|date:"d/m/Y H:i" }}</dd></div>
+        {% endif %}
+        {% if acquirer_name %}
+        <div class="flex justify-between text-[14px]"><dt class="text-gray-500">Adquirente</dt><dd class="text-gray-800">{{ acquirer_name }}</dd></div>
+        {% endif %}
+        {% if acquirer_message %}
+        <div class="flex justify-between text-[14px]"><dt class="text-gray-500">Mensagem</dt><dd class="text-gray-800">{{ acquirer_message }}</dd></div>
+        {% endif %}
       </dl>
       {% else %}
       <div class="text-center py-8">

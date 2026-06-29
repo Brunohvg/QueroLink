@@ -19,6 +19,32 @@ def _skip_foreign_event(event, reason):
     event.save(update_fields=['processed'])
 
 
+def _populate_payment_from_webhook(payment, data, event_type):
+    """Extrai dados do payload do webhook antes do PII scrub no save()."""
+    charge = data
+    if event_type == 'order.paid':
+        charges = data.get('charges', [])
+        charge = charges[0] if charges else {}
+
+    txn = charge.get('last_transaction') or {}
+    card = txn.get('card') or {}
+
+    payment.payment_method = charge.get('payment_method') or payment.payment_method
+    payment.installments = txn.get('installments') or payment.installments
+
+    paid_at = charge.get('paid_at')
+    if paid_at:
+        payment.paid_at = paid_at
+
+    brand = card.get('brand', '')
+    if brand:
+        payment.card_brand = brand
+
+    last4 = card.get('last_four_digits', '')
+    if last4:
+        payment.card_last4 = str(last4)
+
+
 @shared_task(
     autoretry_for=(Exception,),
     max_retries=3,
@@ -110,6 +136,7 @@ def process_pagarme_webhook(event_id):
                     payment.id,
                 )
             else:
+                _populate_payment_from_webhook(payment, data, event_type)
                 payment.status = Payment.Status.PAID
                 payment.raw_callback_payload = payload
                 payment.save()
@@ -161,6 +188,15 @@ def process_pagarme_webhook(event_id):
                 _skip_foreign_event(event, f"Payment ausente na Order {order.uuid}")
                 return
             payment.gateway_transaction_id = data.get('id')
+
+            charge = data
+            if event_type == 'order.payment_failed':
+                charges = data.get('charges', [])
+                charge = charges[0] if charges else {}
+            txn = charge.get('last_transaction') or {}
+            payment.payment_method = charge.get('payment_method') or payment.payment_method
+            payment.installments = txn.get('installments') or payment.installments
+
             payment.status = Payment.Status.FAILED
             payment.raw_callback_payload = payload
             payment.save()
