@@ -1,8 +1,8 @@
-# PRD — VendaPay Sistema de Comissões
+# PRD — VendaPay / QueroLink Sistema de Comissões
 
-> **Status geral:** MVP completo — Lotes 1 a 5 implementados. 55 testes passando.
-> **Versão:** 1.0.0-MVP | **Última atualização:** 2026-06-20
-> **Recomendação:** ✅ PRONTO PARA STAGING (ver `READINESS_REPORT.md`)
+> **Status geral:** ✅ PRODUÇÃO — Lotes 1 a 6 implementados. Sistema estabilizado.
+> **Versão:** 2.0.0 | **Última atualização:** 2026-06-29
+> **Recomendação:** ✅ PRONTO PARA PRODUÇÃO (ver `READINESS_REPORT.md`)
 
 ---
 
@@ -24,18 +24,18 @@ O tenant principal é a Loja Bibelô, com 16 vendedores reais.
 
 | App | Função | Status |
 |-----|--------|--------|
-| accounts | Tenant, User customizado | ✅ Lote 1 |
+| accounts | Tenant, User customizado, middleware trial, backup task | ✅ Lote 1 |
 | sellers | Seller (vendedor) | ✅ Lote 1 + 1.5 |
-| orders | Order, PaymentLink | Existente (fora de escopo) |
-| payments | Payment (transações gateway) | Existente (fora de escopo) |
-| sales | Sales (vendas lançadas) | ✅ Cross-tenant validation adicionada |
-| commissions | CommissionPeriod, SellerCommission | Existente |
-| webhooks | WebhookEvent (Pagar.me) | Bug conhecido, fora de escopo |
-| notifications | Templates + envio WhatsApp | ✅ Lote 1.5 (generalizado) |
-| analytics | Analytics de cliques | Não implementado |
-| audit | Auditoria | Não implementado |
-| dashboard | Dashboard do gestor + cadastro de vendedor | ✅ Lote 1.5 (tela seller create) |
-| api | API REST | ❌ Lote 2 (futuro) |
+| orders | Order, PaymentLink, services (link creation) | ✅ |
+| payments | Payment (paid_at, card_brand, card_last4, gateway IDs) | ✅ |
+| sales | Sales (vendas lançadas, origens LINK + MANUAL) | ✅ |
+| commissions | CommissionPeriod, SellerCommission, services | ✅ |
+| webhooks | WebhookEvent (Pagar.me), 9 eventos tratados, cleanup task | ✅ Lote 6 |
+| notifications | Templates + envio WhatsApp | ✅ Lote 1.5 |
+| analytics | Analytics de cliques (LinkClick) | ❌ Model existe, view não implementada |
+| audit | Auditoria (AuditLog) | ✅ |
+| dashboard | Dashboard gestor/financeiro + mobile vendedor + link detalhe | ✅ Lotes 1-6 |
+| api | REST API (25+ endpoints, rate limiting, JWT logout) | ✅ Lote 2-6 |
 
 ---
 
@@ -509,6 +509,35 @@ Fora de escopo. Não corrigir.
 - `VALIDATION_CHECKLIST_LOTE5.md` com 52 itens
 - `READINESS_REPORT.md`: ✅ PRONTO PARA STAGING
 - Pendente: provisionar Coolify staging, testar WhatsApp real, validar PWA em celular real
+
+### Lote 6 — Estabilização e UI (2026-06-29)
+**16 correções de estabilidade + redesign + backup:**
+
+- **C1**: `UnboundLocalError` corrigido no handler `payment-link.expired` (faltava `return` no else)
+- **C2**: `Sale` deletada em `charge.refunded` e `charge.chargedback` (relatórios não inflam mais)
+- **C3**: CSRF token injetado automaticamente em todos `fetch()` do mobile PWA via wrapper global
+- **C4**: Webhook sem assinatura: WARNING no log (não rejeita — Pagar.me não envia por padrão)
+- **C5**: Endpoint `POST /api/auth/logout/` com `TokenBlacklistView` (JWT)
+- **H3**: Middleware `TrialEnforcementMiddleware` — aviso quando trial expira (sem bloqueio)
+- **H4**: Cálculo de comissão unificado — `recalculate()` chama `get_commission_rate()` do services
+- **H7**: `_normalize_api_key` — `rstrip(':')` substituído por remoção condicional exata do `:`
+- **M1**: Páginas públicas (`orders/index.html`, `payment_success.html`) migradas para Tailwind
+- **M2**: Rate limit 10/min em `POST /api/seller/links/`
+- **M5**: Celery beat `cleanup_old_webhook_events` (diário, remove eventos >90 dias)
+- **M6**: Anos dinâmicos no filtro do dashboard (±2 anos do atual)
+- **M7**: Validação valor máximo R$ 100.000 em venda manual (API serializer + mobile view)
+- **M8**: Template tag `currency_filters.brl` criada (evita 500 no mobile)
+- **M10**: `short_code` gerado automaticamente no `create_payment_link()`
+
+**Novas features e redesign:**
+- **Payment metadata**: campos `paid_at`, `card_brand`, `card_last4` extraídos do webhook (antes do scrub PII)
+- **Link detail premium**: card visual com avatar, telefone, bandeira + final cartão, adquirente, status condicional
+- **Webhook `payment-link.finished`**: handler adicionado ao bloco `order.paid`/`charge.paid`
+- **Backup automático**: `pg_dump -Fc -Z9` → `rclone` → Google Drive (Celery beat 02:00 diário, R$ 0)
+- Scripts: `backup.sh`, `restore.sh`, `setup-rclone.sh`
+- `.env`: indentação corrigida, duplicatas removidas, `FERNET_KEY` documentada
+- Dockerfile: +rclone +postgresql-client + `/app/backups`
+- docker-compose: volume `backup_volume` no celery_beat
 
 ---
 

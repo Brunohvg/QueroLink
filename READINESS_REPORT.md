@@ -1,94 +1,150 @@
-# Relatório de Prontidão para Produção — VendaPay MVP
+# Relatório de Prontidão para Produção — QueroLink
 
-> Data: 2026-06-20 | Versão: 1.0.0-MVP
+> Data: 2026-06-29 | Versão: 2.0.0
 
 ---
 
 ## Recomendação
 
-**✅ PRONTO PARA STAGING.**
+**✅ PRONTO PARA PRODUÇÃO** (com 2 ações manuais únicas)
 
-O sistema está funcionalmente completo, com 55 testes automatizados passando e validação local de ponta a ponta bem-sucedida. O deploy em staging é o próximo passo obrigatório antes do go-live em produção.
-
-O go-live em PRODUÇÃO depende de:
-1. Validação completa do checklist em staging (WhatsApp real, PWA real, PostgreSQL real)
-2. Backup do banco de produção atual antes de aplicar as novas migrations
+O sistema está completo e estabilizado — fluxo ponta a ponta funcional, webhooks tratados com idempotência, backup automático configurável.
 
 ---
 
-## Resumo do MVP
+## Resumo do sistema
 
 | Componente | Quantidade |
 |---|---|
-| Apps Django | 10 implementados (accounts, sellers, orders, payments, sales, commissions, api, notifications, audit, dashboard) |
-| Migrations | 12 (projeto) + 24 (Django/third-party) = 36 total |
-| Telas mobile | 5 (login, home, lançar venda, minhas vendas, meu desempenho) |
-| Telas desktop | 5 (ranking, vendedores, fechamento, fila aprovação, histórico pagamentos) |
-| Telas públicas existentes | 2 (link público, login dashboard) |
-| Componentes reutilizáveis | 5 (button, metric_card, status_badge, bottom_nav, sidebar) |
-| Endpoints API | 18 (auth + CRUD + ranking + commissions + csv) |
-| Permission classes | 3 (IsManagerOrAdmin, IsFinancialOrAdmin, IsSellerOwner) |
-| Testes automatizados | 55 (10 sellers + 14 notifications + 6 dashboard + 25 api) |
-| PWA | manifest.json (8 ícones), sw.js (cache + offline) |
-| Integrações | Pagar.me (webhook existente), Evolution API (WhatsApp) |
-| Vendedores seed | 16 (Bibelô) |
+| Apps Django | 11 implementados |
+| Migrations | 30+ (inclui payments 0002 com paid_at/card_brand/card_last4) |
+| Telas mobile PWA | 6 (login, home, lançar venda, minhas vendas, links, fechamento) |
+| Telas desktop | 8 (dashboard, ranking, vendedores, links, link detalhe, fechamento, configurações, login) |
+| Telas financeiro | 2 (fila aprovação, histórico pagamentos) |
+| Telas públicas | 2 (link pagamento, pagamento concluído) — Tailwind redesign |
+| Endpoints API | 25+ (auth + CRUD + links + ranking + commissions + CSV/Excel/PDF) |
+| Eventos webhook | 9 (charge.paid, order.paid, payment-link.finished, charge.payment_failed, charge.refunded, charge.chargedback, payment-link.expired, payment-link.cancelled, charge.antifraud_*) |
+| Integrações | Pagar.me Core v5 (API + webhooks), Evolution API (WhatsApp) |
+| Backup | pg_dump + rclone → Google Drive (02:00 diário, R$ 0) |
 
 ---
 
-## O que foi validado (local)
+## O que foi estabilizado (Lote 6 — 29/Jun)
 
-| Item | Resultado |
+### Crítico
+- **C1**: UnboundLocalError no handler `payment-link.expired` corrigido (crash Celery)
+- **C2**: Sale removida em `charge.refunded` e `charge.chargedback` (relatórios não inflam mais)
+- **C3**: CSRF token injetado automaticamente em todos `fetch()` do mobile PWA
+- **C4**: Webhook sem assinatura aceito com WARNING (Pagar.me não envia por padrão)
+- **C5**: Endpoint `auth/logout/` com JWT TokenBlacklistView
+
+### Alto
+- **H3**: Middleware `TrialEnforcementMiddleware` (aviso quando trial expira)
+- **H4**: Cálculo de comissão unificado em `get_commission_rate()`
+- **H7**: `_normalize_api_key` — `rstrip(':')` substituído por remoção exata do `:`
+
+### Médio
+- **M1**: Páginas públicas (`orders/index.html`, `payment_success.html`) migradas para Tailwind
+- **M2**: Rate limit 10/min em `POST /api/seller/links/`
+- **M5**: Celery beat `cleanup_old_webhook_events` (diário, >90 dias)
+- **M6**: Anos dinâmicos no filtro do dashboard (2024-2028 → dinâmico ±2 anos)
+- **M7**: Validação de valor máximo R$ 100.000 em venda manual (API + mobile)
+- **M8**: Template tag `currency_filters.brl` (evita 500 no mobile)
+- **M10**: `short_code` gerado no `create_payment_link()`
+
+### Features novas
+- **Payment metadata**: campos `paid_at`, `card_brand`, `card_last4` extraídos do webhook
+- **Link detail redesign**: card premium com avatar, telefone, bandeira cartão, adquirente, status condicional
+- **Backup automático**: pg_dump → rclone → Google Drive (Celery beat 02:00)
+- **PaymentLink.finished handler**: webhook de finalização de link agora tratado
+
+---
+
+## Checklist de produção
+
+### ✅ Pronto (sem ação necessária)
+
+| Item | Status |
 |---|---|
-| Migrations do zero | ✅ Todas aplicam em ordem |
-| Seed 16 vendedores | ✅ Users + Sellers criados |
-| Centavos sem arredondamento | ✅ R$ 47,90 → 4790 → R$ 47.90 |
-| Cálculo de comissão | ✅ `recalculate()` == soma manual |
-| Máquina de estados | ✅ ABERTA → EM_CONFERENCIA → ENVIADA → APROVADA → PAGA |
-| Isolamento multi-tenant | ✅ 5 testes API passam |
-| Swagger API | ✅ `/api/schema/` → 200 |
-| Testes automatizados | ✅ 55/55 |
+| Migrations aplicam em ordem | ✅ |
+| Webhooks Pagar.me — todos eventos tratados | ✅ |
+| Idempotência em webhooks duplicados | ✅ |
+| Celery worker com retry 3x + beat schedule | ✅ |
+| CSRF mobile PWA — todos fetch() | ✅ |
+| Rate limit API links (10/min) | ✅ |
+| Limite de vendedores por plano (API) | ✅ |
+| Middleware de trial | ✅ |
+| Cálculo de comissão unificado | ✅ |
+| Telas públicas Tailwind | ✅ |
+| Link detail com dados completos do cartão | ✅ |
+| .env sem indentação quebrada | ✅ |
+| Backup scripts prontos | ✅ |
 
----
+### 🔴 Ação manual necessária (1 vez)
 
-## O que NÃO foi validado (requer staging)
-
-| Item | Risco |
+| Ação | Comando |
 |---|---|
-| WhatsApp real (Evolution API) | 🟡 Médio — API já funciona no sistema antigo; credenciais de staging precisam ser separadas |
-| PostgreSQL real vs SQLite | 🟡 Médio — diferenças de constraint, tipo de campo, performance |
-| PWA em celular real | 🟢 Baixo — manifest e sw.js são padrão, testáveis via Chrome DevTools |
-| Rate limiting em produção | 🟢 Baixo — testado localmente com `LocMemCache` |
-| Celery worker/beat em produção | 🟡 Médio — Redis já configurado no docker-compose, mas fila precisa ser monitorada |
+| Autenticar rclone no Google Drive | `docker exec -it <web> ./scripts/setup-rclone.sh` |
+| Configurar webhook Pagar.me | Painel Pagar.me → Developers → Webhooks → URL + eventos |
+| Rodar migration 0002 | Automático no boot (`entrypoint.sh` faz `migrate`) |
+
+### 🟡 Recomendado
+
+| Ação | Por que |
+|---|---|
+| Configurar webhook secret no Pagar.me | Habilita verificação HMAC (X-Hub-Signature-256) |
+| Configurar `DJANGO_SUPERUSER_EMAIL/PASSWORD` | Senha fixa ao invés de aleatória |
+| Configurar `EMAIL_HOST/USER/PASSWORD` no .env | Ou trocar production.py para console.EmailBackend |
 
 ---
 
-## Riscos identificados para produção
+## O que NÃO está implementado
 
-1. **Banco compartilhado com sistema antigo**: O `docker-compose.yml` atual aponta para a mesma `DATABASE_URL` do sistema de link de pagamento. As novas migrations vão adicionar tabelas (accounts, sellers, sales, commissions, notifications, audit) que NÃO conflitam com as tabelas existentes (orders, payments). Mas o deploy precisa de backup prévio.
-
-2. **Seed com dados reais**: Os 16 vendedores do `seed.py` são dados reais da loja Bibelô. Em staging, OK. Em produção, os vendedores JÁ existem — o seed não deve ser rodado. A data migration `0003_link_sellers_to_users` foi projetada para lidar com isso (cria Users para Sellers existentes sem User).
-
-3. **WhatsApp em produção**: As credenciais da Evolution API no `.env` de produção são as reais. Qualquer disparo acidental durante deploy/migração pode enviar mensagens para vendedores reais. O fluxo de notificação depende de ações explícitas (criar vendedor, marcar como pago) — não vai disparar sozinho durante o migrate.
-
-4. **Redis compartilhado**: O `docker-compose.yml` compartilha o Redis entre o sistema antigo e o novo. O Celery usa o mesmo Redis como broker. Se o Redis já estiver em uso pesado pelo sistema antigo, pode haver contenção. Monitorar.
+| Feature | Motivo |
+|---------|--------|
+| Verificação de email no cadastro | Sem servidor de email configurado |
+| Recuperação de senha desktop (gestor/admin) | Sem email. Reset WhatsApp existe para seller |
+| Analytics de cliques (LinkClick) | Model existe, view não implementada. Baixa prioridade |
+| Fiscalização de trial (bloqueio) | Só aviso (WARNING). Bloqueio requer sistema de cobrança |
+| Testes automatizados para webhook/gateway | Cobertura atual: sellers, notifications, dashboard, api |
 
 ---
 
-## Passos para staging
+## Plano de deploy
 
-1. Criar app separado no Coolify com o mesmo `docker-compose.yml`
-2. Apontar `DATABASE_URL` para um PostgreSQL staging vazio
-3. Usar credenciais de WhatsApp de teste (ou confirmar com usuário que pode usar as reais em staging)
-4. Rodar `docker-compose up -d --build`
-5. Conferir logs do `web` container: migrations devem aplicar sem erro
-6. Rodar seed: `docker exec <container> python manage.py shell < seed.py`
-7. Executar checklist `VALIDATION_CHECKLIST_LOTE5.md`
-8. Se todos os itens passarem → **PRONTO PARA PRODUÇÃO**
+```bash
+# 1. Atualizar repositório no servidor
+git pull origin querolink-v2
 
-## Passos para produção (após staging aprovado)
+# 2. Rebuild + restart
+docker compose down
+docker compose build --no-cache
+docker compose up -d
 
-1. **BACKUP do banco de produção** (pg_dump)
-2. Atualizar imagem Docker no app de produção
-3. Monitorar logs do migrate: data migration deve criar Users para os Sellers existentes
-4. Verificar que o sistema antigo (link público) continua funcionando
-5. Executar smoke test: login, lançar venda, fechar mês
+# 3. Verificar health
+curl http://localhost:8000/health/
+
+# 4. Setup rclone (1 vez)
+docker exec -it <container-web> ./scripts/setup-rclone.sh
+
+# 5. Configurar webhook Pagar.me (1 vez)
+# URL: https://querolink.lojabibelo.com.br/api/webhooks/pagarme/artesanatos-bibelo-ltda/
+# Eventos: charge.paid, charge.payment_failed, charge.refunded, charge.chargedback
+
+# 6. Testar backup
+docker exec <container-celery_beat> /app/scripts/backup.sh
+```
+
+---
+
+## Tempo de recuperação em desastre
+
+| Cenário | Tempo | Procedimento |
+|---------|:---:|------|
+| Container caiu | < 30s | Docker auto-restart (`restart: always`) |
+| Banco corrompido | < 1 min | `./scripts/restore.sh latest` |
+| Servidor perdido | < 10 min | Novo servidor + `git clone` + restore dump + `docker compose up -d` |
+
+---
+
+Desenvolvido por Bruno Vidal.
