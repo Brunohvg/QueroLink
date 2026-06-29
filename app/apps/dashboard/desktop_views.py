@@ -528,6 +528,7 @@ def gestor_link_detalhe(request, order_uuid):
             'card_last4': payment.card_last4 if payment else '',
             'acquirer_message': last_txn.get('acquirer_message', '') if payment else '',
             'acquirer_name': last_txn.get('acquirer_name', '') if payment else '',
+            'refusal_reason': payment.refusal_reason if payment else '',
             'clicks_count': payment_link.clicks_count if payment_link else 0,
             'opened_at': payment_link.opened_at if payment_link else None,
             'expires_at': payment_link.expires_at if payment_link else None,

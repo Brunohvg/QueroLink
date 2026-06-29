@@ -176,10 +176,10 @@
           </div>
         </div>
         <div class="space-y-2.5 pt-3 border-t border-red-100">
-          {% if acquirer_message %}
+          {% if refusal_reason or acquirer_message %}
           <div class="flex justify-between text-[13px]">
             <span class="text-gray-500">Motivo</span>
-            <span class="font-medium text-red-700">{{ acquirer_message }}</span>
+            <span class="font-medium text-red-700">{{ refusal_reason|default:acquirer_message }}</span>
           </div>
           {% endif %}
           {% if payment.gateway_transaction_id %}
