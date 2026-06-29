@@ -17,6 +17,8 @@ WORKDIR /app
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
         curl \
+        unzip \
+        postgresql-client \
         libpq-dev \
         gcc \
         libpango-1.0-0 \
@@ -32,13 +34,17 @@ COPY requirements/production.txt ./requirements/production.txt
 RUN pip install --no-cache-dir -r requirements/production.txt \
     && rm -rf /root/.cache/pip /var/lib/apt/lists/*
 
+RUN curl -fsSL https://downloads.rclone.org/rclone-current-linux-amd64.deb -o /tmp/rclone.deb \
+    && dpkg -i /tmp/rclone.deb \
+    && rm /tmp/rclone.deb
+
 COPY . .
 
 COPY --from=tailwind-build /app/static/css/tailwind.css ./static/css/tailwind.css
 
-RUN chmod +x /app/entrypoint.sh \
+RUN chmod +x /app/entrypoint.sh /app/scripts/*.sh \
     && useradd -m -u 1000 appuser \
-    && mkdir -p /app/celerybeat-schedule \
+    && mkdir -p /app/celerybeat-schedule /app/backups \
     && chown -R appuser:appuser /app
 
 USER appuser

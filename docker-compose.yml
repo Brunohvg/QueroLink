@@ -129,6 +129,7 @@ services:
           cpus: '0.1'
           memory: 128M
     volumes:
+      - backup_volume:/app/backups
       - celery_beat_schedule:/app/celerybeat-schedule
     networks:
       - coolify
@@ -137,6 +138,7 @@ volumes:
   redis_data:
   media_volume:
   celery_beat_schedule:
+  backup_volume:
 
 networks:
   coolify:

@@ -1,5 +1,6 @@
 import dj_database_url
 import os
+from celery.schedules import crontab
 from .base import *
 
 DEBUG = config('DEBUG', default=False, cast=bool)
@@ -47,6 +48,10 @@ CELERY_ACCEPT_CONTENT = ['json']
 CELERY_BROKER_CONNECTION_RETRY_ON_STARTUP = True
 
 CELERY_BEAT_SCHEDULE = {
+    'daily-db-backup': {
+        'task': 'app.apps.accounts.tasks.daily_backup',
+        'schedule': crontab(hour=2, minute=0),
+    },
     'cleanup-old-webhook-events': {
         'task': 'app.apps.webhooks.tasks.cleanup_old_webhook_events',
         'schedule': 86400.0,  # diariamente
