@@ -157,15 +157,17 @@ def gestor_configuracoes(request):
 
 def _resolve_tenant_instance(tenant, instance_id):
     """Resolve o instance_id garantindo isolamento entre tenants.
-    Retorna (instance_id, None) se OK, ou (None, mensagem_erro) se bloqueado."""
+    Retorna (instance_id, None) se OK, ou (None, mensagem_erro) se invalido."""
     if not instance_id:
         return None, 'Nome da instancia nao configurado.'
     prefix = f"{tenant.slug}-"
     if instance_id.startswith(prefix):
+        if instance_id == prefix.rstrip('-') or instance_id == prefix:
+            return None, f'Escolha um nome unico apos o prefixo. Ex: {prefix}loja'
         return instance_id, None
     if '-' in instance_id:
         return None, 'Esta instancia pertence a outro lojista.'
-    return f"{prefix}{instance_id}", None
+    return None, f'O nome deve comecar com "{prefix}". Ex: {prefix}loja'
 
 
 @login_required
