@@ -23,7 +23,7 @@
             </select>
             <select x-model="filterYear" @change="loadSummary()" class="px-3 py-2.5 border border-gray-200 rounded-xl text-[14px] bg-gray-50/50 hover:border-brand-300 focus:border-brand-400 focus:outline-none focus:ring-2 focus:ring-brand-100 transition cursor-pointer appearance-none pr-8" style="background-image:url('data:image/svg+xml;utf8,<svg xmlns=%22http://www.w3.org/2000/svg%22 width=%2216%22 height=%2216%22 viewBox=%220 0 24 24%22 fill=%22none%22 stroke=%22%239ca3af%22 stroke-width=%222%22><path stroke-linecap=%22round%22 stroke-linejoin=%22round%22 d=%22M6 9l6 6 6-6%22/></svg>');background-repeat:no-repeat;background-position:right 8px center;">
                 <option value="">Ano atual</option>
-                <template x-for="y in [2024,2025,2026,2027,2028]" :key="y">
+                <template x-for="y in [...Array(6)].map(function(_,i){return new Date().getFullYear()-2+i})" :key="y">
                     <option :value="y" x-text="y"></option>
                 </template>
             </select>

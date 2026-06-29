@@ -1,5 +1,6 @@
 from django.db import transaction
 from django.conf import settings
+import hashlib
 from app.apps.orders.models import Order, PaymentLink
 from app.apps.payments.models import Payment
 from app.services.gateway.pagar_me import PagarMeGateway
@@ -55,6 +56,7 @@ def create_payment_link(tenant, seller, customer_name, amount_cents, installment
             order=order,
             gateway_url=link_url,
             gateway_link_id=gateway_link_id,
+            short_code=hashlib.sha256(str(order.uuid).encode()).hexdigest()[:8].upper(),
         )
 
     return order, link_url

@@ -17,6 +17,17 @@
     <link rel="stylesheet" href="/static/css/tailwind.css">
     <script src="/static/js/format.js"></script>
     <script>
+        var _originalFetch = window.fetch;
+        window.fetch = function(url, opts) {
+            opts = opts || {};
+            if (typeof opts === 'object' && !(opts.headers instanceof Headers)) {
+                opts.headers = opts.headers || {};
+                if (!opts.headers['X-CSRFToken']) {
+                    opts.headers['X-CSRFToken'] = getCSRFToken();
+                }
+            }
+            return _originalFetch(url, opts);
+        };
         function getCSRFToken() {
             var name = 'csrftoken';
             var cookies = document.cookie.split(';');

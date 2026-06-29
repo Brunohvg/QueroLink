@@ -46,6 +46,13 @@ CELERY_RESULT_SERIALIZER = 'json'
 CELERY_ACCEPT_CONTENT = ['json']
 CELERY_BROKER_CONNECTION_RETRY_ON_STARTUP = True
 
+CELERY_BEAT_SCHEDULE = {
+    'cleanup-old-webhook-events': {
+        'task': 'app.apps.webhooks.tasks.cleanup_old_webhook_events',
+        'schedule': 86400.0,  # diariamente
+    },
+}
+
 # E-mail em producao
 EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
 

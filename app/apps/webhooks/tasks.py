@@ -234,6 +234,7 @@ def process_pagarme_webhook(event_id):
             payment.status = Payment.Status.REFUNDED
             payment.raw_callback_payload = payload
             payment.save()
+            Sale.objects.filter(order=order).delete()
             if order.seller:
                 from app.apps.notifications.tasks import notify_seller_link_status
                 notify_seller_link_status(order.seller, order, 'payment_refunded')
@@ -256,6 +257,7 @@ def process_pagarme_webhook(event_id):
                     return
             else:
                 _skip_foreign_event(event, f"{event_type}: gateway_link_id ausente no payload")
+                return
 
             if event_type == 'payment-link.expired':
                 if order.status == Order.Status.EXPIRED:
@@ -303,6 +305,7 @@ def process_pagarme_webhook(event_id):
                 payment.status = Payment.Status.CHARGEBACK
                 payment.raw_callback_payload = payload
                 payment.save(update_fields=['status', 'raw_callback_payload'])
+                Sale.objects.filter(order=order).delete()
                 if order.seller:
                     from app.apps.notifications.tasks import notify_seller_link_status
                     notify_seller_link_status(order.seller, order, 'payment_refunded')
@@ -343,3 +346,14 @@ def process_pagarme_webhook(event_id):
 
         event.processed = True
         event.save(update_fields=['processed'])
+
+
+@shared_task
+def cleanup_old_webhook_events():
+    from datetime import timedelta
+    cutoff = timezone.now() - timedelta(days=90)
+    count, _ = WebhookEvent.objects.filter(
+        processed=True, received_at__lt=cutoff,
+    ).delete()
+    if count:
+        logger.info("Cleaned up %d old webhook events", count)

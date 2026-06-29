@@ -1119,6 +1119,7 @@ class SellerLinkCreateView(generics.GenericAPIView):
 
         return Response(orders_data)
 
+    @method_decorator(ratelimit(key='user', rate='10/m', method='POST', block=True))
     def post(self, request):
         try:
             seller = request.user.seller_profile

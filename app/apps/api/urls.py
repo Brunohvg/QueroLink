@@ -1,6 +1,6 @@
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
-from rest_framework_simplejwt.views import TokenRefreshView
+from rest_framework_simplejwt.views import TokenRefreshView, TokenBlacklistView
 from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView
 
 from . import views
@@ -13,6 +13,7 @@ router.register(r'commissions/periods', views.CommissionPeriodViewSet, basename=
 urlpatterns = [
     path('auth/login/', views.JWTLoginView.as_view(), name='api-login'),
     path('auth/refresh/', TokenRefreshView.as_view(), name='api-refresh'),
+    path('auth/logout/', TokenBlacklistView.as_view(), name='api-logout'),
 
     path('seller/sales/', views.SellerSalesListView.as_view(), name='api-seller-sales'),
     path('seller/links/', views.SellerLinkCreateView.as_view(), name='seller-link-create'),

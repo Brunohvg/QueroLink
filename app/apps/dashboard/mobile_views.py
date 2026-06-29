@@ -312,6 +312,8 @@ def mobile_lancar_venda(request):
 
             if amount_cents <= 0:
                 raise ValueError('Valor deve ser maior que zero.')
+            if amount_cents > 10_000_000:
+                raise ValueError('Valor maximo e R$ 100.000,00.')
 
             sale_date = (
                 date.fromisoformat(sale_date_str)

@@ -372,6 +372,12 @@ class SaleCreateSerializer(serializers.ModelSerializer):
                 'sale_date': 'Nao e possivel lancar vendas em data futura.'
             })
 
+        amount = attrs.get('amount', 0)
+        if amount and int(amount) > 10_000_000:
+            raise serializers.ValidationError({
+                'amount': 'Valor maximo e R$ 100.000,00.'
+            })
+
         origin = attrs.get('origin', Sale.Origin.MANUAL)
 
         if origin == Sale.Origin.MANUAL:

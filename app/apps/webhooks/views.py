@@ -98,11 +98,11 @@ def pagarme_webhook(request, tenant_slug=None):
             )
             return JsonResponse({"error": "Forbidden"}, status=403)
     else:
-        logger.info(
-            "Pagarme webhook without signature header (payment-link event) — "
-            "skipping verification, body_len=%d tenant=%s",
-            len(raw_body),
-            tenant_slug or 'none',
+        logger.warning(
+            "Pagarme webhook without signature header — "
+            "configure o webhook secret no painel do Pagar.me para habilitar verificacao HMAC. "
+            "body_len=%d tenant=%s",
+            len(raw_body), tenant_slug or 'none',
         )
 
     sanitized = scrub_payment_payload(payload)
