@@ -155,14 +155,17 @@ def gestor_configuracoes(request):
     })
 
 
-def _validate_tenant_instance(tenant, instance_id):
-    """Garante que o instance_id pertence ao tenant. Retorna o ID ou None."""
+def _resolve_tenant_instance(tenant, instance_id):
+    """Resolve o instance_id garantindo isolamento entre tenants.
+    Retorna (instance_id, None) se OK, ou (None, mensagem_erro) se bloqueado."""
     if not instance_id:
-        return None
+        return None, 'Nome da instancia nao configurado.'
     prefix = f"{tenant.slug}-"
-    if not instance_id.startswith(prefix):
-        return None
-    return instance_id
+    if instance_id.startswith(prefix):
+        return instance_id, None
+    if '-' in instance_id:
+        return None, 'Esta instancia pertence a outro lojista.'
+    return f"{prefix}{instance_id}", None
 
 
 @login_required
@@ -182,16 +185,12 @@ def whatsapp_instance_status(request):
     instance_id = request.GET.get('instance') or tenant.whatsapp_instance_id or ''
     global_key = getattr(settings, 'WHATSAPP_API_KEY', '')
 
-    if not instance_id:
+    instance_id, error = _resolve_tenant_instance(tenant, instance_id)
+    if error:
         return JsonResponse({
             'connected': False, 'state': 'not_configured',
-            'error': 'Nome da instancia nao configurado.',
-        })
-    if not _validate_tenant_instance(tenant, instance_id):
-        return JsonResponse({
-            'connected': False, 'state': 'forbidden',
-            'error': 'Esta instancia pertence a outro lojista.',
-        }, status=403)
+            'error': error,
+        }, status=400)
     if not global_key:
         return JsonResponse({
             'connected': False, 'state': 'not_configured',
@@ -277,16 +276,12 @@ def whatsapp_connection_state(request):
 
     instance_id = request.GET.get('instance') or tenant.whatsapp_instance_id or ''
 
-    if not instance_id:
+    instance_id, error = _resolve_tenant_instance(tenant, instance_id)
+    if error:
         return JsonResponse({
             'connected': False, 'state': 'not_configured',
-            'error': 'Nome da instancia nao configurado.',
-        })
-    if not _validate_tenant_instance(tenant, instance_id):
-        return JsonResponse({
-            'connected': False, 'state': 'forbidden',
-            'error': 'Esta instancia pertence a outro lojista.',
-        }, status=403)
+            'error': error,
+        }, status=400)
 
     api_key = tenant.whatsapp_token or getattr(settings, 'WHATSAPP_API_KEY', '')
     if not api_key:
@@ -348,10 +343,9 @@ def whatsapp_disconnect(request):
     )
 
     instance_id = request.GET.get('instance') or tenant.whatsapp_instance_id or ''
-    if not instance_id:
-        return JsonResponse({'error': 'Nome da instancia nao configurado.'}, status=400)
-    if not _validate_tenant_instance(tenant, instance_id):
-        return JsonResponse({'error': 'Esta instancia pertence a outro lojista.'}, status=403)
+    instance_id, error = _resolve_tenant_instance(tenant, instance_id)
+    if error:
+        return JsonResponse({'error': error}, status=400)
 
     api_key = tenant.whatsapp_token or getattr(settings, 'WHATSAPP_API_KEY', '')
     if not api_key:
@@ -363,8 +357,6 @@ def whatsapp_disconnect(request):
         return JsonResponse({'disconnected': True})
     except WhatsAppError as e:
         return JsonResponse({'error': str(e)}, status=500)
-    except Exception as e:
-        return JsonResponse({'error': f'Erro inesperado: {e}'}, status=500)
     except Exception as e:
         return JsonResponse({'error': f'Erro inesperado: {e}'}, status=500)
 
@@ -383,10 +375,9 @@ def whatsapp_delete_instance(request):
     )
 
     instance_id = request.GET.get('instance') or tenant.whatsapp_instance_id or ''
-    if not instance_id:
-        return JsonResponse({'error': 'Nome da instancia nao configurado.'}, status=400)
-    if not _validate_tenant_instance(tenant, instance_id):
-        return JsonResponse({'error': 'Esta instancia pertence a outro lojista.'}, status=403)
+    instance_id, error = _resolve_tenant_instance(tenant, instance_id)
+    if error:
+        return JsonResponse({'error': error}, status=400)
 
     api_key = getattr(settings, 'WHATSAPP_API_KEY', '')
     if not api_key:
