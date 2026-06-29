@@ -1,7 +1,7 @@
 import logging
 
 from celery import shared_task
-from django.db import transaction
+from django.db import transaction, IntegrityError
 from django.utils import timezone
 
 from app.apps.webhooks.models import WebhookEvent
@@ -19,6 +19,21 @@ def _skip_foreign_event(event, reason):
     event.save(update_fields=['processed'])
 
 
+VALID_PAYMENT_METHODS = {'credit_card', 'pix', 'boleto', 'unknown'}
+
+
+def _normalize_payment_method(raw_method: str) -> str:
+    method = (raw_method or '').strip().lower()
+    if method in VALID_PAYMENT_METHODS:
+        return method
+    method_map = {
+        'debit_card': 'unknown',
+        'voucher': 'unknown',
+        'cash': 'unknown',
+    }
+    return method_map.get(method, 'unknown')
+
+
 def _populate_payment_from_webhook(payment, data, event_type):
     """Extrai dados do payload do webhook antes do PII scrub no save()."""
     charge = data
@@ -29,7 +44,8 @@ def _populate_payment_from_webhook(payment, data, event_type):
     txn = charge.get('last_transaction') or {}
     card = txn.get('card') or {}
 
-    payment.payment_method = charge.get('payment_method') or payment.payment_method
+    raw_method = charge.get('payment_method', '')
+    payment.payment_method = _normalize_payment_method(raw_method) or payment.payment_method
     payment.installments = txn.get('installments') or payment.installments
 
     paid_at = charge.get('paid_at')
@@ -144,16 +160,22 @@ def process_pagarme_webhook(event_id):
                 order.status = Order.Status.COMPLETED
                 order.save()
 
-                Sale.objects.get_or_create(
-                    order=order,
-                    defaults={
-                        'tenant': order.tenant,
-                        'seller': order.seller,
-                        'origin': Sale.Origin.LINK,
-                        'amount': order.total_amount,
-                        'sale_date': timezone.localdate(),
-                    },
-                )
+                try:
+                    Sale.objects.get_or_create(
+                        order=order,
+                        defaults={
+                            'tenant': order.tenant,
+                            'seller': order.seller,
+                            'origin': Sale.Origin.LINK,
+                            'amount': order.total_amount,
+                            'sale_date': timezone.localdate(),
+                        },
+                    )
+                except IntegrityError:
+                    logger.info(
+                        "Sale for order %s already exists (concurrent webhook), skipping",
+                        order.uuid,
+                    )
 
                 if order.seller:
                     from app.apps.notifications.tasks import notify_seller_link_status
@@ -194,7 +216,8 @@ def process_pagarme_webhook(event_id):
                 charges = data.get('charges', [])
                 charge = charges[0] if charges else {}
             txn = charge.get('last_transaction') or {}
-            payment.payment_method = charge.get('payment_method') or payment.payment_method
+            raw_method = charge.get('payment_method', '')
+            payment.payment_method = _normalize_payment_method(raw_method) or payment.payment_method
             payment.installments = txn.get('installments') or payment.installments
 
             payment.status = Payment.Status.FAILED

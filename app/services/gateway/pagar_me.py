@@ -38,11 +38,11 @@ class PagarMeGateway:
     """
 
     def __init__(self, api_key=None):
-        self.api_key = api_key or getattr(settings, 'API_KEY_PAGAR_ME', None)
+        self.api_key = api_key
         if not self.api_key:
             raise PagarMeError(
-                "API_KEY_PAGAR_ME nao configurada. "
-                "Verifique as variaveis de ambiente."
+                "Chave de API do Pagar.me nao configurada. "
+                "Cada lojista deve configurar sua chave na pagina de configuracoes."
             )
         base = "https://api.pagar.me/core/v5"
         self.api_url_links = f"{base}/paymentlinks"

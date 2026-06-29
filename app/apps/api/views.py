@@ -362,7 +362,7 @@ class PaymentQueueView(generics.GenericAPIView):
         for period in periods:
             fechadas = [
                 sc for sc in period.seller_commissions.all()
-                if sc.status == SellerCommission.Status.FECHADA
+                if sc.status in (SellerCommission.Status.FECHADA, SellerCommission.Status.AJUSTADA)
             ]
             if not fechadas:
                 continue

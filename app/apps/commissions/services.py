@@ -134,7 +134,7 @@ def calculate_period_summary(period):
         if s == SellerCommission.Status.ABERTA or s == SellerCommission.Status.REABERTA:
             aberta += sc.commission_amount
             abertos_count += 1
-        elif s == SellerCommission.Status.FECHADA:
+        elif s in (SellerCommission.Status.FECHADA, SellerCommission.Status.AJUSTADA):
             val = sc.frozen_commission_amount or sc.commission_amount
             fechada += val
             fechados_count += 1
@@ -233,13 +233,16 @@ def reopen_seller_commissions(period, seller_commission_ids, user, reason):
     commissions = SellerCommission.objects.filter(
         id__in=seller_commission_ids,
         period=period,
-        status=SellerCommission.Status.FECHADA,
+        status__in=[
+            SellerCommission.Status.FECHADA,
+            SellerCommission.Status.AJUSTADA,
+        ],
     )
     if not commissions.exists():
-        raise ValueError('Nenhuma comissao fechada valida para reverter.')
+        raise ValueError('Nenhuma comissao fechada ou ajustada valida para reverter.')
     if commissions.count() != len(seller_commission_ids):
         raise ValueError(
-            'Apenas vendedores FECHADOS e ainda nao pagos '
+            'Apenas vendedores com comissao FECHADA ou AJUSTADA '
             'podem ser revertidos.'
         )
 
@@ -260,13 +263,16 @@ def pay_seller_commissions(period, seller_commission_ids, user, payment_data):
     commissions = SellerCommission.objects.filter(
         id__in=seller_commission_ids,
         period=period,
-        status=SellerCommission.Status.FECHADA,
+        status__in=[
+            SellerCommission.Status.FECHADA,
+            SellerCommission.Status.AJUSTADA,
+        ],
     )
     if not commissions.exists():
-        raise ValueError('Nenhuma comissao fechada valida para pagar.')
+        raise ValueError('Nenhuma comissao fechada ou ajustada valida para pagar.')
     if commissions.count() != len(seller_commission_ids):
         raise ValueError(
-            'Apenas vendedores com comissao FECHADA '
+            'Apenas vendedores com comissao FECHADA ou AJUSTADA '
             'podem ser enviados para pagamento.'
         )
 

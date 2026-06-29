@@ -34,7 +34,7 @@ COPY requirements/production.txt ./requirements/production.txt
 RUN pip install --no-cache-dir -r requirements/production.txt \
     && rm -rf /root/.cache/pip /var/lib/apt/lists/*
 
-RUN curl -fsSL https://downloads.rclone.org/rclone-current-linux-amd64.deb -o /tmp/rclone.deb \
+RUN curl -fsSL https://downloads.rclone.org/rclone-current-linux-arm64.deb -o /tmp/rclone.deb \
     && dpkg -i /tmp/rclone.deb \
     && rm /tmp/rclone.deb
 

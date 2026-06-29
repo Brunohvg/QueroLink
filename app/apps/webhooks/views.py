@@ -3,7 +3,6 @@ import hmac
 import hashlib
 import logging
 
-from django.conf import settings
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 
@@ -14,6 +13,7 @@ logger = logging.getLogger(__name__)
 
 
 def _verify_webhook_token(tenant_uuid, token):
+    from django.conf import settings
     secret = getattr(settings, 'WHATSAPP_API_KEY', None) or settings.SECRET_KEY
     expected = hmac.new(
         secret.encode(),
@@ -23,87 +23,15 @@ def _verify_webhook_token(tenant_uuid, token):
     return hmac.compare_digest(expected, token)
 
 
-def _verify_pagarme_signature(body: bytes, api_key: str, received_sig: str) -> bool:
-    if not received_sig:
-        return False
-    key_bytes = api_key.encode()
-    body_hmac = hmac.new(key_bytes, body, hashlib.sha256).hexdigest()
-    if hmac.compare_digest(body_hmac, received_sig):
-        return True
-    body_hmac_sha1 = hmac.new(key_bytes, body, hashlib.sha1).hexdigest()
-    if hmac.compare_digest(body_hmac_sha1, received_sig):
-        return True
-    key_with_colon = f"{api_key}:"
-    body_hmac_colon = hmac.new(key_with_colon.encode(), body, hashlib.sha256).hexdigest()
-    if hmac.compare_digest(body_hmac_colon, received_sig):
-        return True
-    body_hash = hashlib.sha256(key_bytes + body).hexdigest()
-    if hmac.compare_digest(body_hash, received_sig):
-        return True
-    return False
-
-
 @csrf_exempt
 def pagarme_webhook(request, tenant_slug=None):
     if request.method != "POST":
         return JsonResponse({"error": "Method not allowed"}, status=405)
 
-    raw_body = request.body
-    received_sig = (
-        request.headers.get('x-pagarme-signature', '')
-        or request.headers.get('X-Hub-Signature-256', '')
-        or request.headers.get('X-Hub-Signature', '')
-        or ''
-    )
-
     try:
-        payload = json.loads(raw_body)
+        payload = json.loads(request.body)
     except json.JSONDecodeError:
         return JsonResponse({"error": "Invalid JSON"}, status=400)
-
-    from django.conf import settings
-    from app.apps.accounts.models import Tenant
-    from app.services.gateway.pagar_me import _normalize_api_key
-
-    raw_key = getattr(settings, 'API_KEY_PAGAR_ME', '')
-
-    if tenant_slug:
-        try:
-            tenant = Tenant.objects.get(slug=tenant_slug, is_active=True)
-            tenant_key = tenant.pagarme_api_key
-            if tenant_key:
-                raw_key = tenant_key
-        except Tenant.DoesNotExist:
-            logger.warning("Pagarme webhook: tenant slug=%s not found", tenant_slug)
-
-    normalized_key = _normalize_api_key(raw_key)
-
-    sig = received_sig
-    if sig.startswith('sha256='):
-        sig = sig[7:]
-
-    if sig:
-        verified = _verify_pagarme_signature(raw_body, normalized_key, sig)
-        if not verified and raw_key != normalized_key:
-            verified = _verify_pagarme_signature(raw_body, raw_key, sig)
-
-        if not verified:
-            logger.warning(
-                "Pagarme webhook signature verification failed: "
-                "sig=%s key_prefix=%s body_len=%d tenant=%s",
-                sig[:16],
-                normalized_key[:4] if normalized_key else '(empty)',
-                len(raw_body),
-                tenant_slug or 'none',
-            )
-            return JsonResponse({"error": "Forbidden"}, status=403)
-    else:
-        logger.warning(
-            "Pagarme webhook without signature header — "
-            "configure o webhook secret no painel do Pagar.me para habilitar verificacao HMAC. "
-            "body_len=%d tenant=%s",
-            len(raw_body), tenant_slug or 'none',
-        )
 
     sanitized = scrub_payment_payload(payload)
     event = WebhookEvent.objects.create(gateway='pagarme', payload=sanitized)
