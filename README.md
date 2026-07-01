@@ -1,4 +1,4 @@
-# QueroLink — Sistema de Links de Pagamento e Comissões
+# Comissã — Gestão de Comissões
 
 Sistema multi-tenant para gestão de links de pagamento (Pagar.me) e comissões de vendedores. Inclui PWA para vendedores e dashboard administrativo completo.
 

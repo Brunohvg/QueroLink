@@ -215,7 +215,7 @@ REST_FRAMEWORK = {
 }
 
 SPECTACULAR_SETTINGS = {
-    'TITLE': 'VendaPay API',
+    'TITLE': 'Comissã API',
     'DESCRIPTION': 'API de gestao de comissoes multi-tenant',
     'VERSION': '1.0.0',
     'SERVE_INCLUDE_SCHEMA': False,

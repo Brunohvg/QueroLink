@@ -162,7 +162,7 @@ def mobile_forgot_password(request):
                         channel='whatsapp',
                         recipient=seller.phone,
                         message_body=(
-                            f'Seu PIN de recuperacao de senha VendaPay: '
+                            f'Seu PIN de recuperacao de senha Comissã: '
                             f'{pin}. Valido por 10 minutos.'
                         ),
                     )

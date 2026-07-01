@@ -1,6 +1,6 @@
 {
-    "name": "VendaPay — Comissões",
-    "short_name": "VendaPay",
+    "name": "Comissã — Comissões",
+    "short_name": "Comissã",
     "description": "App de gestão de comissões para vendedores",
     "start_url": "/dashboard/mobile/",
     "scope": "/dashboard/mobile/",

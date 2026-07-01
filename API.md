@@ -1,4 +1,4 @@
-# API REST — VendaPay / QueroLink
+# API REST — Comissã
 
 > **Base URL:** `https://querolink.lojabibelo.com.br/api/`
 > **Schema OpenAPI:** `/api/schema/`
