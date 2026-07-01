@@ -68,13 +68,13 @@ def get_or_create_period(tenant, month, year, expected_working_days=None):
 
 def sync_period_seller_commissions(period):
     tenant = period.tenant
-    sellers = Seller.objects.filter(tenant=tenant, is_active=True)
+    sellers = Seller.objects.filter(tenant=tenant, is_active=True).select_related('tenant')
     sellers_with_manual = Seller.objects.filter(
         tenant=tenant,
         sales__origin=Sale.Origin.MANUAL,
         sales__sale_date__year=period.year,
         sales__sale_date__month=period.month,
-    )
+    ).select_related('tenant')
     all_sellers = (sellers | sellers_with_manual).distinct()
 
     created_count = 0
@@ -114,7 +114,7 @@ def calculate_seller_working_days(period, seller):
 
 
 def calculate_period_summary(period):
-    commissions = SellerCommission.objects.filter(period=period)
+    commissions = SellerCommission.objects.filter(period=period).select_related('seller', 'period')
     total_vendido = 0
     aberta = 0
     fechada = 0
@@ -201,7 +201,8 @@ def close_seller_commissions(period, seller_commission_ids, user):
             SellerCommission.Status.ABERTA,
             SellerCommission.Status.REABERTA,
         ],
-    )
+    ).select_related('seller', 'period')
+
     if not commissions.exists():
         raise ValueError('Nenhuma comissao valida para fechar.')
     if commissions.count() != len(seller_commission_ids):
@@ -212,6 +213,7 @@ def close_seller_commissions(period, seller_commission_ids, user):
 
     calculations = []
     with transaction.atomic():
+        commissions = list(commissions.select_for_update())
         for sc in commissions:
             sc.freeze(user, commit=True)
             calculations.append({
@@ -247,6 +249,7 @@ def reopen_seller_commissions(period, seller_commission_ids, user, reason):
         )
 
     with transaction.atomic():
+        commissions = list(commissions.select_for_update())
         for sc in commissions:
             if sc.is_paid:
                 raise ValueError(
@@ -267,7 +270,7 @@ def pay_seller_commissions(period, seller_commission_ids, user, payment_data):
             SellerCommission.Status.FECHADA,
             SellerCommission.Status.AJUSTADA,
         ],
-    )
+    ).select_related('seller', 'period')
     if not commissions.exists():
         raise ValueError('Nenhuma comissao fechada ou ajustada valida para pagar.')
     if commissions.count() != len(seller_commission_ids):
@@ -283,6 +286,7 @@ def pay_seller_commissions(period, seller_commission_ids, user, payment_data):
         payment_date = None
 
     with transaction.atomic():
+        commissions = list(commissions.select_for_update())
         for sc in commissions:
             sc.mark_paid(user, {
                 'payment_date': payment_date or timezone.localdate(),

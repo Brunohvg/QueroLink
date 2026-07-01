@@ -76,6 +76,20 @@ def process_pagarme_webhook(event_id):
             logger.info("Webhook %s already processed or not found", event_id)
             return
 
+        if event.gateway_event_id:
+            already_processed = WebhookEvent.objects.filter(
+                gateway_event_id=event.gateway_event_id,
+                processed=True,
+            ).exclude(id=event.id).exists()
+            if already_processed:
+                logger.info(
+                    "Webhook %s ja processado via outro evento (gateway_event_id=%s), ignorando",
+                    event_id, event.gateway_event_id,
+                )
+                event.processed = True
+                event.save(update_fields=['processed'])
+                return
+
         payload = event.payload
         if not isinstance(payload, dict):
             raise ValueError("Payload is not a dictionary")

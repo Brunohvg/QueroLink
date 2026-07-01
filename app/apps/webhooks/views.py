@@ -59,7 +59,17 @@ def pagarme_webhook(request, tenant_slug=None):
         return JsonResponse({"error": "Invalid JSON"}, status=400)
 
     sanitized = scrub_payment_payload(payload)
-    event_kwargs = {'gateway': 'pagarme', 'payload': sanitized}
+    gateway_event_id = payload.get('id') or ''
+    if gateway_event_id and gateway_event_id.startswith('evt_'):
+        if WebhookEvent.objects.filter(gateway_event_id=gateway_event_id).exists():
+            logger.info("Webhook duplicado ignorado: gateway_event_id=%s", gateway_event_id)
+            return JsonResponse({"status": "duplicate"}, status=200)
+
+    event_kwargs = {
+        'gateway': 'pagarme',
+        'payload': sanitized,
+        'gateway_event_id': gateway_event_id or None,
+    }
     if tenant_slug:
         try:
             tenant_obj = TenantModel.objects.get(slug=tenant_slug)
