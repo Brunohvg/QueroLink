@@ -226,8 +226,8 @@ showToast("{{ message|escapejs }}", "{% if message.tags == 'error' %}error{% eli
             </div>
             <div class="flex items-center gap-2 text-[12px]" x-show="status.last_event">
               <span class="text-gray-400">
-                Ultimo: <span x-text="new Date(status.last_event.received_at).toLocaleString('pt-BR')"></span>
-                <span class="font-medium" :class="status.last_event.processed ? 'text-emerald-600' : 'text-red-500'" x-text="status.last_event.processed ? ' · OK' : ' · Falha'"></span>
+                Ultimo: <span x-text="status.last_event?.received_at ? new Date(status.last_event.received_at).toLocaleString('pt-BR') : ''"></span>
+                <span class="font-medium" :class="status.last_event?.processed ? 'text-emerald-600' : 'text-red-500'" x-text="status.last_event?.processed ? ' · OK' : ' · Falha'"></span>
               </span>
             </div>
           </div>
