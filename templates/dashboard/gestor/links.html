@@ -142,7 +142,7 @@
   </div>
 </div>
 
-<script>var ORDERS_DATA = {{ orders_json|safe }};</script>
+{{ orders_json|json_script:"orders-data" }}
 <script>
 function gestorLinksPage() {
     return {
@@ -156,7 +156,7 @@ function gestorLinksPage() {
 
         init() {
             try {
-                this.orders = typeof ORDERS_DATA !== 'undefined' ? ORDERS_DATA : [];
+                this.orders = JSON.parse(document.getElementById('orders-data')?.textContent || '[]');
             } catch(e) { this.orders = []; }
             this.filter();
         },

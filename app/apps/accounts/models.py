@@ -18,6 +18,8 @@ class Tenant(models.Model):
     cnpj_hash = models.CharField(max_length=64, blank=True, null=True, unique=True, db_index=True)
     slug = models.SlugField(max_length=100, unique=True, blank=True)
     pagarme_api_key = EncryptedCharField(max_length=600, blank=True, null=True)
+    pagarme_webhook_username = EncryptedCharField(max_length=600, blank=True, null=True)
+    pagarme_webhook_password = EncryptedCharField(max_length=600, blank=True, null=True)
     whatsapp_instance_id = models.CharField(max_length=100, blank=True, null=True)
     whatsapp_token = EncryptedCharField(max_length=600, blank=True, null=True)
     default_commission_rate = models.DecimalField(max_digits=5, decimal_places=4, default=0.01)

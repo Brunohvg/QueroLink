@@ -123,6 +123,31 @@ showToast("{{ message|escapejs }}", "{% if message.tags == 'error' %}error{% eli
            Deixe em branco para manter a chave atual. A chave nao sera exibida apos salva.
         </p>
         <div class="border-t border-gray-100 mt-4 pt-4">
+          <label for="pagarme_webhook_username" class="block text-[13px] font-medium text-gray-700 mb-1.5">Usuario do Webhook</label>
+          <input type="text" id="pagarme_webhook_username" name="pagarme_webhook_username"
+                 class="w-full max-w-xs px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-[14px] outline-none transition-all focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100"
+                 placeholder="Ex: meu-webhook"
+                 value="{% if tenant.pagarme_webhook_username %}••••••••{% endif %}"
+                 autocomplete="off">
+          <p class="text-[12px] text-gray-400 mt-1.5">Configure no painel Pagar.me em Webhooks &gt; Habilitar autenticação. Use este usuario e a senha abaixo.</p>
+        </div>
+        <div class="border-t border-gray-100 mt-4 pt-4">
+          <label for="pagarme_webhook_password" class="block text-[13px] font-medium text-gray-700 mb-1.5">Senha do Webhook</label>
+          <div class="relative max-w-xs">
+            <input type="password" id="pagarme_webhook_password" name="pagarme_webhook_password"
+                   class="w-full pl-4 pr-10 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-[14px] outline-none transition-all focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100"
+                   placeholder="Senha configurada no Pagar.me"
+                   value="{% if tenant.pagarme_webhook_password %}••••••••{% endif %}"
+                   autocomplete="off">
+            <button type="button"
+                    onclick="var i=document.getElementById('pagarme_webhook_password');i.type=i.type==='password'?'text':'password';this.querySelector('svg').classList.toggle('text-gray-400');this.querySelector('svg').classList.toggle('text-gray-600')"
+                    class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors p-1">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
+            </button>
+          </div>
+          <p class="text-[12px] text-gray-400 mt-1.5">Deixe em branco para manter a senha atual.</p>
+        </div>
+        <div class="border-t border-gray-100 mt-4 pt-4">
           <label for="link_expires_in" class="block text-[13px] font-medium text-gray-700 mb-1.5">Expiracao do Link</label>
           <select id="link_expires_in" name="link_expires_in"
                   class="max-w-xs w-full px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-[13px] outline-none transition-all focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100">

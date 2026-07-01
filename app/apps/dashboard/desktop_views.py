@@ -109,6 +109,14 @@ def gestor_configuracoes(request):
 
         if pagarme_api_key and pagarme_api_key != '••••••••':
             tenant.pagarme_api_key = pagarme_api_key
+
+        webhook_username = request.POST.get('pagarme_webhook_username', '').strip()
+        webhook_password = request.POST.get('pagarme_webhook_password', '').strip()
+        if webhook_username and webhook_username != '••••••••':
+            tenant.pagarme_webhook_username = webhook_username
+        if webhook_password and webhook_password != '••••••••':
+            tenant.pagarme_webhook_password = webhook_password
+
         if whatsapp_instance_id:
             base = whatsapp_instance_id.strip().lower().replace(' ', '-')
             if not base.startswith(f"{tenant.slug}-"):

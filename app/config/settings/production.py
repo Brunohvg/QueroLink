@@ -37,6 +37,9 @@ SECURE_CONTENT_TYPE_NOSNIFF = True
 SECURE_BROWSER_XSS_FILTER = True
 SECURE_REFERRER_POLICY = 'same-origin'
 
+# Content Security Policy via middleware customizado
+MIDDLEWARE = MIDDLEWARE + ['app.apps.accounts.csp_middleware.CSPMiddleware']
+
 # Celery producao
 CELERY_TASK_ACKS_LATE = True
 CELERY_WORKER_PREFETCH_MULTIPLIER = 1

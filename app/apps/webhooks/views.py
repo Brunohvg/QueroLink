@@ -28,13 +28,45 @@ def pagarme_webhook(request, tenant_slug=None):
     if request.method != "POST":
         return JsonResponse({"error": "Method not allowed"}, status=405)
 
+    if tenant_slug:
+        from app.apps.accounts.models import Tenant as TenantModel
+        try:
+            tenant = TenantModel.objects.get(slug=tenant_slug)
+            if tenant.pagarme_webhook_username and tenant.pagarme_webhook_password:
+                auth_header = request.META.get('HTTP_AUTHORIZATION', '')
+                if not auth_header.startswith('Basic '):
+                    logger.warning("Webhook sem Basic Auth para tenant %s", tenant_slug)
+                    return JsonResponse({"error": "Unauthorized"}, status=401)
+
+                import base64
+                try:
+                    decoded = base64.b64decode(auth_header[6:]).decode('utf-8')
+                    username, password = decoded.split(':', 1)
+                except Exception:
+                    logger.warning("Webhook Basic Auth mal formatado para tenant %s", tenant_slug)
+                    return JsonResponse({"error": "Unauthorized"}, status=401)
+
+                if username != tenant.pagarme_webhook_username or password != tenant.pagarme_webhook_password:
+                    logger.warning("Webhook credenciais invalidas para tenant %s", tenant_slug)
+                    return JsonResponse({"error": "Unauthorized"}, status=401)
+        except TenantModel.DoesNotExist:
+            logger.warning("Webhook recebido para tenant_slug inexistente: %s", tenant_slug)
+            return JsonResponse({"error": "Not found"}, status=404)
+
     try:
         payload = json.loads(request.body)
     except json.JSONDecodeError:
         return JsonResponse({"error": "Invalid JSON"}, status=400)
 
     sanitized = scrub_payment_payload(payload)
-    event = WebhookEvent.objects.create(gateway='pagarme', payload=sanitized)
+    event_kwargs = {'gateway': 'pagarme', 'payload': sanitized}
+    if tenant_slug:
+        try:
+            tenant_obj = TenantModel.objects.get(slug=tenant_slug)
+            event_kwargs['tenant'] = tenant_obj
+        except TenantModel.DoesNotExist:
+            pass
+    event = WebhookEvent.objects.create(**event_kwargs)
     from app.apps.webhooks.tasks import process_pagarme_webhook
     process_pagarme_webhook.delay(event.id)
     return JsonResponse({"status": "received"}, status=200)

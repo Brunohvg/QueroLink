@@ -9,6 +9,7 @@
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="VendaPay">
+    <meta name="csrf-token" content="{% csrf_token %}">
     <link rel="manifest" href="{% static 'manifest.json' %}">
     <link rel="apple-touch-icon" href="{% static 'icons/icon-192.png' %}">
     <title>{% block title %}VendaPay{% endblock %}</title>
@@ -17,18 +18,9 @@
     <link rel="stylesheet" href="/static/css/tailwind.css">
     <script src="/static/js/format.js"></script>
     <script>
-        var _originalFetch = window.fetch;
-        window.fetch = function(url, opts) {
-            opts = opts || {};
-            if (typeof opts === 'object' && !(opts.headers instanceof Headers)) {
-                opts.headers = opts.headers || {};
-                if (!opts.headers['X-CSRFToken']) {
-                    opts.headers['X-CSRFToken'] = getCSRFToken();
-                }
-            }
-            return _originalFetch(url, opts);
-        };
         function getCSRFToken() {
+            var meta = document.querySelector('meta[name="csrf-token"]');
+            if (meta) return meta.getAttribute('content');
             var name = 'csrftoken';
             var cookies = document.cookie.split(';');
             for (var i = 0; i < cookies.length; i++) {

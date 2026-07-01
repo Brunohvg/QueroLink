@@ -231,7 +231,7 @@ class SellerCommission(models.Model):
         if commit:
             self.save(update_fields=[
                 'submitted_days_count', 'expected_working_days',
-                'missing_days_count', 'operational_status',
+                'missing_days_count', 'operational_status', 'updated_at',
             ])
 
     def recalculate(self, commit=True):
@@ -259,7 +259,7 @@ class SellerCommission(models.Model):
             self.save(update_fields=[
                 'total_sold_amount', 'commission_rate', 'commission_amount',
                 'submitted_days_count', 'expected_working_days',
-                'missing_days_count', 'operational_status',
+                'missing_days_count', 'operational_status', 'updated_at',
             ])
 
     def freeze(self, user, commit=True):
@@ -272,26 +272,26 @@ class SellerCommission(models.Model):
         self.closed_at = timezone.now()
         if commit:
             self.save(update_fields=[
-                'total_sold_amount', 'commission_amount',
+                'total_sold_amount', 'commission_rate', 'commission_amount',
                 'submitted_days_count', 'expected_working_days',
                 'missing_days_count', 'operational_status',
                 'frozen_total_sold_amount', 'frozen_commission_rate',
                 'frozen_commission_amount',
-                'status', 'closed_by', 'closed_at',
+                'status', 'closed_by', 'closed_at', 'updated_at',
             ])
 
     def mark_paid(self, user, payment_data, commit=True):
         self.status = self.Status.PAGA
         self.paid_by = user
         self.paid_at = timezone.now()
-        self.paid_amount = self.frozen_commission_amount or self.commission_amount
+        self.paid_amount = self.frozen_commission_amount if self.frozen_commission_amount is not None else self.commission_amount
         self.payment_date = payment_data.get('payment_date')
         self.payment_method = (payment_data.get('payment_method') or '').strip() or None
         self.payment_notes = (payment_data.get('payment_notes') or '').strip() or None
         if commit:
             self.save(update_fields=[
                 'status', 'paid_by', 'paid_at', 'paid_amount',
-                'payment_date', 'payment_method', 'payment_notes',
+                'payment_date', 'payment_method', 'payment_notes', 'updated_at',
             ])
 
     def reopen(self, user, reason, commit=True):
@@ -309,7 +309,7 @@ class SellerCommission(models.Model):
                 'status', 'reopened_by', 'reopened_at', 'reopen_reason',
                 'closed_at', 'closed_by',
                 'frozen_total_sold_amount', 'frozen_commission_rate',
-                'frozen_commission_amount',
+                'frozen_commission_amount', 'updated_at',
             ])
 
     @property

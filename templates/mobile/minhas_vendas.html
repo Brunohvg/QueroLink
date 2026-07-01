@@ -107,6 +107,7 @@
   </div>
 </div>
 
+{{ sales_json|json_script:"sales-data" }}
 <script>
 var WEEKDAYS = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sab'];
 
@@ -129,7 +130,7 @@ function getWeekRange(weekNum, monthSales) {
 
 function minhasVendas() {
     return {
-        sales: {{ sales_json|safe }},
+        sales: JSON.parse(document.getElementById('sales-data').textContent),
         currentMonth: {{ current_month }},
         filterMonth: {{ current_month }},
         visibleWeeksCount: 3,

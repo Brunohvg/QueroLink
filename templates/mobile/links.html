@@ -137,10 +137,11 @@
   {% endverbatim %}
 </div>
 
+{{ orders_json|json_script:"orders-data" }}
 <script>
 function sellerLinksPage() {
     return {
-        orders: {% if orders_json %}{{ orders_json|safe }}{% else %}[]{% endif %},
+        orders: JSON.parse(document.getElementById('orders-data').textContent || '[]'),
         filteredOrders: [],
         showForm: false,
         creating: false,

@@ -1227,7 +1227,9 @@ class WebhookStatusView(generics.GenericAPIView):
         )
 
         last_event = (
-            WebhookEvent.objects.filter(gateway='pagarme')
+            WebhookEvent.objects.filter(
+                gateway='pagarme', tenant=tenant,
+            )
             .order_by('-received_at')
             .first()
         )

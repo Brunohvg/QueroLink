@@ -3,11 +3,14 @@ from django.contrib.auth import authenticate, login as auth_login, logout as aut
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.utils.http import url_has_allowed_host_and_scheme
+from django_ratelimit.decorators import ratelimit
 from app.apps.orders.models import Order
 from app.apps.accounts.models import Tenant, User
 from django.db.models import Sum
 
 
+@ratelimit(key='ip', rate='10/m', method='POST', block=True)
+@ratelimit(key='post:identifier', rate='5/m', method='POST', block=True)
 def login_view(request):
     next_url = request.GET.get('next', 'dashboard:home')
 

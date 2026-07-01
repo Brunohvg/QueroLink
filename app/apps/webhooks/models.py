@@ -5,6 +5,10 @@ class WebhookEvent(models.Model):
     payload = models.JSONField()
     processed = models.BooleanField(default=False)
     processing_error = models.TextField(blank=True, null=True)
+    tenant = models.ForeignKey(
+        'accounts.Tenant', on_delete=models.CASCADE,
+        null=True, blank=True, related_name='webhook_events',
+    )
     received_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
