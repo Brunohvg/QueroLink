@@ -10,7 +10,7 @@ showToast("{{ message|escapejs }}", "{% if message.tags == 'error' %}error{% eli
 </script>
 {% endif %}
 
-<div x-data="configPage()" x-init="checkWhatsAppStatus()" class="max-w-4xl mx-auto">
+<div x-data="configPage()" class="max-w-4xl mx-auto">
 
   <div class="sticky top-0 z-10 -mx-6 px-6 py-4 bg-gray-50/90 backdrop-blur-lg border-b border-gray-200/60 mb-6">
     <div class="flex items-center justify-between">
@@ -21,13 +21,6 @@ showToast("{{ message|escapejs }}", "{% if message.tags == 'error' %}error{% eli
           {{ tenant.company_name }}
         </p>
       </div>
-      <div class="flex items-center gap-3">
-        <button type="submit" form="config-form"
-                class="inline-flex items-center gap-2 bg-gray-900 hover:bg-gray-800 text-white font-semibold py-2.5 px-5 rounded-xl transition-all text-[14px] shadow-sm hover:shadow-md active:scale-[0.97]">
-          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
-          Salvar
-        </button>
-      </div>
     </div>
   </div>
 
@@ -37,35 +30,31 @@ showToast("{{ message|escapejs }}", "{% if message.tags == 'error' %}error{% eli
       <div class="relative">
         <div class="flex items-center justify-between mb-3">
           <p class="text-[11px] font-semibold text-gray-400 uppercase tracking-[0.08em]">Pagar.me</p>
-          <span class="flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[11px] font-medium {% if tenant.pagarme_configured %}bg-emerald-50 text-emerald-600{% else %}bg-gray-100 text-gray-500{% endif %}">
-            <span class="w-1.5 h-1.5 rounded-full {% if tenant.pagarme_configured %}bg-emerald-500{% else %}bg-gray-400{% endif %}"></span>
-            {% if tenant.pagarme_configured %}Conectado{% else %}Pendente{% endif %}
+          <span class="flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[11px] font-medium {% if tenant.pagarme_api_key %}bg-emerald-50 text-emerald-600{% else %}bg-gray-100 text-gray-500{% endif %}">
+            <span class="w-1.5 h-1.5 rounded-full {% if tenant.pagarme_api_key %}bg-emerald-500{% else %}bg-gray-400{% endif %}"></span>
+            {% if tenant.pagarme_api_key %}Conectado{% else %}Pendente{% endif %}
           </span>
         </div>
-        <p class="text-[22px] font-bold text-gray-900">{% if tenant.pagarme_configured %}<span class="text-emerald-600">Ativo</span>{% else %}<span class="text-gray-400">—</span>{% endif %}</p>
+        <p class="text-[22px] font-bold text-gray-900">{% if tenant.pagarme_api_key %}<span class="text-emerald-600">Ativo</span>{% else %}<span class="text-gray-400">—</span>{% endif %}</p>
         <p class="text-[12px] text-gray-400 mt-1">Gateway de pagamento</p>
       </div>
     </div>
 
     <div class="relative overflow-hidden bg-white rounded-2xl p-5 border border-gray-100 shadow-[0_1px_3px_-1px_rgba(0,0,0,0.04),0_4px_16px_-4px_rgba(67,97,238,0.06)]">
-      <div class="absolute top-0 right-0 w-32 h-32 bg-gradient-to-bl from-emerald-50/60 to-transparent rounded-full -mr-8 -mt-8"
-           x-show="whatsappState === 'open'"></div>
-      <div class="absolute top-0 right-0 w-32 h-32 bg-gradient-to-bl from-amber-50/60 to-transparent rounded-full -mr-8 -mt-8"
-           x-show="whatsappState === 'connecting'"></div>
+      <div class="absolute top-0 right-0 w-32 h-32 bg-gradient-to-bl from-emerald-50/60 to-transparent rounded-full -mr-8 -mt-8"></div>
       <div class="relative">
         <div class="flex items-center justify-between mb-3">
           <p class="text-[11px] font-semibold text-gray-400 uppercase tracking-[0.08em]">WhatsApp</p>
           <span class="flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[11px] font-medium"
-                :class="whatsappState === 'open' ? 'bg-emerald-50 text-emerald-600' : (whatsappState === 'connecting' ? 'bg-amber-50 text-amber-600' : 'bg-gray-100 text-gray-500')">
+                :class="whatsappInitState === 'open' ? 'bg-emerald-50 text-emerald-600' : (whatsappInitState === 'connecting' ? 'bg-amber-50 text-amber-600' : 'bg-gray-100 text-gray-500')">
             <span class="w-1.5 h-1.5 rounded-full"
-                  :class="whatsappState === 'open' ? 'bg-emerald-500' : (whatsappState === 'connecting' ? 'bg-amber-500 animate-pulse' : 'bg-gray-400')"></span>
-            <span x-text="whatsappState === 'open' ? 'Conectado' : (whatsappState === 'connecting' ? 'Pendente' : 'Inativo')"></span>
+                  :class="whatsappInitState === 'open' ? 'bg-emerald-500' : (whatsappInitState === 'connecting' ? 'bg-amber-500 animate-pulse' : 'bg-gray-400')"></span>
+            <span x-text="whatsappInitState === 'open' ? 'Conectado' : (whatsappInitState === 'connecting' ? 'Pendente' : 'Inativo')"></span>
           </span>
         </div>
         <p class="text-[22px] font-bold text-gray-900">
-          <span x-show="whatsappState === 'open'" class="text-emerald-600">Conectado</span>
-          <span x-show="whatsappState === 'connecting'" class="text-amber-600">Aguardando...</span>
-          <span x-show="whatsappState !== 'open' && whatsappState !== 'connecting'" class="text-gray-400">—</span>
+          <span x-show="whatsappInitState === 'open'" class="text-emerald-600">Conectado</span>
+          <span x-show="whatsappInitState !== 'open'" class="text-gray-400">—</span>
         </p>
         <p class="text-[12px] text-gray-400 mt-1">Notificacoes para vendedores</p>
       </div>
@@ -87,14 +76,34 @@ showToast("{{ message|escapejs }}", "{% if message.tags == 'error' %}error{% eli
     </div>
   </div>
 
-  <form method="post" id="config-form" action="{% url 'dashboard:gestor_configuracoes' %}" class="space-y-6">
-    {% csrf_token %}
+  <div class="mb-8 border-b border-gray-200">
+    <nav class="flex gap-1 -mb-px overflow-x-auto">
+      <button @click="tab='gateway'" :class="tab==='gateway' ? 'border-brand-500 text-brand-600 bg-brand-50/50' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'" class="flex items-center gap-2 px-5 py-3 text-[14px] font-medium border-b-2 transition-all whitespace-nowrap rounded-t-lg">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"/></svg>
+        Gateway
+      </button>
+      <button @click="tab='whatsapp'" :class="tab==='whatsapp' ? 'border-brand-500 text-brand-600 bg-brand-50/50' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'" class="flex items-center gap-2 px-5 py-3 text-[14px] font-medium border-b-2 transition-all whitespace-nowrap rounded-t-lg">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/></svg>
+        WhatsApp
+      </button>
+      <button @click="tab='commission'" :class="tab==='commission' ? 'border-brand-500 text-brand-600 bg-brand-50/50' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'" class="flex items-center gap-2 px-5 py-3 text-[14px] font-medium border-b-2 transition-all whitespace-nowrap rounded-t-lg">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+        Comissao
+      </button>
+      <button @click="tab='messages'" :class="tab==='messages' ? 'border-brand-500 text-brand-600 bg-brand-50/50' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'" class="flex items-center gap-2 px-5 py-3 text-[14px] font-medium border-b-2 transition-all whitespace-nowrap rounded-t-lg">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z"/></svg>
+        Mensagens
+      </button>
+    </nav>
+  </div>
 
-    <div class="bg-white rounded-2xl border border-gray-100 shadow-[0_1px_3px_-1px_rgba(0,0,0,0.04),0_4px_16px_-4px_rgba(67,97,238,0.06)] overflow-hidden">
+  <div x-show="tab==='gateway'">
+    <form method="post" action="{% url 'dashboard:gestor_configuracoes' %}" class="bg-white rounded-2xl border border-gray-100 shadow-[0_1px_3px_-1px_rgba(0,0,0,0.04),0_4px_16px_-4px_rgba(67,97,238,0.06)] overflow-hidden">
+      {% csrf_token %}
       <div class="px-6 py-5 border-b border-gray-100">
         <div class="flex items-center gap-3">
           <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-400 to-emerald-500 flex items-center justify-center shadow-sm">
-            <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"></path></svg>
+            <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"/></svg>
           </div>
           <div>
             <h2 class="text-[15px] font-semibold text-gray-900">Pagar.me</h2>
@@ -102,10 +111,10 @@ showToast("{{ message|escapejs }}", "{% if message.tags == 'error' %}error{% eli
           </div>
         </div>
       </div>
-      <div class="px-6 py-5">
-        <label for="pagarme_api_key" class="block text-[13px] font-medium text-gray-700 mb-1.5">Chave de API (sk_)</label>
-        <div class="relative">
-          <div class="relative">
+      <div class="px-6 py-5 space-y-5">
+        <div>
+          <label for="pagarme_api_key" class="block text-[13px] font-medium text-gray-700 mb-1.5">Chave de API (sk_)</label>
+          <div class="relative max-w-md">
             <input type="password" id="pagarme_api_key" name="pagarme_api_key"
                    class="w-full pl-4 pr-10 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-[14px] outline-none transition-all focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100 focus:bg-white"
                    placeholder="sk_test_xxxxxxxxxx"
@@ -117,134 +126,127 @@ showToast("{{ message|escapejs }}", "{% if message.tags == 'error' %}error{% eli
               <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
             </button>
           </div>
+          <p class="text-[12px] text-gray-400 mt-2 flex items-center gap-1.5">
+            <svg class="w-3.5 h-3.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+            Deixe em branco para manter a chave atual. A chave nao sera exibida apos salva.
+          </p>
         </div>
-        <p class="text-[12px] text-gray-400 mt-2 flex items-center gap-1.5">
-          <svg class="w-3.5 h-3.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
-           Deixe em branco para manter a chave atual. A chave nao sera exibida apos salva.
-        </p>
-        <div class="border-t border-gray-100 mt-4 pt-4">
-          <label for="pagarme_webhook_username" class="block text-[13px] font-medium text-gray-700 mb-1.5">Usuario do Webhook</label>
-          <input type="text" id="pagarme_webhook_username" name="pagarme_webhook_username"
-                 class="w-full max-w-xs px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-[14px] outline-none transition-all focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100"
-                 placeholder="Ex: meu-webhook"
-                 value="{% if tenant.pagarme_webhook_username %}••••••••{% endif %}"
-                 autocomplete="off">
-          <p class="text-[12px] text-gray-400 mt-1.5">Configure no painel Pagar.me em Webhooks &gt; Habilitar autenticação. Use este usuario e a senha abaixo.</p>
-        </div>
-        <div class="border-t border-gray-100 mt-4 pt-4">
-          <label for="pagarme_webhook_password" class="block text-[13px] font-medium text-gray-700 mb-1.5">Senha do Webhook</label>
-          <div class="relative max-w-xs">
-            <input type="password" id="pagarme_webhook_password" name="pagarme_webhook_password"
-                   class="w-full pl-4 pr-10 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-[14px] outline-none transition-all focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100"
-                   placeholder="Senha configurada no Pagar.me"
-                   value="{% if tenant.pagarme_webhook_password %}••••••••{% endif %}"
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <label for="pagarme_webhook_username" class="block text-[13px] font-medium text-gray-700 mb-1.5">Usuario do Webhook</label>
+            <input type="text" id="pagarme_webhook_username" name="pagarme_webhook_username"
+                   class="w-full px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-[14px] outline-none transition-all focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100"
+                   placeholder="Ex: meu-webhook"
+                   value="{% if tenant.pagarme_webhook_username %}••••••••{% endif %}"
                    autocomplete="off">
-            <button type="button"
-                    onclick="var i=document.getElementById('pagarme_webhook_password');i.type=i.type==='password'?'text':'password';this.querySelector('svg').classList.toggle('text-gray-400');this.querySelector('svg').classList.toggle('text-gray-600')"
-                    class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors p-1">
-              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
-            </button>
+            <p class="text-[12px] text-gray-400 mt-1.5">Configure no painel Pagar.me</p>
           </div>
-          <p class="text-[12px] text-gray-400 mt-1.5">Deixe em branco para manter a senha atual.</p>
-        </div>
-        <div class="border-t border-gray-100 mt-4 pt-4">
-          <label for="link_expires_in" class="block text-[13px] font-medium text-gray-700 mb-1.5">Expiracao do Link</label>
-          <select id="link_expires_in" name="link_expires_in"
-                  class="max-w-xs w-full px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-[13px] outline-none transition-all focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100">
-            <option value="120" {% if tenant.link_expires_in == 120 %}selected{% endif %}>2 horas</option>
-            <option value="360" {% if tenant.link_expires_in == 360 %}selected{% endif %}>6 horas</option>
-            <option value="720" {% if tenant.link_expires_in == 720 %}selected{% endif %}>12 horas</option>
-            <option value="1200" {% if tenant.link_expires_in == 1200 %}selected{% endif %}>20 horas</option>
-            <option value="1440" {% if tenant.link_expires_in == 1440 %}selected{% endif %}>24 horas</option>
-          </select>
-          <p class="text-[12px] text-gray-400 mt-2">Tempo maximo para o cliente pagar apos a geracao do link.</p>
-        </div>
-        <div class="border-t border-gray-100 mt-4 pt-4">
-          <label class="flex items-center gap-3 cursor-pointer">
-            <input type="checkbox" name="pix_enabled" value="1"
-                   class="w-5 h-5 rounded border-gray-300 text-brand-500 focus:ring-brand-500"
-                   {% if tenant.pix_enabled %}checked{% endif %}>
-            <div>
-              <span class="text-[13px] font-medium text-gray-700">Habilitar PIX</span>
-              <p class="text-[12px] text-gray-400">Oferecer PIX como metodo de pagamento nos links. Desative se o PIX nao estiver configurado no Pagar.me.</p>
+          <div>
+            <label for="pagarme_webhook_password" class="block text-[13px] font-medium text-gray-700 mb-1.5">Senha do Webhook</label>
+            <div class="relative">
+              <input type="password" id="pagarme_webhook_password" name="pagarme_webhook_password"
+                     class="w-full pl-4 pr-10 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-[14px] outline-none transition-all focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100"
+                     placeholder="Senha configurada no Pagar.me"
+                     value="{% if tenant.pagarme_webhook_password %}••••••••{% endif %}"
+                     autocomplete="off">
+              <button type="button"
+                      onclick="var i=document.getElementById('pagarme_webhook_password');i.type=i.type==='password'?'text':'password';this.querySelector('svg').classList.toggle('text-gray-400');this.querySelector('svg').classList.toggle('text-gray-600')"
+                      class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors p-1">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
+              </button>
             </div>
-          </label>
-        </div>
-      </div>
-    </div>
-
-    <div x-data="webhookCard()" x-init="fetchStatus()" class="bg-white rounded-2xl border border-gray-100 shadow-[0_1px_3px_-1px_rgba(0,0,0,0.04),0_4px_16px_-4px_rgba(67,97,238,0.06)] overflow-hidden">
-      <div class="px-6 py-5 border-b border-gray-100">
-        <div class="flex items-center justify-between">
-          <div class="flex items-center gap-3">
-            <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-violet-400 to-violet-500 flex items-center justify-center shadow-sm">
-              <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg>
-            </div>
-            <div>
-              <h2 class="text-[15px] font-semibold text-gray-900">Webhook Pagar.me</h2>
-              <p class="text-[12px] text-gray-400">Notificacoes automaticas de pagamento, falha e expiracao</p>
-            </div>
-          </div>
-          <span class="flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-medium"
-                :class="status.last_event?.processed ? 'bg-emerald-50 text-emerald-600' : 'bg-gray-100 text-gray-500'">
-            <span class="w-1.5 h-1.5 rounded-full"
-                  :class="status.last_event?.processed ? 'bg-emerald-500 animate-pulse' : 'bg-gray-400'"></span>
-            <span x-text="status.last_event?.processed ? 'Ativo' : 'Aguardando'"></span>
-          </span>
-        </div>
-      </div>
-      <div class="px-6 py-5 space-y-4">
-        <div>
-          <label class="block text-[13px] font-medium text-gray-700 mb-2">URL do Webhook</label>
-          <p class="text-[12px] text-gray-400 mb-2">Copie esta URL e cole no painel do Pagar.me em <strong>Webhooks</strong>.</p>
-          <div class="flex items-center gap-2">
-            <div class="flex-1 relative">
-              <input type="text" readonly
-                     x-ref="webhookUrl"
-                     :value="status.webhook_url"
-                     class="w-full pl-4 pr-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-[13px] text-gray-700 font-mono outline-none select-all">
-            </div>
-            <button @click="copyUrl()"
-                    class="flex-shrink-0 flex items-center gap-1.5 px-4 py-2.5 bg-violet-500 hover:bg-violet-600 text-white font-medium rounded-xl transition text-[13px] shadow-sm active:scale-[0.97]">
-              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>
-              <span x-text="copied ? 'Copiado!' : 'Copiar'"></span>
-            </button>
           </div>
         </div>
 
-        <div class="border-t border-gray-50 pt-4">
-          <p class="text-[12px] font-semibold text-gray-600 mb-2.5">Eventos para marcar no Pagar.me:</p>
-          <div class="flex flex-wrap gap-x-3 gap-y-1 text-[12px] text-gray-600">
-            <span class="flex items-center gap-1"><svg class="w-3.5 h-3.5 text-emerald-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>order.paid</span>
-            <span class="flex items-center gap-1"><svg class="w-3.5 h-3.5 text-emerald-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>charge.paid</span>
-            <span class="flex items-center gap-1"><svg class="w-3.5 h-3.5 text-emerald-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>charge.payment_failed</span>
-            <span class="flex items-center gap-1"><svg class="w-3.5 h-3.5 text-emerald-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>order.payment_failed</span>
-            <span class="flex items-center gap-1"><svg class="w-3.5 h-3.5 text-emerald-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>charge.refunded</span>
-            <span class="flex items-center gap-1"><svg class="w-3.5 h-3.5 text-emerald-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>payment-link.expired</span>
-            <span class="flex items-center gap-1"><svg class="w-3.5 h-3.5 text-emerald-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>payment-link.cancelled</span>
-            <span class="flex items-center gap-1"><svg class="w-3.5 h-3.5 text-emerald-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>charge.chargedback</span>
-            <span class="flex items-center gap-1"><svg class="w-3.5 h-3.5 text-amber-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>charge.antifraud_approved</span>
-            <span class="flex items-center gap-1"><svg class="w-3.5 h-3.5 text-amber-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>charge.antifraud_reproved</span>
-            <span class="flex items-center gap-1"><svg class="w-3.5 h-3.5 text-amber-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>charge.antifraud_manual</span>
-            <span class="flex items-center gap-1"><svg class="w-3.5 h-3.5 text-amber-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>charge.antifraud_pending</span>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <label for="link_expires_in" class="block text-[13px] font-medium text-gray-700 mb-1.5">Expiracao do Link</label>
+            <select id="link_expires_in" name="link_expires_in"
+                    class="w-full px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-[13px] outline-none transition-all focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100">
+              <option value="120" {% if tenant.link_expires_in == 120 %}selected{% endif %}>2 horas</option>
+              <option value="360" {% if tenant.link_expires_in == 360 %}selected{% endif %}>6 horas</option>
+              <option value="720" {% if tenant.link_expires_in == 720 %}selected{% endif %}>12 horas</option>
+              <option value="1200" {% if tenant.link_expires_in == 1200 %}selected{% endif %}>20 horas</option>
+              <option value="1440" {% if tenant.link_expires_in == 1440 %}selected{% endif %}>24 horas</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-[13px] font-medium text-gray-700 mb-3">PIX</label>
+            <label class="flex items-center gap-3 cursor-pointer">
+              <input type="checkbox" name="pix_enabled" value="1"
+                     class="w-5 h-5 rounded border-gray-300 text-brand-500 focus:ring-brand-500"
+                     {% if tenant.pix_enabled %}checked{% endif %}>
+              <div>
+                <span class="text-[13px] font-medium text-gray-700">Habilitar PIX</span>
+                <p class="text-[12px] text-gray-400">Oferecer PIX como metodo nos links</p>
+              </div>
+            </label>
           </div>
         </div>
 
-        <div class="border-t border-gray-50 pt-3 flex items-center gap-2 text-[11px]">
-          <template x-if="status.last_event">
-            <span class="text-gray-400">
-              Ultimo webhook: <span x-text="new Date(status.last_event.received_at).toLocaleString('pt-BR')"></span>
-              <span class="font-medium" :class="status.last_event.processed ? 'text-emerald-600' : 'text-red-500'" x-text="status.last_event.processed ? ' · Processado' : ' · Falha'"></span>
+        <div x-data="webhookCard()" x-init="fetchStatus()" class="border-t border-gray-100 pt-5">
+          <div class="flex items-center justify-between mb-4">
+            <div class="flex items-center gap-2">
+              <svg class="w-4 h-4 text-violet-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg>
+              <span class="text-[13px] font-semibold text-gray-700">Webhook Pagar.me</span>
+            </div>
+            <span class="flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-medium"
+                  :class="status.last_event?.processed ? 'bg-emerald-50 text-emerald-600' : 'bg-gray-100 text-gray-500'">
+              <span class="w-1.5 h-1.5 rounded-full"
+                    :class="status.last_event?.processed ? 'bg-emerald-500 animate-pulse' : 'bg-gray-400'"></span>
+              <span x-text="status.last_event?.processed ? 'Ativo' : 'Aguardando'"></span>
             </span>
-          </template>
-          <template x-if="!status.last_event">
-            <span class="text-gray-400">Nenhum webhook recebido ainda.</span>
-          </template>
+          </div>
+          <div class="space-y-3">
+            <div>
+              <p class="text-[12px] text-gray-500 mb-2">Copie esta URL e cole no painel do Pagar.me em <strong>Webhooks</strong>:</p>
+              <div class="flex items-center gap-2">
+                <div class="flex-1 relative">
+                  <input type="text" readonly
+                         x-ref="webhookUrl"
+                         :value="status.webhook_url"
+                         class="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-[13px] text-gray-700 font-mono outline-none select-all">
+                </div>
+                <button @click="copyUrl()"
+                        class="flex-shrink-0 flex items-center gap-1.5 px-4 py-2.5 bg-violet-500 hover:bg-violet-600 text-white font-medium rounded-xl transition text-[13px] shadow-sm active:scale-[0.97]">
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>
+                  <span x-text="copied ? 'Copiado!' : 'Copiar'"></span>
+                </button>
+              </div>
+            </div>
+            <div class="flex flex-wrap gap-x-3 gap-y-1 text-[12px] text-gray-600">
+              <span class="text-[11px] font-semibold text-gray-500 mr-1">Eventos:</span>
+              <span class="flex items-center gap-1"><svg class="w-3 h-3 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>order.paid</span>
+              <span class="flex items-center gap-1"><svg class="w-3 h-3 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>charge.paid</span>
+              <span class="flex items-center gap-1"><svg class="w-3 h-3 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>charge.payment_failed</span>
+              <span class="flex items-center gap-1"><svg class="w-3 h-3 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>charge.refunded</span>
+              <span class="flex items-center gap-1"><svg class="w-3 h-3 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>payment-link.expired</span>
+              <span class="flex items-center gap-1"><svg class="w-3 h-3 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>charge.chargedback</span>
+            </div>
+            <div class="flex items-center gap-2 text-[12px]" x-show="status.last_event">
+              <span class="text-gray-400">
+                Ultimo: <span x-text="new Date(status.last_event.received_at).toLocaleString('pt-BR')"></span>
+                <span class="font-medium" :class="status.last_event.processed ? 'text-emerald-600' : 'text-red-500'" x-text="status.last_event.processed ? ' · OK' : ' · Falha'"></span>
+              </span>
+            </div>
+          </div>
+        </div>
+
+        <div class="flex justify-end pt-4 border-t border-gray-100">
+          <button type="submit"
+                  class="inline-flex items-center gap-2 bg-gray-900 hover:bg-gray-800 text-white font-semibold py-2.5 px-6 rounded-xl transition-all text-[14px] shadow-sm hover:shadow-md active:scale-[0.97]">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+            Salvar Gateway
+          </button>
         </div>
       </div>
-    </div>
+    </form>
+  </div>
 
-    <div class="bg-white rounded-2xl border border-gray-100 shadow-[0_1px_3px_-1px_rgba(0,0,0,0.04),0_4px_16px_-4px_rgba(67,97,238,0.06)] overflow-hidden">
+  <div x-show="tab==='whatsapp'">
+    <form method="post" action="{% url 'dashboard:gestor_configuracoes' %}" class="bg-white rounded-2xl border border-gray-100 shadow-[0_1px_3px_-1px_rgba(0,0,0,0.04),0_4px_16px_-4px_rgba(67,97,238,0.06)] overflow-hidden">
+      {% csrf_token %}
       <div class="px-6 py-5 border-b border-gray-100">
         <div class="flex items-center gap-3">
           <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-400 to-emerald-500 flex items-center justify-center shadow-sm">
@@ -254,162 +256,120 @@ showToast("{{ message|escapejs }}", "{% if message.tags == 'error' %}error{% eli
             <h2 class="text-[15px] font-semibold text-gray-900">WhatsApp</h2>
             <p class="text-[12px] text-gray-400">Envio de notificacoes de comissao para vendedores</p>
           </div>
-          <div class="flex items-center gap-1.5 px-3 py-1 rounded-full text-[12px] font-medium"
-               :class="whatsappState === 'open' ? 'bg-emerald-50 text-emerald-600' : (whatsappState === 'connecting' ? 'bg-amber-50 text-amber-600' : 'bg-gray-100 text-gray-500')">
-            <span class="w-1.5 h-1.5 rounded-full"
-                  :class="whatsappState === 'open' ? 'bg-emerald-500' : (whatsappState === 'connecting' ? 'bg-amber-500 animate-pulse' : 'bg-gray-400')"></span>
-            <span x-text="whatsappState === 'open' ? 'Conectado' : (whatsappState === 'connecting' ? 'Aguardando QR' : 'Desconectado')"></span>
-          </div>
         </div>
       </div>
-
       <div class="px-6 py-5 space-y-5">
         <div>
           <label for="whatsapp_instance_id" class="block text-[13px] font-medium text-gray-700 mb-1.5">Nome da Instancia</label>
-          <div class="relative">
+          <div class="relative max-w-md">
             <input type="text" id="whatsapp_instance_id" name="whatsapp_instance_id"
                    class="w-full pl-4 pr-10 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-[14px] outline-none transition-all focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100 focus:bg-white"
                    placeholder="Ex: minha-loja"
                    value="{{ tenant.whatsapp_instance_id|default:'' }}"
+                   x-model="whatsappInstanceInput"
                    @input.debounce.500ms="checkWhatsAppStatus()">
             <span class="absolute right-3 top-1/2 -translate-y-1/2">
               <span x-show="whatsappLoading" class="block w-4 h-4 border-2 border-gray-300 border-t-brand-500 rounded-full animate-spin"></span>
               <svg x-show="!whatsappLoading && whatsappState === 'open'" class="w-4 h-4 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
-              <svg x-show="!whatsappLoading && whatsappState === 'not_configured'" class="w-4 h-4 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"></path></svg>
             </span>
           </div>
-          <p class="text-[12px] text-gray-400 mt-2 flex items-center gap-1.5">
-            <svg class="w-3.5 h-3.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
-            Escolha um nome unico. Ex: nome-da-loja
-          </p>
         </div>
 
-        <div class="border-t border-gray-100 pt-5">
-          <div class="space-y-4">
+        <div class="space-y-4">
+          <div x-show="whatsappLoading" class="flex items-center justify-center py-8">
+            <div class="w-7 h-7 border-[3px] border-brand-200 border-t-brand-500 rounded-full animate-spin"></div>
+            <span class="ml-3 text-[13px] text-gray-500 font-medium">Consultando instancia...</span>
+          </div>
 
-            <div x-show="whatsappLoading" class="flex items-center justify-center py-8">
-              <div class="w-7 h-7 border-[3px] border-brand-200 border-t-brand-500 rounded-full animate-spin"></div>
-              <span class="ml-3 text-[13px] text-gray-500 font-medium">Consultando instancia...</span>
+          <div x-show="!whatsappLoading && whatsappState === 'open'"
+               class="bg-gradient-to-br from-emerald-50 to-emerald-50/50 border border-emerald-200 rounded-2xl p-5">
+            <div class="flex items-center gap-4">
+              <div class="w-12 h-12 rounded-full bg-emerald-100 flex items-center justify-center flex-shrink-0">
+                <svg class="w-6 h-6 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+              </div>
+              <div class="flex-1">
+                <p class="text-[15px] font-semibold text-emerald-800">WhatsApp conectado</p>
+                <p class="text-[12px] text-emerald-600 mt-0.5" x-text="'Instancia: ' + (whatsappOwner || whatsappInstance)"></p>
+              </div>
+              <button @click="disconnectWhatsApp()" :disabled="whatsappQrLoading"
+                      class="flex items-center gap-1.5 px-3 py-1.5 bg-red-100 hover:bg-red-200 text-red-600 rounded-xl transition-all text-[12px] font-medium">
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 12H4m0 0l6-6m-6 6l6 6"/></svg>
+                Desconectar
+              </button>
             </div>
+          </div>
 
-            <div x-show="!whatsappLoading && whatsappState === 'open'"
-                 class="bg-gradient-to-br from-emerald-50 to-emerald-50/50 border border-emerald-200 rounded-2xl p-5">
-              <div class="flex items-center gap-4">
-                <div class="w-12 h-12 rounded-full bg-emerald-100 flex items-center justify-center flex-shrink-0">
-                  <svg class="w-6 h-6 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
-                </div>
-                <div class="flex-1">
-                  <p class="text-[15px] font-semibold text-emerald-800">WhatsApp conectado</p>
-                  <p class="text-[12px] text-emerald-600 mt-0.5" x-text="'Instancia: ' + (whatsappOwner || whatsappInstance)"></p>
-                </div>
-                <div class="flex items-center gap-2">
-                  <div class="flex items-center gap-1.5 px-2.5 py-1 bg-emerald-100 rounded-full">
-                    <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
-                    <span class="text-[11px] font-medium text-emerald-700">Online</span>
-                  </div>
-                  <button @click="disconnectWhatsApp()" :disabled="whatsappQrLoading"
-                          class="flex items-center gap-1.5 px-2.5 py-1 bg-red-100 hover:bg-red-200 text-red-600 rounded-full transition-all text-[11px] font-medium">
-                    <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 12H4m0 0l6-6m-6 6l6 6"/></svg>
-                    Desconectar
-                  </button>
-                </div>
+          <div x-show="!whatsappLoading && whatsappState === 'connecting'"
+               class="bg-gradient-to-br from-amber-50 to-amber-50/50 border border-amber-200 rounded-2xl p-5">
+            <div class="flex items-center gap-4 mb-4">
+              <div class="w-12 h-12 rounded-full bg-amber-100 flex items-center justify-center flex-shrink-0">
+                <svg class="w-6 h-6 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v1m6 11h2m-6 0h-2m4 0h2M4 12h2m12-7v2M6 6l15 15M6 12v8h4v-4h4v4h4v-8H6z"></path></svg>
               </div>
-            </div>
-
-            <div x-show="!whatsappLoading && whatsappState === 'connecting'"
-                 class="bg-gradient-to-br from-amber-50 to-amber-50/50 border border-amber-200 rounded-2xl p-5">
-              <div class="flex items-center gap-4 mb-4">
-                <div class="w-12 h-12 rounded-full bg-amber-100 flex items-center justify-center flex-shrink-0">
-                  <svg class="w-6 h-6 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v1m6 11h2m-6 0h-2m4 0h2M4 12h2m12-7v2M6 6l15 15M6 12v8h4v-4h4v4h4v-8H6z"></path></svg>
-                </div>
-                <div>
-                  <p class="text-[15px] font-semibold text-amber-800">Aguardando leitura do QR Code</p>
-                  <p class="text-[12px] text-amber-600 mt-0.5">Abra o WhatsApp no celular e escaneie o codigo</p>
-                </div>
-              </div>
-              <div x-show="whatsappQrCode" class="flex flex-col items-center">
-                <div class="bg-white rounded-2xl border-2 border-amber-200 p-4 shadow-sm inline-block">
-                  <img :src="whatsappQrCode" alt="QR Code" class="w-56 h-56">
-                </div>
-                <p class="text-[11px] text-gray-400 mt-3 flex items-center gap-1.5">
-                  <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
-                  O QR Code expira em alguns minutos. Se expirar, gere novamente.
-                </p>
-              </div>
-              <div x-show="!whatsappQrCode" class="text-center py-4">
-                <div class="w-10 h-10 mx-auto mb-3 rounded-full bg-amber-100 flex items-center justify-center">
-                  <svg class="w-5 h-5 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
-                </div>
-                <p class="text-[13px] text-amber-700 font-medium mb-1">QR Code nao disponivel</p>
-                <p class="text-[12px] text-gray-500 mb-4">A instancia pode estar travada. Tente reconectar ou excluir.</p>
-              </div>
-              <div class="flex items-center justify-center gap-3 mt-4">
-                <button @click="fetchQRCode()" :disabled="whatsappQrLoading"
-                        class="inline-flex items-center gap-2 bg-amber-500 hover:bg-amber-600 disabled:bg-gray-300 text-white font-medium py-2 px-5 rounded-xl transition-all text-[13px] shadow-sm active:scale-[0.97]">
-                  <svg x-show="whatsappQrLoading" class="w-4 h-4 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
-                  <span x-text="whatsappQrLoading ? 'Gerando...' : 'Regenerar QR'"></span>
-                </button>
-                <button @click="deleteWhatsAppInstance()"
-                        class="inline-flex items-center gap-2 bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 font-medium py-2 px-5 rounded-xl transition-all text-[13px] active:scale-[0.97]">
-                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
-                  Excluir
-                </button>
+              <div>
+                <p class="text-[15px] font-semibold text-amber-800">Aguardando leitura do QR Code</p>
+                <p class="text-[12px] text-amber-600 mt-0.5">Abra o WhatsApp no celular e escaneie o codigo</p>
               </div>
             </div>
-
-            <div x-show="!whatsappLoading && whatsappState === 'disconnected'"
-                 class="bg-gradient-to-br from-gray-50 to-gray-50/50 border border-gray-200 rounded-2xl p-5">
-              <div class="flex items-center gap-4">
-                <div class="w-12 h-12 rounded-full bg-gray-100 flex items-center justify-center flex-shrink-0">
-                  <svg class="w-6 h-6 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
-                </div>
-                <div class="flex-1">
-                  <p class="text-[15px] font-semibold text-gray-700">Instancia desconectada</p>
-                  <p class="text-[12px] text-gray-500 mt-0.5" x-text="'Instancia: ' + (whatsappInstance || 'desconhecida')"></p>
-                </div>
-                <button @click="fetchQRCode()" :disabled="whatsappQrLoading"
-                        class="inline-flex items-center gap-2 bg-amber-500 hover:bg-amber-600 disabled:bg-gray-300 text-white font-semibold py-2 px-4 rounded-xl transition-all text-[13px] shadow-sm active:scale-[0.97]">
-                  <svg x-show="whatsappQrLoading" class="w-4 h-4 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
-                  <svg x-show="!whatsappQrLoading" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
-                  <span x-text="whatsappQrLoading ? 'Reconectando...' : 'Reconectar'"></span>
-                </button>
+            <div x-show="whatsappQrCode" class="flex flex-col items-center">
+              <div class="bg-white rounded-2xl border-2 border-amber-200 p-4 shadow-sm inline-block">
+                <img :src="whatsappQrCode" alt="QR Code" class="w-56 h-56">
               </div>
+              <p class="text-[11px] text-gray-400 mt-3 flex items-center gap-1.5">
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                O QR Code expira em alguns minutos. Se expirar, gere novamente.
+              </p>
             </div>
-
-            <div x-show="!whatsappLoading && (whatsappState === 'not_found' || whatsappState === 'error' || whatsappState === 'auth_error')"
-                 class="bg-gradient-to-br from-gray-50 to-gray-50/50 border border-gray-200 rounded-2xl p-6">
-              <div class="text-center max-w-sm mx-auto">
-                <div class="w-14 h-14 mx-auto mb-4 rounded-2xl bg-gray-100 flex items-center justify-center">
-                  <svg class="w-7 h-7 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v1m6 11h2m-6 0h-2m4 0h2M4 12h2m12-7v2M6 6l15 15M6 12v8h4v-4h4v4h4v-8H6z"></path></svg>
-                </div>
-                <p class="text-[14px] font-medium text-gray-700 mb-1" x-text="whatsappError || 'Instancia nao conectada'"></p>
-                <p class="text-[12px] text-gray-400 mb-5">Digite um nome de instancia e gere o QR Code para conectar</p>
-                <button @click="fetchQRCode()" :disabled="whatsappQrLoading"
-                        class="inline-flex items-center gap-2 bg-gray-900 hover:bg-gray-800 disabled:bg-gray-300 text-white font-semibold py-2.5 px-6 rounded-xl transition-all text-[14px] shadow-sm hover:shadow-md active:scale-[0.97]">
-                  <svg x-show="whatsappQrLoading" class="w-4 h-4 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
-                  <span x-text="whatsappQrLoading ? 'Gerando...' : 'Gerar QR Code'"></span>
-                  <svg x-show="!whatsappQrLoading" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v1m6 11h2m-6 0h-2m4 0h2M4 12h2m12-7v2M6 6l15 15M6 12v8h4v-4h4v4h4v-8H6z"></path></svg>
-                </button>
+            <div x-show="!whatsappQrCode" class="text-center py-4">
+              <div class="w-10 h-10 mx-auto mb-3 rounded-full bg-amber-100 flex items-center justify-center">
+                <svg class="w-5 h-5 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
               </div>
+              <p class="text-[13px] text-amber-700 font-medium mb-1">QR Code nao disponivel</p>
+              <p class="text-[12px] text-gray-500 mb-4">A instancia pode estar travada. Tente reconectar ou excluir.</p>
             </div>
+            <div class="flex items-center justify-center gap-3 mt-4">
+              <button @click="fetchQRCode()" :disabled="whatsappQrLoading"
+                      class="inline-flex items-center gap-2 bg-amber-500 hover:bg-amber-600 disabled:bg-gray-300 text-white font-medium py-2 px-5 rounded-xl transition-all text-[13px] shadow-sm active:scale-[0.97]">
+                <svg x-show="whatsappQrLoading" class="w-4 h-4 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
+                <span x-text="whatsappQrLoading ? 'Gerando...' : 'Regenerar QR'"></span>
+              </button>
+              <button @click="deleteWhatsAppInstance()"
+                      class="inline-flex items-center gap-2 bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 font-medium py-2 px-5 rounded-xl transition-all text-[13px] active:scale-[0.97]">
+                Excluir Instancia
+              </button>
+            </div>
+          </div>
 
-            <div x-show="!whatsappLoading && whatsappState === 'not_configured'"
-                 class="border-2 border-dashed border-gray-200 rounded-2xl p-6">
-              <div class="text-center max-w-sm mx-auto">
-                <div class="w-14 h-14 mx-auto mb-4 rounded-2xl bg-gray-50 flex items-center justify-center">
-                  <svg class="w-7 h-7 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"></path></svg>
-                </div>
-                <p class="text-[14px] font-medium text-gray-600 mb-1">Configure sua instancia WhatsApp</p>
-                <p class="text-[12px] text-gray-400">Digite o nome da instancia acima e clique em "Gerar QR Code"</p>
+          <div x-show="!whatsappLoading && (whatsappState === 'disconnected' || whatsappState === 'not_found' || whatsappState === 'error' || whatsappState === 'auth_error')"
+               class="bg-gradient-to-br from-gray-50 to-gray-50/50 border border-gray-200 rounded-2xl p-6">
+            <div class="text-center max-w-sm mx-auto">
+              <div class="w-14 h-14 mx-auto mb-4 rounded-2xl bg-gray-100 flex items-center justify-center">
+                <svg class="w-7 h-7 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v1m6 11h2m-6 0h-2m4 0h2M4 12h2m12-7v2M6 6l15 15M6 12v8h4v-4h4v4h4v-8H6z"></path></svg>
               </div>
+              <p class="text-[14px] font-medium text-gray-700 mb-1" x-text="whatsappError || 'Instancia nao conectada'"></p>
+              <p class="text-[12px] text-gray-400 mb-5">Digite um nome de instancia e gere o QR Code para conectar</p>
+              <button @click="fetchQRCode()" :disabled="whatsappQrLoading"
+                      class="inline-flex items-center gap-2 bg-gray-900 hover:bg-gray-800 disabled:bg-gray-300 text-white font-semibold py-2.5 px-6 rounded-xl transition-all text-[14px] shadow-sm hover:shadow-md active:scale-[0.97]">
+                <svg x-show="whatsappQrLoading" class="w-4 h-4 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
+                <span x-text="whatsappQrLoading ? 'Gerando...' : 'Gerar QR Code'"></span>
+              </button>
             </div>
-
           </div>
         </div>
-      </div>
-    </div>
 
-    <div class="bg-white rounded-2xl border border-gray-100 shadow-[0_1px_3px_-1px_rgba(0,0,0,0.04),0_4px_16px_-4px_rgba(67,97,238,0.06)] overflow-hidden">
+        <div class="flex justify-end pt-4 border-t border-gray-100">
+          <button type="submit"
+                  class="inline-flex items-center gap-2 bg-gray-900 hover:bg-gray-800 text-white font-semibold py-2.5 px-6 rounded-xl transition-all text-[14px] shadow-sm hover:shadow-md active:scale-[0.97]">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+            Salvar WhatsApp
+          </button>
+        </div>
+      </div>
+    </form>
+  </div>
+
+  <div x-show="tab==='commission'">
+    <form method="post" action="{% url 'dashboard:gestor_configuracoes' %}" class="bg-white rounded-2xl border border-gray-100 shadow-[0_1px_3px_-1px_rgba(0,0,0,0.04),0_4px_16px_-4px_rgba(67,97,238,0.06)] overflow-hidden">
+      {% csrf_token %}
       <div class="px-6 py-5 border-b border-gray-100">
         <div class="flex items-center gap-3">
           <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-brand-400 to-brand-500 flex items-center justify-center shadow-sm">
@@ -421,9 +381,9 @@ showToast("{{ message|escapejs }}", "{% if message.tags == 'error' %}error{% eli
           </div>
         </div>
       </div>
-      <div class="px-6 py-5">
+      <div class="px-6 py-5 max-w-md">
         <label for="default_commission_rate" class="block text-[13px] font-medium text-gray-700 mb-1.5">Percentual (%)</label>
-        <div class="relative max-w-xs">
+        <div class="relative">
           <input type="text" id="default_commission_rate" name="default_commission_rate"
                  class="w-full pl-4 pr-10 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-[14px] outline-none transition-all focus:border-brand-400 focus:ring-2 focus:ring-brand-100 focus:bg-white"
                  placeholder="1,00"
@@ -432,16 +392,26 @@ showToast("{{ message|escapejs }}", "{% if message.tags == 'error' %}error{% eli
         </div>
         <p class="text-[12px] text-gray-400 mt-2 flex items-center gap-1.5">
           <svg class="w-3.5 h-3.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
-          Ex: 1,00 = 1% de comissao sobre as vendas. Altere a qualquer momento.
+          Ex: 1,00 = 1% de comissao sobre as vendas.
         </p>
+        <div class="flex justify-end pt-4 border-t border-gray-100 mt-5">
+          <button type="submit"
+                  class="inline-flex items-center gap-2 bg-gray-900 hover:bg-gray-800 text-white font-semibold py-2.5 px-6 rounded-xl transition-all text-[14px] shadow-sm hover:shadow-md active:scale-[0.97]">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+            Salvar Comissao
+          </button>
+        </div>
       </div>
-    </div>
+    </form>
+  </div>
 
-    <div class="bg-white rounded-2xl border border-gray-100 shadow-[0_1px_3px_-1px_rgba(0,0,0,0.04),0_4px_16px_-4px_rgba(67,97,238,0.06)] overflow-hidden">
+  <div x-show="tab==='messages'">
+    <form method="post" action="{% url 'dashboard:gestor_configuracoes' %}" class="bg-white rounded-2xl border border-gray-100 shadow-[0_1px_3px_-1px_rgba(0,0,0,0.04),0_4px_16px_-4px_rgba(67,97,238,0.06)] overflow-hidden">
+      {% csrf_token %}
       <div class="px-6 py-5 border-b border-gray-100">
         <div class="flex items-center gap-3">
           <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-amber-400 to-amber-500 flex items-center justify-center shadow-sm">
-            <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/></svg>
+            <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z"/></svg>
           </div>
           <div>
             <h2 class="text-[15px] font-semibold text-gray-900">Templates de Mensagem</h2>
@@ -452,27 +422,35 @@ showToast("{{ message|escapejs }}", "{% if message.tags == 'error' %}error{% eli
       <div class="px-6 py-5 space-y-4">
         <p class="text-[12px] text-gray-500 flex items-center gap-1.5">
           <svg class="w-3.5 h-3.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-          Use as variaveis: <code class="text-brand-600 bg-brand-50 px-1.5 py-0.5 rounded text-[11px]">{"{"}}vendedor{"}"}</code> <code class="text-brand-600 bg-brand-50 px-1.5 py-0.5 rounded text-[11px]">{"{"}}valor{"}"}</code> <code class="text-brand-600 bg-brand-50 px-1.5 py-0.5 rounded text-[11px]">{"{"}}cliente{"}"}</code> <code class="text-brand-600 bg-brand-50 px-1.5 py-0.5 rounded text-[11px]">{"{"}}link{"}"}</code> <code class="text-brand-600 bg-brand-50 px-1.5 py-0.5 rounded text-[11px]">{"{"}}usuario{"}"}</code> <code class="text-brand-600 bg-brand-50 px-1.5 py-0.5 rounded text-[11px]">{"{"}}senha{"}"}</code>
+          Use as variaveis:
+          <code class="text-brand-600 bg-brand-50 px-1.5 py-0.5 rounded text-[11px]">{"{"}}vendedor{"}"}</code>
+          <code class="text-brand-600 bg-brand-50 px-1.5 py-0.5 rounded text-[11px]">{"{"}}valor{"}"}</code>
+          <code class="text-brand-600 bg-brand-50 px-1.5 py-0.5 rounded text-[11px]">{"{"}}periodo{"}"}</code>
+          <code class="text-brand-600 bg-brand-50 px-1.5 py-0.5 rounded text-[11px]">{"{"}}cliente{"}"}</code>
+          <code class="text-brand-600 bg-brand-50 px-1.5 py-0.5 rounded text-[11px]">{"{"}}link{"}"}</code>
         </p>
-        {% for event_type, label, body in link_events %}
-        <div>
-          <label for="template_{{ event_type }}" class="block text-[13px] font-medium text-gray-700 mb-1.5">{{ label }}</label>
-          <textarea id="template_{{ event_type }}" name="template_{{ event_type }}"
-                    class="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-[13px] outline-none transition-all focus:border-amber-400 focus:ring-2 focus:ring-amber-100"
-                    rows="2" placeholder="{{ label }}">{{ body }}</textarea>
-        </div>
-        {% endfor %}
-      </div>
-    </div>
 
-    <div class="flex justify-end gap-3 pt-2 pb-8">
-      <button type="submit" form="config-form"
-              class="inline-flex items-center gap-2 bg-gray-900 hover:bg-gray-800 text-white font-semibold py-3 px-8 rounded-xl transition-all text-[15px] shadow-sm hover:shadow-md active:scale-[0.97]">
-        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
-        Salvar Configuracoes
-      </button>
-    </div>
-  </form>
+        <div class="grid grid-cols-1 gap-4">
+          {% for event_type, label, body in link_events %}
+          <div>
+            <label for="template_{{ event_type }}" class="block text-[13px] font-medium text-gray-700 mb-1.5">{{ label }}</label>
+            <textarea id="template_{{ event_type }}" name="template_{{ event_type }}"
+                      class="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-[13px] outline-none transition-all focus:border-amber-400 focus:ring-2 focus:ring-amber-100"
+                      rows="2" placeholder="{{ label }}">{{ body }}</textarea>
+          </div>
+          {% endfor %}
+        </div>
+
+        <div class="flex justify-end pt-4 border-t border-gray-100">
+          <button type="submit"
+                  class="inline-flex items-center gap-2 bg-gray-900 hover:bg-gray-800 text-white font-semibold py-2.5 px-6 rounded-xl transition-all text-[14px] shadow-sm hover:shadow-md active:scale-[0.97]">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+            Salvar Mensagens
+          </button>
+        </div>
+      </div>
+    </form>
+  </div>
 </div>
 
 <script>
@@ -498,49 +476,62 @@ function webhookCard() {
 }
 function configPage() {
     return {
+        tab: 'gateway',
         whatsappState: 'not_configured',
+        whatsappInitState: 'not_configured',
         whatsappQrCode: null,
         whatsappOwner: null,
-        whatsappInstance: '{{ tenant.whatsapp_instance_id|default:''|escapejs }}',
+        whatsappInstance: '{{ tenant.whatsapp_instance_id|default:""|escapejs }}',
+        whatsappInstanceInput: '{{ tenant.whatsapp_instance_id|default:""|escapejs }}',
         whatsappLoading: false,
         whatsappQrLoading: false,
         whatsappError: null,
 
+        init() {
+            if (this.whatsappInstance) {
+                this.checkWhatsAppStatus();
+            }
+        },
+
         async checkWhatsAppStatus() {
-            var instance = document.getElementById('whatsapp_instance_id')?.value?.trim();
+            var instance = this.whatsappInstanceInput?.trim();
             if (!instance) {
                 this.whatsappState = 'not_configured';
+                this.whatsappInitState = 'not_configured';
                 return;
             }
             this.whatsappLoading = true;
             try {
                 var resp = await fetch('{% url "dashboard:whatsapp_status" %}?instance=' + encodeURIComponent(instance));
                 if (!resp.ok) {
-                    if (resp.status === 404) this.whatsappState = 'not_found';
-                    else if (resp.status === 401) this.whatsappState = 'auth_error';
-                    else this.whatsappState = 'error';
-                    this.whatsappError = (await resp.json()).error || 'Erro ao consultar instancia.';
+                    this.whatsappState = 'not_found';
+                    this.whatsappInitState = 'not_found';
+                    this.whatsappError = null;
                     return;
                 }
                 var data = await resp.json();
                 if (data.connected) {
                     this.whatsappState = 'open';
+                    this.whatsappInitState = 'open';
                     this.whatsappOwner = data.owner || '';
                 } else if (data.state === 'connecting' || data.state === 'qrcode') {
                     this.whatsappState = 'connecting';
+                    this.whatsappInitState = 'connecting';
                 } else {
                     this.whatsappState = 'disconnected';
+                    this.whatsappInitState = 'disconnected';
                 }
             } catch (e) {
                 this.whatsappState = 'error';
-                this.whatsappError = 'Erro de rede ao consultar instancia.';
+                this.whatsappInitState = 'error';
+                this.whatsappError = null;
             } finally {
                 this.whatsappLoading = false;
             }
         },
 
         async disconnectWhatsApp() {
-            var instance = document.getElementById('whatsapp_instance_id')?.value?.trim();
+            var instance = this.whatsappInstanceInput?.trim();
             if (!instance) return;
             if (!confirm('Desconectar o WhatsApp? Voce precisara escanear o QR Code novamente para conectar.')) return;
             this.whatsappQrLoading = true;
@@ -562,7 +553,7 @@ function configPage() {
         },
 
         async deleteWhatsAppInstance() {
-            var instance = document.getElementById('whatsapp_instance_id')?.value?.trim();
+            var instance = this.whatsappInstanceInput?.trim();
             if (!instance) return;
             if (!confirm('Excluir a instancia "' + instance + '"? Essa acao nao pode ser desfeita.')) return;
             this.whatsappQrLoading = true;
@@ -570,7 +561,9 @@ function configPage() {
                 var resp = await fetch('{% url "dashboard:whatsapp_delete_instance" %}?instance=' + encodeURIComponent(instance));
                 if (resp.ok) {
                     this.whatsappState = 'not_configured';
+                    this.whatsappInitState = 'not_configured';
                     this.whatsappQrCode = null;
+                    this.whatsappInstanceInput = '';
                     document.getElementById('whatsapp_instance_id').value = '';
                     showToast('Instancia excluida com sucesso.', 'success');
                 } else {
@@ -585,7 +578,7 @@ function configPage() {
         },
 
         async fetchQRCode() {
-            var instance = document.getElementById('whatsapp_instance_id')?.value?.trim();
+            var instance = this.whatsappInstanceInput?.trim();
             if (!instance) {
                 this.whatsappError = 'Digite o nome da instancia primeiro.';
                 return;
@@ -597,9 +590,7 @@ function configPage() {
                 if (!resp.ok) {
                     var errData = await resp.json();
                     this.whatsappError = errData.error || 'Erro ao gerar QR Code.';
-                    if (resp.status === 404) this.whatsappState = 'not_found';
-                    else if (resp.status === 401) this.whatsappState = 'auth_error';
-                    else this.whatsappState = 'error';
+                    this.whatsappState = 'error';
                     return;
                 }
                 var data = await resp.json();

@@ -10,7 +10,7 @@ class CSPMiddleware:
             "style-src 'self' https://fonts.googleapis.com https://cdn.jsdelivr.net 'unsafe-inline'; "
             "font-src 'self' https://fonts.gstatic.com; "
             "img-src 'self' data: https:; "
-            "connect-src 'self'; "
+            "connect-src 'self' https://cdn.jsdelivr.net; "
             "frame-src 'self'; "
             "object-src 'none'; "
             "base-uri 'self'; "
