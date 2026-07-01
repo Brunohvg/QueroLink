@@ -1,8 +1,8 @@
 # PRD — VendaPay / QueroLink Sistema de Comissões
 
-> **Status geral:** ✅ PRODUÇÃO — Lotes 1 a 6 implementados. Sistema estabilizado.
-> **Versão:** 2.0.0 | **Última atualização:** 2026-06-29
-> **Recomendação:** ✅ PRONTO PARA PRODUÇÃO (ver `READINESS_REPORT.md`)
+> **Status geral:** ✅ PRODUÇÃO — Lotes 1 a 7 implementados. Sistema estabilizado.
+> **Versão:** 2.1.0 | **Última atualização:** 2026-07-01
+> **Recomendação:** ✅ PRONTO PARA PRODUÇÃO
 
 ---
 
@@ -13,24 +13,25 @@ O tenant principal é a Loja Bibelô, com 16 vendedores reais.
 
 ## 2. Arquitetura
 
-- Django 5.1 + SQLite (dev) / PostgreSQL (prod)
+- Django 5.1 + PostgreSQL
 - Celery + Redis para tarefas assíncronas (envio de WhatsApp via Evolution API)
 - Multi-tenant via model Tenant, com isolamento lógico nos models
 - Custom User model com roles: ADMIN, MANAGER, FINANCEIRO, SELLER
 - Integração WhatsApp: Evolution API (`api.lojabibelo.com.br`), client em `app/services/messaging/whatsapp.py`
+- CSP middleware ativo com `unsafe-inline` + `unsafe-eval` para Alpine.js
 - Dependência real: `requirements/base.txt` + `requirements/production.txt` (Dockerfile)
 
 ## 3. Apps
 
 | App | Função | Status |
 |-----|--------|--------|
-| accounts | Tenant, User customizado, middleware trial, backup task | ✅ Lote 1 |
+| accounts | Tenant, User customizado, middleware CSP, backup task | ✅ Lote 1 |
 | sellers | Seller (vendedor) | ✅ Lote 1 + 1.5 |
 | orders | Order, PaymentLink, services (link creation) | ✅ |
 | payments | Payment (paid_at, card_brand, card_last4, gateway IDs) | ✅ |
 | sales | Sales (vendas lançadas, origens LINK + MANUAL) | ✅ |
-| commissions | CommissionPeriod, SellerCommission, services | ✅ |
-| webhooks | WebhookEvent (Pagar.me), 9 eventos tratados, cleanup task | ✅ Lote 6 |
+| commissions | CommissionPeriod, SellerCommission, services | ✅ Lote 7 |
+| webhooks | WebhookEvent (Pagar.me), 9 eventos tratados, dedup, cleanup | ✅ Lote 6 + 7 |
 | notifications | Templates + envio WhatsApp | ✅ Lote 1.5 |
 | analytics | Analytics de cliques (LinkClick) | ❌ Model existe, view não implementada |
 | audit | Auditoria (AuditLog) | ✅ |
@@ -47,24 +48,13 @@ O tenant principal é a Loja Bibelô, com 16 vendedores reais.
 class Seller(models.Model):
     uuid = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     tenant = models.ForeignKey(Tenant, on_delete=models.CASCADE, related_name='sellers')
-    user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='seller_profile')  # Lote 1
+    user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='seller_profile')
     name = models.CharField(max_length=100)
     phone = models.CharField(max_length=20)
-    commission_rate = models.DecimalField(max_digits=5, decimal_places=4, default=0.01)                              # Lote 1
+    commission_rate = models.DecimalField(max_digits=5, decimal_places=4, default=0.01)
     is_active = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
 ```
-
-**Related names vindos de outros models → Seller (não usar como `@property`):**
-- `sales` (de Sale.seller)
-- `orders` (de Order.seller)
-- `commissions` (de SellerCommission.seller)
-
-**Migrations Seller (4 arquivos):**
-- `0001_initial` — tabela original
-- `0002_add_user_and_commission_rate` — +`user` (nullable, `CASCADE`), +`commission_rate`
-- `0003_link_sellers_to_users` — data migration `RunPython` (cria User para Sellers órfãos)
-- `0004_make_user_required` — `AlterField` remove `null=True`
 
 ### 4.2 Tenant (app `accounts`)
 
@@ -72,18 +62,22 @@ class Seller(models.Model):
 class Tenant(models.Model):
     uuid = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     company_name = models.CharField(max_length=255)
-    cnpj = models.CharField(max_length=14, unique=True, blank=True, null=True)
-    pagarme_api_key = models.CharField(max_length=255, blank=True, null=True)
+    cnpj = models.CharField(max_length=14, blank=True, null=True, unique=True, db_index=True)
+    cnpj_hash = models.CharField(max_length=64, blank=True, null=True, unique=True, db_index=True)
+    slug = models.SlugField(max_length=100, unique=True, blank=True)
+    pagarme_api_key = EncryptedCharField(max_length=600, blank=True, null=True)
+    pagarme_webhook_username = EncryptedCharField(max_length=600, blank=True, null=True)
+    pagarme_webhook_password = EncryptedCharField(max_length=600, blank=True, null=True)
     whatsapp_instance_id = models.CharField(max_length=100, blank=True, null=True)
-    whatsapp_token = models.CharField(max_length=255, blank=True, null=True)
-    default_commission_rate = models.DecimalField(max_digits=5, decimal_places=4, default=0.01)  # Lote 1
+    whatsapp_token = EncryptedCharField(max_length=600, blank=True, null=True)
+    default_commission_rate = models.DecimalField(max_digits=5, decimal_places=4, default=0.01)
+    link_expires_in = models.PositiveIntegerField(default=1200)
+    pix_enabled = models.BooleanField(default=True)
     is_active = models.BooleanField(default=True)
+    trial_expires_at = models.DateTimeField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 ```
-
-**Migration Accounts:**
-- `0002_add_user_and_commission_rate` — +`default_commission_rate`
 
 ### 4.3 User (app `accounts`)
 
@@ -99,185 +93,266 @@ class User(AbstractUser):
     role = models.CharField(max_length=10, choices=Role.choices, default=Role.MANAGER)
 ```
 
-### 4.4 Sale (app `sales`) — Cross-tenant validation
-
-Adicionado em `clean()` (Lote 1):
-```python
-if self.seller.tenant_id != self.tenant_id:
-    raise ValidationError("O vendedor nao pertence ao tenant da venda.")
-```
-
-### 4.5 Notification + MessageTemplate (app `notifications`) — Lote 1.5
-
-#### MessageTemplate
+### 4.4 Order (app `orders`)
 
 ```python
-class MessageTemplate(models.Model):
-    class EventType(models.TextChoices):
-        LINK_CREATED = 'link_created', 'Link Created'
-        LINK_OPENED = 'link_opened', 'Link Opened'
-        CHECKOUT_STARTED = 'checkout_started', 'Checkout Started'
-        PAYMENT_PAID = 'payment_paid', 'Payment Paid'
-        PAYMENT_FAILED = 'payment_failed', 'Payment Failed'
-        PAYMENT_EXPIRED = 'payment_expired', 'Payment Expired'
-        PAYMENT_REFUNDED = 'payment_refunded', 'Payment Refunded'
-        PAYMENT_CHARGEBACK = 'payment_chargeback', 'Payment Chargeback'
-        SELLER_CREDENTIALS = 'seller_credentials', 'Seller Credentials'   # Lote 1.5
-        COMMISSION_PAID = 'commission_paid', 'Commission Paid'            # Lote 1.5
-```
+class Order(models.Model):
+    class Status(models.TextChoices):
+        PENDING = 'PENDING', 'Pending'
+        COMPLETED = 'COMPLETED', 'Completed'
+        EXPIRED = 'EXPIRED', 'Expired'
+        CANCELED = 'CANCELED', 'Canceled'
+        SUSPENDED = 'SUSPENDED', 'Suspended'
 
-**Templates padrão (data migration `0002`):**
-
-- `SELLER_CREDENTIALS` (whatsapp):
-  `"Ola {{vendedor}}! Seu acesso ao sistema de comissoes foi criado.\nUsuario: {{usuario}}\nSenha temporaria: {{senha}}\nAcesse e troque sua senha no primeiro login."`
-
-- `COMMISSION_PAID` (whatsapp):
-  `"Ola {{vendedor}}! Sua comissao de {{periodo}} no valor de {{valor}} foi paga. Confira os detalhes no app."`
-
-#### Notification
-
-```python
-class Notification(models.Model):
     uuid = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    tenant = models.ForeignKey(Tenant, null=True, blank=True, ...)          # Lote 1.5 — auto-preenchido no save()
-    order = models.ForeignKey(Order, null=True, blank=True, ...)            # Lote 1.5 — agora nullable
-    seller = models.ForeignKey(Seller, null=True, blank=True, ...)          # Lote 1.5 — novo
-    commission_period = models.ForeignKey(CommissionPeriod, null=True, ...) # Lote 1.5 — novo
-    event_type = models.CharField(choices=MessageTemplate.EventType.choices)
-    channel = models.CharField(choices=MessageTemplate.Channel.choices)
-    recipient = models.CharField(max_length=255)
-    message_body = models.TextField()
-    status = models.CharField(choices=(PENDING/SENT/FAILED))
-    retry_count = models.PositiveIntegerField(default=0)
-    error_log = models.TextField(blank=True, null=True)
+    tenant = models.ForeignKey(Tenant, on_delete=models.CASCADE, related_name='orders')
+    seller = models.ForeignKey(Seller, on_delete=models.SET_NULL, null=True, related_name='orders')
+    customer_name = EncryptedCharField(max_length=600)
+    customer_phone = EncryptedCharField(max_length=600, blank=True, null=True)
+    total_amount = models.PositiveIntegerField(help_text="Value in cents")
+    status = models.CharField(max_length=20, choices=Status.choices, default=Status.PENDING)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        indexes = [
+            models.Index(fields=['tenant', 'status']),
+            models.Index(fields=['tenant', 'seller', 'created_at']),
+        ]
 ```
 
-**Migrations Notifications (2 arquivos):**
-- `0001_generalize_notification` — criação inicial dos models
-- `0002_create_default_templates` — data migration (templates padrão por tenant)
+### 4.5 PaymentLink (app `orders`)
+
+```python
+class PaymentLink(models.Model):
+    uuid = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    order = models.OneToOneField(Order, on_delete=models.CASCADE, related_name='payment_link')
+    short_code = models.CharField(max_length=20, unique=True, blank=True, null=True)
+    gateway_url = models.URLField(max_length=500, blank=True, null=True)
+    gateway_link_id = models.CharField(max_length=100, blank=True, null=True, db_index=True)
+    expires_at = models.DateTimeField(null=True, blank=True)
+    opened_at = models.DateTimeField(null=True, blank=True)
+    clicks_count = models.PositiveIntegerField(default=0)
+    created_at = models.DateTimeField(auto_now_add=True)
+```
+
+### 4.6 Payment (app `payments`)
+
+```python
+class Payment(models.Model):
+    class Status(models.TextChoices):
+        PENDING = 'PENDING', 'Pending'
+        PAID = 'PAID', 'Paid'
+        FAILED = 'FAILED', 'Failed'
+        REFUNDED = 'REFUNDED', 'Refunded'
+        CHARGEBACK = 'CHARGEBACK', 'Chargeback'
+
+    order = models.ForeignKey(Order, on_delete=models.CASCADE, related_name='payments')
+    gateway_name = models.CharField(max_length=50, default='pagarme')
+    gateway_order_id = models.CharField(max_length=100, blank=True, null=True)
+    gateway_transaction_id = models.CharField(max_length=100, unique=True, blank=True, null=True)
+    status = models.CharField(max_length=20, choices=Status.choices, default=Status.PENDING)
+    payment_method = models.CharField(max_length=20, blank=True, null=True)
+    installments = models.IntegerField(default=1)
+    paid_at = models.DateTimeField(null=True, blank=True)
+    card_brand = models.CharField(max_length=20, blank=True, null=True)
+    card_last4 = models.CharField(max_length=4, blank=True, null=True)
+    raw_callback_payload = models.JSONField(blank=True, null=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+```
+
+### 4.7 Sale (app `sales`)
+
+```python
+class Sale(models.Model):
+    class Origin(models.TextChoices):
+        LINK = 'LINK', 'Link'
+        MANUAL = 'MANUAL', 'Manual'
+
+    uuid = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    tenant = models.ForeignKey(Tenant, on_delete=models.CASCADE, related_name='sales')
+    seller = models.ForeignKey(Seller, on_delete=models.CASCADE, related_name='sales')
+    order = models.ForeignKey(Order, on_delete=models.SET_NULL, null=True, blank=True, related_name='sales')
+    origin = models.CharField(max_length=10, choices=Origin.choices, default=Origin.MANUAL)
+    amount = models.PositiveIntegerField(help_text="Value in cents")
+    sale_date = models.DateField()
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+```
+
+### 4.8 CommissionPeriod (app `commissions`)
+
+```python
+class CommissionPeriod(models.Model):
+    class Status(models.TextChoices):
+        ABERTA = 'ABERTA', 'Aberta'
+        FECHADA = 'FECHADA', 'Fechada'
+        PARCIALMENTE_FECHADA = 'PARCIALMENTE_FECHADA', 'Parcialmente Fechada'
+        PAGA = 'PAGA', 'Paga'
+        PARCIALMENTE_PAGA = 'PARCIALMENTE_PAGA', 'Parcialmente Paga'
+        CANCELADA = 'CANCELADA', 'Cancelada'
+
+    uuid = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    tenant = models.ForeignKey(Tenant, on_delete=models.CASCADE, related_name='commission_periods')
+    month = models.PositiveSmallIntegerField()
+    year = models.PositiveSmallIntegerField()
+    expected_working_days = models.PositiveSmallIntegerField(default=22)
+    status = models.CharField(max_length=25, choices=Status.choices, default=Status.ABERTA)
+    notes = models.TextField(blank=True, null=True)
+    cancelled_by = models.ForeignKey(User, null=True, blank=True, on_delete=models.SET_NULL, related_name='cancelled_periods')
+    cancelled_at = models.DateTimeField(null=True, blank=True)
+    cancel_reason = models.TextField(blank=True, null=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        unique_together = [('tenant', 'month', 'year')]
+```
+
+### 4.9 SellerCommission (app `commissions`)
+
+```python
+class SellerCommission(models.Model):
+    class Status(models.TextChoices):
+        ABERTA = 'ABERTA', 'Aberta'
+        FECHADA = 'FECHADA', 'Fechada'
+        PAGA = 'PAGA', 'Paga'
+        AJUSTADA = 'AJUSTADA', 'Ajustada'
+        REABERTA = 'REABERTA', 'Reaberta'
+        CANCELADA = 'CANCELADA', 'Cancelada'
+
+    class OperationalStatus(models.TextChoices):
+        PRONTO = 'PRONTO', 'Pronto'
+        PENDENTE = 'PENDENTE', 'Pendente'
+        SEM_LANCAMENTO = 'SEM_LANCAMENTO', 'Sem Lancamento'
+
+    period = models.ForeignKey(CommissionPeriod, on_delete=models.CASCADE, related_name='seller_commissions')
+    seller = models.ForeignKey(Seller, on_delete=models.CASCADE, related_name='commissions')
+    status = models.CharField(max_length=20, choices=Status.choices, default=Status.ABERTA)
+    # ... (campos de valores, datas, métodos freeze/recalculate/reopen/mark_paid)
+    # Campo gateway_link_id com db_index=True (Lote 7)
+```
+
+### 4.10 WebhookEvent (app `webhooks`)
+
+```python
+class WebhookEvent(models.Model):
+    gateway = models.CharField(max_length=50)
+    gateway_event_id = models.CharField(max_length=100, blank=True, null=True, unique=True)
+    payload = models.JSONField()
+    processed = models.BooleanField(default=False)
+    processing_error = models.TextField(blank=True, null=True)
+    tenant = models.ForeignKey(Tenant, on_delete=models.CASCADE, null=True, blank=True, related_name='webhook_events')
+    received_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        indexes = [
+            models.Index(fields=['gateway', 'received_at']),
+            models.Index(fields=['processed']),
+            models.Index(fields=['gateway_event_id']),
+        ]
+```
 
 ---
 
 ## 5. Comandos de Management
 
-### `reset_seller_password` (Lote 1)
+### `reset_seller_password`
 
 ```bash
 python manage.py reset_seller_password <seller_uuid>
 ```
 
 Gera nova senha temporária para o vendedor, aplica via `set_password()`, imprime no terminal.
-Cobre "esqueci minha senha" sem e-mail. Local: `sellers/management/commands/reset_seller_password.py`.
 
 ---
 
 ## 6. Tarefas Assíncronas (Celery)
 
-### `send_whatsapp_notification` (Lote 1.5)
-
-Task Celery em `notifications/tasks.py`. Usa `WhatsappClient` existente (`app/services/messaging/whatsapp.py`).
-- Retry: 3 tentativas com backoff exponencial (60s, 120s, 240s)
-- Max retries: falha definitiva após `MAX_RETRIES=3`
-- Fallback: se não houver `MessageTemplate` cadastrado, usa `_fallback_body()` com texto em português
-
-### `notify_seller_credentials(seller, password)` (Lote 1.5)
-
-Cria `Notification` com `event_type=SELLER_CREDENTIALS`, dispara task assíncrona.
-Chamada automaticamente pelo `dashboard.seller_create`.
-
-### `notify_commission_paid(seller_commission)` (Lote 1.5)
-
-Cria `Notification` com `event_type=COMMISSION_PAID`, dispara task assíncrona.
-Pronta para ser chamada pelo Lote 2 (API) e Lote 4 (tela financeiro).
+| Task | Arquivo | Time Limits | Descrição |
+|------|---------|:-----------:|-----------|
+| `process_pagarme_webhook` | `webhooks/tasks.py` | 120s/180s | Processa eventos do Pagar.me com dedup e retry 3x |
+| `cleanup_old_webhook_events` | `webhooks/tasks.py` | 300s/360s | Remove eventos >90 dias em lotes de 1000 |
+| `send_whatsapp_notification` | `notifications/tasks.py` | 60s/90s | Envia WhatsApp com retry exponencial 3x |
+| `daily_backup` | `accounts/tasks.py` | 360s/420s | Backup pg_dump → Google Drive via rclone |
 
 ---
 
 ## 7. Fluxos Implementados
 
-### 7.1 Cadastro de vendedor pelo gestor (Lote 1.5)
+### 7.1 Cadastro de vendedor pelo gestor
 - URL: `POST /dashboard/sellers/create/`
-- Autenticação: `@login_required` (qualquer role com tenant)
-- Form: nome + telefone
-- Sistema gera username (`slugify(name)` + sufixo se duplicado) + senha temporária (`get_random_string(12)`)
-- Cria `User` com `role=SELLER`, vinculado ao `Seller`
-- `commission_rate` inicial = `Tenant.default_commission_rate`
-- Dispara `notify_seller_credentials()` (WhatsApp) — **falha no envio NÃO bloqueia a criação**
-- Exibe username + senha + status do envio na tela
+- Autenticação: `@login_required`
+- Gera username + senha temporária, cria User + Seller
+- Dispara `notify_seller_credentials()` (WhatsApp) — falha não bloqueia
 
-### 7.2 Onboarding do vendedor (recém-criado)
-1. Recebe WhatsApp com username + senha temporária
-2. Login via username + senha
-3. Troca de senha (futuro: tela de perfil)
-4. Acesso às telas de vendedor (Lotes futuros)
+### 7.2 Criação de link de pagamento
+- `orders/services.py:create_payment_link` — orquestra criação no Pagar.me
+- Em caso de falha no banco após criar link no gateway, cancela o link órfão
 
-### 7.3 Reset de senha (sem e-mail)
-- Gestor roda `python manage.py reset_seller_password <uuid>` no servidor
-- Senha temporária gerada e impressa no terminal
-- Gestor repassa manualmente ao vendedor
+### 7.3 Processamento de webhook
+- View: `pagarme_webhook` — recebe POST, dedup via `gateway_event_id`, autenticação Basic Auth opcional
+- Task: `process_pagarme_webhook` — idempotente, com `select_for_update(nowait=True)`, trata 9 tipos de evento
+
+### 7.4 Fechamento de comissões
+- `close_seller_commissions` — usa `select_for_update` com `order_by('id')` para evitar deadlocks
+- `reopen_seller_commissions` — mesmo padrão
+- `pay_seller_commissions` — mesmo padrão, notifica vendedores
+- `create_commission_adjustment` — atomico com `select_for_update`
 
 ---
 
 ## 8. Telas
 
-### 8.1 Implementadas
+### 8.1 Mobile PWA (vendedor)
 
-| Tela | URL | Template | Status |
-|------|-----|----------|--------|
-| Login dashboard (desktop) | `/dashboard/login/` | `dashboard/login.html` | Existente |
-| Dashboard home | `/dashboard/` | `dashboard/index.html` | Existente |
-| Cadastro vendedor | `/dashboard/sellers/create/` | `dashboard/seller_create.html` | ✅ Lote 1.5 |
-| Login mobile | `/dashboard/mobile/login/` | `mobile/login.html` | ✅ Lote 3 |
-| Home mobile | `/dashboard/mobile/` | `mobile/home.html` | ✅ Lote 3 |
-| Lançar venda | `/dashboard/mobile/lancar/` | `mobile/lancar_venda.html` | ✅ Lote 3 |
-| Minhas vendas | `/dashboard/mobile/vendas/` | `mobile/minhas_vendas.html` | ✅ Lote 3 |
-| Meu desempenho | `/dashboard/mobile/desempenho/` | `mobile/meu_desempenho.html` | ✅ Lote 3 |
-| Esqueci senha | `/dashboard/mobile/forgot-password/` | `mobile/forgot_password.html` | ✅ Lote 3 |
-| Link público | `/` | `orders/index.html` | Existente |
+| Tela | URL | Status |
+|------|-----|--------|
+| Login | `/dashboard/mobile/login/` | ✅ |
+| Home (resumo do mês) | `/dashboard/mobile/` | ✅ |
+| Lançar venda | `/dashboard/mobile/lancar/` | ✅ |
+| Minhas vendas | `/dashboard/mobile/vendas/` | ✅ |
+| Links de pagamento | `/dashboard/mobile/links/` | ✅ |
+| Fechamento | `/dashboard/mobile/fechamento/` | ✅ |
+| Esqueci senha | `/dashboard/mobile/forgot-password/` | ✅ |
 
-### 8.2 PWA (Lote 3)
+### 8.2 Desktop (gestor)
 
-- `static/manifest.json` — 8 ícones, `display: standalone`, `theme_color: #4361ee`
-- `static/sw.js` — cache de assets, fallback offline "Sem conexão"
-- Service worker registrado no `base_mobile.html`
-- Prompt de instalação via `beforeinstallprompt` — aparece após 2+ logins
-- `static/icons/` — 8 PNGs (72 a 512px)
+| Tela | URL | Status |
+|------|-----|--------|
+| Login | `/dashboard/login/` | ✅ |
+| Home (dashboard) | `/dashboard/gestor/` | ✅ |
+| Ranking | `/dashboard/gestor/ranking/` | ✅ |
+| Vendedores | `/dashboard/gestor/vendedores/` | ✅ |
+| Links | `/dashboard/gestor/links/` | ✅ |
+| Detalhe do link | `/dashboard/gestor/links/{uuid}/` | ✅ |
+| Fechamento | `/dashboard/gestor/fechamento/` | ✅ |
+| Configurações | `/dashboard/gestor/configuracoes/` | ✅ |
 
-### 8.3 Decisão de frontend mobile
+### 8.3 Desktop (financeiro)
 
-**Alpine.js** escolhido sobre HTMX:
-- API REST retorna JSON — Alpine consome nativamente via `fetch()`
-- Reatividade local sem build step (`x-model`, `x-show`, `x-for`)
-- Máscara monetária em JS (entrada em R$, submit em centavos)
-- Sessão Django (cookie) para autenticação — mais seguro que JWT em localStorage para dispositivos compartilhados
+| Tela | URL | Status |
+|------|-----|--------|
+| Fila de aprovação | `/dashboard/financeiro/fila/` | ✅ |
+| Histórico de pagamentos | `/dashboard/financeiro/historico/` | ✅ |
 
-### 8.4 Telas desktop — Lote 4
+### 8.4 Público
 
-| Tela | URL | Template | Status |
-|------|-----|----------|--------|
-| Ranking gestor | `/dashboard/gestor/ranking/` | `dashboard/gestor/ranking.html` | ✅ Lote 4 |
-| Vendedores gestor | `/dashboard/gestor/vendedores/` | `dashboard/gestor/vendedores.html` | ✅ Lote 4 |
-| Fechamento gestor | `/dashboard/gestor/fechamento/` | `dashboard/gestor/fechamento.html` | ✅ Lote 4 |
-| Fila aprovação financeiro | `/dashboard/financeiro/fila/` | `dashboard/financeiro/fila_aprovacao.html` | ✅ Lote 4 |
-| Histórico pagamentos | `/dashboard/financeiro/historico/` | `dashboard/financeiro/historico_pagamentos.html` | ✅ Lote 4 |
-
-### 8.5 Infraestrutura Tailwind (Lote 4)
-
-- `package.json` + `tailwind.config.js` com paleta curada (Inter, cores primárias)
-- Dockerfile multi-stage: `node:20-alpine` (build CSS) → `python:3.12.3-slim` (sem Node na imagem final)
-- `static/css/input.css` com `@tailwind` directives + componentes utilitários
-- `templates/dashboard/base_desktop.html` — sidebar com menu role-based
-- Chart.js 4.4 para gráfico de ranking
-- `app.apps.audit` registrado em `INSTALLED_APPS`, migration gerada, logging em approve/reject
+| Tela | URL | Status |
+|------|-----|--------|
+| Link de pagamento | `/<tenant_slug>/` | ✅ |
+| Pagamento concluído | `/pago/<order_uuid>/` | ✅ |
 
 ---
 
-## 9. API REST (✅ Lote 2 implementado)
+## 9. API REST
 
 ### 9.1 Autenticação
 - JWT via `djangorestframework-simplejwt`
 - `POST /api/auth/login/` — login (rate limit 5/min por IP + username)
 - `POST /api/auth/refresh/` — refresh token
-- `TokenAuthentication` mantido em paralelo (legacy)
+- `POST /api/auth/logout/` — blacklist do refresh token
 - Variáveis de ambiente: `JWT_ACCESS_TOKEN_LIFETIME_MINUTES` (default 30), `JWT_REFRESH_TOKEN_LIFETIME_DAYS` (default 7)
 
 ### 9.2 Endpoints
@@ -285,19 +360,35 @@ Pronta para ser chamada pelo Lote 2 (API) e Lote 4 (tela financeiro).
 | Método | URL | Permissão | Descrição |
 |--------|-----|-----------|-----------|
 | GET/POST | `/api/sellers/` | MANAGER/ADMIN | Listar/criar vendedores |
-| GET/PUT/DELETE | `/api/sellers/{uuid}/` | MANAGER/ADMIN | Detalhe/editar/remover vendedor |
+| GET/PUT/DELETE | `/api/sellers/{uuid}/` | MANAGER/ADMIN | Detalhe/editar/excluir vendedor |
+| POST | `/api/sellers/{uuid}/reset_password/` | MANAGER/ADMIN | Resetar senha do vendedor |
+| POST | `/api/sellers/import_sellers/` | MANAGER/ADMIN | Importar CSV/XLSX |
 | GET/POST | `/api/sales/` | SELLER/MANAGER/ADMIN | Listar/criar vendas |
-| GET/PUT/DELETE | `/api/sales/{uuid}/` | SELLER (própria)/MANAGER | Detalhe/editar/remover venda |
-| GET | `/api/seller/sales/` | SELLER | Listar vendas do próprio vendedor |
-| GET | `/api/manager/sales/` | MANAGER/ADMIN | Listar todas as vendas do tenant (?seller=uuid) |
+| GET/PUT/DELETE | `/api/sales/{uuid}/` | SELLER/MANAGER | Detalhe/editar/excluir venda |
+| GET | `/api/seller/sales/` | SELLER | Vendas do próprio vendedor |
+| GET | `/api/manager/sales/` | MANAGER/ADMIN | Todas vendas do tenant |
+| GET | `/api/manager/seller/{uuid}/` | MANAGER/ADMIN | Detalhe do vendedor (vendas + comissões + evolução) |
+| GET | `/api/manager/seller/{uuid}/csv/` | MANAGER/ADMIN | Exportar CSV |
+| GET | `/api/manager/seller/{uuid}/xlsx/` | MANAGER/ADMIN | Exportar XLSX |
+| GET | `/api/manager/seller/{uuid}/pdf/` | MANAGER/ADMIN | Exportar PDF |
+| GET/POST | `/api/seller/links/` | SELLER | Criar/listar links pagamento (rate limit 10/min) |
 | GET/POST | `/api/commissions/periods/` | MANAGER/ADMIN | Listar/criar competências |
-| POST | `/api/commissions/periods/{uuid}/close/` | MANAGER/ADMIN | Fechar → EM_CONFERENCIA |
-| POST | `/api/commissions/periods/{uuid}/send/` | MANAGER/ADMIN | Enviar → ENVIADA_FINANCEIRO |
-| POST | `/api/commissions/periods/{uuid}/approve/` | FINANCEIRO/ADMIN | Aprovar → APROVADA |
-| POST | `/api/commissions/periods/{uuid}/reject/` | FINANCEIRO/ADMIN | Rejeitar → EM_CONFERENCIA |
-| POST | `/api/commissions/periods/{uuid}/mark-paid/` | FINANCEIRO/ADMIN | Marcar paga → PAGA + notificações |
+| GET/PATCH/DELETE | `/api/commissions/periods/{uuid}/` | MANAGER/ADMIN | Detalhe/editar/excluir competência |
+| POST | `/api/commissions/periods/{uuid}/sync/` | MANAGER/ADMIN | Sincronizar vendedores |
+| POST | `/api/commissions/periods/{uuid}/close_sellers/` | MANAGER/ADMIN | Fechar comissões selecionadas |
+| POST | `/api/commissions/periods/{uuid}/reopen_sellers/` | MANAGER/ADMIN | Reabrir comissões |
+| POST | `/api/commissions/periods/{uuid}/pay_sellers/` | FINANCEIRO/ADMIN | Marcar comissões como pagas |
+| POST | `/api/commissions/periods/{uuid}/cancel/` | MANAGER/ADMIN | Cancelar competência |
+| GET | `/api/manager/commissions/{status}/` | MANAGER/ADMIN | Filtrar por status |
+| GET | `/api/manager/ranking/` | MANAGER/ADMIN | Ranking do mês |
+| GET | `/api/manager/ranking/annual/` | MANAGER/ADMIN | Ranking anual top 5 |
+| GET | `/api/manager/dashboard/summary/` | MANAGER/ADMIN | Dashboard resumo |
+| GET | `/api/manager/webhook-status/` | MANAGER/ADMIN | Status do webhook |
+| GET | `/api/financial/payment-queue/` | FINANCEIRO/ADMIN | Fila de pagamentos |
+| GET | `/api/financial/commissions/{uuid}/csv/` | FINANCEIRO/ADMIN | Exportar CSV financeiro |
+| POST | `/api/seller/change-password/` | SELLER | Alterar própria senha |
 
-### 9.3 Permission classes (app/api/permissions.py)
+### 9.3 Permission classes
 
 | Classe | Função |
 |--------|--------|
@@ -305,20 +396,7 @@ Pronta para ser chamada pelo Lote 2 (API) e Lote 4 (tela financeiro).
 | `IsFinancialOrAdmin` | Acesso: FINANCEIRO ou ADMIN. Object: verifica tenant. |
 | `IsSellerOwner` | Acesso: SELLER. Object: verifica `request.user.seller_profile`. |
 
-### 9.4 Máquina de estados (CommissionPeriod)
-
-```
-ABERTA → [close] → EM_CONFERENCIA → [send] → ENVIADA_FINANCEIRO
-                                                    ↓
-                                    [approve] → APROVADA → [mark-paid] → PAGA
-                                    [reject]  → EM_CONFERENCIA
-```
-
-- Cada transição valida o status atual; pular etapa retorna 400.
-- `close` chama `SellerCommission.recalculate()` para cada vendedor.
-- `mark-paid` dispara `notify_commission_paid()` para cada vendedor.
-
-### 9.5 Documentação
+### 9.4 Documentação
 - Swagger UI: `/api/schema/swagger-ui/`
 - Schema OpenAPI: `/api/schema/`
 
@@ -326,108 +404,105 @@ ABERTA → [close] → EM_CONFERENCIA → [send] → ENVIADA_FINANCEIRO
 
 ## 10. Webhooks
 
-Bug conhecido de correlação em `webhooks/tasks.py` — `data.get('code')` para matching Order.
-Fora de escopo. Não corrigir.
+### 10.1 Endpoint
+`POST /api/webhooks/pagarme/<tenant_slug>/`
+
+### 10.2 Autenticação
+- Basic Auth opcional configurado por tenant no painel de configurações
+- Se `pagarme_webhook_username` e `pagarme_webhook_password` estão configurados, a autenticação é exigida
+
+### 10.3 Deduplicação
+- Eventos com `id` no formato `evt_xxx` são deduplicados na view (retorna 200 "duplicate")
+- Na task, verifica se outro evento com mesmo `gateway_event_id` já foi processado
+- Campo `gateway_event_id` com `unique=True` no banco
+
+### 10.4 Eventos tratados
+
+| Evento | Ação |
+|--------|------|
+| `charge.paid` | Payment → PAID, Order → COMPLETED, cria Sale, notifica WhatsApp |
+| `charge.payment_failed` | Payment → FAILED, notifica com motivo |
+| `charge.refunded` | Payment → REFUNDED, remove Sale, notifica |
+| `charge.chargedback` | Payment → CHARGEBACK, remove Sale, notifica |
+| `charge.antifraud_reproved` | Payment → FAILED, notifica |
+| `order.paid` | Igual charge.paid via charges[0] |
+| `payment-link.finished` | Igual charge.paid via gateway_link_id |
+| `payment-link.expired` | Order → EXPIRED, notifica |
+| `payment-link.cancelled` | Order → CANCELED, notifica |
+
+### 10.5 Task Celery
+- `process_pagarme_webhook`: retry 3x com 30s, `select_for_update(nowait=True)`
+- `cleanup_old_webhook_events`: diário, remove eventos >90 dias em lotes de 1000
 
 ---
 
 ## 11. Migrations (resumo completo)
 
-| App | Arquivo | Conteúdo |
-|-----|---------|----------|
-| accounts | `0001_initial` | Tenant, User |
-| accounts | `0002_add_user_and_commission_rate` | +`Tenant.default_commission_rate` |
-| sellers | `0001_initial` | Seller (sem user) |
-| sellers | `0002_add_user_and_commission_rate` | +`user` (nullable), +`commission_rate` |
-| sellers | `0003_link_sellers_to_users` | Data migration (RunPython) |
-| sellers | `0004_make_user_required` | `user` → non-nullable |
-| notifications | `0001_generalize_notification` | Create MessageTemplate + Notification |
-| notifications | `0002_create_default_templates` | Data migration (templates padrão) |
-| orders | `0001_initial` | Order, PaymentLink |
-| payments | `0001_initial` | Payment |
-| sales | `0001_initial` | Sale |
-| commissions | `0001_initial` | CommissionPeriod, SellerCommission |
+### accounts
+| Migration | Conteúdo |
+|-----------|----------|
+| `0001_initial` | Tenant, User |
+| `0002` | +`Tenant.default_commission_rate` |
+| `0003` | +`Tenant.cnpj` |
+| `0004` | +`Tenant.cnpj_hash` |
+| `0005` | Altera Tenant.cnpj_hash para unique |
+| `0006` | +`Tenant.slug` (raw SQL) |
+| `0007` | +`Tenant.link_expires_in`, +`Tenant.pix_enabled` |
+| `0008` | +`Tenant.trial_expires_at` |
+| `0009_0010_0011` | Ajustes de campos |
+| `0012` | +`pagarme_webhook_username`, +`pagarme_webhook_password` |
+
+### sellers
+| Migration | Conteúdo |
+|-----------|----------|
+| `0001_initial` | Seller |
+| `0002` | +`user` (nullable), +`commission_rate` |
+| `0003` | Data migration: link sellers to users |
+| `0004` | user → non-nullable |
+
+### orders
+| Migration | Conteúdo |
+|-----------|----------|
+| `0001_initial` | Order, PaymentLink |
+| `0002` | Altera campos criptografados |
+| `0003` | +`db_index` em `gateway_link_id` |
+
+### webhooks
+| Migration | Conteúdo |
+|-----------|----------|
+| `0001_initial` | WebhookEvent |
+| `0002` | +`tenant` FK |
+| `0003` | +`gateway_event_id` + index |
+
+### notifications
+| Migration | Conteúdo |
+|-----------|----------|
+| `0001_generalize_notification` | MessageTemplate, Notification |
+| `0002_create_default_templates` | Data migration |
+
+### commissions
+| Migration | Conteúdo |
+|-----------|----------|
+| `0001_initial` | CommissionPeriod, SellerCommission, CommissionAdjustment |
+| `0002` | Ajustes de campos de comissão |
 
 ---
 
 ## 12. Testes
 
-**Suíte completa:** `python manage.py test app.apps.sellers app.apps.notifications app.apps.dashboard`
-
 ### 12.1 sellers (10 testes)
-
-| Teste | Cobertura |
-|-------|-----------|
-| `test_seller_cannot_be_in_sale_of_other_tenant` | Isolamento multi-tenant — `full_clean()` lança `ValidationError` |
-| `test_seller_sales_all_no_recursion` | Regressão: `seller.sales.count()` não dispara exceção |
-| `test_generate_unique_usernames_no_collision` | Username único com slugify + sufixo |
-| `test_link_sellers_to_users_creates_unique_usernames` | Data migration — integração |
-| `test_recalculate_sums_sales_correctly` | `SellerCommission.recalculate()` — soma + comissão |
-| `test_recalculate_empty_period` | `recalculate()` com 0 vendas |
-| `test_reset_password_generates_valid_password` | Comando gera senha ≠ anterior |
-| `test_reset_password_allows_login` | Login funciona com nova senha |
-| `test_reset_password_output_contains_username` | Output contém dados do vendedor |
-| `test_nonexistent_seller_raises_error` | UUID inválido → `CommandError` |
+- Isolamento multi-tenant, username único, data migration, recalculate, reset password
 
 ### 12.2 notifications (14 testes)
-
-| Teste | Cobertura |
-|-------|-----------|
-| `test_notification_without_order_using_seller` | Criação sem Order, com Seller |
-| `test_notification_with_commission_period` | Criação com CommissionPeriod |
-| `test_tenant_auto_filled_from_seller` | `tenant` auto-preenchido no `save()` |
-| `test_default_status_is_pending` | Status padrão = PENDING |
-| `test_render_body_seller_credentials` | Template render com variáveis de vendedor |
-| `test_render_body_commission_paid` | Template render com variáveis de comissão |
-| `test_create_and_send_notification_renders_template` | Template → Notification completo |
-| `test_fallback_body_when_no_template` | Fallback sem template cadastrado |
-| `test_notify_seller_credentials` | Fluxo completo seller credentials |
-| `test_notify_commission_paid` | Fluxo completo commission paid |
-| `test_send_whatsapp_notification_success` | Task marca SENT no sucesso |
-| `test_send_whatsapp_notification_max_retries_exceeded` | Task marca FAILED após max retries |
-| `test_send_whatsapp_notification_retry_on_failure` | Incrementa retry_count + grava error_log |
-| `test_skip_non_pending_notification` | Ignora notificação já SENT |
+- Criação, templates, fallback, retry WhatsApp, max retries
 
 ### 12.3 dashboard (6 testes)
-
-| Teste | Cobertura |
-|-------|-----------|
-| `test_get_seller_create_page` | GET retorna 200 + formulário |
-| `test_create_seller_success` | POST cria Seller + User + commission_rate |
-| `test_seller_created_even_when_whatsapp_fails` | Falha no WhatsApp não bloqueia criação |
-| `test_duplicate_name_gets_unique_username` | Nome duplicado → suffix `-2` |
-| `test_missing_name_shows_error` | Campo nome vazio → erro |
-| `test_missing_phone_shows_error` | Campo telefone vazio → erro |
+- CRUD vendedor, username único, falha WhatsApp não bloqueia
 
 ### 12.4 api (25 testes)
+- JWT login/refresh/logout, permissões multi-tenant, CRUD sellers/sales, máquina de estados
 
-| Teste | Cobertura |
-|-------|-----------|
-| `test_jwt_login_returns_tokens` | Login JWT retorna access + refresh |
-| `test_jwt_login_invalid_credentials` | Credenciais inválidas → 401 |
-| `test_jwt_refresh_returns_new_access` | Refresh gera novo access token |
-| `test_unauthenticated_request_returns_401` | Sem token → 401 |
-| `test_authenticated_request_with_bearer` | Com Bearer → 200 |
-| `test_manager_can_create_seller` | POST /api/sellers/ como MANAGER → 201 |
-| `test_seller_cannot_create_another_seller` | SELLER tenta criar vendedor → 403 |
-| `test_manager_can_list_sellers` | GET /api/sellers/ como MANAGER |
-| `test_seller_cannot_list_sellers` | SELLER tenta listar → 403 |
-| `test_seller_can_create_own_sale` | SELLER cria própria venda → 201 |
-| `test_sale_amount_is_integer` | amount é int (centavos) no JSON |
-| `test_seller_can_view_own_sales` | SELLER vê apenas suas vendas |
-| `test_manager_can_view_all_sales` | MANAGER vê todas vendas do tenant |
-| `test_manager_a_cannot_see_tenant_b_sellers` | Isolamento multi-tenant sellers |
-| `test_manager_a_cannot_see_tenant_b_sales` | Isolamento multi-tenant sales |
-| `test_seller_a_cannot_see_tenant_b_sales` | SELLER só vê seu tenant |
-| `test_cannot_create_sale_for_other_tenant_seller` | Cross-tenant sale → 400 |
-| `test_seller_cannot_view_sales_of_another_seller` | SELLER não vê vendas de outro seller |
-| `test_close_aberta_works` | ABERTA → close → EM_CONFERENCIA |
-| `test_cannot_close_twice` | Fechar 2x → 400 |
-| `test_cannot_approve_before_send` | Aprovar antes de enviar → 400 |
-| `test_full_flow_close_send_approve_mark_paid` | Fluxo completo ABERTA→PAGA |
-| `test_reject_sends_back_to_conferencia` | Rejeitar volta p/ EM_CONFERENCIA |
-| `test_manager_cannot_approve` | MANAGER tenta aprovar → 403 |
-| `test_cannot_mark_paid_before_approved` | mark-paid antes de APPROVED → 400 |
+**Total: 55 testes**
 
 ---
 
@@ -435,189 +510,126 @@ Fora de escopo. Não corrigir.
 
 ### Lote 0 — Reconhecimento (2026-06-20)
 - Mapeamento de apps, dependências, models, banco
-- Identificação de lixo (`Não`, `pyproject.toml`, `uv.lock`, `req.txt`)
-- Confirmação: `requirements/base.txt` + `requirements/production.txt` é a fonte real
-- Banco local vazio (0 registros), 16 sellers prontos no `seed.py`
+- Identificação de resíduos
 
 ### Lote 1 — Models, Seller↔User, Migração (2026-06-20)
-- `Seller.user` (OneToOneField, CASCADE, `related_name='seller_profile'`)
-- `Seller.commission_rate` (DecimalField, default=0.01)
-- `Tenant.default_commission_rate` (DecimalField, default=0.01)
-- Data migration `0003_link_sellers_to_users` — cria User para Sellers órfãos
-- Comando `reset_seller_password`
-- Cross-tenant validation em `Sale.clean()`
-- **10 testes passando**
+- Seller.user, commission_rate, Tenant.default_commission_rate
+- Data migration link_sellers_to_users
+- Comando reset_seller_password
+- Cross-tenant validation em Sale
 
-### Lote 1.5 — Cadastro de Vendedor + Notificações WhatsApp (2026-06-20)
-- Generalização de `Notification` (nullable `order`, +`seller`, +`commission_period`, +`event_type`, +`tenant`)
-- `MessageTemplate.EventType` com `SELLER_CREDENTIALS` e `COMMISSION_PAID`
-- Task Celery `send_whatsapp_notification` com retry/backoff
-- Funções `notify_seller_credentials()` e `notify_commission_paid()`
-- Data migration de templates padrão por tenant
-- Tela `/dashboard/sellers/create/` (view + template + URL)
-- **30 testes passando** (10 sellers + 14 notifications + 6 dashboard)
+### Lote 1.5 — Cadastro + Notificações WhatsApp (2026-06-20)
+- Generalização Notification, MessageTemplate
+- Task Celery send_whatsapp_notification com retry
+- Tela de cadastro de vendedor
 
-### Lote 2 — API REST, JWT, Permissões multi-tenant (2026-06-20)
-- App `api` com `DefaultRouter` + `ViewSet`s
-- JWT via `djangorestframework-simplejwt` (access 30min, refresh 7d)
-- Rate limiting no login (5/min, IP + username)
-- 3 permission classes: `IsManagerOrAdmin`, `IsFinancialOrAdmin`, `IsSellerOwner`
-- Todas as permissions verificam tenant em every request
-- Máquina de estados do `CommissionPeriod` com validação de transições
-- `mark_paid` chama `notify_commission_paid()` para cada vendedor
-- `close` chama `SellerCommission.recalculate()` para cada vendedor
-- Swagger UI em `/api/schema/swagger-ui/`
-- Dependências: `djangorestframework-simplejwt`, `drf-spectacular`, `django-ratelimit`
-- **55 testes passando** (10 sellers + 14 notifications + 6 dashboard + 25 api)
+### Lote 2 — API REST, JWT, Permissões (2026-06-20)
+- ViewSets, JWT simplesjwt, rate limiting
+- 3 permission classes
+- Máquina de estados CommissionPeriod
+- Swagger UI
 
-### Lote 3 — Telas mobile (vendedor) + PWA (2026-06-20)
-- Decisão Alpine.js (documentada no README)
-- `SessionAuthentication` adicionado ao DRF
-- 5 telas mobile: login, home, lançar venda, minhas vendas, meu desempenho
-- Máscara monetária: entrada visual em R$ (Alpine.js), submit em centavos inteiros
-- Layout mobile com Tailwind CDN + bottom nav fixo (3 ícones)
-- Exclusão de venda: botão visível só para vendas do dia; validação real no backend
-- Forgot password: tela informativa "procure seu gestor" (sem e-mail)
-- PWA: manifest.json (8 ícones), sw.js (cache + offline fallback)
-- Prompt de instalação via `beforeinstallprompt` (aparece após 2+ logins)
-- **55 testes passando** (sem regressão) + **9 passos de fluxo mobile verificados**
+### Lote 3 — Telas mobile + PWA (2026-06-20)
+- Alpine.js, 5 telas mobile, PWA
 
-### Lote 4 — Telas desktop + Infraestrutura final (2026-06-20)
-- Tailwind: `package.json`, `tailwind.config.js`, `Dockerfile` multi-stage (Node build → Python runtime)
-- 5 telas desktop: ranking (Chart.js), vendedores (CRUD visual + reset senha), fechamento, fila aprovação, histórico pagamentos
-- Audit logging em approve/reject + comando reset_seller_password
-- API: +`/api/manager/ranking/`, +`/api/manager/commissions/<status>/`, +CSV export, +`reset_password` action
-- Sidebar desktop com navegação role-based
-- Exportação CSV via stdlib
-- Fluxo MVP completo verificado: cadastro → lançamento → fechamento → aprovação → pagamento
-- **55 testes passando** + fluxo end-to-end com audit logs confirmados
+### Lote 4 — Telas desktop + Infraestrutura (2026-06-20)
+- Tailwind compilado, 5 telas desktop, Chart.js
+- Sidebar role-based, export CSV
 
-### Lote 4.5 — Design system e refinamento visual (2026-06-20)
-- `tailwind.config.js` com tokens `brand-*`, `success-*`, `warning-*`, `danger-*` (50/500/700)
-- 5 component partials: `_button.html`, `_metric_card.html`, `_status_badge.html`, `_bottom_nav.html`, `_sidebar.html`
-- 10 telas refatoradas com partials; zero cores hardcoded (`blue-*`, `green-*`, `red-*`)
-- Tipografia Inter com hierarquia 28/18/14/13px
-- Botão "Lançar venda" em `success-500`; botão "Devolver" como outline `danger-500`
-- Gráfico ranking: líder em `brand-700` (#2540ad), demais em tom claro
-- Zero mudanças em views/endpoints — só templates/CSS
+### Lote 4.5 — Design system (2026-06-20)
+- Tokens Tailwind, component partials, refatoração visual
 
-### Lote 5 — Validação em staging (2026-06-20)
-- Migrations do zero: todas 12 aplicam em ordem correta
-- Seed atualizado para criar `User` + `Seller` (16 vendedores Bibelô)
-- Validação local: centavos sem arredondamento (R$ 47,90), recalculate == manual (57990)
-- Máquina de estados: ABERTA → PAGA sem erro
-- `VALIDATION_CHECKLIST_LOTE5.md` com 52 itens
-- `READINESS_REPORT.md`: ✅ PRONTO PARA STAGING
-- Pendente: provisionar Coolify staging, testar WhatsApp real, validar PWA em celular real
+### Lote 5 — Validação staging (2026-06-20)
+- 52 itens validados, 55/55 testes
 
 ### Lote 6 — Estabilização e UI (2026-06-29)
-**16 correções de estabilidade + redesign + backup:**
+**16 correções:**
+- C1: UnboundLocalError em payment-link.expired
+- C2: Sale deletada em refunded/chargedback
+- C3: CSRF token injetado automaticamente no mobile
+- C4: WARNING para webhook sem assinatura
+- C5: POST /api/auth/logout/ com blacklist
+- H3: TrialEnforcementMiddleware (aviso sem bloqueio)
+- H4: recalculate() unificado com get_commission_rate()
+- H7: _normalize_api_key com rstrip condicional
+- M1: Páginas públicas migradas para Tailwind
+- M2: Rate limit 10/min em links
+- M5: Celery beat cleanup_old_webhook_events
+- M6: Anos dinâmicos no filtro
+- M7: Validação R$ 100.000 em venda manual
+- M8: Template tag currency_filters.brl
+- M10: short_code automático em create_payment_link()
 
-- **C1**: `UnboundLocalError` corrigido no handler `payment-link.expired` (faltava `return` no else)
-- **C2**: `Sale` deletada em `charge.refunded` e `charge.chargedback` (relatórios não inflam mais)
-- **C3**: CSRF token injetado automaticamente em todos `fetch()` do mobile PWA via wrapper global
-- **C4**: Webhook sem assinatura: WARNING no log (não rejeita — Pagar.me não envia por padrão)
-- **C5**: Endpoint `POST /api/auth/logout/` com `TokenBlacklistView` (JWT)
-- **H3**: Middleware `TrialEnforcementMiddleware` — aviso quando trial expira (sem bloqueio)
-- **H4**: Cálculo de comissão unificado — `recalculate()` chama `get_commission_rate()` do services
-- **H7**: `_normalize_api_key` — `rstrip(':')` substituído por remoção condicional exata do `:`
-- **M1**: Páginas públicas (`orders/index.html`, `payment_success.html`) migradas para Tailwind
-- **M2**: Rate limit 10/min em `POST /api/seller/links/`
-- **M5**: Celery beat `cleanup_old_webhook_events` (diário, remove eventos >90 dias)
-- **M6**: Anos dinâmicos no filtro do dashboard (±2 anos do atual)
-- **M7**: Validação valor máximo R$ 100.000 em venda manual (API serializer + mobile view)
-- **M8**: Template tag `currency_filters.brl` criada (evita 500 no mobile)
-- **M10**: `short_code` gerado automaticamente no `create_payment_link()`
+**Novas features:** Payment metadata (paid_at, card_brand, card_last4), webhook payment-link.finished, backup Google Drive
 
-**Novas features e redesign:**
-- **Payment metadata**: campos `paid_at`, `card_brand`, `card_last4` extraídos do webhook (antes do scrub PII)
-- **Link detail premium**: card visual com avatar, telefone, bandeira + final cartão, adquirente, status condicional
-- **Webhook `payment-link.finished`**: handler adicionado ao bloco `order.paid`/`charge.paid`
-- **Backup automático**: `pg_dump -Fc -Z9` → `rclone` → Google Drive (Celery beat 02:00 diário, R$ 0)
-- Scripts: `backup.sh`, `restore.sh`, `setup-rclone.sh`
-- `.env`: indentação corrigida, duplicatas removidas, `FERNET_KEY` documentada
-- Dockerfile: +rclone +postgresql-client + `/app/backups`
-- docker-compose: volume `backup_volume` no celery_beat
+### Lote 7 — Correções de concorrência e operação (2026-07-01)
+**5 correções:**
+
+| # | Arquivo | Correção |
+|---|---------|----------|
+| C1 | `commissions/services.py` | Deadlock: `select_for_update` sem `ORDER BY` — adicionado `.order_by('id')` em close, reopen, pay |
+| C2 | `commissions/services.py` | Race condition: `create_commission_adjustment` lê sem lock — adicionado `transaction.atomic()` + `select_for_update` |
+| C3 | `orders/models.py` | Performance: `PaymentLink.gateway_link_id` sem `db_index` — adicionado + migration 0003 |
+| C4 | `webhooks/tasks.py`, `notifications/tasks.py`, `accounts/tasks.py` | Operação: tasks sem time limits — adicionados `soft_time_limit`/`time_limit` em todas as 4 tasks |
+| C5 | `webhooks/tasks.py` | Operação: DELETE massivo sem batching — alterado para lotes de 1000 |
+
+**Outras correções:**
+| # | Arquivo | Correção |
+|---|---------|----------|
+| C6 | `csp_middleware.py` | CSP bloqueava scripts inline (Alpine.js quebrava) — adicionado `unsafe-inline` + `unsafe-eval` |
+| C7 | `webhooks/models.py`, `webhooks/views.py`, `webhooks/tasks.py` | Dedup de webhooks via `gateway_event_id` |
+| C8 | `orders/services.py` | Limpeza de links órfãos no Pagar.me em caso de falha |
 
 ---
 
-## 16. Deploy e Automação
+## 14. Segurança
 
-### entrypoint.sh (inicialização automática)
-1. Aguarda banco de dados responder (30 tentativas, 2s cada)
-2. `makemigrations --noinput` + `migrate --noinput`
-3. Seed opcional via `SEED_ON_START=true` (16 vendedores criados automaticamente)
-4. Templates padrão de notificação garantidos (idempotente)
-5. `collectstatic --noinput`
-6. Gunicorn com workers configuráveis (`GUNICORN_WORKERS`, `GUNICORN_TIMEOUT`)
+| Item | Status |
+|------|--------|
+| DEBUG=False em produção | ✅ |
+| HTTPS forçado (SECURE_SSL_REDIRECT) | ✅ |
+| HSTS 1 ano + subdomains + preload | ✅ |
+| Session + CSRF cookies secure | ✅ |
+| Content-Type nosniff | ✅ |
+| XSS filter | ✅ |
+| Referrer policy same-origin | ✅ |
+| CSP middleware ativo (script-src com self + CDNs + unsafe-inline) | ✅ |
+| .env no .gitignore | ✅ |
+| Dados sensíveis criptografados (EncryptedCharField) | ✅ |
+| Rate limiting em login, criação de links, forgot password | ✅ |
+| Safe redirect pattern no login | ✅ |
+| Proteção multi-tenant em todas as queries | ✅ |
+| Cross-tenant validation em Sale.clean() | ✅ |
+| 3 permission classes no DRF | ✅ |
 
-### docker-compose.yml
-4 serviços: `web` (Gunicorn), `querolink-redis` (broker), `celery_worker`, `celery_beat`
-- Healthchecks em todos os serviços
-- `start_period: 30s` no web para aguardar migrations
-- Volumes: `static_volume`, `media_volume`, `redis_data`
-- Rede `coolify` externa
+---
 
-### Dockerfile multi-stage
-- Estágio 1: `node:20-alpine` → `npm install` → `tailwindcss` build → `tailwind.css`
-- Estágio 2: `python:3.12.3-slim` → `pip install` → copia `tailwind.css` → sem Node na imagem final
+## 15. Deploy e Automação
 
-### Makefile
-17 comandos: `make help`, `dev`, `test`, `seed`, `build`, `up`, `down`, `logs`, `reset-db`, `deploy-check`, `clean`, etc.
+### entrypoint.sh
+1. Aguarda banco (30 tentativas, 2s cada)
+2. migrate + collectstatic
+3. Seed opcional via SEED_ON_START
+4. Gunicorn
+
+### Docker
+- Dockerfile multi-stage (Node → Python + rclone)
+- 4 serviços: web, redis, celery_worker, celery_beat
+- Healthchecks em todos
 
 ### scripts/deploy.sh
-Deploy com um comando: `scripts/deploy.sh [staging|production]`
-- Valida `.env`
-- Produção: tenta backup `pg_dump`
-- `docker compose build --no-cache` + `up -d`
-- Aguarda healthcheck
-- Exibe logs
-
-### .env.example
-Todas as 18 variáveis documentadas: Django, banco, Redis, APIs externas, JWT, Gunicorn, URLs
+- Valida .env, tenta backup pré-deploy, build + up, aguarda healthcheck
 
 ---
 
-## 14. Consolidação Final do MVP — Decisões por Lote
+## 16. Decisões Consolidadas
 
-### Lote 1
-- `Seller.user`: `on_delete=CASCADE` desde a primeira migration (não `SET_NULL`)
-- `commission_rate` no Seller copia `Tenant.default_commission_rate` no cadastro; não é fallback dinâmico
-- Username gerado via `slugify(name)` + sufixo numérico se colisão
-
-### Lote 1.5
-- `Notification` generalizada com 3 FKs opcionais (não `GenericForeignKey`) — mais simples para 2-3 tipos
-- Templates padrão `SELLER_CREDENTIALS` e `COMMISSION_PAID` via data migration
-- Senha temporária impressa na tela UMA vez; WhatsApp assíncrono não bloqueante
-
-### Lote 2
-- `TokenAuthentication` mantido em paralelo com JWT (legacy)
-- SELLER auto-força próprio `seller_profile` no `SaleCreateSerializer` (ignora payload)
-- Rate limit usa `LocMemCache`; testes limpam cache no `setUp`
-- `django-ratelimit` com `block=True` retorna 403
-
-### Lote 3
 - Alpine.js sobre HTMX: API JSON, reatividade sem build step
 - Sessão Django para mobile (não JWT em localStorage)
-- Tailwind CDN para dev; build compilado no Docker para prod
-- Forgot password: tela informativa, sem fluxo automático
-
-### Lote 4
-- Chart.js para gráfico de ranking (não lib mais pesada)
-- CSV export via `csv` stdlib (sem dependência nova)
-- Audit via model `AuditLog` existente (não mecanismo paralelo)
-- `mark_paid`: URL path com underscore (`mark_paid/`), nome reverso com hífen (`api-commission-period-mark-paid`)
-
----
-
-## 15. Arquivos de Resíduo (identificados, NÃO removidos)
-
-| Arquivo | Motivo |
-|---------|--------|
-| `./Não` | 0 bytes, erro de encoding no nome |
-| `req.txt` | Encoding quebrado, faltam celery/redis |
-| `requirements.txt` (raiz) | Duplicata do `base.txt` |
-| `pyproject.toml` | `dependencies=[]` vazio, resíduo `uv init` |
-| `uv.lock` | Nunca usado |
-| `nova_base.html` | Rascunho com sellers hardcoded, não referenciado |
-| `messages.pot` | Resíduo de i18n |
+- Tailwind compilado no Docker para prod, CDN para dev
+- Chart.js para gráficos (não lib mais pesada)
+- `AuditLog` existente para auditoria
+- `select_for_update` com `order_by('id')` para evitar deadlocks
+- Webhook dedup via `gateway_event_id` + `unique=True`
+- Tasks com `soft_time_limit` + `time_limit`
+- DELETE em lotes de 1000 para limpeza de eventos

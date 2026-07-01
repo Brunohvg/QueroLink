@@ -10,12 +10,12 @@ Sistema multi-tenant para gestão de links de pagamento (Pagar.me) e comissões 
 
 | Camada | Tecnologia |
 |--------|------------|
-| Backend | Python 3.12, Django 5.1, DRF |
+| Backend | Python 3.13, Django 5.1, DRF |
 | Async | Celery 5.4 + Redis 7 |
 | Auth | JWT (simplejwt) + Token + Session |
-| Frontend | Alpine.js + Tailwind CSS + Chart.js |
+| Frontend | Alpine.js 3.14 + Tailwind CSS + Chart.js 4.4 |
 | PWA | Service Worker + Web Manifest (8 ícones) |
-| Banco | PostgreSQL (prod) / SQLite (dev) |
+| Banco | PostgreSQL |
 | Gateway | Pagar.me Core v5 |
 | WhatsApp | Evolution API |
 | Deploy | Docker multi-stage, Gunicorn, Whitenoise |
@@ -90,11 +90,11 @@ scripts/deploy.sh production
 ```bash
 # 1. Configurar rclone com Google Drive (para backup automático)
 docker exec -it <container-web> ./scripts/setup-rclone.sh
-# → Segue OAuth (abre URL no PC, autentica Google, cola token)
 
 # 2. Configurar webhook no painel do Pagar.me
 # URL: https://querolink.lojabibelo.com.br/api/webhooks/pagarme/<tenant_slug>/
 # Eventos: charge.paid, charge.payment_failed, charge.refunded, charge.chargedback
+# Para autenticação, configure usuário/senha no painel de configurações do tenant
 ```
 
 ### Variáveis de ambiente críticas
@@ -144,7 +144,7 @@ O sistema faz backup diário do PostgreSQL para o Google Drive via **rclone**.
 
 ## Webhooks Pagar.me
 
-Eventos tratados com idempotência e Celery retry (3x, 30s):
+Eventos tratados com idempotência (dedup via `gateway_event_id`), Celery retry (3x, 30s) e time limits:
 
 | Evento | Ação |
 |--------|------|
@@ -158,9 +158,9 @@ Eventos tratados com idempotência e Celery retry (3x, 30s):
 | `payment-link.expired` | Order → EXPIRED, notifica vendedor |
 | `payment-link.cancelled` | Order → CANCELED, notifica vendedor |
 
-URL: `POST /api/webhooks/pagarme/<tenant_slug>/`
+URL: `POST /api/webhooks/pagarme/<tenant_slug>/` (com autenticação Basic Auth opcional por tenant)
 
-Verificação HMAC: `X-Hub-Signature-256` quando webhook secret configurado no Pagar.me. Aceito sem assinatura com aviso no log (configurar secret é recomendado).
+Dedup: eventos com mesmo `id` (ex: `evt_xxx`) são ignorados após o primeiro processamento.
 
 ---
 
@@ -169,7 +169,7 @@ Verificação HMAC: `X-Hub-Signature-256` quando webhook secret configurado no P
 ```
 ├── app/
 │   ├── apps/
-│   │   ├── accounts/     # Tenant, User (roles), middleware trial, backup task
+│   │   ├── accounts/     # Tenant, User (roles), middleware CSP, backup task
 │   │   ├── api/          # REST API (25+ endpoints, rate limiting)
 │   │   ├── audit/        # AuditLog
 │   │   ├── commissions/  # CommissionPeriod, SellerCommission, services
@@ -198,7 +198,9 @@ Verificação HMAC: `X-Hub-Signature-256` quando webhook secret configurado no P
 ├── entrypoint.sh         # Boot (migrate, superuser, collectstatic)
 ├── seed.py               # Dados demo
 ├── manage.py
-└── README.md
+├── README.md
+└── docs/
+    └── GOOGLE_DRIVE_CREDENTIALS.md
 ```
 
 ---
@@ -211,7 +213,7 @@ Swagger UI: `/api/schema/swagger-ui/`
 
 | Método | URL | Permissão |
 |--------|-----|-----------|
-| POST | `/api/auth/login/` | Público |
+| POST | `/api/auth/login/` | Público (rate limit 5/min) |
 | POST | `/api/auth/refresh/` | Autenticado |
 | POST | `/api/auth/logout/` | Autenticado (blacklist do refresh token) |
 
@@ -220,8 +222,9 @@ Swagger UI: `/api/schema/swagger-ui/`
 | Método | URL | Permissão |
 |--------|-----|-----------|
 | GET/POST | `/api/sellers/` | MANAGER, ADMIN |
-| GET/PUT/PATCH | `/api/sellers/{uuid}/` | MANAGER, ADMIN |
-| POST | `/api/sellers/import/` | MANAGER, ADMIN (CSV/XLSX) |
+| GET/PUT/PATCH/DELETE | `/api/sellers/{uuid}/` | MANAGER, ADMIN |
+| POST | `/api/sellers/{uuid}/reset_password/` | MANAGER, ADMIN |
+| POST | `/api/sellers/import_sellers/` | MANAGER, ADMIN (CSV/XLSX) |
 | GET | `/api/manager/seller/{uuid}/` | MANAGER, ADMIN |
 | GET | `/api/manager/seller/{uuid}/csv/` | MANAGER, ADMIN |
 | GET | `/api/manager/seller/{uuid}/xlsx/` | MANAGER, ADMIN |
@@ -232,6 +235,7 @@ Swagger UI: `/api/schema/swagger-ui/`
 | Método | URL | Permissão |
 |--------|-----|-----------|
 | GET/POST | `/api/sales/` | SELLER / MANAGER, ADMIN |
+| GET/PUT/DELETE | `/api/sales/{uuid}/` | SELLER (própria) / MANAGER |
 | GET | `/api/seller/sales/` | SELLER |
 | GET | `/api/manager/sales/` | MANAGER, ADMIN |
 
@@ -246,11 +250,22 @@ Swagger UI: `/api/schema/swagger-ui/`
 | Método | URL | Permissão |
 |--------|-----|-----------|
 | GET/POST | `/api/commissions/periods/` | MANAGER, ADMIN |
+| GET/PATCH/DELETE | `/api/commissions/periods/{uuid}/` | MANAGER, ADMIN |
+| POST | `/api/commissions/periods/{uuid}/sync/` | MANAGER, ADMIN |
+| POST | `/api/commissions/periods/{uuid}/close_sellers/` | MANAGER, ADMIN |
+| POST | `/api/commissions/periods/{uuid}/reopen_sellers/` | MANAGER, ADMIN |
+| POST | `/api/commissions/periods/{uuid}/pay_sellers/` | ADMIN, FINANCEIRO |
+| POST | `/api/commissions/periods/{uuid}/cancel/` | MANAGER, ADMIN |
 | GET | `/api/manager/commissions/{status}/` | MANAGER, ADMIN |
 | GET | `/api/manager/ranking/` | MANAGER, ADMIN |
 | GET | `/api/manager/ranking/annual/` | MANAGER, ADMIN |
 | GET | `/api/manager/dashboard/summary/` | MANAGER, ADMIN |
-| POST | `/api/financial/payment-queue/` | FINANCEIRO, ADMIN |
+
+### Financeiro
+
+| Método | URL | Permissão |
+|--------|-----|-----------|
+| GET | `/api/financial/payment-queue/` | FINANCEIRO, ADMIN |
 | GET | `/api/financial/commissions/{uuid}/csv/` | FINANCEIRO, ADMIN |
 
 ### Configuração
@@ -318,7 +333,8 @@ python manage.py reset_seller_password <seller_uuid>
 | Arquivo | Conteúdo |
 |---------|----------|
 | `PRD_QUEROLINK_COMISSOES.md` | PRD completo com especificação de todos os lotes |
-| `READINESS_REPORT.md` | Relatório de prontidão para produção (atualizado) |
+| `API.md` | Documentação detalhada da API REST |
+| `READINESS_REPORT.md` | Relatório de prontidão para produção |
 
 ---
 
@@ -326,6 +342,7 @@ python manage.py reset_seller_password <seller_uuid>
 
 | Versão | Data | Descrição |
 |--------|------|-----------|
+| 2.1.0 | 2026-07-01 | Correções de concorrência, dedup de webhooks, CSP fix, time limits em tasks, cleanup batch |
 | 2.0.0 | 2026-06-29 | Estabilização: 16 correções críticas/altas, webhook completo, backup automático, redesign UI |
 | 1.0.0 | 2026-06-20 | MVP — 55 testes, 6 lotes implementados |
 
