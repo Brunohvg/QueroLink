@@ -213,7 +213,7 @@ def close_seller_commissions(period, seller_commission_ids, user):
 
     calculations = []
     with transaction.atomic():
-        commissions = list(commissions.select_for_update())
+        commissions = list(commissions.order_by('id').select_for_update())
         for sc in commissions:
             sc.freeze(user, commit=True)
             calculations.append({
@@ -249,7 +249,7 @@ def reopen_seller_commissions(period, seller_commission_ids, user, reason):
         )
 
     with transaction.atomic():
-        commissions = list(commissions.select_for_update())
+        commissions = list(commissions.order_by('id').select_for_update())
         for sc in commissions:
             if sc.is_paid:
                 raise ValueError(
@@ -286,7 +286,7 @@ def pay_seller_commissions(period, seller_commission_ids, user, payment_data):
         payment_date = None
 
     with transaction.atomic():
-        commissions = list(commissions.select_for_update())
+        commissions = list(commissions.order_by('id').select_for_update())
         for sc in commissions:
             sc.mark_paid(user, {
                 'payment_date': payment_date or timezone.localdate(),
@@ -311,29 +311,31 @@ def pay_seller_commissions(period, seller_commission_ids, user, payment_data):
 
 
 def create_commission_adjustment(seller_commission, new_amount, reason, user):
-    previous_amount = seller_commission.frozen_commission_amount or seller_commission.commission_amount
-    difference = new_amount - previous_amount
+    with transaction.atomic():
+        sc = SellerCommission.objects.select_for_update().get(pk=seller_commission.pk)
+        previous_amount = sc.frozen_commission_amount or sc.commission_amount
+        difference = new_amount - previous_amount
 
-    adjustment = CommissionAdjustment.objects.create(
-        seller_commission=seller_commission,
-        previous_amount=previous_amount,
-        new_amount=new_amount,
-        difference=difference,
-        reason=reason,
-        adjusted_by=user,
-    )
+        adjustment = CommissionAdjustment.objects.create(
+            seller_commission=sc,
+            previous_amount=previous_amount,
+            new_amount=new_amount,
+            difference=difference,
+            reason=reason,
+            adjusted_by=user,
+        )
 
-    seller_commission.commission_amount = new_amount
-    seller_commission.status = SellerCommission.Status.AJUSTADA
-    seller_commission.save(update_fields=['commission_amount', 'status', 'updated_at'])
+        sc.commission_amount = new_amount
+        sc.status = SellerCommission.Status.AJUSTADA
+        sc.save(update_fields=['commission_amount', 'status', 'updated_at'])
 
     try:
         from app.apps.notifications.tasks import notify_commission_adjusted
-        notify_commission_adjusted(seller_commission, adjustment)
+        notify_commission_adjusted(sc, adjustment)
     except Exception:
         logger.error(
             'Failed to send adjustment notification for commission %s',
-            seller_commission.id, exc_info=True,
+            sc.id, exc_info=True,
         )
 
     return adjustment

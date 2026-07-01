@@ -10,7 +10,7 @@ logger = logging.getLogger(__name__)
 MAX_RETRIES = 3
 
 
-@shared_task(bind=True, max_retries=MAX_RETRIES, default_retry_delay=60)
+@shared_task(bind=True, max_retries=MAX_RETRIES, default_retry_delay=60, soft_time_limit=60, time_limit=90)
 def send_whatsapp_notification(self, notification_id):
     try:
         notification = Notification.objects.select_related(

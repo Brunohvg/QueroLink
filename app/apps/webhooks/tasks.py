@@ -65,6 +65,8 @@ def _populate_payment_from_webhook(payment, data, event_type):
     autoretry_for=(Exception,),
     max_retries=3,
     default_retry_delay=30,
+    soft_time_limit=120,
+    time_limit=180,
 )
 def process_pagarme_webhook(event_id):
     with transaction.atomic():
@@ -385,12 +387,18 @@ def process_pagarme_webhook(event_id):
         event.save(update_fields=['processed'])
 
 
-@shared_task
+@shared_task(soft_time_limit=300, time_limit=360)
 def cleanup_old_webhook_events():
     from datetime import timedelta
     cutoff = timezone.now() - timedelta(days=90)
-    count, _ = WebhookEvent.objects.filter(
-        processed=True, received_at__lt=cutoff,
-    ).delete()
-    if count:
-        logger.info("Cleaned up %d old webhook events", count)
+    total = 0
+    while True:
+        ids = list(WebhookEvent.objects.filter(
+            processed=True, received_at__lt=cutoff,
+        ).values_list('pk', flat=True)[:1000])
+        if not ids:
+            break
+        deleted, _ = WebhookEvent.objects.filter(pk__in=ids).delete()
+        total += deleted
+    if total:
+        logger.info("Cleaned up %d old webhook events", total)

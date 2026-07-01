@@ -40,7 +40,7 @@ class PaymentLink(models.Model):
     order = models.OneToOneField(Order, on_delete=models.CASCADE, related_name='payment_link')
     short_code = models.CharField(max_length=20, unique=True, blank=True, null=True)
     gateway_url = models.URLField(max_length=500, blank=True, null=True)
-    gateway_link_id = models.CharField(max_length=100, blank=True, null=True)
+    gateway_link_id = models.CharField(max_length=100, blank=True, null=True, db_index=True)
     expires_at = models.DateTimeField(null=True, blank=True)
     opened_at = models.DateTimeField(null=True, blank=True)
     clicks_count = models.PositiveIntegerField(default=0)

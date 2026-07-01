@@ -6,7 +6,7 @@ from celery import shared_task
 logger = logging.getLogger(__name__)
 
 
-@shared_task
+@shared_task(soft_time_limit=360, time_limit=420)
 def daily_backup():
     try:
         result = subprocess.run(
