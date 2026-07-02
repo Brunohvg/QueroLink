@@ -1,3 +1,4 @@
+from django.core.exceptions import ObjectDoesNotExist
 from rest_framework.permissions import BasePermission
 
 
@@ -51,7 +52,7 @@ class IsSellerOwner(BasePermission):
             return False
         try:
             seller_profile = request.user.seller_profile
-        except Exception:
+        except ObjectDoesNotExist:
             return False
         if hasattr(obj, 'seller'):
             return obj.seller == seller_profile

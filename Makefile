@@ -2,7 +2,7 @@
 # QueroLink — Makefile
 # ============================================================
 
-.PHONY: help install dev build test clean shell migrate seed
+.PHONY: help install dev build test test-fast clean shell migrate seed lint build-css check
 
 help: ## Mostra ajuda
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-18s\033[0m %s\n", $$1, $$2}'
@@ -26,10 +26,10 @@ exec(open('seed.py').read())
 "
 
 test: ## Roda todos os testes
-	.venv/bin/python manage.py test app.apps.sellers app.apps.notifications app.apps.dashboard app.apps.api -v2
+	.venv/bin/python manage.py test app.apps.sellers app.apps.notifications app.apps.dashboard app.apps.api app.apps.commissions -v2
 
 test-fast: ## Roda testes sem verbose
-	.venv/bin/python manage.py test app.apps.sellers app.apps.notifications app.apps.dashboard app.apps.api
+	.venv/bin/python manage.py test app.apps.sellers app.apps.notifications app.apps.dashboard app.apps.api app.apps.commissions
 
 build: ## Build Docker (Tailwind + Python)
 	docker compose build
@@ -64,6 +64,12 @@ check: ## Verifica configuração Django
 
 urls: ## Lista todas as URLs registradas
 	.venv/bin/python manage.py show_urls 2>/dev/null || echo "Instale django-extensions para show_urls"
+
+build-css: ## Build Tailwind CSS
+	npm run build:css
+
+lint: ## Roda ruff linter
+	.venv/bin/python -m ruff check app/
 
 deploy-check: test ## Roda testes + check
 	.venv/bin/python manage.py check --deploy

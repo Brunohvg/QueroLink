@@ -447,9 +447,12 @@ class TestGetLinksData(BaseTest):
 
     def test_links_data_with_order(self):
         from app.apps.orders.models import Order
-        Order.objects.create(
+        order = Order.objects.create(
             tenant=self.tenant, seller=self.seller,
             customer_name='Test', total_amount=10000, status='PENDING',
+        )
+        Order.objects.filter(pk=order.pk).update(
+            created_at=timezone.datetime(2026, 6, 15, tzinfo=timezone.get_current_timezone()),
         )
         data = get_links_data(self.tenant, 6, 2026)
         self.assertEqual(data['links_gerados'], 1)
@@ -981,8 +984,11 @@ class TestMobileHomeMissingDaysContext(BaseTest):
         from django.test import RequestFactory
         from app.apps.dashboard.mobile_views import mobile_home
 
-        self._create_manual_sale(self.seller, 50000, 15)
-        period = self._create_period(month=6, year=2026)
+        today = timezone.localdate()
+
+        self._create_manual_sale(self.seller, 50000, 15,
+                                 month=today.month, year=today.year)
+        period = self._create_period(month=today.month, year=today.year)
         sync_period_seller_commissions(period)
         sc = SellerCommission.objects.get(period=period, seller=self.seller)
         close_seller_commissions(period, [sc.id], self.manager)

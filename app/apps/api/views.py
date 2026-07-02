@@ -5,6 +5,7 @@ from rest_framework import viewsets, status, generics, serializers as drf_serial
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
+from django.core.exceptions import ObjectDoesNotExist
 from django.utils import timezone
 from django.db import transaction
 from django.db.models import Sum, Q
@@ -12,6 +13,7 @@ from django.http import HttpResponse
 from django_ratelimit.decorators import ratelimit
 from django.utils.decorators import method_decorator
 from rest_framework_simplejwt.views import TokenObtainPairView
+from drf_spectacular.utils import extend_schema, OpenApiParameter, OpenApiTypes
 
 from app.apps.sales.models import Sale
 from app.apps.sellers.models import Seller
@@ -345,6 +347,10 @@ class CommissionPeriodViewSet(viewsets.ModelViewSet):
         return Response(self.get_serializer(period).data)
 
 
+@extend_schema(
+    responses={200: dict},
+    description='Retorna períodos com comissões fechadas/ajustadas para pagamento.',
+)
 class PaymentQueueView(generics.GenericAPIView):
     permission_classes = [IsAuthenticated, IsFinancialOrAdmin | IsManagerOrAdmin]
 
@@ -397,13 +403,20 @@ class SellerSalesListView(generics.ListAPIView):
     def get_queryset(self):
         try:
             seller = self.request.user.seller_profile
-        except Exception:
+        except ObjectDoesNotExist:
             return Sale.objects.none()
         return Sale.objects.filter(
             seller=seller, tenant=self.request.user.tenant,
         )
 
 
+@extend_schema(
+    parameters=[
+        OpenApiParameter('month', int, required=False),
+        OpenApiParameter('year', int, required=False),
+    ],
+    responses={200: dict},
+)
 class RankingView(generics.GenericAPIView):
     permission_classes = [IsAuthenticated, IsManagerOrAdmin]
 
@@ -490,6 +503,7 @@ class CommissionPeriodsByStatusView(generics.ListAPIView):
         ).order_by('-year', '-month')
 
 
+@extend_schema(responses={(200, 'text/csv'): OpenApiTypes.BINARY})
 class CommissionPeriodCsvView(generics.GenericAPIView):
     permission_classes = [IsAuthenticated, IsFinancialOrAdmin | IsManagerOrAdmin]
 
@@ -536,6 +550,16 @@ class ManagerSalesListView(generics.ListAPIView):
         return qs
 
 
+@extend_schema(
+    parameters=[
+        OpenApiParameter('seller_id', str, location=OpenApiParameter.PATH),
+        OpenApiParameter('start', str, required=False, description='Data inicial (YYYY-MM-DD)'),
+        OpenApiParameter('end', str, required=False, description='Data final (YYYY-MM-DD)'),
+        OpenApiParameter('month', int, required=False),
+        OpenApiParameter('year', int, required=False),
+    ],
+    responses={200: dict},
+)
 class SellerDetailView(generics.GenericAPIView):
     permission_classes = [IsAuthenticated, IsManagerOrAdmin]
 
@@ -733,6 +757,7 @@ class SellerDetailView(generics.GenericAPIView):
         })
 
 
+@extend_schema(responses={(200, 'text/csv'): OpenApiTypes.BINARY})
 class SellerReportCsvView(generics.GenericAPIView):
     permission_classes = [IsAuthenticated, IsManagerOrAdmin]
 
@@ -822,6 +847,7 @@ class SellerReportCsvView(generics.GenericAPIView):
         return response
 
 
+@extend_schema(responses={(200, 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'): OpenApiTypes.BINARY})
 class SellerReportExcelView(generics.GenericAPIView):
     permission_classes = [IsAuthenticated, IsManagerOrAdmin]
 
@@ -951,6 +977,7 @@ class SellerReportExcelView(generics.GenericAPIView):
         return response
 
 
+@extend_schema(responses={(200, 'application/pdf'): OpenApiTypes.BINARY})
 class SellerReportPdfView(generics.GenericAPIView):
     permission_classes = [IsAuthenticated, IsManagerOrAdmin]
 
@@ -1039,6 +1066,10 @@ class SellerReportPdfView(generics.GenericAPIView):
         return response
 
 
+@extend_schema(
+    parameters=[OpenApiParameter('year', int, required=False)],
+    responses={200: dict},
+)
 class AnnualRankingView(generics.GenericAPIView):
     permission_classes = [IsAuthenticated, IsManagerOrAdmin]
 
@@ -1062,6 +1093,13 @@ class AnnualRankingView(generics.GenericAPIView):
         })
 
 
+@extend_schema(
+    parameters=[
+        OpenApiParameter('month', int, required=False),
+        OpenApiParameter('year', int, required=False),
+    ],
+    responses={200: dict},
+)
 class DashboardSummaryView(generics.GenericAPIView):
     permission_classes = [IsAuthenticated, IsManagerOrAdmin]
 
@@ -1081,13 +1119,18 @@ class DashboardSummaryView(generics.GenericAPIView):
         return Response(data)
 
 
+@extend_schema(
+    request=dict,
+    responses={200: dict, 201: dict, 400: dict, 500: dict},
+    methods=['GET', 'POST'],
+)
 class SellerLinkCreateView(generics.GenericAPIView):
     permission_classes = [IsAuthenticated, IsSellerOwner]
 
     def get(self, request):
         try:
             seller = request.user.seller_profile
-        except Exception:
+        except ObjectDoesNotExist:
             return Response({'error': 'Perfil de vendedor nao encontrado.'}, status=400)
 
         from app.apps.orders.models import Order
@@ -1123,7 +1166,7 @@ class SellerLinkCreateView(generics.GenericAPIView):
     def post(self, request):
         try:
             seller = request.user.seller_profile
-        except Exception:
+        except ObjectDoesNotExist:
             return Response(
                 {'error': 'Perfil de vendedor nao encontrado.'}, status=400,
             )
@@ -1213,6 +1256,7 @@ class ChangePasswordView(generics.GenericAPIView):
         return Response({'message': 'Senha alterada com sucesso.'})
 
 
+@extend_schema(responses={200: dict})
 class WebhookStatusView(generics.GenericAPIView):
     permission_classes = [IsAuthenticated, IsManagerOrAdmin]
 

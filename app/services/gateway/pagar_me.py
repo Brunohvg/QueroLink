@@ -23,7 +23,7 @@ def _normalize_api_key(key):
         decoded = base64.b64decode(key).decode('utf-8')
         if decoded.startswith('sk_'):
             return decoded[:-1] if decoded.endswith(':') else decoded
-    except Exception:
+    except ValueError:
         pass
     return key
 
