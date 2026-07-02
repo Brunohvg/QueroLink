@@ -1,13 +1,8 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 44" fill="none">
-  <!-- Left arm (Graphite) -->
-  <path d="M8 36L19 8" stroke="#0B1120" stroke-width="6" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
-  <!-- Right arm (Electric Blue) -->
-  <path d="M19 8L30 36" stroke="#1263FF" stroke-width="6" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
-  <!-- Pixel blocks above right arm -->
-  <rect x="30" y="4" width="5" height="5" rx="1" fill="#00D1E6"/>
-  <rect x="37" y="1" width="5" height="5" rx="1" fill="#1263FF"/>
-  <rect x="44" y="6" width="4" height="4" rx="0.8" fill="#00D1E6"/>
-  <rect x="34" y="12" width="4" height="4" rx="0.8" fill="#1263FF"/>
-  <!-- Wordmark -->
-  <text x="60" y="28" font-family="'Inter','Space Grotesk',system-ui,sans-serif" font-size="22" font-weight="700" fill="#0B1120" letter-spacing="-0.5">Vidalys</text>
+  <rect x="4" y="18" width="7" height="18" rx="2" fill="#0B1120" transform="rotate(30, 7.5, 27)"/>
+  <rect x="13" y="18" width="7" height="18" rx="2" fill="#1263FF" transform="rotate(-30, 16.5, 27)"/>
+  <rect x="22" y="4" width="5" height="5" rx="1" fill="#00D1E6"/>
+  <rect x="29" y="2" width="4" height="4" rx="0.8" fill="#1263FF"/>
+  <rect x="35" y="7" width="3.5" height="3.5" rx="0.7" fill="#00D1E6"/>
+  <text x="52" y="28" font-family="'Inter','Space Grotesk',system-ui,sans-serif" font-size="20" font-weight="700" fill="#0B1120" letter-spacing="0.5">Vidalys</text>
 </svg>
