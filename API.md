@@ -1,4 +1,4 @@
-# API REST — Comissã
+# API REST — V-Com
 
 > **Base URL:** `https://querolink.lojabibelo.com.br/api/`
 > **Schema OpenAPI:** `/api/schema/`

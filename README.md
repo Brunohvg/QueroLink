@@ -1,4 +1,4 @@
-# Comissã — Gestão de Comissões
+# V-Com — Gestão de Comissões
 
 Sistema multi-tenant para gestão de links de pagamento (Pagar.me) e comissões de vendedores. Inclui PWA para vendedores e dashboard administrativo completo.
 

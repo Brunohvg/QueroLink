@@ -1,7 +1,7 @@
 version: "3.8"
 
 # ============================================================
-# VendaPay — docker-compose.yml
+# V-Com — docker-compose.yml
 # Uso: docker compose up -d --build
 # ============================================================
 

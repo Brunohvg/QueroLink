@@ -1,5 +1,5 @@
 {% extends 'dashboard/base_desktop.html' %}
-{% block title %}Link — {{ order.customer_name }} — Comissã{% endblock %}
+{% block title %}Link — {{ order.customer_name }} — V-Com{% endblock %}
 {% block content %}
 <div x-data="linkDetailPage()" class="max-w-4xl mx-auto">
 
@@ -17,7 +17,7 @@
 
   <div class="bg-white rounded-2xl border border-gray-100 shadow-[0_1px_3px_-1px_rgba(0,0,0,0.04),0_4px_16px_-4px_rgba(67,97,238,0.06)] p-6 mb-6">
     <div class="flex flex-col sm:flex-row sm:items-center gap-4">
-      <div class="w-16 h-16 rounded-2xl flex items-center justify-center flex-shrink-0 shadow-sm" style="background: linear-gradient(135deg, #4361ee, #2540ad);">
+      <div class="w-16 h-16 rounded-2xl flex items-center justify-center flex-shrink-0 shadow-sm" style="background: linear-gradient(135deg, #1263FF, #0940a3);">
         <span class="text-[28px] font-bold text-white">{{ order.customer_name|first|upper }}</span>
       </div>
       <div class="flex-1 min-w-0">

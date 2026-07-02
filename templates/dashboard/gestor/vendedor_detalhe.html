@@ -1,5 +1,5 @@
 {% extends 'dashboard/base_desktop.html' %}
-{% block title %}{{ seller.name }} — Comissã{% endblock %}
+{% block title %}{{ seller.name }} — V-Com{% endblock %}
 {% block content %}
 <div x-data="sellerDetailPage()" x-init="init('{{ seller.uuid }}')" class="max-w-7xl mx-auto">
 
@@ -261,9 +261,9 @@ function sellerDetailPage() {
                     datasets: [{
                         label: 'Total (R$)',
                         data: this.sellerData.evolution.map(e => e.total / 100),
-                        borderColor: '#4361ee',
-                        backgroundColor: 'rgba(67, 97, 238, 0.08)',
-                        fill: true, tension: 0.3, pointRadius: 3, pointBackgroundColor: '#4361ee',
+                        borderColor: '#1263FF',
+                        backgroundColor: 'rgba(18, 99, 255, 0.08)',
+                        fill: true, tension: 0.3, pointRadius: 3, pointBackgroundColor: '#1263FF',
                     }]
                 },
                 options: {

@@ -2,7 +2,7 @@
 set -e
 
 # ============================================================
-# VendaPay entrypoint — deploy automático
+# V-Com entrypoint — deploy automático
 # ============================================================
 
 log() { echo "[$(date +%H:%M:%S)] $*"; }

@@ -1,4 +1,4 @@
-# Readiness Report — VendaPay / QueroLink
+# Readiness Report — V-Com / QueroLink
 
 > **Data:** 2026-07-01
 > **Versão:** 2.1.0

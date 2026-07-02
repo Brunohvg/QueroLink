@@ -4,17 +4,17 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-    <meta name="theme-color" content="#4361ee">
+    <meta name="theme-color" content="#1263FF">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <meta name="apple-mobile-web-app-title" content="Comissã">
-    <meta name="application-name" content="Comissã">
+    <meta name="apple-mobile-web-app-title" content="V-Com">
+    <meta name="application-name" content="V-Com">
     <meta name="csrf-token" content="{% csrf_token %}">
     <link rel="manifest" href="{% static 'manifest.json' %}">
     <link rel="apple-touch-icon" href="{% static 'icons/icon-192.png' %}">
-    <title>{% block title %}Comissã{% endblock %}</title>
-    <link href="https://fonts.googleapis.com/css2?family=Lexend:wght@400;500;600;700&family=Public+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <title>{% block title %}V-Com{% endblock %}</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.9/dist/cdn.min.js" defer integrity="sha384-9Ax3MmS9AClxJyd5/zafcXXjxmwFhZCdsT6HJoJjarvCaAkJlk5QDzjLJm+Wdx5F" crossorigin="anonymous"></script>
     <link rel="stylesheet" href="/static/css/tailwind.css">
     <script src="/static/js/format.js"></script>
@@ -58,7 +58,7 @@
         }
     </script>
     <style>
-        body { font-family: 'Public Sans', system-ui, sans-serif; background: #f8f9fc; }
+        body { font-family: 'Inter', system-ui, sans-serif; background: #f8f9fc; }
         .safe-bottom { padding-bottom: max(env(safe-area-inset-bottom), 16px); }
         .safe-top { padding-top: max(env(safe-area-inset-top), 0px); }
         .tap-target { min-height: 44px; min-width: 44px; cursor: pointer; }
@@ -72,20 +72,20 @@
         .fade-up { animation: fadeUp 0.45s ease forwards; }
         .fade-up-d2 { animation: fadeUp 0.45s ease 0.08s forwards; opacity: 0; }
         .fade-up-d3 { animation: fadeUp 0.45s ease 0.15s forwards; opacity: 0; }
-        .card-shadow { box-shadow: 0 1px 3px rgba(0,0,0,0.04), 0 4px 16px -4px rgba(67,97,238,0.06); }
+        .card-shadow { box-shadow: 0 1px 3px rgba(0,0,0,0.04), 0 4px 16px -4px rgba(18,99,255,0.06); }
         .btn-primary {
             width: 100%; padding: 0.875rem; border-radius: 16px;
-            background: #4361ee; color: #fff; font-weight: 600; font-size: 15px;
-            transition: all 0.15s; box-shadow: 0 4px 14px -2px rgba(67,97,238,0.3);
+            background: #1263FF; color: #fff; font-weight: 600; font-size: 15px;
+            transition: all 0.15s; box-shadow: 0 4px 14px -2px rgba(18,99,255,0.3);
         }
-        .btn-primary:active { transform: scale(0.97); background: #3051d3; }
+        .btn-primary:active { transform: scale(0.97); background: #0d52d9; }
         .btn-primary:disabled { background: #d1d5db; box-shadow: none; cursor: not-allowed; }
         .input-field {
             width: 100%; padding: 0.75rem 1rem;
             border: 1.5px solid #e5e7eb; border-radius: 14px; background: #fff;
             outline: none; transition: all 0.15s;
         }
-        .input-field:focus { border-color: #6b7fee; box-shadow: 0 0 0 3px rgba(67,97,238,0.08); }
+        .input-field:focus { border-color: #66a3ff; box-shadow: 0 0 0 3px rgba(18,99,255,0.08); }
     </style>
 </head>
 <body class="text-gray-800 antialiased">

@@ -2,7 +2,7 @@
 set -e
 
 # ============================================================
-# VendaPay — Deploy Script
+# V-Com — Deploy Script
 # Uso: scripts/deploy.sh [staging|production]
 # ============================================================
 

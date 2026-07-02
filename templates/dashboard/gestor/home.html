@@ -1,5 +1,5 @@
 {% extends 'dashboard/base_desktop.html' %}
-{% block title %}Painel do Gestor — Comissã{% endblock %}
+{% block title %}Painel do Gestor — V-Com{% endblock %}
 {% block content %}
 <div x-data="gestorHomePage()" x-init="loadSummary()">
 
@@ -337,17 +337,17 @@ function gestorHomePage() {
                     datasets: [{
                         label: 'Manual',
                         data: values,
-                        borderColor: '#4361ee',
+                        borderColor: '#1263FF',
                         backgroundColor: function(context) {
                             var gradient = ctx.getContext('2d').createLinearGradient(0, 0, 0, 256);
-                            gradient.addColorStop(0, 'rgba(67, 97, 238, 0.15)');
-                            gradient.addColorStop(1, 'rgba(67, 97, 238, 0)');
+                            gradient.addColorStop(0, 'rgba(18, 99, 255, 0.15)');
+                            gradient.addColorStop(1, 'rgba(18, 99, 255, 0)');
                             return gradient;
                         },
                         fill: true,
                         tension: 0.3,
                         pointRadius: 3,
-                        pointBackgroundColor: '#4361ee',
+                        pointBackgroundColor: '#1263FF',
                         pointBorderColor: '#fff',
                         pointBorderWidth: 2,
                         spanGaps: true,

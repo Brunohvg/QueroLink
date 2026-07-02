@@ -1,12 +1,12 @@
 {
-    "name": "Comissã — Comissões",
-    "short_name": "Comissã",
+    "name": "V-Com — Comissões",
+    "short_name": "V-Com",
     "description": "App de gestão de comissões para vendedores",
     "start_url": "/dashboard/mobile/",
     "scope": "/dashboard/mobile/",
     "display": "standalone",
     "orientation": "portrait",
-    "theme_color": "#4361ee",
+    "theme_color": "#1263FF",
     "background_color": "#ffffff",
     "lang": "pt-BR",
     "icons": [

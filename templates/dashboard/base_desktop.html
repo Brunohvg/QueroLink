@@ -4,18 +4,18 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{% block title %}Comissã{% endblock %}</title>
-    <link href="https://fonts.googleapis.com/css2?family=Lexend:wght@400;500;600;700&family=Public+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <title>{% block title %}V-Com{% endblock %}</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link href="/static/css/tailwind.css" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.9/dist/cdn.min.js" defer integrity="sha384-9Ax3MmS9AClxJyd5/zafcXXjxmwFhZCdsT6HJoJjarvCaAkJlk5QDzjLJm+Wdx5F" crossorigin="anonymous"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js" integrity="sha384-e6nUZLBkQ86NJ6TVVKAeSaK8jWa3NhkYWZFomE39AvDbQWeie9PlQqM3pmYW5d1g" crossorigin="anonymous"></script>
     <script src="/static/js/format.js"></script>
     <style>
-        body { font-family: 'Public Sans', system-ui, sans-serif; }
+        body { font-family: 'Inter', system-ui, sans-serif; }
 
         .surface-hero {
             background: #fff; border-radius: 16px; padding: 2rem; border: 1px solid #e5e7eb;
-            box-shadow: 0 1px 3px rgba(15, 23, 42, 0.04), 0 8px 24px -4px rgba(67, 97, 238, 0.08);
+            box-shadow: 0 1px 3px rgba(15, 23, 42, 0.04), 0 8px 24px -4px rgba(18, 99, 255, 0.08);
         }
         .surface-card {
             background: #fff; border-radius: 12px; padding: 1.25rem; border: 1px solid #e5e7eb; box-shadow: none;
@@ -27,13 +27,13 @@
             padding: 0.625rem 1rem; border: 1px solid #d1d5db; border-radius: 12px;
             outline: none; transition: border-color 0.15s, box-shadow 0.15s;
         }
-        .input-field:focus { border-color: #6b7fee; box-shadow: 0 0 0 3px rgba(67,97,238,0.08); }
+        .input-field:focus { border-color: #66a3ff; box-shadow: 0 0 0 3px rgba(18,99,255,0.08); }
         .btn-primary {
             padding: 0.625rem 1.25rem; border-radius: 12px;
-            background: #4361ee; color: #fff; font-weight: 600; font-size: 14px;
+            background: #1263FF; color: #fff; font-weight: 600; font-size: 14px;
             transition: background 0.15s;
         }
-        .btn-primary:hover { background: #3051d3; }
+        .btn-primary:hover { background: #0d52d9; }
         .btn-primary:disabled { background: #d1d5db; cursor: not-allowed; }
         .toast-enter { animation: toastIn 0.3s ease forwards; }
         .toast-leave { animation: toastOut 0.3s ease forwards; }

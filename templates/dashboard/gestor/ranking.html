@@ -1,5 +1,5 @@
 {% extends 'dashboard/base_desktop.html' %}
-{% block title %}Ranking — Comissã{% endblock %}
+{% block title %}Ranking — V-Com{% endblock %}
 {% block content %}
 <div x-data="rankingPage()" x-init="load()" class="max-w-7xl mx-auto">
 
@@ -123,7 +123,7 @@ function rankingPage() {
                     datasets: [{
                         label: 'Total Vendido (R$)',
                         data: this.ranking.map(s => s.total_sold / 100),
-                        backgroundColor: this.ranking.map((_, i) => i === 0 ? '#2540ad' : '#a5b4fc'),
+                        backgroundColor: this.ranking.map((_, i) => i === 0 ? '#0940a3' : '#66a3ff'),
                         borderRadius: 8,
                     }]
                 },

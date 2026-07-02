@@ -119,7 +119,7 @@ class PagarMeGateway:
             "expires_in": expires_in,
             "max_paid_sessions": 1,
             "layout_settings": {
-                "primary_color": "#4361ee",
+                "primary_color": "#1263FF",
             },
         }
         if pix_enabled:
