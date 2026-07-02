@@ -1,2 +1,2 @@
 -r base.txt
-# add any local dev tools like debug-toolbar, flake8, pytest here
+ruff>=0.5.0

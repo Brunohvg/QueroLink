@@ -3,7 +3,8 @@ from django.conf import settings
 import hashlib
 from app.apps.orders.models import Order, PaymentLink
 from app.apps.payments.models import Payment
-from app.services.gateway.pagar_me import PagarMeGateway
+from django.db import IntegrityError
+from app.services.gateway.pagar_me import PagarMeGateway, PagarMeError
 
 
 def create_payment_link(tenant, seller, customer_name, amount_cents, installments=1):
@@ -47,7 +48,7 @@ def create_payment_link(tenant, seller, customer_name, amount_cents, installment
             gateway_link_id = response.get("id", "")
 
             if not link_url:
-                raise Exception("Falha ao gerar o link de pagamento no Pagar.me.")
+                raise PagarMeError("Falha ao gerar o link de pagamento no Pagar.me.")
 
             Payment.objects.create(
                 order=order,
@@ -65,13 +66,13 @@ def create_payment_link(tenant, seller, customer_name, amount_cents, installment
 
         return order, link_url
 
-    except Exception:
+    except (IntegrityError, PagarMeError):
         if gateway_link_id:
             try:
                 gateway = PagarMeGateway(api_key=tenant.pagarme_api_key)
                 gateway.cancel_payment_link(gateway_link_id)
                 logger.info("Link orfao cancelado no Pagar.me: %s", gateway_link_id)
-            except Exception:
+            except PagarMeError:
                 logger.warning(
                     "Nao foi possivel cancelar link orfao no Pagar.me: %s",
                     gateway_link_id,

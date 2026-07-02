@@ -11,6 +11,7 @@ log() { echo "[$(date +%H:%M:%S)] $*"; }
 [ -z "$SECRET_KEY" ] && log "FATAL: SECRET_KEY nao configurada." && exit 1
 [ -z "$DATABASE_URL" ] && log "FATAL: DATABASE_URL nao configurada." && exit 1
 [ -z "$FERNET_KEY" ] && log "FATAL: FERNET_KEY nao configurada. Gere com: python -c \"from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())\"" && exit 1
+[ -z "$JWT_SIGNING_KEY" ] && log "WARNING: JWT_SIGNING_KEY nao configurada. Usando SECRET_KEY como fallback."
 
 # ── Esperar banco ──────────────────────────────────────────
 wait_for_db() {
