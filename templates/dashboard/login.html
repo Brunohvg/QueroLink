@@ -4,8 +4,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Login — V-Com</title>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <title>Login — Mérito</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
     <link href="/static/css/tailwind.css" rel="stylesheet">
     <script>
         function getCSRFToken() {
@@ -31,7 +31,7 @@
         }
     </script>
     <style>
-        body { font-family: 'Inter', system-ui, sans-serif; background: #F3F5F9; }
+        body { font-family: 'Inter', system-ui, sans-serif; background: #F5F7FA; }
         @keyframes slideIn { from { transform: translateX(120%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
         .animate-slide-in { animation: slideIn 0.35s cubic-bezier(0.21, 1.02, 0.73, 1) forwards; }
         input, button { font-size: 16px !important; }
@@ -48,11 +48,8 @@
 
     <div class="w-full max-w-sm">
         <div class="text-center mb-10">
-            <div class="w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg shadow-brand-100" style="background: linear-gradient(135deg, #1263FF, #0940a3);">
-                <svg class="w-9 h-9 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"><path d="M7 5L12 17L17 5"/></svg>
-            </div>
-            <h1 class="font-display text-[24px] font-bold text-gray-900 tracking-tight">V-Com</h1>
-            <p class="text-[12px] text-gray-400 mt-1 font-medium">by <strong class="text-gray-600">Vidalys</strong> — Acesso administrativo</p>
+            <img src="{% static 'img/merito-lockup.svg' %}" alt="Mérito by Vidalys" class="h-12 mx-auto mb-4">
+            <p class="text-[12px] text-gray-400 mt-1 font-medium">Acesso administrativo</p>
         </div>
 
         <form method="post" action="{% url 'dashboard:login' %}" class="space-y-5">
@@ -73,7 +70,7 @@
                        placeholder="Sua senha">
             </div>
             <button type="submit"
-                    class="w-full py-3.5 bg-gray-900 hover:bg-gray-800 text-white font-semibold rounded-2xl transition-all text-[15px] shadow-lg shadow-gray-200 active:scale-[0.97]">
+                    class="w-full py-3.5 bg-brand-500 hover:bg-brand-600 text-white font-semibold rounded-2xl transition-all text-[15px] shadow-lg shadow-brand-100 active:scale-[0.97]">
                 Entrar
             </button>
             <label class="flex items-center gap-2.5 cursor-pointer">

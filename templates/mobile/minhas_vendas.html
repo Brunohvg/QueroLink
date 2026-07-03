@@ -1,6 +1,6 @@
 {% extends 'mobile/base_mobile.html' %}
 {% load currency_filters %}
-{% block title %}Minhas Vendas — V-Com{% endblock %}
+{% block title %}Minhas Vendas — Mérito{% endblock %}
 {% block content %}
 <div class="space-y-4 fade-up" x-data="minhasVendas()">
   <div class="flex items-center gap-3">
@@ -70,8 +70,12 @@
                   <span class="text-[12px] font-medium text-gray-500 w-7 flex-shrink-0 text-right" x-text="sale.day"></span>
                   <span class="text-[10px] text-gray-400 w-7 flex-shrink-0" x-text="sale.weekday"></span>
                   <span class="w-1.5 h-1.5 rounded-full flex-shrink-0"
-                        :class="sale.origin === 'LINK' ? 'bg-brand-400' : 'bg-emerald-400'"></span>
-                  <span class="font-semibold text-[14px] text-gray-800 truncate" x-text="formatMoneyBRL(sale.amount)"></span>
+                        :class="sale.status === 'ESTORNADA' ? 'bg-red-400' : (sale.origin === 'LINK' ? 'bg-brand-400' : 'bg-emerald-400')"></span>
+                  <span class="font-semibold text-[14px] truncate"
+                        :class="sale.status === 'ESTORNADA' ? 'text-gray-800 line-through opacity-60' : 'text-gray-800'"
+                        x-text="formatMoneyBRL(sale.amount)"></span>
+                  <span x-show="sale.status === 'ESTORNADA'"
+                        class="inline-flex items-center px-1.5 py-0.5 rounded-full text-[9px] font-semibold bg-red-50 text-red-600 flex-shrink-0">Estornada</span>
                   <span x-show="sale.notes" class="text-[11px] text-gray-400 truncate hidden sm:inline" x-text="'— ' + sale.notes"></span>
                 </div>
                 <div class="flex items-center gap-0.5 flex-shrink-0 ml-2">
@@ -104,6 +108,7 @@
         <p class="text-gray-400 text-[13px] font-medium">Nenhuma venda neste periodo.</p>
       </div>
     </template>
+    <p class="text-[10px] text-gray-400 text-center mt-2" x-show="sales.some(s => s.status === 'ESTORNADA')">Vendas estornadas nao entram nos totais.</p>
   </div>
 </div>
 

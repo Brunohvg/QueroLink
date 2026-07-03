@@ -1,0 +1,58 @@
+{% extends 'mobile/base_mobile.html' %}
+{% load currency_filters %}
+{% block title %}Ranking — Mérito{% endblock %}
+{% block content %}
+<div class="space-y-4 fade-up pb-20">
+
+  <div class="mb-2">
+    <h1 class="font-display text-[22px] font-bold text-gray-900">Ranking</h1>
+    <p class="text-[13px] text-gray-500 mt-0.5">{{ current_month }}</p>
+  </div>
+
+  {% if seller_pos %}
+  <div class="relative overflow-hidden rounded-2xl p-6 text-white" style="background: linear-gradient(135deg, #111827, #1E293B);">
+    <div class="absolute top-2 right-3 flex items-center gap-1">
+      <span class="w-2 h-2 rounded-sm bg-brand-500"></span>
+      <span class="w-2 h-2 rounded-sm bg-blue-400"></span>
+      <span class="w-1.5 h-1.5 rounded-sm bg-accent"></span>
+    </div>
+    <div class="relative">
+      <p class="text-[11px] font-semibold text-gray-400 uppercase tracking-[0.08em] mb-1">Sua posicao</p>
+      <p class="font-display text-[40px] font-bold leading-none tracking-tight">#{{ seller_pos }}</p>
+    </div>
+  </div>
+  {% endif %}
+
+  {% if ranking %}
+  <div class="space-y-2">
+    {% for r in ranking %}
+    <div class="bg-white rounded-2xl p-4 flex items-center gap-3 card-shadow {% if r.is_me %}ring-2 ring-brand-500 bg-brand-50/50{% endif %}">
+      <div class="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 font-display text-sm font-bold
+                  {% if forloop.counter == 1 %}bg-amber-400 text-white
+                  {% elif forloop.counter == 2 %}bg-gray-300 text-gray-600
+                  {% elif forloop.counter == 3 %}bg-amber-700 text-white
+                  {% else %}bg-gray-100 text-gray-500{% endif %}">
+        {{ forloop.counter }}
+      </div>
+      <div class="flex-1 min-w-0">
+        <p class="text-[14px] font-semibold text-gray-900 truncate">
+          {{ r.seller__name }}
+          {% if r.is_me %}<span class="text-[12px] font-normal text-brand-600 ml-1">(voce)</span>{% endif %}
+        </p>
+      </div>
+      <p class="font-display text-[15px] font-bold text-gray-900 flex-shrink-0">{{ r.total|brl }}</p>
+    </div>
+    {% endfor %}
+  </div>
+
+  {% if not visible_to_sellers %}
+  <p class="text-[11px] text-gray-400 text-center mt-3">Seu gestor optou por exibir apenas a sua posicao.</p>
+  {% endif %}
+  {% else %}
+  <div class="text-center py-10">
+    <p class="text-[14px] text-gray-400">Nenhuma venda registrada neste mes ainda.</p>
+  </div>
+  {% endif %}
+
+</div>
+{% endblock %}

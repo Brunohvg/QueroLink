@@ -7,12 +7,12 @@
     <style>
         @page { size: A4; margin: 2cm; }
         body { font-family: 'Inter', system-ui, sans-serif; color: #1e293b; font-size: 11pt; line-height: 1.6; }
-        .header { text-align: center; margin-bottom: 24pt; border-bottom: 2pt solid #1263FF; padding-bottom: 12pt; }
-        .header h1 { font-size: 16pt; font-weight: 700; color: #1263FF; margin: 0 0 4pt; }
+        .header { text-align: center; margin-bottom: 24pt; border-bottom: 2pt solid #1463FF; padding-bottom: 12pt; }
+        .header h1 { font-size: 16pt; font-weight: 700; color: #1463FF; margin: 0 0 4pt; }
         .header p { font-size: 10pt; color: #64748b; margin: 2pt 0; }
         .title { font-size: 14pt; font-weight: 700; margin: 20pt 0 12pt; color: #1e293b; }
         .section { margin-bottom: 16pt; }
-        .section h3 { font-size: 11pt; font-weight: 600; color: #1263FF; margin: 0 0 8pt; border-bottom: 1pt solid #e2e8f0; padding-bottom: 4pt; }
+        .section h3 { font-size: 11pt; font-weight: 600; color: #1463FF; margin: 0 0 8pt; border-bottom: 1pt solid #e2e8f0; padding-bottom: 4pt; }
         table { width: 100%; border-collapse: collapse; margin-top: 8pt; }
         th { background: #f1f5f9; font-weight: 600; padding: 6pt 8pt; text-align: left; font-size: 10pt; color: #475569; }
         td { padding: 6pt 8pt; border-bottom: 1pt solid #e2e8f0; font-size: 10pt; }
@@ -92,7 +92,8 @@
     </div>
 
     <div class="footer">
-        Recibo gerado por V-Com em {{ hoje|date:"d/m/Y" }}
+        Mérito by Vidalys &middot; vidalys.com.br<br>
+        Recibo gerado em {{ hoje|date:"d/m/Y" }}
     </div>
 </body>
 </html>

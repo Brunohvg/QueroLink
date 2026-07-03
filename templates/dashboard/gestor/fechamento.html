@@ -1,5 +1,5 @@
 {% extends 'dashboard/base_desktop.html' %}
-{% block title %}Competencias de Comissao — V-Com{% endblock %}
+{% block title %}Competencias de Comissao — Mérito{% endblock %}
 {% block content %}
 <div x-data="fechamentoPage()" x-init="load()" class="max-w-7xl mx-auto">
 
@@ -102,6 +102,13 @@
             <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
             CSV
           </a>
+          <a :href="'/api/commissions/periods/'+p.uuid+'/receipts/'"
+             x-show="p.status==='PAGA'||p.status==='PARCIALMENTE_PAGA'"
+             target="_blank"
+             class="text-[12px] px-3 py-1.5 rounded-lg hover:bg-brand-50 text-brand-600 font-medium transition flex items-center gap-1.5">
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+            Recibos do periodo (PDF)
+          </a>
         </div>
       </div>
 
@@ -154,6 +161,13 @@
                             :class="{'bg-emerald-500': sc.status==='PAGA', 'bg-amber-500': sc.status==='FECHADA', 'bg-sky-500': sc.status==='AJUSTADA', 'bg-purple-500': sc.status==='REABERTA', 'bg-red-500': sc.status==='CANCELADA', 'bg-gray-400': sc.status==='ABERTA'}"></span>
                       <span x-text="sc.status"></span>
                     </span>
+                    <a :href="'/api/commissions/periods/'+p.uuid+'/receipt/'+sc.id+'/'"
+                       x-show="sc.status==='PAGA'"
+                       target="_blank"
+                       class="ml-2 inline-flex items-center gap-1 text-[11px] text-brand-500 hover:bg-brand-50 px-2 py-0.5 rounded-lg font-medium transition">
+                      <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+                      Recibo
+                    </a>
                   </td>
                 </tr>
               </template>

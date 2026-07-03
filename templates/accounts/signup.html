@@ -4,8 +4,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Criar conta — V-Com</title>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <title>Criar conta — Mérito</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
     <link href="/static/css/tailwind.css" rel="stylesheet">
     <script>
         function showToast(m, t) {
@@ -27,7 +27,7 @@
         }
     </script>
     <style>
-        body { font-family: 'Inter', system-ui, sans-serif; background: #F3F5F9; }
+        body { font-family: 'Inter', system-ui, sans-serif; background: #F5F7FA; }
         @keyframes slideIn { from{transform:translateX(120%);opacity:0} to{transform:translateX(0);opacity:1} }
         .animate-slide-in { animation: slideIn 0.35s cubic-bezier(0.21,1.02,0.73,1) forwards; }
         input, select, button { font-size: 16px !important; }
@@ -44,11 +44,9 @@
 
     <div class="w-full max-w-lg">
         <div class="text-center mb-8">
-            <a href="/" class="w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg shadow-brand-100" style="background: linear-gradient(135deg, #1263FF, #0940a3);">
-                <svg class="w-9 h-9 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-            </a>
+            <img src="{% static 'img/merito-lockup.svg' %}" alt="Mérito by Vidalys" class="h-12 mx-auto mb-4">
             <h1 class="font-display text-[24px] font-bold text-gray-900 tracking-tight">Criar conta</h1>
-            <p class="text-[14px] text-gray-400 mt-1">Cadastre sua loja no V-Com</p>
+            <p class="text-[14px] text-gray-400 mt-1">Cadastre sua loja</p>
         </div>
 
         <div class="bg-white rounded-2xl border border-gray-100 shadow-[0_1px_3px_-1px_rgba(0,0,0,0.04),0_4px_16px_-4px_rgba(67,97,238,0.06)] p-6">
@@ -117,7 +115,7 @@
 
                 <input type="text" name="website" style="display:none;" tabindex="-1" autocomplete="off">
 
-                <button type="submit" class="w-full mt-5 py-3 bg-gray-900 hover:bg-gray-800 text-white font-semibold rounded-2xl transition-all text-[15px] shadow-lg shadow-gray-200 active:scale-[0.97]">
+                <button type="submit" class="w-full mt-5 py-3 bg-brand-500 hover:bg-brand-600 text-white font-semibold rounded-2xl transition-all text-[15px] shadow-lg shadow-brand-100 active:scale-[0.97]">
                     Criar conta
                 </button>
             </form>

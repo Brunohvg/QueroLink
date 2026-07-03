@@ -1,15 +1,13 @@
 {% extends 'mobile/base_mobile.html' %}
-{% block title %}Login — V-Com{% endblock %}
+{% load static %}
+{% block title %}Login — Mérito{% endblock %}
 {% block content %}
 <div class="flex flex-col items-center justify-center min-h-[85vh]">
   <div class="w-full max-w-sm fade-up">
 
     <div class="text-center mb-10">
-      <div class="w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg shadow-brand-100" style="background: linear-gradient(135deg, #1263FF, #0940a3);">
-        <svg class="w-9 h-9 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"><path d="M7 5L12 17L17 5"/></svg>
-      </div>
-      <h1 class="font-display text-[24px] font-bold text-gray-900 tracking-tight">V-Com</h1>
-      <p class="text-[12px] text-gray-400 mt-1 font-medium">by <strong class="text-gray-600">Vidalys</strong> — Acesso do vendedor</p>
+      <img src="{% static 'img/merito-lockup.svg' %}" alt="Mérito by Vidalys" class="h-12 mx-auto mb-4">
+      <p class="text-[12px] text-gray-400 mt-1 font-medium">Acesso do vendedor</p>
     </div>
 
     {% if error %}

@@ -93,7 +93,7 @@ class UpgradeSubscriptionView(APIView):
             )
             frequency = 12 if billing_cycle == 'YEARLY' else 1
             result = gateway.create_preapproval(
-                reason=f"Plano {dict(Tenant.Plan.choices)[plan]} - V-Com",
+                reason=f"Plano {dict(Tenant.Plan.choices)[plan]} - Mérito by Vidalys",
                 external_reference=str(tenant.uuid),
                 payer_email=tenant.billing_email,
                 amount=amount / 100,

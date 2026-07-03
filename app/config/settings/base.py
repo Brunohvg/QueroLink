@@ -90,6 +90,7 @@ TEMPLATES = [
                 "django.template.context_processors.request",
                 "django.contrib.auth.context_processors.auth",
                 "django.contrib.messages.context_processors.messages",
+                "app.apps.accounts.context_processors.trial_status",
             ],
         },
     },
@@ -216,7 +217,7 @@ REST_FRAMEWORK = {
 }
 
 SPECTACULAR_SETTINGS = {
-    'TITLE': 'V-Com API',
+    'TITLE': 'Mérito API',
     'DESCRIPTION': 'API de gestao de comissoes multi-tenant',
     'VERSION': '1.0.0',
     'SERVE_INCLUDE_SCHEMA': False,

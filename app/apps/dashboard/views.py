@@ -79,7 +79,7 @@ def plano_expirado(request):
 @login_required
 def assinatura(request):
     tenant = request.user.tenant
-    from app.apps.billing.models import Subscription
+    from app.apps.billing.models import Subscription, plan_amount
     from app.apps.webhooks.models import WebhookEvent
     from app.apps.sellers.models import Seller
     from django.conf import settings
@@ -158,7 +158,7 @@ def assinatura(request):
     all_plans = []
     for key in ['STARTER', 'PRO', 'ENTERPRISE']:
         monthly = prices.get(key, 0)
-        yearly = int(monthly * 12 * 0.9) if monthly else 0
+        yearly = plan_amount(key, 'YEARLY') if monthly else 0
         all_plans.append({
             'id': key,
             'name': plan_names.get(key, key),

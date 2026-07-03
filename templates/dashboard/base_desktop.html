@@ -4,8 +4,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{% block title %}V-Com{% endblock %}</title>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <title>{% block title %}Mérito{% endblock %}</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
     <link href="/static/css/tailwind.css" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.9/dist/cdn.min.js" defer integrity="sha384-9Ax3MmS9AClxJyd5/zafcXXjxmwFhZCdsT6HJoJjarvCaAkJlk5QDzjLJm+Wdx5F" crossorigin="anonymous"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js" integrity="sha384-e6nUZLBkQ86NJ6TVVKAeSaK8jWa3NhkYWZFomE39AvDbQWeie9PlQqM3pmYW5d1g" crossorigin="anonymous"></script>
@@ -31,7 +31,7 @@
         .input-field:focus { border-color: #66a3ff; box-shadow: 0 0 0 3px rgba(18,99,255,0.08); }
         .btn-primary {
             padding: 0.625rem 1.25rem; border-radius: 12px;
-            background: #1263FF; color: #fff; font-weight: 600; font-size: 14px;
+            background: #1463FF; color: #fff; font-weight: 600; font-size: 14px;
             transition: background 0.15s;
         }
         .btn-primary:hover { background: #0d52d9; }
@@ -72,8 +72,25 @@
         }
     </script>
 </head>
-<body class="text-gray-900" style="background: #F3F5F9;">
+<body class="text-gray-900" style="background: #F5F7FA;">
     <div id="toast-container" class="fixed top-4 right-4 z-[9999] flex flex-col gap-2 pointer-events-none max-w-sm w-full"></div>
+
+    {% if show_trial_banner %}
+    <div id="trial-banner" class="bg-graphite text-white py-2.5 px-4 text-[13px] font-medium flex items-center justify-center gap-2 sticky top-0 z-30">
+        <svg class="w-4 h-4 text-accent flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+        <span>Seu periodo de teste termina em {{ trial_days_left }} dia{{ trial_days_left|pluralize }}.</span>
+        <a href="{% url 'dashboard:assinatura' %}" class="text-accent font-semibold whitespace-nowrap">Assinar agora →</a>
+        <button onclick="document.getElementById('trial-banner').remove(); sessionStorage.setItem('trial_banner_dismissed', '1');" class="text-white/50 hover:text-white p-1 ml-1">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+        </button>
+    </div>
+    <script>
+        if (sessionStorage.getItem('trial_banner_dismissed')) {
+            var b = document.getElementById('trial-banner');
+            if (b) b.remove();
+        }
+    </script>
+    {% endif %}
 
     <div class="flex h-screen overflow-hidden">
         {% include 'components/_sidebar.html' %}

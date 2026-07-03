@@ -1,13 +1,13 @@
 {
-    "name": "Vidalys Rota",
-    "short_name": "Rota",
-    "description": "App de gestão de comissões para vendedores",
+    "name": "Mérito by Vidalys",
+    "short_name": "Mérito",
+    "description": "Gestão de comissões para equipes de vendas",
     "start_url": "/dashboard/mobile/",
     "scope": "/dashboard/mobile/",
     "display": "standalone",
     "orientation": "portrait",
-    "theme_color": "#1263FF",
-    "background_color": "#ffffff",
+    "theme_color": "#111827",
+    "background_color": "#F5F7FA",
     "lang": "pt-BR",
     "icons": [
         {

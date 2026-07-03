@@ -1,0 +1,30 @@
+from django.utils import timezone
+
+
+def trial_status(request):
+    if not request.user.is_authenticated:
+        return {'trial_days_left': None, 'show_trial_banner': False}
+
+    tenant = getattr(request.user, 'tenant', None)
+    if not tenant:
+        return {'trial_days_left': None, 'show_trial_banner': False}
+
+    from app.apps.billing.models import Subscription
+    try:
+        sub = Subscription.objects.get(tenant=tenant)
+        if sub.status == 'ACTIVE':
+            return {'trial_days_left': None, 'show_trial_banner': False}
+    except Subscription.DoesNotExist:
+        pass
+
+    if not tenant.trial_ends_at:
+        return {'trial_days_left': None, 'show_trial_banner': False}
+
+    remaining = (tenant.trial_ends_at - timezone.now()).days
+    if remaining <= 7 and remaining >= 0:
+        return {
+            'trial_days_left': remaining,
+            'show_trial_banner': True,
+        }
+
+    return {'trial_days_left': None, 'show_trial_banner': False}

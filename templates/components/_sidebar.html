@@ -1,14 +1,9 @@
+{% load static %}
 {% comment %}Usage: include components/_sidebar.html — desktop sidebar, role-aware{% endcomment %}
 <aside class="w-64 bg-white border-r border-gray-100 flex flex-col flex-shrink-0 h-screen">
     <div class="p-5 border-b border-gray-100">
         <a href="{% url 'dashboard:gestor_home' %}" class="flex items-center gap-3">
-            <span class="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0" style="background: #1263FF;">
-                <svg class="w-5 h-5 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M8 6L12 18L16 6"/></svg>
-            </span>
-            <div>
-                <span class="font-display text-base font-bold tracking-tight" style="color: #0B1120;">V-Com</span>
-                <p class="text-[10px] leading-tight" style="color: #94a3b8;">by Vidalys</p>
-            </div>
+            <img src="{% static 'img/vidalys-logo.svg' %}" alt="Vidalys" class="h-8">
         </a>
     </div>
     <nav class="flex-1 p-3 space-y-1 overflow-y-auto">

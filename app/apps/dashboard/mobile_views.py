@@ -154,7 +154,7 @@ def mobile_forgot_password(request):
                             channel='whatsapp',
                             recipient=seller.phone,
                             message_body=(
-                                f'Seu PIN de recuperacao de senha V-Com: '
+                                f'Seu PIN de recuperacao de senha Mérito: '
                                 f'{pin}. Valido por 10 minutos.'
                             ),
                         )
@@ -259,6 +259,7 @@ def mobile_home(request):
             seller=seller, month=today.month, year=today.year,
         ).first()
         goal_progress = goal.progress_percent if goal else None
+        goal_remaining = max(0, goal.target_amount - (month_total + month_link_total)) if goal else None
         combined_month_total = month_total + month_link_total
 
         missing_past_days = []
@@ -285,6 +286,7 @@ def mobile_home(request):
             'has_missing_past_days': has_missing_past_days,
             'goal': goal,
             'goal_progress': goal_progress,
+            'goal_remaining': goal_remaining,
             'combined_month_total': combined_month_total,
         })
     except Exception as e:
@@ -452,6 +454,7 @@ def mobile_minhas_vendas(request):
             'notes': s.notes or '',
             'origin': s.origin,
             'origin_display': s.get_origin_display(),
+            'status': s.status,
             'date': s.sale_date.strftime('%d/%m/%Y'),
             'date_iso': s.sale_date.isoformat(),
             'canDelete': s.origin == Sale.Origin.MANUAL and not is_locked,
