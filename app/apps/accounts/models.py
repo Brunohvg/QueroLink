@@ -8,11 +8,9 @@ from .fields import EncryptedCharField, compute_hash
 
 class Tenant(models.Model):
     class Plan(models.TextChoices):
-        VCOM = 'VCOM', 'V-Com'
-        ESSENCIAL = 'ESSENCIAL', 'Essencial (ate 5 vendedores)'
-        PROFISSIONAL = 'PROFISSIONAL', 'Profissional (ate 15 vendedores)'
-        PLUS = 'PLUS', 'Plus (ate 30 vendedores)'
-        ENTERPRISE = 'ENTERPRISE', 'Enterprise (ilimitado)'
+        STARTER = 'STARTER', 'Starter'
+        PRO = 'PRO', 'Pro'
+        ENTERPRISE = 'ENTERPRISE', 'Enterprise'
 
     uuid = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     company_name = models.CharField(max_length=255)
