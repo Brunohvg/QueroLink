@@ -84,6 +84,15 @@ def assinatura(request):
     from app.apps.sellers.models import Seller
     from django.conf import settings
 
+    if request.method == 'POST':
+        billing_email = request.POST.get('billing_email', '').strip()
+        if billing_email:
+            tenant.billing_email = billing_email
+            tenant.save(update_fields=['billing_email', 'updated_at'])
+            from django.contrib import messages
+            messages.success(request, 'Email de cobranca atualizado.')
+        return redirect('dashboard:assinatura')
+
     try:
         sub = Subscription.objects.get(tenant=tenant)
     except Subscription.DoesNotExist:
@@ -116,6 +125,13 @@ def assinatura(request):
             if len(billing_history) >= 12:
                 break
 
+    PLAN_FEATURES = {
+        'ESSENCIAL': ['Gerenciamento de comissoes', 'Links de pagamento', 'App do vendedor', 'Relatorios basicos'],
+        'PROFISSIONAL': ['Tudo do Essencial', 'Ate 15 vendedores', 'Relatorios em PDF', 'Ranking de vendas'],
+        'PLUS': ['Tudo do Profissional', 'Ate 30 vendedores', 'Suporte prioritario', 'Metas mensais'],
+        'ENTERPRISE': ['Tudo do Plus', 'Vendedores ilimitados', 'Suporte dedicado', 'Prioridade em novas features'],
+    }
+
     plan_names = dict(Tenant.Plan.choices)
     all_plans = []
     for key in ['ESSENCIAL', 'PROFISSIONAL', 'PLUS', 'ENTERPRISE']:
@@ -126,9 +142,12 @@ def assinatura(request):
             'name': plan_names.get(key, key),
             'seller_limit': limits.get(key, '—'),
             'price_monthly': monthly,
+            'features': PLAN_FEATURES.get(key, []),
             'price_yearly': yearly,
             'is_current': tenant.plan == key,
         })
+
+    limit_remaining = (plan_limit - active_sellers) if plan_limit is not None else None
 
     return render(request, 'dashboard/assinatura.html', {
         'tenant': tenant,
@@ -137,6 +156,7 @@ def assinatura(request):
         'active_sellers': active_sellers,
         'billing_history': billing_history,
         'all_plans': all_plans,
+        'limit_remaining': limit_remaining,
     })
 
 

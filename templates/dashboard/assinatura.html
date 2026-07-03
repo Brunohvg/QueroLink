@@ -4,161 +4,193 @@
 {% block title %}Assinatura — V-Com{% endblock %}
 {% block content %}
 
-<div class="surface-hero mb-6 flex items-center justify-between bg-gradient-to-r from-brand-500 to-brand-600 text-white border-none">
-    <div>
-        <h1 class="text-[20px] font-bold mb-1">Assinatura</h1>
-        <p class="text-[13px] text-white/80">Gerencie seu plano e pagamentos</p>
+<style>
+    .plan-card { transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1); }
+    .plan-card:hover { transform: translateY(-3px); box-shadow: 0 12px 40px -8px rgba(18,99,255,0.12); }
+    .plan-card-current { border-color: #1263FF; box-shadow: 0 0 0 3px rgba(18,99,255,0.1), 0 8px 24px -4px rgba(18,99,255,0.15); }
+    .gradient-hero { background: linear-gradient(135deg, #0B1120 0%, #1a2744 50%, #1263FF 100%); }
+    .pill-active { background: rgba(18,99,255,0.1); color: #1263FF; font-weight: 600; }
+    .pill-inactive { color: #64748b; }
+    .pill-inactive:hover { color: #1e293b; background: #f8fafc; }
+</style>
+
+<div class="gradient-hero rounded-2xl p-8 mb-6 text-white">
+    <div class="flex items-start justify-between">
+        <div>
+            <p class="text-[12px] font-semibold text-white/60 uppercase tracking-wider mb-1">Assinatura</p>
+            <h1 class="text-[22px] font-bold tracking-tight">{{ tenant.company_name }}</h1>
+            <p class="text-[14px] text-white/70 mt-1">Gerencie seu plano e pagamentos</p>
+        </div>
+        <div class="text-right">
+            <span class="inline-flex items-center px-3 py-1.5 rounded-full text-xs font-semibold
+                {% if subscription.status == 'ACTIVE' or subscription.status == 'TRIALING' %}bg-emerald-400/20 text-emerald-300
+                {% elif subscription.status == 'PAST_DUE' %}bg-amber-400/20 text-amber-300
+                {% elif subscription.status == 'CANCELED' %}bg-red-400/20 text-red-300
+                {% else %}bg-white/10 text-white/50{% endif %}">
+                <span class="w-1.5 h-1.5 rounded-full mr-1.5
+                    {% if subscription.status == 'ACTIVE' or subscription.status == 'TRIALING' %}bg-emerald-400
+                    {% elif subscription.status == 'PAST_DUE' %}bg-amber-400
+                    {% elif subscription.status == 'CANCELED' %}bg-red-400
+                    {% else %}bg-white/30{% endif %}"></span>
+                {{ subscription.get_status_display|default:"Sem assinatura" }}
+            </span>
+        </div>
     </div>
-    <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold
-        {% if subscription.status == 'ACTIVE' or subscription.status == 'TRIALING' %}bg-white/20 text-white
-        {% elif subscription.status == 'PAST_DUE' %}bg-amber-400/30 text-amber-100
-        {% elif subscription.status == 'CANCELED' %}bg-red-400/30 text-red-100
-        {% else %}bg-white/10 text-white/60{% endif %}">
-        {{ subscription.get_status_display|default:"Sem assinatura" }}
-    </span>
 </div>
 
+{% if messages %}
+<div class="mb-4 space-y-2">
+    {% for msg in messages %}
+    <div class="px-4 py-3 rounded-xl text-sm font-medium {% if msg.tags == 'error' %}bg-red-50 text-red-700 border border-red-200{% else %}bg-emerald-50 text-emerald-700 border border-emerald-200{% endif %}">
+        {{ msg }}
+    </div>
+    {% endfor %}
+</div>
+{% endif %}
+
 {% if not subscription or subscription.status == 'CANCELED' %}
-<div class="bg-amber-50 border border-amber-200 rounded-2xl p-5 mb-6">
-    <p class="text-[14px] font-semibold text-amber-800">Assine um plano para continuar usando o V-Com</p>
-    <p class="text-[13px] text-amber-600 mt-1">Escolha o plano ideal para sua loja abaixo.</p>
+<div class="bg-amber-50 border border-amber-200 rounded-2xl p-5 mb-6 flex items-start gap-3">
+    <svg class="w-5 h-5 text-amber-500 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"></path></svg>
+    <div>
+        <p class="text-[14px] font-semibold text-amber-800">Assine um plano para continuar usando o V-Com</p>
+        <p class="text-[13px] text-amber-600 mt-0.5">Escolha o plano ideal para sua loja abaixo.</p>
+    </div>
 </div>
 {% endif %}
 
 <div id="billing-app" x-data="billingApp()">
 
-    <!-- Abas -->
+    <!-- Abas estilo pill -->
     <div class="flex gap-1 mb-6 bg-white rounded-xl p-1 shadow-sm border border-gray-100">
-        <button @click="tab = 'overview'" :class="tab === 'overview' ? 'bg-brand-50 text-brand-600 font-semibold' : 'text-gray-500 hover:text-gray-700'" class="flex-1 px-4 py-2.5 text-sm rounded-lg transition">Visao Geral</button>
-        <button @click="tab = 'plans'" :class="tab === 'plans' ? 'bg-brand-50 text-brand-600 font-semibold' : 'text-gray-500 hover:text-gray-700'" class="flex-1 px-4 py-2.5 text-sm rounded-lg transition">Planos</button>
-        <button @click="tab = 'history'" :class="tab === 'history' ? 'bg-brand-50 text-brand-600 font-semibold' : 'text-gray-500 hover:text-gray-700'" class="flex-1 px-4 py-2.5 text-sm rounded-lg transition">Historico</button>
+        <button @click="tab = 'overview'" :class="tab === 'overview' ? 'pill-active' : 'pill-inactive'" class="flex-1 px-4 py-2.5 text-sm rounded-lg transition-all duration-200">Visao Geral</button>
+        <button @click="tab = 'plans'" :class="tab === 'plans' ? 'pill-active' : 'pill-inactive'" class="flex-1 px-4 py-2.5 text-sm rounded-lg transition-all duration-200">Planos</button>
+        <button @click="tab = 'history'" :class="tab === 'history' ? 'pill-active' : 'pill-inactive'" class="flex-1 px-4 py-2.5 text-sm rounded-lg transition-all duration-200">Historico</button>
         {% if subscription and subscription.status != 'CANCELED' %}
-        <button @click="tab = 'cancel'" :class="tab === 'cancel' ? 'bg-red-50 text-red-600 font-semibold' : 'text-gray-500 hover:text-gray-700'" class="flex-1 px-4 py-2.5 text-sm rounded-lg transition">Cancelar</button>
+        <button @click="tab = 'cancel'" :class="tab === 'cancel' ? 'bg-red-50 text-red-600 font-semibold' : 'pill-inactive'" class="flex-1 px-4 py-2.5 text-sm rounded-lg transition-all duration-200">Cancelar</button>
         {% endif %}
     </div>
 
     <!-- Tab: Visao Geral -->
     <div x-show="tab === 'overview'" class="space-y-4">
         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            <div class="bg-white rounded-2xl p-5 shadow-sm border border-gray-100">
-                <p class="text-[12px] font-semibold text-gray-400 uppercase tracking-wide mb-1">Plano atual</p>
-                <p class="text-[22px] font-bold text-gray-900">{{ tenant.get_plan_display }}</p>
+            <div class="bg-white rounded-xl p-5 shadow-sm border border-gray-100 plan-card">
+                <p class="text-[11px] font-semibold text-gray-400 uppercase tracking-wider mb-1">Plano atual</p>
+                <p class="text-[20px] font-bold text-gray-900">{{ tenant.get_plan_display }}</p>
+                <p class="text-[12px] text-gray-400 mt-1">{{ active_sellers }} vendedor{{ active_sellers|pluralize }} ativo{{ active_sellers|pluralize }}</p>
             </div>
-            <div class="bg-white rounded-2xl p-5 shadow-sm border border-gray-100">
-                <p class="text-[12px] font-semibold text-gray-400 uppercase tracking-wide mb-1">Proximo vencimento</p>
-                <p class="text-[22px] font-bold text-gray-900">
-                    {% if subscription.current_period_end %}{{ subscription.current_period_end|date:"d/m/Y" }}{% else %}—{% endif %}
-                </p>
+            <div class="bg-white rounded-xl p-5 shadow-sm border border-gray-100 plan-card">
+                <p class="text-[11px] font-semibold text-gray-400 uppercase tracking-wider mb-1">Limite de vendedores</p>
+                <p class="text-[20px] font-bold text-gray-900">{{ active_sellers }}{% if plan_limit %}/{{ plan_limit }}{% endif %}</p>
+                <p class="text-[12px] text-gray-400 mt-1">{% if limit_remaining is not None %}{{ limit_remaining }} vaga{{ limit_remaining|pluralize }} restante{{ limit_remaining|pluralize }}{% else %}Ilimitado{% endif %}</p>
             </div>
-            <div class="bg-white rounded-2xl p-5 shadow-sm border border-gray-100">
-                <p class="text-[12px] font-semibold text-gray-400 uppercase tracking-wide mb-1">Valor</p>
-                <p class="text-[22px] font-bold text-gray-900">
-                    {% if subscription.amount %}{{ subscription.amount|brl }}{% else %}—{% endif %}
-                </p>
+            <div class="bg-white rounded-xl p-5 shadow-sm border border-gray-100 plan-card">
+                <p class="text-[11px] font-semibold text-gray-400 uppercase tracking-wider mb-1">Valor</p>
+                <p class="text-[20px] font-bold text-gray-900">{{ subscription.amount|brl|default:"—" }}</p>
+                <p class="text-[12px] text-gray-400 mt-1">{{ subscription.get_billing_cycle_display|default:"—" }}</p>
             </div>
-            <div class="bg-white rounded-2xl p-5 shadow-sm border border-gray-100">
-                <p class="text-[12px] font-semibold text-gray-400 uppercase tracking-wide mb-1">Vendedores</p>
-                <p class="text-[22px] font-bold text-gray-900">
-                    {{ active_sellers }}{% if plan_limit %}/{{ plan_limit }}{% endif %}
-                </p>
+            <div class="bg-white rounded-xl p-5 shadow-sm border border-gray-100 plan-card">
+                <p class="text-[11px] font-semibold text-gray-400 uppercase tracking-wider mb-1">Proximo vencimento</p>
+                <p class="text-[20px] font-bold text-gray-900">{{ subscription.current_period_end|date:"d/m/Y"|default:"—" }}</p>
+                <p class="text-[12px] text-gray-400 mt-1">{% if subscription.current_period_end %}{{ subscription.current_period_end|timeuntil }}{% endif %}</p>
             </div>
         </div>
 
-        <div class="bg-white rounded-2xl p-5 shadow-sm border border-gray-100">
+        <!-- Email de cobranca editavel inline -->
+        <div class="bg-white rounded-xl p-5 shadow-sm border border-gray-100">
             <div class="flex items-center justify-between">
-                <div>
-                    <p class="text-[12px] font-semibold text-gray-400 uppercase tracking-wide mb-1">Email de cobranca</p>
-                    <p class="text-[14px] text-gray-700">{{ tenant.billing_email|default:"Nao configurado" }}</p>
-                </div>
-                <a href="{% url 'dashboard:gestor_configuracoes' %}" class="text-[13px] text-brand-500 hover:text-brand-600 font-medium">Configurar</a>
+                <p class="text-[11px] font-semibold text-gray-400 uppercase tracking-wider mb-1">Email de cobranca</p>
+                <button @click="editingEmail = !editingEmail" class="text-[12px] text-brand-500 hover:text-brand-600 font-medium" x-show="!editingEmail">Alterar</button>
             </div>
-            {% if not tenant.billing_email %}
-            <p class="text-[12px] text-amber-600 mt-2">Configure o email nas configuracoes para ativar a assinatura.</p>
-            {% endif %}
+            <div x-show="!editingEmail">
+                <p class="text-[14px] text-gray-700">{{ tenant.billing_email|default:"Nao configurado" }}</p>
+                {% if not tenant.billing_email %}
+                <p class="text-[12px] text-amber-600 mt-1">O email e necessario para ativar a assinatura.</p>
+                {% endif %}
+            </div>
+            <form x-show="editingEmail" method="post" action="{% url 'dashboard:assinatura' %}" class="mt-2">
+                {% csrf_token %}
+                <div class="flex gap-2">
+                    <input type="email" name="billing_email" value="{{ tenant.billing_email|default:'' }}"
+                           class="flex-1 px-3 py-2 border border-gray-200 rounded-lg text-[14px] outline-none focus:border-brand-400 focus:ring-2 focus:ring-brand-100"
+                           placeholder="financeiro@minhaloja.com.br">
+                    <button type="submit" class="px-4 py-2 bg-brand-500 text-white rounded-lg text-sm font-semibold hover:bg-brand-600 transition">Salvar</button>
+                    <button type="button" @click="editingEmail = false" class="px-4 py-2 text-gray-500 rounded-lg text-sm hover:bg-gray-50 transition">Cancelar</button>
+                </div>
+            </form>
         </div>
     </div>
 
     <!-- Tab: Planos -->
-    <div x-show="tab === 'plans'" class="space-y-4">
+    <div x-show="tab === 'plans'" class="space-y-6">
         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             {% for plan in all_plans %}
-            <div class="bg-white rounded-2xl p-6 shadow-sm border-2 transition-all duration-200 hover:shadow-md {% if plan.is_current %}border-brand-500 ring-2 ring-brand-500/20{% else %}border-gray-100 hover:border-gray-200{% endif %} relative overflow-hidden">
+            <div class="bg-white rounded-xl p-6 border-2 plan-card {% if plan.is_current %}plan-card-current{% else %}border-gray-100 hover:border-gray-200{% endif %} relative">
                 {% if plan.is_current %}
-                <div class="absolute top-0 right-0">
-                    <div class="bg-brand-500 text-white text-[10px] font-bold px-3 py-1 rounded-bl-xl">Atual</div>
+                <div class="absolute -top-3 right-4">
+                    <span class="bg-brand-500 text-white text-[10px] font-bold px-3 py-1 rounded-full shadow-sm">Plano atual</span>
                 </div>
                 {% endif %}
-                <div class="mb-4">
-                    <p class="text-[14px] font-bold text-gray-900 mb-1">{{ plan.name }}</p>
-                    <p class="text-[12px] text-gray-500">
-                        {% if plan.seller_limit is None %}Vendedores ilimitados{% else %}Ate {{ plan.seller_limit }} vendedores{% endif %}
-                    </p>
+                <div class="mb-5">
+                    <p class="text-[15px] font-bold text-gray-900 mb-1">{{ plan.name }}</p>
+                    <p class="text-[12px] text-gray-500">{% if plan.seller_limit is None %}Sem limite de vendedores{% else %}Ate {{ plan.seller_limit }} vendedores{% endif %}</p>
                 </div>
-                <div class="mb-4">
+                <div class="mb-5">
                     {% if plan.price_monthly %}
-                    <p class="text-[28px] font-bold text-gray-900 tracking-tight">{{ plan.price_monthly|brl }}<span class="text-[14px] font-normal text-gray-400">/mes</span></p>
-                    {% if plan.price_yearly %}
-                    <p class="text-[12px] text-gray-400 mt-1">{{ plan.price_yearly|brl }}/ano <span class="text-success-600 font-medium">(10% off)</span></p>
-                    {% endif %}
+                    <p class="text-[28px] font-bold text-gray-900 tracking-tight">{{ plan.price_monthly|brl }}<span class="text-[13px] font-normal text-gray-400">/mes</span></p>
+                    <p class="text-[12px] text-gray-400 mt-1">{{ plan.price_yearly|brl }}/ano <span class="text-emerald-600 font-medium">economize 10%</span></p>
                     {% else %}
-                    <p class="text-[20px] font-bold text-gray-400">Sob consulta</p>
+                    <p class="text-[20px] font-bold text-gray-300">Sob consulta</p>
                     {% endif %}
                 </div>
-                <div class="space-y-2 text-[13px] text-gray-600">
-                    {% if plan.id == 'ESSENCIAL' %}
-                    <p class="flex items-center gap-2"><svg class="w-4 h-4 text-success-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>Gerenciamento de comissoes</p>
-                    <p class="flex items-center gap-2"><svg class="w-4 h-4 text-success-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>Links de pagamento</p>
-                    <p class="flex items-center gap-2"><svg class="w-4 h-4 text-success-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>App do vendedor</p>
-                    {% elif plan.id == 'PROFISSIONAL' %}
-                    <p class="flex items-center gap-2"><svg class="w-4 h-4 text-success-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>Tudo do Essencial</p>
-                    <p class="flex items-center gap-2"><svg class="w-4 h-4 text-success-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>Ate 15 vendedores</p>
-                    <p class="flex items-center gap-2"><svg class="w-4 h-4 text-success-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>Relatorios em PDF</p>
-                    {% elif plan.id == 'PLUS' %}
-                    <p class="flex items-center gap-2"><svg class="w-4 h-4 text-success-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>Tudo do Profissional</p>
-                    <p class="flex items-center gap-2"><svg class="w-4 h-4 text-success-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>Ate 30 vendedores</p>
-                    <p class="flex items-center gap-2"><svg class="w-4 h-4 text-success-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>Suporte prioritario</p>
-                    {% elif plan.id == 'ENTERPRISE' %}
-                    <p class="flex items-center gap-2"><svg class="w-4 h-4 text-success-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>Tudo do Plus</p>
-                    <p class="flex items-center gap-2"><svg class="w-4 h-4 text-success-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>Vendedores ilimitados</p>
-                    <p class="flex items-center gap-2"><svg class="w-4 h-4 text-success-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>Suporte dedicado</p>
-                    {% endif %}
-                </div>
+                <ul class="space-y-2.5 text-[13px]">
+                    {% for feat in plan.features %}
+                    <li class="flex items-start gap-2 text-gray-600">
+                        <svg class="w-4 h-4 text-emerald-500 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"></path></svg>
+                        {{ feat }}
+                    </li>
+                    {% endfor %}
+                </ul>
             </div>
             {% endfor %}
         </div>
 
         {% if not subscription or subscription.status != 'ACTIVE' %}
-        <div class="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
-            <h3 class="text-[15px] font-bold text-gray-900 mb-2">Ativar plano</h3>
-            <p class="text-[13px] text-gray-500 mb-5">Escolha o plano e ciclo de faturamento. Voce sera redirecionado ao Mercado Pago para autorizar.</p>
+        <div class="bg-white rounded-xl p-6 shadow-sm border border-gray-100">
+            <h3 class="text-[15px] font-bold text-gray-900 mb-1">Ativar assinatura</h3>
+            <p class="text-[13px] text-gray-500 mb-5">Escolha o plano e ciclo abaixo. Voce sera redirecionado ao Mercado Pago para autorizar.</p>
+            {% if not tenant.billing_email %}
+            <div class="bg-amber-50 border border-amber-200 rounded-lg p-3 mb-4 text-[13px] text-amber-700">
+                Configure seu email de cobranca na aba "Visao Geral" antes de ativar.
+            </div>
+            {% endif %}
             <form id="upgrade-form" method="post" action="{% url 'billing:api-billing-upgrade' %}">
                 {% csrf_token %}
-                <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-5">
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
                     <div>
-                        <label class="block text-[13px] font-medium text-gray-700 mb-1.5">Plano</label>
-                        <select name="plan" class="input-field w-full">
+                        <label class="block text-[12px] font-medium text-gray-600 mb-1">Plano</label>
+                        <select name="plan" class="w-full px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-lg text-[14px] outline-none focus:border-brand-400">
                             {% for plan in all_plans %}
                             <option value="{{ plan.id }}" {% if plan.is_current %}selected{% endif %}>{{ plan.name }}</option>
                             {% endfor %}
                         </select>
                     </div>
                     <div>
-                        <label class="block text-[13px] font-medium text-gray-700 mb-1.5">Ciclo</label>
-                        <select name="billing_cycle" class="input-field w-full">
+                        <label class="block text-[12px] font-medium text-gray-600 mb-1">Ciclo</label>
+                        <select name="billing_cycle" class="w-full px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-lg text-[14px] outline-none focus:border-brand-400">
                             <option value="MONTHLY">Mensal</option>
-                            <option value="YEARLY">Anual (10% off)</option>
+                            <option value="YEARLY">Anual (economize 10%)</option>
                         </select>
                     </div>
                     <div>
-                        <label class="block text-[13px] font-medium text-gray-700 mb-1.5">Pagamento</label>
-                        <select name="payment_method" class="input-field w-full">
+                        <label class="block text-[12px] font-medium text-gray-600 mb-1">Pagamento</label>
+                        <select name="payment_method" class="w-full px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-lg text-[14px] outline-none focus:border-brand-400">
                             <option value="boleto">Boleto</option>
                             <option value="credit_card">Cartao de credito</option>
                         </select>
                     </div>
                     <div class="flex items-end">
-                        <button type="submit" class="w-full bg-brand-500 text-white py-2.5 px-5 rounded-xl text-sm font-semibold hover:bg-brand-600 transition disabled:bg-gray-300">
-                            Ativar assinatura
+                        <button type="submit" class="w-full bg-brand-500 text-white py-2.5 px-5 rounded-lg text-sm font-semibold hover:bg-brand-600 transition disabled:bg-gray-300" {% if not tenant.billing_email %}disabled{% endif %}>
+                            Ativar
                         </button>
                     </div>
                 </div>
@@ -169,24 +201,28 @@
     </div>
 
     <!-- Tab: Historico -->
-    <div x-show="tab === 'history'" class="space-y-4">
-        <div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-            <div class="p-5 border-b border-gray-100">
-                <h3 class="text-[13px] font-semibold text-gray-500 uppercase tracking-wide">Ultimos eventos</h3>
+    <div x-show="tab === 'history'">
+        <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+            <div class="px-5 py-4 border-b border-gray-100">
+                <p class="text-[11px] font-semibold text-gray-400 uppercase tracking-wider">Ultimos eventos</p>
             </div>
             {% if billing_history %}
-            <table class="w-full text-left text-[14px]">
+            <table class="w-full text-left">
                 <thead>
-                    <tr><th class="px-5 py-3 font-semibold text-gray-500 border-b border-gray-100 bg-gray-50/50 text-[12px] uppercase tracking-wide">Data</th><th class="px-5 py-3 font-semibold text-gray-500 border-b border-gray-100 bg-gray-50/50 text-[12px] uppercase tracking-wide">Evento</th><th class="px-5 py-3 font-semibold text-gray-500 border-b border-gray-100 bg-gray-50/50 text-[12px] uppercase tracking-wide">Processado</th></tr>
+                    <tr class="bg-gray-50/50">
+                        <th class="px-5 py-3 text-[11px] font-semibold text-gray-400 uppercase tracking-wider">Data</th>
+                        <th class="px-5 py-3 text-[11px] font-semibold text-gray-400 uppercase tracking-wider">Evento</th>
+                        <th class="px-5 py-3 text-[11px] font-semibold text-gray-400 uppercase tracking-wider">Status</th>
+                    </tr>
                 </thead>
                 <tbody>
                     {% for h in billing_history %}
-                    <tr class="hover:bg-gray-50">
-                        <td class="px-5 py-3 border-b border-gray-50 text-[13px]">{{ h.date|date:"d/m/Y H:i" }}</td>
-                        <td class="px-5 py-3 border-b border-gray-50">{{ h.event }}</td>
-                        <td class="px-5 py-3 border-b border-gray-50">
-                            <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium {% if h.processed %}bg-success-50 text-success-700{% else %}bg-amber-50 text-amber-700{% endif %}">
-                                {{ h.processed|yesno:"Sim,Nao" }}
+                    <tr class="hover:bg-gray-50 border-t border-gray-50">
+                        <td class="px-5 py-3.5 text-[13px] text-gray-700">{{ h.date|date:"d/m/Y H:i" }}</td>
+                        <td class="px-5 py-3.5 text-[13px] text-gray-700">{{ h.event }}</td>
+                        <td class="px-5 py-3.5">
+                            <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium {% if h.processed %}bg-emerald-50 text-emerald-700{% else %}bg-amber-50 text-amber-700{% endif %}">
+                                {{ h.processed|yesno:"Processado,Pendente" }}
                             </span>
                         </td>
                     </tr>
@@ -194,25 +230,25 @@
                 </tbody>
             </table>
             {% else %}
-            <p class="text-[13px] text-gray-500 py-8 text-center">Nenhum evento de cobranca registrado.</p>
+            <p class="text-[13px] text-gray-400 py-10 text-center">Nenhum evento registrado.</p>
             {% endif %}
         </div>
     </div>
 
     <!-- Tab: Cancelar -->
     {% if subscription and subscription.status != 'CANCELED' %}
-    <div x-show="tab === 'cancel'" class="space-y-4">
-        <div class="bg-white rounded-2xl p-6 shadow-sm border border-red-100">
+    <div x-show="tab === 'cancel'">
+        <div class="bg-white rounded-xl p-6 shadow-sm border border-red-100">
             <div class="flex items-start gap-4">
                 <div class="w-10 h-10 bg-red-100 rounded-xl flex items-center justify-center flex-shrink-0">
                     <svg class="w-5 h-5 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"></path></svg>
                 </div>
-                <div>
-                    <h3 class="text-[15px] font-bold text-gray-900 mb-1">Cancelar assinatura</h3>
-                    <p class="text-[13px] text-gray-500 mb-4">Ao cancelar, voce perdera acesso ao V-Com ao final do periodo atual. Esta acao nao pode ser desfeita.</p>
+                <div class="flex-1">
+                    <p class="text-[15px] font-bold text-gray-900 mb-1">Cancelar assinatura</p>
+                    <p class="text-[13px] text-gray-500 mb-4">Ao cancelar, voce perde acesso ao V-Com ao final do periodo atual. Esta acao e irreversivel.</p>
                     <form id="cancel-form" method="post" action="{% url 'billing:api-billing-cancel' %}">
                         {% csrf_token %}
-                        <button type="submit" class="px-5 py-2.5 bg-red-600 text-white rounded-xl text-sm font-semibold hover:bg-red-700 transition"
+                        <button type="submit" class="px-5 py-2.5 bg-red-600 text-white rounded-lg text-sm font-semibold hover:bg-red-700 transition"
                                 onclick="return confirm('Tem certeza que deseja cancelar sua assinatura?')">
                             Cancelar assinatura
                         </button>
@@ -226,100 +262,51 @@
 </div>
 
 <script>
-    (function() {
-        var params = new URLSearchParams(window.location.search);
-        var status = params.get('status');
-        var preapprovalId = params.get('preapproval_id');
-        if (status === 'authorized' && preapprovalId) {
-            var msg = 'Assinatura ativada com sucesso!';
-            if (typeof showToast === 'function') {
-                showToast(msg, 'success');
-            } else {
-                var el = document.createElement('div');
-                el.className = 'bg-success-50 border border-success-200 text-success-700 p-3 rounded-lg text-sm mb-4';
-                el.textContent = msg;
-                document.querySelector('.bg-gradient-to-r').after(el);
-            }
-            if (window.history && window.history.replaceState) {
-                window.history.replaceState({}, document.title, window.location.pathname);
-            }
-        }
-    })();
-
     document.addEventListener('alpine:init', function() {
         Alpine.data('billingApp', function() {
-            return { tab: 'overview' };
+            return { tab: 'overview', editingEmail: false };
         });
     });
+
+    (function() {
+        var sp = new URLSearchParams(window.location.search);
+        if (sp.get('status') === 'authorized' && sp.get('preapproval_id')) {
+            if (typeof showToast === 'function') showToast('Assinatura ativada com sucesso!', 'success');
+            history.replaceState({}, '', window.location.pathname);
+        }
+    })();
 
     document.getElementById('upgrade-form')?.addEventListener('submit', async function(e) {
         e.preventDefault();
         var btn = this.querySelector('button[type="submit"]');
         var err = document.getElementById('upgrade-error');
-        btn.disabled = true;
-        btn.textContent = 'Processando...';
+        btn.disabled = true; btn.textContent = 'Redirecionando...';
         err.classList.add('hidden');
-
         try {
-            var form = new FormData(this);
-            var data = {};
-            form.forEach(function(v, k) { data[k] = v; });
-
-            var resp = await fetch(this.action, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
-                },
-                body: JSON.stringify(data),
-            });
-            var result = await resp.json();
-
-            if (resp.ok && result.init_point) {
-                window.location.href = result.init_point;
-            } else {
-                err.textContent = result.error || 'Erro ao criar assinatura.';
-                err.classList.remove('hidden');
-                btn.disabled = false;
-                btn.textContent = 'Ativar assinatura';
-            }
-        } catch(e) {
-            err.textContent = 'Erro de conexao. Tente novamente.';
-            err.classList.remove('hidden');
-            btn.disabled = false;
-            btn.textContent = 'Ativar assinatura';
-        }
+            var fd = new FormData(this), data = {};
+            fd.forEach(function(v, k) { data[k] = v; });
+            var r = await fetch(this.action, { method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value },
+                body: JSON.stringify(data) });
+            var j = await r.json();
+            if (r.ok && j.init_point) { window.location.href = j.init_point; }
+            else { err.textContent = j.error || 'Erro ao criar assinatura.'; err.classList.remove('hidden'); btn.disabled = false; btn.textContent = 'Ativar'; }
+        } catch(e) { err.textContent = 'Erro de conexao.'; err.classList.remove('hidden'); btn.disabled = false; btn.textContent = 'Ativar'; }
     });
 
     document.getElementById('cancel-form')?.addEventListener('submit', async function(e) {
         e.preventDefault();
-        if (!confirm('Tem certeza que deseja cancelar sua assinatura?')) return;
+        if (!confirm('Tem certeza?')) return;
         var btn = this.querySelector('button[type="submit"]');
         var err = document.getElementById('cancel-error');
-        btn.disabled = true;
-        btn.textContent = 'Cancelando...';
+        btn.disabled = true; btn.textContent = 'Cancelando...';
         err.classList.add('hidden');
-
         try {
-            var resp = await fetch(this.action, {
-                method: 'POST',
-                headers: { 'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value },
-            });
-            var result = await resp.json();
-            if (resp.ok) {
-                window.location.reload();
-            } else {
-                err.textContent = result.error || 'Erro ao cancelar.';
-                err.classList.remove('hidden');
-                btn.disabled = false;
-                btn.textContent = 'Cancelar assinatura';
-            }
-        } catch(e) {
-            err.textContent = 'Erro de conexao.';
-            err.classList.remove('hidden');
-            btn.disabled = false;
-            btn.textContent = 'Cancelar assinatura';
-        }
+            var r = await fetch(this.action, { method: 'POST', headers: { 'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value } });
+            var j = await r.json();
+            if (r.ok) { window.location.reload(); }
+            else { err.textContent = j.error || 'Erro.'; err.classList.remove('hidden'); btn.disabled = false; btn.textContent = 'Cancelar assinatura'; }
+        } catch(e) { err.textContent = 'Erro de conexao.'; err.classList.remove('hidden'); btn.disabled = false; btn.textContent = 'Cancelar assinatura'; }
     });
 </script>
 
