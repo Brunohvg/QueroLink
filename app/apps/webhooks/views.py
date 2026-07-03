@@ -145,32 +145,56 @@ def billing_webhook(request):
     if request.method != "POST":
         return JsonResponse({"error": "Method not allowed"}, status=405)
 
-    from django.conf import settings
-    expected_user = getattr(settings, 'BILLING_WEBHOOK_USER', '')
-    expected_pass = getattr(settings, 'BILLING_WEBHOOK_PASS', '')
-
-    if expected_user and expected_pass:
-        auth_header = request.META.get('HTTP_AUTHORIZATION', '')
-        if not auth_header.startswith('Basic '):
-            return JsonResponse({"error": "Unauthorized"}, status=401)
-        import base64
-        try:
-            decoded = base64.b64decode(auth_header[6:]).decode('utf-8')
-            username, password = decoded.split(':', 1)
-        except Exception:
-            return JsonResponse({"error": "Unauthorized"}, status=401)
-        if username != expected_user or password != expected_pass:
-            return JsonResponse({"error": "Unauthorized"}, status=401)
+    raw_body = request.body
 
     try:
-        payload = json.loads(request.body)
+        payload = json.loads(raw_body)
     except json.JSONDecodeError:
         return JsonResponse({"error": "Invalid JSON"}, status=400)
 
+    from django.conf import settings
+    webhook_secret = getattr(settings, 'MP_WEBHOOK_SECRET', '')
+
+    if webhook_secret:
+        x_sig = request.META.get('HTTP_X_SIGNATURE', '')
+        if not x_sig:
+            logger.warning("Billing webhook sem x-signature, rejeitado")
+            return JsonResponse({"error": "Forbidden"}, status=403)
+
+        import hashlib
+        import hmac
+
+        parts = {}
+        for pair in x_sig.split(','):
+            if '=' in pair:
+                k, v = pair.split('=', 1)
+                parts[k.strip()] = v.strip()
+
+        ts = parts.get('ts', '')
+        v1 = parts.get('v1', '')
+
+        if not ts or not v1:
+            logger.warning("Billing webhook x-signature mal formatada: %s", x_sig)
+            return JsonResponse({"error": "Forbidden"}, status=403)
+
+        data_id = str(payload.get('data', {}).get('id', ''))
+        template = f"id:{data_id};ts:{ts};{raw_body.decode('utf-8')}"
+        expected = hmac.new(
+            webhook_secret.encode('utf-8'),
+            template.encode('utf-8'),
+            hashlib.sha256,
+        ).hexdigest()
+
+        if not hmac.compare_digest(expected, v1):
+            logger.warning("Billing webhook x-signature invalida: esperado=%s recebido=%s", expected, v1)
+            return JsonResponse({"error": "Forbidden"}, status=403)
+
+        logger.info("Billing webhook x-signature OK (data_id=%s)", data_id)
+
     event = WebhookEvent.objects.create(
-        gateway='pagarme_billing',
+        gateway='mercadopago',
         payload=payload,
-        gateway_event_id=payload.get('id', '') or None,
+        gateway_event_id=str(payload.get('id', '')) or None,
     )
     from app.apps.webhooks.tasks import process_billing_webhook
     process_billing_webhook.delay(event.id)

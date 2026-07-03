@@ -241,8 +241,7 @@ PLAN_SELLER_LIMITS = {
 
 MP_ACCESS_TOKEN = config('MP_ACCESS_TOKEN', default='')
 MP_PUBLIC_KEY = config('MP_PUBLIC_KEY', default='')
-BILLING_WEBHOOK_USER = config('BILLING_WEBHOOK_USER', default='')
-BILLING_WEBHOOK_PASS = config('BILLING_WEBHOOK_PASS', default='')
+MP_WEBHOOK_SECRET = config('MP_WEBHOOK_SECRET', default='')
 
 SIMPLE_JWT = {
     'ACCESS_TOKEN_LIFETIME': timedelta(minutes=config('JWT_ACCESS_TOKEN_LIFETIME_MINUTES', default=30, cast=int)),

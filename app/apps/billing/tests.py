@@ -11,6 +11,61 @@ from app.apps.sales.models import Sale
 from app.apps.webhooks.models import WebhookEvent
 
 
+class TestBillingWebhookSignature(TestCase):
+    @override_settings(MP_WEBHOOK_SECRET='test_secret_key')
+    def test_valid_signature_passes(self):
+        import hashlib
+        import hmac
+        import json
+
+        data_id = '56789'
+        ts = '1704067200'
+        payload = {'type': 'payment', 'data': {'id': data_id}}
+        raw_body = json.dumps(payload).encode()
+
+        template = f"id:{data_id};ts:{ts};{raw_body.decode('utf-8')}"
+        v1 = hmac.new(
+            b'test_secret_key', template.encode(), hashlib.sha256,
+        ).hexdigest()
+        x_sig = f"ts={ts},v1={v1}"
+
+        resp = self.client.post(
+            '/api/webhooks/billing/',
+            data=raw_body,
+            content_type='application/json',
+            HTTP_X_SIGNATURE=x_sig,
+        )
+        self.assertEqual(resp.status_code, 200)
+
+    @override_settings(MP_WEBHOOK_SECRET='test_secret_key')
+    def test_invalid_signature_rejected(self):
+        resp = self.client.post(
+            '/api/webhooks/billing/',
+            data='{"type":"payment","data":{"id":"123"}}',
+            content_type='application/json',
+            HTTP_X_SIGNATURE='ts=1,v1=invalid',
+        )
+        self.assertEqual(resp.status_code, 403)
+
+    @override_settings(MP_WEBHOOK_SECRET='test_secret_key')
+    def test_missing_signature_rejected(self):
+        resp = self.client.post(
+            '/api/webhooks/billing/',
+            data='{"type":"payment","data":{"id":"123"}}',
+            content_type='application/json',
+        )
+        self.assertEqual(resp.status_code, 403)
+
+    @override_settings(MP_WEBHOOK_SECRET='')
+    def test_no_secret_configured_accepts(self):
+        resp = self.client.post(
+            '/api/webhooks/billing/',
+            data='{"type":"payment","data":{"id":"123"}}',
+            content_type='application/json',
+        )
+        self.assertEqual(resp.status_code, 200)
+
+
 class TestTenantOperational(TestCase):
     def setUp(self):
         self.tenant = Tenant.objects.create(
@@ -102,7 +157,7 @@ class TestBillingWebhook(TestCase):
             'data': {'id': '12345'},
         }
         event = WebhookEvent.objects.create(
-            gateway='pagarme_billing', payload=payload,
+            gateway='mercadopago', payload=payload,
             gateway_event_id='evt_test1',
         )
         from app.apps.webhooks.tasks import process_billing_webhook
@@ -123,7 +178,7 @@ class TestBillingWebhook(TestCase):
             'data': {'id': '12346'},
         }
         event = WebhookEvent.objects.create(
-            gateway='pagarme_billing', payload=payload,
+            gateway='mercadopago', payload=payload,
             gateway_event_id='evt_test2',
         )
         from app.apps.webhooks.tasks import process_billing_webhook
@@ -143,7 +198,7 @@ class TestBillingWebhook(TestCase):
             'data': {'id': 'sub_test123'},
         }
         event = WebhookEvent.objects.create(
-            gateway='pagarme_billing', payload=payload,
+            gateway='mercadopago', payload=payload,
             gateway_event_id='evt_test3',
         )
         from app.apps.webhooks.tasks import process_billing_webhook
@@ -163,7 +218,7 @@ class TestBillingWebhook(TestCase):
             'data': {'id': 'sub_test123'},
         }
         event = WebhookEvent.objects.create(
-            gateway='pagarme_billing', payload=payload,
+            gateway='mercadopago', payload=payload,
             gateway_event_id='evt_test4',
         )
         from app.apps.webhooks.tasks import process_billing_webhook

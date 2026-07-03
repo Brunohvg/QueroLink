@@ -98,7 +98,7 @@ def assinatura(request):
     billing_history = []
     if sub and sub.gateway_subscription_id:
         events = WebhookEvent.objects.filter(
-            gateway='pagarme_billing',
+            gateway='mercadopago',
         ).order_by('-received_at')[:50]
 
         for ev in events:
