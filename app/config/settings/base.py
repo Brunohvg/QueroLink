@@ -227,12 +227,15 @@ from datetime import timedelta
 WEBHOOK_AUTH_REQUIRED = config('WEBHOOK_AUTH_REQUIRED', default=True, cast=bool)
 
 PLAN_PRICES = {
+    'VCOM': config('PLAN_PRICE_VCOM', default=9700, cast=int),
+    'VCOM_YEARLY': config('PLAN_PRICE_VCOM_YEARLY', default=99000, cast=int),
     'ESSENCIAL': config('PLAN_PRICE_ESSENCIAL', default=0, cast=int),
     'PROFISSIONAL': config('PLAN_PRICE_PROFISSIONAL', default=0, cast=int),
     'PLUS': config('PLAN_PRICE_PLUS', default=0, cast=int),
     'ENTERPRISE': config('PLAN_PRICE_ENTERPRISE', default=0, cast=int),
 }
 PLAN_SELLER_LIMITS = {
+    'VCOM': None,
     'ESSENCIAL': 5,
     'PROFISSIONAL': 15,
     'PLUS': 30,

@@ -126,24 +126,38 @@ def assinatura(request):
                 break
 
     PLAN_FEATURES = {
-        'ESSENCIAL': ['Gerenciamento de comissoes', 'Links de pagamento', 'App do vendedor', 'Relatorios basicos'],
-        'PROFISSIONAL': ['Tudo do Essencial', 'Ate 15 vendedores', 'Relatorios em PDF', 'Ranking de vendas'],
-        'PLUS': ['Tudo do Profissional', 'Ate 30 vendedores', 'Suporte prioritario', 'Metas mensais'],
-        'ENTERPRISE': ['Tudo do Plus', 'Vendedores ilimitados', 'Suporte dedicado', 'Prioridade em novas features'],
+        'VCOM': [
+            'Vendedores ilimitados',
+            'App do vendedor',
+            'Links de pagamento',
+            'Fechamento automatico de comissao',
+            'Recibo PDF',
+            'Ranking de vendas',
+            'Metas mensais',
+            'Lembrete via WhatsApp',
+        ],
+        'ENTERPRISE': [
+            'Tudo do V-Com',
+            'SLA dedicado',
+            'Onboarding personalizado',
+            'Integracoes sob demanda',
+            'Suporte telefonico',
+            'Contrato anual',
+        ],
     }
 
     plan_names = dict(Tenant.Plan.choices)
     all_plans = []
-    for key in ['ESSENCIAL', 'PROFISSIONAL', 'PLUS', 'ENTERPRISE']:
+    for key in ['VCOM', 'ENTERPRISE']:
         monthly = prices.get(key, 0)
-        yearly = int(monthly * 12 * 0.9) if monthly else 0
+        yearly = prices.get(f'{key}_YEARLY', int(monthly * 12 * 0.9)) if monthly else 0
         all_plans.append({
             'id': key,
             'name': plan_names.get(key, key),
             'seller_limit': limits.get(key, '—'),
             'price_monthly': monthly,
-            'features': PLAN_FEATURES.get(key, []),
             'price_yearly': yearly,
+            'features': PLAN_FEATURES.get(key, []),
             'is_current': tenant.plan == key,
         })
 

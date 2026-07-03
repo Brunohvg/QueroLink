@@ -24,9 +24,9 @@ class PlanListView(APIView):
         limits = getattr(settings, 'PLAN_SELLER_LIMITS', {})
         plan_names = dict(Tenant.Plan.choices)
         data = []
-        for key in ['ESSENCIAL', 'PROFISSIONAL', 'PLUS', 'ENTERPRISE']:
+        for key in ['VCOM', 'ENTERPRISE']:
             monthly = prices.get(key, 0)
-            yearly = int(monthly * 12 * 0.9) if monthly else 0
+            yearly = prices.get(f'{key}_YEARLY', int(monthly * 12 * 0.9)) if monthly else 0
             data.append({
                 'id': key,
                 'name': plan_names.get(key, key),

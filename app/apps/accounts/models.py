@@ -8,6 +8,7 @@ from .fields import EncryptedCharField, compute_hash
 
 class Tenant(models.Model):
     class Plan(models.TextChoices):
+        VCOM = 'VCOM', 'V-Com'
         ESSENCIAL = 'ESSENCIAL', 'Essencial (ate 5 vendedores)'
         PROFISSIONAL = 'PROFISSIONAL', 'Profissional (ate 15 vendedores)'
         PLUS = 'PLUS', 'Plus (ate 30 vendedores)'

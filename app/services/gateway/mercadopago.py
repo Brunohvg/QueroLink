@@ -13,15 +13,23 @@ class MercadoPagoError(Exception):
 class MercadoPagoGateway:
     def __init__(self):
         access_token = getattr(settings, 'MP_ACCESS_TOKEN', '')
-        if not access_token:
+        self._configured = bool(access_token)
+        if self._configured:
+            self.sdk = mercadopago.SDK(access_token)
+        else:
+            self.sdk = None
+
+    def _check(self):
+        if not self._configured:
             raise MercadoPagoError(
-                "MP_ACCESS_TOKEN nao configurado nas settings."
+                "MP_ACCESS_TOKEN nao configurado. "
+                "Billing nao esta disponivel no momento."
             )
-        self.sdk = mercadopago.SDK(access_token)
 
     def create_preapproval(self, reason, external_reference, payer_email,
                            amount, frequency=1, frequency_type='months',
                            back_url=None):
+        self._check()
         payload = {
             "reason": reason,
             "external_reference": str(external_reference),
@@ -46,6 +54,7 @@ class MercadoPagoGateway:
         )
 
     def get_preapproval(self, preapproval_id):
+        self._check()
         result = self.sdk.preapproval().get(preapproval_id)
         if result["status"] == 200:
             return result["response"]
@@ -54,6 +63,7 @@ class MercadoPagoGateway:
         )
 
     def cancel_preapproval(self, preapproval_id):
+        self._check()
         result = self.sdk.preapproval().update(
             preapproval_id, {"status": "cancelled"},
         )
@@ -64,6 +74,7 @@ class MercadoPagoGateway:
         )
 
     def get_payment(self, payment_id):
+        self._check()
         result = self.sdk.payment().get(payment_id)
         if result["status"] == 200:
             return result["response"]

@@ -27,15 +27,9 @@ PLAN_LIMITS = {
 
 
 def _check_seller_limit(tenant):
-    limit = PLAN_LIMITS.get(tenant.plan)
-    if limit is None:
-        return
-    current = Seller.objects.filter(tenant=tenant, is_active=True).count()
-    if current >= limit:
-        raise serializers.ValidationError(
-            f'Limite de vendedores do plano {tenant.plan} atingido ({limit}). '
-            f'Faca upgrade para adicionar mais vendedores.'
-        )
+    # Desabilitado — limite de vendedores nao e mais aplicado.
+    # Quando o billing for ativado, reativar esta funcao.
+    pass
 
 
 class SellerSerializer(serializers.ModelSerializer):
