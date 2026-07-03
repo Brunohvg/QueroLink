@@ -56,6 +56,7 @@ INSTALLED_APPS = [
     "app.apps.dashboard",
     "app.apps.api",
     "app.apps.analytics",
+    "app.apps.billing",
 
     'rest_framework',
     'rest_framework.authtoken',
@@ -224,6 +225,24 @@ SPECTACULAR_SETTINGS = {
 from datetime import timedelta
 
 WEBHOOK_AUTH_REQUIRED = config('WEBHOOK_AUTH_REQUIRED', default=True, cast=bool)
+
+PLAN_PRICES = {
+    'ESSENCIAL': config('PLAN_PRICE_ESSENCIAL', default=0, cast=int),
+    'PROFISSIONAL': config('PLAN_PRICE_PROFISSIONAL', default=0, cast=int),
+    'PLUS': config('PLAN_PRICE_PLUS', default=0, cast=int),
+    'ENTERPRISE': config('PLAN_PRICE_ENTERPRISE', default=0, cast=int),
+}
+PLAN_SELLER_LIMITS = {
+    'ESSENCIAL': 5,
+    'PROFISSIONAL': 15,
+    'PLUS': 30,
+    'ENTERPRISE': None,
+}
+
+VIDALYS_PAGARME_API_KEY = config('VIDALYS_PAGARME_API_KEY', default='')
+VIDALYS_PAGARME_PUBLIC_KEY = config('VIDALYS_PAGARME_PUBLIC_KEY', default='')
+BILLING_WEBHOOK_USER = config('BILLING_WEBHOOK_USER', default='')
+BILLING_WEBHOOK_PASS = config('BILLING_WEBHOOK_PASS', default='')
 
 SIMPLE_JWT = {
     'ACCESS_TOKEN_LIFETIME': timedelta(minutes=config('JWT_ACCESS_TOKEN_LIFETIME_MINUTES', default=30, cast=int)),

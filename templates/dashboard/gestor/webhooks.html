@@ -1,0 +1,76 @@
+{% extends 'dashboard/base_desktop.html' %}
+{% block title %}Webhooks — V-Com{% endblock %}
+{% block content %}
+
+<div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+    <div class="surface-card">
+        <p class="text-[13px] font-semibold text-gray-500 uppercase tracking-wide mb-1">Ultimas 24h</p>
+        <p class="font-display text-[28px] font-semibold text-gray-900">{{ recent_24h }}</p>
+    </div>
+    <div class="surface-card">
+        <p class="text-[13px] font-semibold text-gray-500 uppercase tracking-wide mb-1">Pendentes > 10 min</p>
+        <p class="font-display text-[28px] font-semibold text-amber-600">{{ pending_10min }}</p>
+    </div>
+    <div class="surface-card">
+        <p class="text-[13px] font-semibold text-gray-500 uppercase tracking-wide mb-1">Ignorados (7d)</p>
+        <p class="font-display text-[28px] font-semibold text-gray-500">{{ ignored_7d }}</p>
+    </div>
+    <div class="surface-card">
+        <p class="text-[13px] font-semibold text-gray-500 uppercase tracking-wide mb-1">Auth configurada</p>
+        <p class="font-display text-[28px] font-semibold {% if creds_configured %}text-success-700{% else %}text-danger-700{% endif %}">
+            {{ creds_configured|yesno:"Sim,Nao" }}
+        </p>
+    </div>
+</div>
+
+<div class="surface-card mb-6">
+    <h2 class="text-[13px] font-semibold text-gray-500 uppercase tracking-wide mb-2">URL do Webhook</h2>
+    <code class="block text-[13px] bg-gray-50 p-3 rounded-lg border border-gray-200 text-gray-800 break-all">{{ webhook_url }}</code>
+</div>
+
+<div class="surface-card">
+    <h2 class="text-[13px] font-semibold text-gray-500 uppercase tracking-wide mb-4">Ultimos eventos</h2>
+    <div class="overflow-x-auto">
+        <table class="w-full text-left text-[14px]">
+            <thead>
+                <tr>
+                    <th class="px-4 py-3 font-semibold text-gray-500 border-b border-gray-200 bg-gray-50">Data/Hora</th>
+                    <th class="px-4 py-3 font-semibold text-gray-500 border-b border-gray-200 bg-gray-50">Tipo</th>
+                    <th class="px-4 py-3 font-semibold text-gray-500 border-b border-gray-200 bg-gray-50">Status</th>
+                    <th class="px-4 py-3 font-semibold text-gray-500 border-b border-gray-200 bg-gray-50">Payload</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for e in events %}
+                <tr class="hover:bg-gray-50">
+                    <td class="px-4 py-3 border-b border-gray-100 text-[13px]">{{ e.received_at|date:"d/m/Y H:i:s" }}</td>
+                    <td class="px-4 py-3 border-b border-gray-100 font-medium">{{ e.event_type }}</td>
+                    <td class="px-4 py-3 border-b border-gray-100">
+                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium
+                            {% if e.status_label == 'Processado' %}bg-success-50 text-success-700
+                            {% elif e.status_label == 'Ignorado' %}bg-gray-100 text-gray-600
+                            {% else %}bg-amber-50 text-amber-700{% endif %}">
+                            {{ e.status_label }}
+                        </span>
+                        {% if e.skip_reason %}
+                        <span class="text-[11px] text-gray-400 block mt-1">{{ e.skip_reason|truncatechars:60 }}</span>
+                        {% endif %}
+                    </td>
+                    <td class="px-4 py-3 border-b border-gray-100">
+                        <details>
+                            <summary class="text-[13px] text-brand-500 cursor-pointer">Ver</summary>
+                            <pre class="text-[11px] bg-gray-50 p-2 mt-1 rounded overflow-x-auto max-w-xs">{{ e.payload|pprint }}</pre>
+                        </details>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="4" class="text-center py-8 text-gray-500">Nenhum evento de webhook encontrado.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+{% endblock %}

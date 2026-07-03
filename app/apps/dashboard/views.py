@@ -77,6 +77,30 @@ def plano_expirado(request):
 
 
 @login_required
+def assinatura(request):
+    tenant = request.user.tenant
+    from app.apps.billing.models import Subscription
+    from django.conf import settings
+
+    try:
+        sub = Subscription.objects.get(tenant=tenant)
+    except Subscription.DoesNotExist:
+        sub = None
+
+    limits = getattr(settings, 'PLAN_SELLER_LIMITS', {})
+    plan_limit = limits.get(tenant.plan, None)
+    from app.apps.sellers.models import Seller
+    active_sellers = Seller.objects.filter(tenant=tenant, is_active=True).count()
+
+    return render(request, 'dashboard/assinatura.html', {
+        'tenant': tenant,
+        'subscription': sub,
+        'plan_limit': plan_limit,
+        'active_sellers': active_sellers,
+    })
+
+
+@login_required
 def dashboard_home(request):
     user = request.user
     if user.role in (User.Role.MANAGER, User.Role.ADMIN):

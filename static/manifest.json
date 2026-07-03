@@ -1,6 +1,6 @@
 {
-    "name": "V-Com — Comissões",
-    "short_name": "V-Com",
+    "name": "Vidalys Rota",
+    "short_name": "Rota",
     "description": "App de gestão de comissões para vendedores",
     "start_url": "/dashboard/mobile/",
     "scope": "/dashboard/mobile/",

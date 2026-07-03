@@ -36,6 +36,12 @@ class Tenant(models.Model):
     plan = models.CharField(max_length=20, choices=Plan.choices, default=Plan.ESSENCIAL)
     trial_ends_at = models.DateTimeField(null=True, blank=True)
     billing_cycle = models.CharField(max_length=10, choices=[('MONTHLY', 'Mensal'), ('YEARLY', 'Anual')], default='MONTHLY')
+    daily_reminder_enabled = models.BooleanField(default=False)
+    daily_reminder_time = models.TimeField(default='20:00')
+    ranking_visible_to_sellers = models.BooleanField(
+        default=True,
+        help_text="Vendedor ve ranking completo com nomes dos colegas",
+    )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -82,7 +88,22 @@ class Tenant(models.Model):
 
 
 def tenant_operational(tenant):
-    return tenant.is_active and not tenant.is_trial_expired
+    if not tenant.is_active:
+        return False
+    if tenant.trial_ends_at and tenant.trial_ends_at > timezone.now():
+        return True
+    from app.apps.billing.models import Subscription
+    try:
+        sub = Subscription.objects.get(tenant=tenant)
+        if sub.status in ('ACTIVE', 'TRIALING'):
+            return True
+        if sub.status == 'PAST_DUE' and sub.current_period_end:
+            from datetime import timedelta
+            if sub.current_period_end > timezone.now() - timedelta(days=5):
+                return True
+        return False
+    except Subscription.DoesNotExist:
+        return not tenant.is_trial_expired
 
 class User(AbstractUser):
     # Role.ADMIN é admin DENTRO do tenant (gerencia vendedores, fechamento, etc. da propria loja).

@@ -16,7 +16,8 @@ def _skip_foreign_event(event, reason):
     """Marca evento como processado sem erro — evita retry de webhooks de outras plataformas."""
     logger.warning("Webhook %s ignorado: %s", event.id, reason)
     event.processed = True
-    event.save(update_fields=['processed'])
+    event.skip_reason = reason
+    event.save(update_fields=['processed', 'skip_reason'])
 
 
 VALID_PAYMENT_METHODS = {'credit_card', 'pix', 'boleto', 'unknown'}
@@ -451,6 +452,172 @@ def process_pagarme_webhook(event_id):
 
         event.processed = True
         event.save(update_fields=['processed'])
+
+
+@shared_task(
+    autoretry_for=(Exception,),
+    max_retries=3,
+    default_retry_delay=30,
+)
+def process_billing_webhook(event_id):
+    try:
+        event = WebhookEvent.objects.get(id=event_id, processed=False)
+    except WebhookEvent.DoesNotExist:
+        return
+
+    from datetime import timedelta
+    from app.apps.billing.models import Subscription
+
+    payload = event.payload
+    event_type = payload.get('type', '')
+    data = payload.get('data', {})
+
+    gateway_sub_id = data.get('subscription_id') or data.get('id', '')
+
+    if not gateway_sub_id:
+        logger.warning("Billing webhook %s: sem subscription_id", event_id)
+        event.processed = True
+        event.save(update_fields=['processed'])
+        return
+
+    try:
+        sub = Subscription.objects.get(gateway_subscription_id=gateway_sub_id)
+    except Subscription.DoesNotExist:
+        logger.warning("Billing webhook %s: subscription %s nao encontrada", event_id, gateway_sub_id)
+        event.processed = True
+        event.save(update_fields=['processed'])
+        return
+
+    if event_type == 'subscription.charge_paid':
+        sub.status = Subscription.Status.ACTIVE
+        sub.current_period_end = timezone.now() + timedelta(days=30)
+        logger.info("Billing: subscription %s ACTIVE (charge_paid)", gateway_sub_id)
+
+    elif event_type == 'subscription.charge_failed':
+        sub.status = Subscription.Status.PAST_DUE
+        logger.warning("Billing: subscription %s PAST_DUE (charge_failed)", gateway_sub_id)
+
+    elif event_type == 'subscription.canceled':
+        sub.status = Subscription.Status.CANCELED
+        logger.info("Billing: subscription %s CANCELED", gateway_sub_id)
+
+    else:
+        logger.info("Billing webhook %s: tipo ignorado %s", event_id, event_type)
+        event.processed = True
+        event.save(update_fields=['processed'])
+        return
+
+    sub.save(update_fields=['status', 'current_period_end', 'updated_at'])
+    event.processed = True
+    event.save(update_fields=['processed'])
+
+
+@shared_task(soft_time_limit=300, time_limit=360)
+def reconcile_pending_orders():
+    from datetime import timedelta
+    from app.services.gateway.pagar_me import PagarMeGateway, PagarMeError
+
+    cutoff_start = timezone.now() - timedelta(days=7)
+    cutoff_min_age = timezone.now() - timedelta(hours=2)
+
+    orders = Order.objects.filter(
+        status=Order.Status.PENDING,
+        created_at__gte=cutoff_start,
+        created_at__lte=cutoff_min_age,
+        payment_link__gateway_link_id__isnull=False,
+    ).select_related('tenant', 'payment_link').order_by('created_at')[:200]
+
+    counted = 0
+    paid_count = 0
+    failed_count = 0
+    expired_count = 0
+
+    tenant_gateways = {}
+
+    for order in orders:
+        counted += 1
+        tenant = order.tenant
+
+        if tenant.uuid not in tenant_gateways:
+            if not tenant.pagarme_api_key:
+                logger.info(
+                    "Reconcile: tenant %s sem chave Pagar.me, pulando order %s",
+                    tenant.slug, order.uuid,
+                )
+                continue
+            try:
+                tenant_gateways[tenant.uuid] = PagarMeGateway(
+                    api_key=tenant.pagarme_api_key,
+                )
+            except PagarMeError:
+                logger.warning(
+                    "Reconcile: erro ao criar gateway para tenant %s",
+                    tenant.slug,
+                )
+                continue
+
+        gateway = tenant_gateways[tenant.uuid]
+
+        try:
+            remote_order = gateway.find_order_by_code(str(order.uuid))
+        except PagarMeError as e:
+            logger.warning(
+                "Reconcile: erro ao consultar order %s: %s",
+                order.uuid, e,
+            )
+            continue
+
+        if remote_order is None:
+            link = order.payment_link
+            if link and link.expires_at and link.expires_at < timezone.now() - timedelta(hours=24):
+                order.status = Order.Status.EXPIRED
+                order.save(update_fields=['status', 'updated_at'])
+                expired_count += 1
+            continue
+
+        remote_status = remote_order.get('status', '')
+
+        if remote_status == 'paid':
+            synthetic_payload = {
+                'type': 'order.paid',
+                'data': remote_order,
+                'id': f'reconcile_{order.uuid}',
+            }
+            event = WebhookEvent.objects.create(
+                gateway='pagarme',
+                payload=synthetic_payload,
+                gateway_event_id=f'reconcile_{order.uuid}',
+                tenant=tenant,
+            )
+            process_pagarme_webhook.delay(event.id)
+            paid_count += 1
+
+        elif remote_status in ('failed', 'canceled'):
+            synthetic_payload = {
+                'type': 'order.payment_failed',
+                'data': remote_order,
+                'id': f'reconcile_{order.uuid}',
+            }
+            event = WebhookEvent.objects.create(
+                gateway='pagarme',
+                payload=synthetic_payload,
+                gateway_event_id=f'reconcile_{order.uuid}',
+                tenant=tenant,
+            )
+            process_pagarme_webhook.delay(event.id)
+            failed_count += 1
+
+        else:
+            link = order.payment_link
+            if link and link.expires_at and link.expires_at < timezone.now() - timedelta(hours=24):
+                order.status = Order.Status.EXPIRED
+                order.save(update_fields=['status', 'updated_at'])
+                expired_count += 1
+
+    logger.info(
+        "Reconciliacao: %d verificadas, %d pagas, %d falhas, %d expiradas",
+        counted, paid_count, failed_count, expired_count,
+    )
 
 
 @shared_task(soft_time_limit=300, time_limit=360)

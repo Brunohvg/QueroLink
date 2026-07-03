@@ -1,6 +1,7 @@
 from django.test import TestCase
 from django.core.exceptions import ValidationError
 from django.db.utils import IntegrityError
+from django.db.models import Sum
 from app.apps.accounts.models import Tenant, User
 from app.apps.sellers.models import Seller
 from app.apps.sales.models import Sale
@@ -193,3 +194,69 @@ class SellerCommissionRecalculateTest(TestCase):
         self.sc.recalculate()
         self.assertEqual(self.sc.total_sold_amount, 0)
         self.assertEqual(self.sc.commission_amount, 0)
+
+
+class SellerGoalTest(TestCase):
+    def setUp(self):
+        self.tenant = Tenant.objects.create(
+            company_name='Goal Test', slug='goal-test',
+            is_active=True, ranking_visible_to_sellers=True,
+        )
+        self.user = User.objects.create_user(
+            username='seller_goal', password='test123',
+            role=User.Role.SELLER, tenant=self.tenant,
+        )
+        self.seller = Seller.objects.create(
+            tenant=self.tenant, name='Goal Seller', phone='55999999999',
+            user=self.user, is_active=True,
+        )
+
+    def test_goal_progress_percent(self):
+        from app.apps.sellers.models import SellerGoal
+        goal = SellerGoal.objects.create(
+            seller=self.seller, month=7, year=2026,
+            target_amount=100000, created_by=self.user,
+        )
+        Sale.objects.create(
+            tenant=self.tenant, seller=self.seller,
+            origin=Sale.Origin.MANUAL, amount=25000,
+            sale_date='2026-07-15', status='ATIVA',
+            created_by=self.user,
+        )
+        Sale.objects.create(
+            tenant=self.tenant, seller=self.seller,
+            origin=Sale.Origin.MANUAL, amount=25000,
+            sale_date='2026-07-16', status='ATIVA',
+            created_by=self.user,
+        )
+        self.assertEqual(goal.progress_percent, 50)
+
+    def test_goal_excludes_estornada_sales(self):
+        from app.apps.sellers.models import SellerGoal
+        goal = SellerGoal.objects.create(
+            seller=self.seller, month=7, year=2026,
+            target_amount=100000, created_by=self.user,
+        )
+        Sale.objects.create(
+            tenant=self.tenant, seller=self.seller,
+            origin=Sale.Origin.MANUAL, amount=50000,
+            sale_date='2026-07-15', status='ESTORNADA',
+            created_by=self.user,
+        )
+        self.assertEqual(goal.progress_percent, 0)
+
+    def test_goal_ranking_respects_flag(self):
+        from app.apps.sellers.models import SellerGoal
+        self.tenant.ranking_visible_to_sellers = False
+        self.tenant.save()
+        goal = SellerGoal.objects.create(
+            seller=self.seller, month=7, year=2026,
+            target_amount=100000, created_by=self.user,
+        )
+        Sale.objects.create(
+            tenant=self.tenant, seller=self.seller,
+            origin=Sale.Origin.MANUAL, amount=50000,
+            sale_date='2026-07-15', status='ATIVA',
+            created_by=self.user,
+        )
+        self.assertEqual(goal.progress_percent, 50)

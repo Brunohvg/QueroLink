@@ -232,6 +232,109 @@ class TestWebhookAuth(TestCase):
         self.assertTrue(WebhookEvent.objects.filter(tenant=self.tenant).exists())
 
 
+class TestReconcilePendingOrders(BaseWebhookTest):
+    def setUp(self):
+        super().setUp()
+        Tenant.objects.filter(pk=self.tenant.pk).update(
+            pagarme_api_key='sk_test_fakekey123456',
+        )
+        self.tenant.refresh_from_db()
+        self.old_order = Order.objects.create(
+            tenant=self.tenant,
+            seller=self.seller,
+            customer_name='Old Order',
+            total_amount=20000,
+            status=Order.Status.PENDING,
+        )
+        Order.objects.filter(pk=self.old_order.pk).update(
+            created_at=timezone.now() - timezone.timedelta(hours=12),
+        )
+        self.old_order.refresh_from_db()
+        Payment.objects.create(
+            order=self.old_order,
+            gateway_name='pagarme',
+            status=Payment.Status.PENDING,
+        )
+        PaymentLink.objects.create(
+            order=self.old_order,
+            gateway_url='https://pagar.me/link/old',
+            gateway_link_id='pl_old123',
+        )
+
+    @patch('app.apps.webhooks.tasks.process_pagarme_webhook.delay')
+    @patch('app.services.gateway.pagar_me.PagarMeGateway.find_order_by_code')
+    def test_order_paid_creates_webhook_event(self, mock_find, mock_process):
+        mock_find.return_value = {
+            'id': 'or_recon123',
+            'code': str(self.old_order.uuid),
+            'status': 'paid',
+            'charges': [{
+                'id': 'ch_recon1',
+                'payment_method': 'credit_card',
+                'paid_at': '2026-07-03T12:00:00Z',
+                'last_transaction': {
+                    'installments': 1,
+                    'card': {'brand': 'visa', 'last_four_digits': '4242'},
+                },
+            }],
+        }
+
+        from app.apps.webhooks.tasks import reconcile_pending_orders
+        with patch('app.apps.notifications.tasks.create_and_send_notification', return_value=None):
+            reconcile_pending_orders()
+
+        event = WebhookEvent.objects.filter(
+            gateway_event_id=f'reconcile_{self.old_order.uuid}',
+        ).first()
+        self.assertIsNotNone(event)
+        self.assertEqual(event.payload['type'], 'order.paid')
+
+    @patch('app.apps.webhooks.tasks.process_pagarme_webhook.delay')
+    @patch('app.services.gateway.pagar_me.PagarMeGateway.find_order_by_code')
+    def test_reconcile_remote_pending_does_nothing(self, mock_find, mock_process):
+        mock_find.return_value = {
+            'id': 'or_pending',
+            'code': str(self.old_order.uuid),
+            'status': 'pending',
+        }
+
+        from app.apps.webhooks.tasks import reconcile_pending_orders
+        reconcile_pending_orders()
+
+        self.old_order.refresh_from_db()
+        self.assertEqual(self.old_order.status, Order.Status.PENDING)
+        mock_process.assert_not_called()
+
+    @patch('app.apps.webhooks.tasks.process_pagarme_webhook.delay')
+    @patch('app.services.gateway.pagar_me.PagarMeGateway.find_order_by_code')
+    def test_tenant_without_api_key_skipped(self, mock_find, mock_process):
+        self.tenant.pagarme_api_key = None
+        self.tenant.save()
+
+        from app.apps.webhooks.tasks import reconcile_pending_orders
+        reconcile_pending_orders()
+
+        mock_find.assert_not_called()
+
+    @patch('app.apps.webhooks.tasks.process_pagarme_webhook.delay')
+    @patch('app.services.gateway.pagar_me.PagarMeGateway.find_order_by_code')
+    def test_idempotency_does_not_duplicate(self, mock_find, mock_process):
+        mock_find.return_value = {
+            'id': 'or_recon123',
+            'code': str(self.old_order.uuid),
+            'status': 'paid',
+        }
+        self.payment.status = Payment.Status.PAID
+        self.payment.save()
+
+        from app.apps.webhooks.tasks import reconcile_pending_orders
+        with patch('app.apps.notifications.tasks.create_and_send_notification', return_value=None):
+            reconcile_pending_orders()
+
+        sale_count = Sale.objects.filter(order=self.old_order).count()
+        self.assertEqual(sale_count, 0)
+
+
 class TestChargeRefunded(BaseWebhookTest):
     def test_charge_refunded_updates_status(self):
         self.payment.status = Payment.Status.PAID

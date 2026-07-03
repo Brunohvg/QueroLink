@@ -9,6 +9,7 @@ class WebhookEvent(models.Model):
     payload = models.JSONField()
     processed = models.BooleanField(default=False)
     processing_error = models.TextField(blank=True, null=True)
+    skip_reason = models.TextField(blank=True, null=True, help_text="Motivo do skip (evento estrangeiro)")
     tenant = models.ForeignKey(
         'accounts.Tenant', on_delete=models.CASCADE,
         null=True, blank=True, related_name='webhook_events',

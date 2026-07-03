@@ -22,6 +22,7 @@ class MessageTemplate(models.Model):
         SELLER_CREDENTIALS = 'seller_credentials', 'Seller Credentials'
         COMMISSION_PAID = 'commission_paid', 'Commission Paid'
         COMMISSION_ADJUSTED = 'commission_adjusted', 'Commission Adjusted'
+        DAILY_REMINDER = 'daily_reminder', 'Daily Reminder'
 
     class Channel(models.TextChoices):
         WHATSAPP = 'whatsapp', 'WhatsApp'

@@ -469,6 +469,68 @@ def financeiro_historico(request):
 
 
 @login_required
+@login_required
+def gestor_webhooks(request):
+    _check_role(request, User.Role.ADMIN, User.Role.MANAGER)
+    tenant = request.user.tenant
+
+    from app.apps.webhooks.models import WebhookEvent
+    from datetime import timedelta
+    from django.conf import settings
+
+    now = timezone.now()
+    last_24h = now - timedelta(hours=24)
+    last_7d = now - timedelta(days=7)
+
+    events = WebhookEvent.objects.filter(
+        gateway='pagarme', tenant=tenant,
+    ).order_by('-received_at')[:50]
+
+    recent_24h = events.filter(received_at__gte=last_24h).count()
+    pending_10min = events.filter(
+        processed=False, received_at__lte=now - timedelta(minutes=10),
+    ).count()
+    ignored_7d = events.filter(
+        processed=True, received_at__gte=last_7d,
+    ).exclude(skip_reason__isnull=True).count()
+
+    webhook_url = (
+        f"https://{settings.SERVICE_FQDN_WEB}"
+        f"/api/webhooks/pagarme/{tenant.slug}/"
+    )
+    creds_configured = bool(
+        tenant.pagarme_webhook_username and tenant.pagarme_webhook_password
+    )
+
+    events_data = []
+    for e in events:
+        if e.skip_reason:
+            status_label = 'Ignorado'
+        elif e.processed:
+            status_label = 'Processado'
+        else:
+            status_label = 'Pendente'
+
+        events_data.append({
+            'received_at': e.received_at,
+            'event_type': e.payload.get('type', '?') if isinstance(e.payload, dict) else '?',
+            'status_label': status_label,
+            'processed': e.processed,
+            'skip_reason': e.skip_reason,
+            'payload': e.payload,
+        })
+
+    return render(request, 'dashboard/gestor/webhooks.html', {
+        'tenant': tenant,
+        'events': events_data,
+        'recent_24h': recent_24h,
+        'pending_10min': pending_10min,
+        'ignored_7d': ignored_7d,
+        'webhook_url': webhook_url,
+        'creds_configured': creds_configured,
+    })
+
+
 def gestor_links(request):
     if not _check_role(request, User.Role.MANAGER, User.Role.ADMIN):
         return redirect('dashboard:home')

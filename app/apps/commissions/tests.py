@@ -1063,3 +1063,50 @@ class TestMobileHomeMissingDaysContext(BaseTest):
         self.assertTrue(hasattr(response, 'content'))
         content = response.content.decode()
         self.assertIn('Lancamentos bloqueados', content)
+
+
+class TestReceiptPDF(BaseTest):
+    def setUp(self):
+        super().setUp()
+        with patch('app.apps.notifications.tasks.create_and_send_notification', return_value=None):
+            self._create_manual_sale(self.seller, 1000000, 15)
+            self.period = self._create_period()
+            sync_period_seller_commissions(self.period)
+            self.sc = SellerCommission.objects.get(period=self.period, seller=self.seller)
+            close_seller_commissions(self.period, [self.sc.id], self.manager)
+            pay_seller_commissions(self.period, [self.sc.id], self.manager, {
+                'payment_method': 'pix',
+            })
+            self.sc.refresh_from_db()
+
+    def test_receipt_pdf_for_paid_commission(self):
+        self.client.force_login(self.manager)
+        resp = self.client.get(
+            f'/api/commissions/periods/{self.period.uuid}/receipt/{self.sc.id}/',
+        )
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(resp['content-type'], 'application/pdf')
+        self.assertTrue(resp.content.startswith(b'%PDF'))
+
+    def test_receipt_returns_404_for_open_commission(self):
+        self._create_manual_sale(self.seller2, 50000, 16)
+        sc2 = SellerCommission.objects.get(period=self.period, seller=self.seller2)
+        self.client.force_login(self.manager)
+        resp = self.client.get(
+            f'/api/commissions/periods/{self.period.uuid}/receipt/{sc2.id}/',
+        )
+        self.assertEqual(resp.status_code, 404)
+
+    def test_receipt_returns_404_for_other_tenant(self):
+        other_tenant = Tenant.objects.create(
+            company_name='Other', slug='other', is_active=True,
+        )
+        other_user = User.objects.create_user(
+            username='other_mgr', password='test123',
+            role=User.Role.MANAGER, tenant=other_tenant,
+        )
+        self.client.force_login(other_user)
+        resp = self.client.get(
+            f'/api/commissions/periods/{self.period.uuid}/receipt/{self.sc.id}/',
+        )
+        self.assertEqual(resp.status_code, 404)

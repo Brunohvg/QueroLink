@@ -8,6 +8,7 @@ urlpatterns = [
     path('logout/', views.logout_view, name='logout'),
     path('', views.dashboard_home, name='home'),
     path('plano-expirado/', views.plano_expirado, name='plano_expirado'),
+    path('assinatura/', views.assinatura, name='assinatura'),
 
     path('gestor/', desktop_views.gestor_home, name='gestor_home'),
     path('gestor/ranking/', desktop_views.gestor_ranking, name='gestor_ranking'),
@@ -19,6 +20,7 @@ urlpatterns = [
     path('gestor/configuracoes/whatsapp/status/', desktop_views.whatsapp_connection_state, name='whatsapp_status'),
     path('gestor/configuracoes/whatsapp/disconnect/', desktop_views.whatsapp_disconnect, name='whatsapp_disconnect'),
     path('gestor/configuracoes/whatsapp/delete/', desktop_views.whatsapp_delete_instance, name='whatsapp_delete_instance'),
+    path('gestor/webhooks/', desktop_views.gestor_webhooks, name='gestor_webhooks'),
     path('gestor/links/', desktop_views.gestor_links, name='gestor_links'),
     path('gestor/links/<uuid:order_uuid>/', desktop_views.gestor_link_detalhe, name='gestor_link_detalhe'),
     path('gestor/links/<uuid:order_uuid>/cancelar/', desktop_views.gestor_link_cancelar, name='gestor_link_cancelar'),
@@ -37,5 +39,6 @@ urlpatterns += [
     path('mobile/vendas/', mobile_views.mobile_minhas_vendas, name='mobile_minhas_vendas'),
     path('mobile/desempenho/', mobile_views.mobile_meu_desempenho, name='mobile_meu_desempenho'),
     path('mobile/links/', mobile_views.mobile_links, name='mobile_links'),
+    path('mobile/ranking/', mobile_views.mobile_ranking, name='mobile_ranking'),
     path('mobile/perfil/', mobile_views.mobile_perfil, name='mobile_perfil'),
 ]

@@ -346,6 +346,78 @@ class CommissionPeriodViewSet(viewsets.ModelViewSet):
         )
         return Response(self.get_serializer(period).data)
 
+    @action(
+        detail=True, methods=['get'],
+        permission_classes=[IsAuthenticated, IsFinancialOrAdmin | IsManagerOrAdmin],
+        url_path='receipt/(?P<sc_id>[^/.]+)',
+    )
+    def receipt(self, request, pk=None, sc_id=None):
+        from django.template.loader import render_to_string
+        from weasyprint import HTML
+
+        period = self.get_object()
+        try:
+            sc = SellerCommission.objects.select_related(
+                'seller', 'period',
+            ).prefetch_related('adjustments').get(
+                pk=sc_id, period=period,
+            )
+        except SellerCommission.DoesNotExist:
+            return Response({'error': 'Comissao nao encontrada.'}, status=404)
+
+        if sc.status != SellerCommission.Status.PAGA:
+            return Response({'error': 'Recibo disponivel apenas para comissoes pagas.'}, status=404)
+
+        adjustments = sc.adjustments.all()
+        hoje = timezone.now()
+        html = render_to_string('reports/recibo_comissao.html', {
+            'tenant': period.tenant,
+            'period': period,
+            'sc': sc,
+            'adjustments': adjustments,
+            'hoje': hoje,
+        })
+        pdf = HTML(string=html).write_pdf()
+        return HttpResponse(pdf, content_type='application/pdf')
+
+    @action(
+        detail=True, methods=['get'],
+        permission_classes=[IsAuthenticated, IsFinancialOrAdmin | IsManagerOrAdmin],
+        url_path='receipts',
+    )
+    def receipts(self, request, pk=None):
+        from django.template.loader import render_to_string
+        from weasyprint import HTML
+
+        period = self.get_object()
+        commissions = SellerCommission.objects.filter(
+            period=period,
+            status=SellerCommission.Status.PAGA,
+        ).select_related('seller').prefetch_related('adjustments').order_by('seller__name')
+
+        if not commissions.exists():
+            return Response({'error': 'Nenhuma comissao paga no periodo.'}, status=404)
+
+        hoje = timezone.now()
+        pages = []
+        for sc in commissions:
+            adjustments = sc.adjustments.all()
+            html = render_to_string('reports/recibo_comissao.html', {
+                'tenant': period.tenant,
+                'period': period,
+                'sc': sc,
+                'adjustments': adjustments,
+                'hoje': hoje,
+            })
+            pages.append(html)
+
+        full_html = ''.join(
+            f'<div style="page-break-after: always;">{p}</div>' if i < len(pages) - 1 else p
+            for i, p in enumerate(pages)
+        )
+        pdf = HTML(string=full_html).write_pdf()
+        return HttpResponse(pdf, content_type='application/pdf')
+
 
 @extend_schema(
     responses={200: dict},

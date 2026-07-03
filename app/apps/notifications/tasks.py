@@ -180,6 +180,78 @@ def notify_commission_adjusted(seller_commission, adjustment):
     )
 
 
+@shared_task(soft_time_limit=300, time_limit=360)
+def send_daily_entry_reminders():
+    from datetime import time, timedelta
+    from django.db.models import Q
+    from app.apps.accounts.models import Tenant
+    from app.apps.sales.models import Sale
+    from app.apps.sellers.models import Seller
+
+    now = timezone.localtime(timezone.now())
+    current_time = now.time()
+    current_date = now.date()
+
+    if current_date.weekday() == 6:
+        logger.info("Daily reminder: domingo, pulando")
+        return
+
+    window_start = (timezone.localtime(timezone.now()) - timedelta(minutes=15)).time()
+
+    tenants = Tenant.objects.filter(
+        is_active=True,
+        daily_reminder_enabled=True,
+        daily_reminder_time__gte=window_start,
+        daily_reminder_time__lte=current_time,
+    )
+
+    sent_count = 0
+    skipped_no_phone = 0
+    for tenant in tenants:
+        from app.apps.accounts.models import tenant_operational
+        if not tenant_operational(tenant):
+            continue
+
+        sellers_with_sale_today = Sale.objects.filter(
+            tenant=tenant,
+            origin=Sale.Origin.MANUAL,
+            status='ATIVA',
+            sale_date=current_date,
+        ).values_list('seller_id', flat=True).distinct()
+
+        sellers_to_remind = Seller.objects.filter(
+            tenant=tenant, is_active=True,
+        ).exclude(id__in=sellers_with_sale_today).select_related('user')
+
+        for seller in sellers_to_remind:
+            if not seller.phone:
+                skipped_no_phone += 1
+                continue
+
+            already_sent = Notification.objects.filter(
+                seller=seller,
+                event_type=MessageTemplate.EventType.DAILY_REMINDER,
+                created_at__date=current_date,
+            ).exists()
+            if already_sent:
+                continue
+
+            create_and_send_notification(
+                tenant=tenant,
+                event_type=MessageTemplate.EventType.DAILY_REMINDER,
+                channel=MessageTemplate.Channel.WHATSAPP,
+                recipient=seller.phone,
+                seller=seller,
+                context={'vendedor': seller.name},
+            )
+            sent_count += 1
+
+    logger.info(
+        "Daily reminder: %d enviados, %d sem telefone",
+        sent_count, skipped_no_phone,
+    )
+
+
 def _fallback_body(event_type, context):
     v = context.get('vendedor', '')
     val = context.get('valor', '')
@@ -205,6 +277,12 @@ def _fallback_body(event_type, context):
             f"Sua comissao do periodo {context.get('periodo', '')} "
             f"recebeu um ajuste de {val}. "
             f"Acesse o sistema para conferir os detalhes."
+        )
+    if event_type == MessageTemplate.EventType.DAILY_REMINDER:
+        return (
+            f"Ola {v}! "
+            f"Voce ainda nao lancou suas vendas de hoje. "
+            f"Lance agora pelo app para manter sua comissao em dia."
         )
     if event_type in (MessageTemplate.EventType.LINK_CREATED,):
         return f"Ola {v}! Seu link de {val} para {cli} foi gerado com sucesso."

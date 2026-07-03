@@ -1,0 +1,53 @@
+{% extends 'dashboard/base_desktop.html' %}
+{% block title %}Assinatura — V-Com{% endblock %}
+{% block content %}
+
+<div class="surface-hero mb-6">
+    <h1 class="text-[18px] font-semibold text-gray-900 mb-1">Assinatura</h1>
+    <p class="text-[13px] text-gray-500">Plano {{ tenant.get_plan_display }}</p>
+</div>
+
+<div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+    <div class="surface-card">
+        <p class="text-[13px] font-semibold text-gray-500 uppercase tracking-wide mb-1">Plano atual</p>
+        <p class="font-display text-[24px] font-semibold text-gray-900">{{ tenant.get_plan_display }}</p>
+    </div>
+    <div class="surface-card">
+        <p class="text-[13px] font-semibold text-gray-500 uppercase tracking-wide mb-1">Status</p>
+        <p class="font-display text-[24px] font-semibold
+            {% if subscription.status == 'ACTIVE' or subscription.status == 'TRIALING' %}text-success-700
+            {% elif subscription.status == 'PAST_DUE' %}text-amber-600
+            {% else %}text-gray-500{% endif %}">
+            {{ subscription.get_status_display|default:"Nao configurado" }}
+        </p>
+    </div>
+    <div class="surface-card">
+        <p class="text-[13px] font-semibold text-gray-500 uppercase tracking-wide mb-1">Proximo vencimento</p>
+        <p class="font-display text-[24px] font-semibold text-gray-900">
+            {% if subscription.current_period_end %}
+                {{ subscription.current_period_end|date:"d/m/Y" }}
+            {% else %}
+                —
+            {% endif %}
+        </p>
+    </div>
+    <div class="surface-card">
+        <p class="text-[13px] font-semibold text-gray-500 uppercase tracking-wide mb-1">Vendedores ativos</p>
+        <p class="font-display text-[24px] font-semibold text-gray-900">
+            {{ active_sellers }}{% if plan_limit %}/{{ plan_limit }}{% endif %}
+        </p>
+    </div>
+</div>
+
+<div class="surface-card">
+    <h2 class="text-[13px] font-semibold text-gray-500 uppercase tracking-wide mb-4">Precisa de ajuda?</h2>
+    <p class="text-[14px] text-gray-600 mb-4">
+        Para alterar seu plano, atualizar forma de pagamento ou resolver problemas de faturamento,
+        entre em contato com nossa equipe de suporte.
+    </p>
+    <p class="text-[13px] text-gray-500">
+        Chave do pagamento: <code class="bg-gray-100 px-2 py-0.5 rounded text-[12px]">{{ subscription.gateway_subscription_id|default:"—" }}</code>
+    </p>
+</div>
+
+{% endblock %}

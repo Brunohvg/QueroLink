@@ -138,3 +138,40 @@ def evolution_webhook(request, instance_name, tenant_uuid, token):
 def evolution_webhook_legacy(request, instance_name, tenant_uuid):
     logger.info("Legacy webhook (no token): instance=%s tenant=%s", instance_name, tenant_uuid)
     return JsonResponse({"status": "ignored"}, status=200)
+
+
+@csrf_exempt
+def billing_webhook(request):
+    if request.method != "POST":
+        return JsonResponse({"error": "Method not allowed"}, status=405)
+
+    from django.conf import settings
+    expected_user = getattr(settings, 'BILLING_WEBHOOK_USER', '')
+    expected_pass = getattr(settings, 'BILLING_WEBHOOK_PASS', '')
+
+    if expected_user and expected_pass:
+        auth_header = request.META.get('HTTP_AUTHORIZATION', '')
+        if not auth_header.startswith('Basic '):
+            return JsonResponse({"error": "Unauthorized"}, status=401)
+        import base64
+        try:
+            decoded = base64.b64decode(auth_header[6:]).decode('utf-8')
+            username, password = decoded.split(':', 1)
+        except Exception:
+            return JsonResponse({"error": "Unauthorized"}, status=401)
+        if username != expected_user or password != expected_pass:
+            return JsonResponse({"error": "Unauthorized"}, status=401)
+
+    try:
+        payload = json.loads(request.body)
+    except json.JSONDecodeError:
+        return JsonResponse({"error": "Invalid JSON"}, status=400)
+
+    event = WebhookEvent.objects.create(
+        gateway='pagarme_billing',
+        payload=payload,
+        gateway_event_id=payload.get('id', '') or None,
+    )
+    from app.apps.webhooks.tasks import process_billing_webhook
+    process_billing_webhook.delay(event.id)
+    return JsonResponse({"status": "received"}, status=200)

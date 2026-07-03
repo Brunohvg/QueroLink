@@ -254,6 +254,13 @@ def mobile_home(request):
 
         periodo_status = period.status if period else None
 
+        from app.apps.sellers.models import SellerGoal
+        goal = SellerGoal.objects.filter(
+            seller=seller, month=today.month, year=today.year,
+        ).first()
+        goal_progress = goal.progress_percent if goal else None
+        combined_month_total = month_total + month_link_total
+
         missing_past_days = []
         has_missing_past_days = False
         if is_editable and period:
@@ -276,6 +283,9 @@ def mobile_home(request):
             'seller_commission_status': sc_status,
             'missing_past_days': missing_past_days,
             'has_missing_past_days': has_missing_past_days,
+            'goal': goal,
+            'goal_progress': goal_progress,
+            'combined_month_total': combined_month_total,
         })
     except Exception as e:
         logger.exception("Erro ao carregar mobile_home")
@@ -506,6 +516,57 @@ def _get_seller_profile(request):
         return request.user.seller_profile
     except Exception:
         return None
+
+
+@login_required
+def mobile_ranking(request):
+    seller = _get_seller_profile(request)
+    if not seller:
+        return redirect('dashboard:mobile_home')
+
+    today = timezone.localdate()
+    from app.apps.sales.models import Sale
+    from django.db.models import Sum
+
+    ranking_qs = Sale.objects.filter(
+        tenant=seller.tenant,
+        status='ATIVA',
+        sale_date__year=today.year,
+        sale_date__month=today.month,
+    ).values('seller__uuid', 'seller__name').annotate(
+        total=Sum('amount'),
+    ).order_by('-total')
+
+    ranking = list(ranking_qs)
+    seller_pos = None
+    for i, r in enumerate(ranking):
+        if r['seller__uuid'] == str(seller.uuid):
+            seller_pos = i + 1
+            break
+
+    visible_to_sellers = seller.tenant.ranking_visible_to_sellers
+    if not visible_to_sellers:
+        first_total = ranking[0]['total'] if ranking else 0
+        ranking = [
+            {'seller__uuid': r['seller__uuid'],
+             'seller__name': r['seller__name'] if str(r['seller__uuid']) == str(seller.uuid) else '—',
+             'total': r['total'],
+             'is_me': str(r['seller__uuid']) == str(seller.uuid)}
+            for r in ranking
+        ]
+    else:
+        ranking = [
+            {**r, 'is_me': str(r['seller__uuid']) == str(seller.uuid)}
+            for r in ranking
+        ]
+
+    return render(request, 'mobile/ranking.html', {
+        'seller': seller,
+        'ranking': ranking,
+        'seller_pos': seller_pos,
+        'visible_to_sellers': visible_to_sellers,
+        'current_month': f'{today.month:02d}/{today.year}',
+    })
 
 
 @login_required

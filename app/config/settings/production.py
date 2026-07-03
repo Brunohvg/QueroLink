@@ -63,6 +63,14 @@ CELERY_BEAT_SCHEDULE = {
         'task': 'app.apps.accounts.tasks.daily_backup',
         'schedule': crontab(hour=2, minute=0),
     },
+    'send-daily-entry-reminders': {
+        'task': 'app.apps.notifications.tasks.send_daily_entry_reminders',
+        'schedule': 900.0,  # a cada 15 minutos
+    },
+    'reconcile-pending-orders': {
+        'task': 'app.apps.webhooks.tasks.reconcile_pending_orders',
+        'schedule': 1800.0,  # a cada 30 minutos
+    },
     'cleanup-old-webhook-events': {
         'task': 'app.apps.webhooks.tasks.cleanup_old_webhook_events',
         'schedule': 86400.0,  # diariamente
