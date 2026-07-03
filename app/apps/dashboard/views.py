@@ -153,11 +153,12 @@ def assinatura(request):
         ],
     }
 
+    has_active_sub = sub and sub.status not in ('CANCELED',)
     plan_names = dict(Tenant.Plan.choices)
     all_plans = []
     for key in ['STARTER', 'PRO', 'ENTERPRISE']:
         monthly = prices.get(key, 0)
-        yearly = prices.get(f'{key}_YEARLY', int(monthly * 12 * 0.9)) if monthly else 0
+        yearly = int(monthly * 12 * 0.9) if monthly else 0
         all_plans.append({
             'id': key,
             'name': plan_names.get(key, key),
@@ -165,7 +166,7 @@ def assinatura(request):
             'price_monthly': monthly,
             'price_yearly': yearly,
             'features': PLAN_FEATURES.get(key, []),
-            'is_current': tenant.plan == key,
+            'is_current': has_active_sub and tenant.plan == key,
         })
 
     limit_remaining = (plan_limit - active_sellers) if plan_limit is not None else None

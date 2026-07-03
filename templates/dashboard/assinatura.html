@@ -154,14 +154,10 @@
                 </div>
                 {% if not subscription or subscription.status != 'ACTIVE' %}
                 <div class="px-6 pb-6">
-                    {% if plan.id == 'ENTERPRISE' %}
-                    <a href="mailto:suporte@vidalys.com.br" class="block w-full text-center py-2.5 border border-gray-200 rounded-lg text-sm font-semibold text-gray-600 hover:bg-gray-50 transition">Fale conosco</a>
-                    {% else %}
                     <button @click="selectedPlan = '{{ plan.id }}'; showForm = true" 
-                            class="w-full bg-brand-500 text-white py-2.5 rounded-lg text-sm font-semibold hover:bg-brand-600 transition">
-                        Assinar {{ plan.name }}
-                    </button>
-                    {% endif %}
+                        class="w-full bg-brand-500 text-white py-2.5 rounded-lg text-sm font-semibold hover:bg-brand-600 transition">
+                    Assinar {{ plan.name }}
+                </button>
                 </div>
                 {% endif %}
             </div>
@@ -172,7 +168,7 @@
         <div x-show="showForm && selectedPlan" x-transition class="bg-white rounded-xl p-6 shadow-sm border border-gray-100">
             <div class="flex items-center justify-between mb-4">
                 <div>
-                    <h3 class="text-[15px] font-bold text-gray-900">Assinar <span x-text="selectedPlan === 'STARTER' ? 'Starter' : 'Pro'"></span></h3>
+                    <h3 class="text-[15px] font-bold text-gray-900">Assinar <span x-text="{'STARTER':'Starter','PRO':'Pro','ENTERPRISE':'Enterprise'}[selectedPlan] || selectedPlan"></span></h3>
                     <p class="text-[13px] text-gray-500 mt-0.5">Preencha abaixo e confirme no Mercado Pago</p>
                 </div>
                 <button @click="showForm = false" class="text-gray-400 hover:text-gray-600 p-1">

@@ -228,11 +228,8 @@ WEBHOOK_AUTH_REQUIRED = config('WEBHOOK_AUTH_REQUIRED', default=True, cast=bool)
 
 PLAN_PRICES = {
     'STARTER': config('PLAN_PRICE_STARTER', default=4900, cast=int),
-    'STARTER_YEARLY': config('PLAN_PRICE_STARTER_YEARLY', default=49000, cast=int),
     'PRO': config('PLAN_PRICE_PRO', default=9700, cast=int),
-    'PRO_YEARLY': config('PLAN_PRICE_PRO_YEARLY', default=97000, cast=int),
     'ENTERPRISE': config('PLAN_PRICE_ENTERPRISE', default=29700, cast=int),
-    'ENTERPRISE_YEARLY': config('PLAN_PRICE_ENTERPRISE_YEARLY', default=297000, cast=int),
 }
 PLAN_SELLER_LIMITS = {
     'STARTER': None,

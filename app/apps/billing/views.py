@@ -26,7 +26,7 @@ class PlanListView(APIView):
         data = []
         for key in ['STARTER', 'PRO', 'ENTERPRISE']:
             monthly = prices.get(key, 0)
-            yearly = prices.get(f'{key}_YEARLY', int(monthly * 12 * 0.9)) if monthly else 0
+            yearly = int(monthly * 12 * 0.9) if monthly else 0
             data.append({
                 'id': key,
                 'name': plan_names.get(key, key),
