@@ -126,29 +126,36 @@ def assinatura(request):
                 break
 
     PLAN_FEATURES = {
-        'VCOM': [
-            'Vendedores ilimitados',
+        'STARTER': [
             'App do vendedor',
             'Links de pagamento',
-            'Fechamento automatico de comissao',
-            'Recibo PDF',
-            'Ranking de vendas',
+            'Fechamento de comissao',
+            'Dashboard gestor',
+            'Notificacoes WhatsApp',
+        ],
+        'PRO': [
+            'Tudo do Starter',
+            'Vendedores ilimitados',
+            'Recibo PDF de comissao',
             'Metas mensais',
-            'Lembrete via WhatsApp',
+            'Ranking de vendas',
+            'Lembrete diario WhatsApp',
+            'Exportacao CSV/XLSX',
+            'Suporte prioritario',
         ],
         'ENTERPRISE': [
-            'Tudo do V-Com',
+            'Tudo do Pro',
             'SLA dedicado',
             'Onboarding personalizado',
-            'Integracoes sob demanda',
             'Suporte telefonico',
+            'Integracoes sob demanda',
             'Contrato anual',
         ],
     }
 
     plan_names = dict(Tenant.Plan.choices)
     all_plans = []
-    for key in ['VCOM', 'ENTERPRISE']:
+    for key in ['STARTER', 'PRO', 'ENTERPRISE']:
         monthly = prices.get(key, 0)
         yearly = prices.get(f'{key}_YEARLY', int(monthly * 12 * 0.9)) if monthly else 0
         all_plans.append({

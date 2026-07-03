@@ -55,7 +55,7 @@ class TenantRegistrationForm(forms.Form):
     plan = forms.ChoiceField(
         label='Plano',
         choices=Tenant.Plan.choices,
-        initial=Tenant.Plan.ESSENCIAL,
+        initial=Tenant.Plan.STARTER,
         widget=forms.Select(attrs={
             'class': 'form-control',
         }),

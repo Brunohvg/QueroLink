@@ -24,7 +24,7 @@ class TenantRegistrationFormTest(TestCase):
             'email': 'fulano@teste.com.br',
             'password': 'Senha@12345678',
             'password_confirm': 'Senha@12345678',
-            'plan': 'ESSENCIAL',
+            'plan': 'STARTER',
             'billing_cycle': 'MONTHLY',
         }
         data.update(overrides)
@@ -170,7 +170,7 @@ class TenantIsolationAfterSignupTest(TestCase):
             'email': 'admin_b@loja.com',
             'password': 'Senha@12345678',
             'password_confirm': 'Senha@12345678',
-            'plan': 'ESSENCIAL',
+            'plan': 'STARTER',
             'billing_cycle': 'MONTHLY',
         })
         self.assertEqual(response_b.status_code, 302)

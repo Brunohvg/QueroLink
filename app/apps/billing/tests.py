@@ -74,7 +74,7 @@ class TestTenantOperational(TestCase):
         )
         self.sub = Subscription.objects.create(
             tenant=self.tenant,
-            plan='ESSENCIAL',
+            plan='PRO',
             status=Subscription.Status.ACTIVE,
             current_period_end=timezone.now() + timedelta(days=20),
             amount=4900,
@@ -137,7 +137,7 @@ class TestBillingWebhook(TestCase):
         )
         self.sub = Subscription.objects.create(
             tenant=self.tenant,
-            plan='ESSENCIAL',
+            plan='PRO',
             gateway_subscription_id='sub_test123',
             status=Subscription.Status.TRIALING,
         )

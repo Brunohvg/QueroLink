@@ -19,10 +19,9 @@ from app.apps.accounts.fields import compute_hash
 logger = logging.getLogger(__name__)
 
 PLAN_LIMITS = {
-    'ESSENCIAL': 5,
-    'PROFISSIONAL': 15,
-    'PLUS': 30,
-    'ENTERPRISE': None,  # ilimitado
+    'STARTER': None,
+    'PRO': None,
+    'ENTERPRISE': None,
 }
 
 
