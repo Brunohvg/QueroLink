@@ -1,53 +1,291 @@
 {% extends 'dashboard/base_desktop.html' %}
+{% load static %}
 {% block title %}Assinatura — V-Com{% endblock %}
 {% block content %}
 
-<div class="surface-hero mb-6">
-    <h1 class="text-[18px] font-semibold text-gray-900 mb-1">Assinatura</h1>
-    <p class="text-[13px] text-gray-500">Plano {{ tenant.get_plan_display }}</p>
+<div class="surface-hero mb-6 flex items-center justify-between">
+    <div>
+        <h1 class="text-[18px] font-semibold text-gray-900 mb-1">Assinatura</h1>
+        <p class="text-[13px] text-gray-500">Gerencie seu plano e pagamentos</p>
+    </div>
+    <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold
+        {% if subscription.status == 'ACTIVE' or subscription.status == 'TRIALING' %}bg-success-50 text-success-700
+        {% elif subscription.status == 'PAST_DUE' %}bg-amber-50 text-amber-700
+        {% elif subscription.status == 'CANCELED' %}bg-red-50 text-red-700
+        {% else %}bg-gray-100 text-gray-600{% endif %}">
+        {{ subscription.get_status_display|default:"Sem assinatura" }}
+    </span>
 </div>
 
-<div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-    <div class="surface-card">
-        <p class="text-[13px] font-semibold text-gray-500 uppercase tracking-wide mb-1">Plano atual</p>
-        <p class="font-display text-[24px] font-semibold text-gray-900">{{ tenant.get_plan_display }}</p>
+{% if not subscription or subscription.status == 'CANCELED' %}
+<div class="surface-card border-l-4 border-l-amber-500 mb-6">
+    <p class="text-[14px] font-medium text-gray-900">Assine um plano para continuar usando o V-Com</p>
+    <p class="text-[13px] text-gray-500 mt-1">Escolha o plano ideal para sua loja abaixo.</p>
+</div>
+{% endif %}
+
+{% if messages %}
+<div class="mb-4">
+    {% for msg in messages %}
+    <div class="p-3 rounded-lg text-sm {% if msg.tags == 'error' %}bg-red-50 text-red-700 border border-red-200{% else %}bg-blue-50 text-blue-700 border border-blue-200{% endif %}">
+        {{ msg }}
     </div>
-    <div class="surface-card">
-        <p class="text-[13px] font-semibold text-gray-500 uppercase tracking-wide mb-1">Status</p>
-        <p class="font-display text-[24px] font-semibold
-            {% if subscription.status == 'ACTIVE' or subscription.status == 'TRIALING' %}text-success-700
-            {% elif subscription.status == 'PAST_DUE' %}text-amber-600
-            {% else %}text-gray-500{% endif %}">
-            {{ subscription.get_status_display|default:"Nao configurado" }}
-        </p>
+    {% endfor %}
+</div>
+{% endif %}
+
+<div id="billing-app" x-data="billingApp()">
+    <div class="flex gap-2 mb-6 border-b border-gray-200">
+        <button @click="tab = 'overview'" :class="tab === 'overview' ? 'border-b-2 border-brand-500 text-brand-600' : 'text-gray-500'" class="px-4 py-3 text-sm font-medium transition">Visao Geral</button>
+        <button @click="tab = 'plans'" :class="tab === 'plans' ? 'border-b-2 border-brand-500 text-brand-600' : 'text-gray-500'" class="px-4 py-3 text-sm font-medium transition">Planos</button>
+        <button @click="tab = 'history'" :class="tab === 'history' ? 'border-b-2 border-brand-500 text-brand-600' : 'text-gray-500'" class="px-4 py-3 text-sm font-medium transition">Historico</button>
+        {% if subscription and subscription.status != 'CANCELED' %}
+        <button @click="tab = 'cancel'" :class="tab === 'cancel' ? 'border-b-2 border-red-500 text-red-600' : 'text-gray-500'" class="px-4 py-3 text-sm font-medium transition">Cancelar</button>
+        {% endif %}
     </div>
-    <div class="surface-card">
-        <p class="text-[13px] font-semibold text-gray-500 uppercase tracking-wide mb-1">Proximo vencimento</p>
-        <p class="font-display text-[24px] font-semibold text-gray-900">
-            {% if subscription.current_period_end %}
-                {{ subscription.current_period_end|date:"d/m/Y" }}
-            {% else %}
-                —
+
+    <!-- Tab: Visao Geral -->
+    <div x-show="tab === 'overview'" class="space-y-4">
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div class="surface-card">
+                <p class="text-[13px] font-semibold text-gray-500 uppercase tracking-wide mb-1">Plano atual</p>
+                <p class="font-display text-[24px] font-semibold text-gray-900">{{ tenant.get_plan_display }}</p>
+            </div>
+            <div class="surface-card">
+                <p class="text-[13px] font-semibold text-gray-500 uppercase tracking-wide mb-1">Proximo vencimento</p>
+                <p class="font-display text-[24px] font-semibold text-gray-900">
+                    {% if subscription.current_period_end %}{{ subscription.current_period_end|date:"d/m/Y" }}{% else %}—{% endif %}
+                </p>
+            </div>
+            <div class="surface-card">
+                <p class="text-[13px] font-semibold text-gray-500 uppercase tracking-wide mb-1">Valor</p>
+                <p class="font-display text-[24px] font-semibold text-gray-900">
+                    {% if subscription.amount %}R$ {{ subscription.amount|floatformat:2 }}{% else %}—{% endif %}
+                </p>
+            </div>
+            <div class="surface-card">
+                <p class="text-[13px] font-semibold text-gray-500 uppercase tracking-wide mb-1">Vendedores ativos</p>
+                <p class="font-display text-[24px] font-semibold text-gray-900">
+                    {{ active_sellers }}{% if plan_limit %}/{{ plan_limit }}{% endif %}
+                </p>
+            </div>
+        </div>
+        <div class="surface-card">
+            <p class="text-[13px] font-semibold text-gray-500 uppercase tracking-wide mb-2">Email de cobranca</p>
+            <p class="text-[14px] text-gray-700">{{ tenant.billing_email|default:"Nao configurado" }}</p>
+            {% if not tenant.billing_email %}
+            <p class="text-[12px] text-amber-600 mt-1">Configure o email nas configuracoes da loja para ativar a assinatura.</p>
             {% endif %}
-        </p>
+        </div>
     </div>
-    <div class="surface-card">
-        <p class="text-[13px] font-semibold text-gray-500 uppercase tracking-wide mb-1">Vendedores ativos</p>
-        <p class="font-display text-[24px] font-semibold text-gray-900">
-            {{ active_sellers }}{% if plan_limit %}/{{ plan_limit }}{% endif %}
-        </p>
+
+    <!-- Tab: Planos -->
+    <div x-show="tab === 'plans'" class="space-y-4">
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            {% for plan in all_plans %}
+            <div class="surface-card border-2 {% if plan.is_current %}border-brand-500{% else %}border-transparent{% endif %} relative">
+                {% if plan.is_current %}
+                <span class="absolute -top-2 -right-2 bg-brand-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full">Atual</span>
+                {% endif %}
+                <p class="text-[13px] font-semibold text-gray-900 mb-2">{{ plan.name }}</p>
+                <p class="text-[12px] text-gray-500 mb-3">Ate {{ plan.seller_limit }} vendedores</p>
+                <p class="text-[20px] font-bold text-gray-900 mb-1">
+                    {% if plan.price_monthly %}R$ {{ plan.price_monthly|floatformat:2 }}/mes{% else %}Sob consulta{% endif %}
+                </p>
+                {% if plan.price_yearly %}
+                <p class="text-[11px] text-gray-400">R$ {{ plan.price_yearly|floatformat:2 }}/ano (10% off)</p>
+                {% endif %}
+            </div>
+            {% endfor %}
+        </div>
+
+        {% if not subscription or subscription.status != 'ACTIVE' %}
+        <div class="surface-card">
+            <h3 class="text-[14px] font-semibold text-gray-900 mb-4">Ativar plano</h3>
+            <p class="text-[13px] text-gray-500 mb-4">Apos escolher, voce sera redirecionado ao Mercado Pago para autorizar os pagamentos recorrentes.</p>
+            <form id="upgrade-form" method="post" action="{% url 'billing:api-billing-upgrade' %}">
+                {% csrf_token %}
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                    <div>
+                        <label class="block text-[13px] font-medium text-gray-700 mb-1">Plano</label>
+                        <select name="plan" class="input-field">
+                            {% for plan in all_plans %}
+                            <option value="{{ plan.id }}" {% if plan.is_current %}selected{% endif %}>{{ plan.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-[13px] font-medium text-gray-700 mb-1">Ciclo</label>
+                        <select name="billing_cycle" class="input-field">
+                            <option value="MONTHLY">Mensal</option>
+                            <option value="YEARLY">Anual (10% off)</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-[13px] font-medium text-gray-700 mb-1">Pagamento</label>
+                        <select name="payment_method" class="input-field">
+                            <option value="boleto">Boleto</option>
+                            <option value="credit_card">Cartao de credito</option>
+                        </select>
+                    </div>
+                </div>
+                <button type="submit" class="btn-primary" style="width:auto;padding:0.75rem 2rem;">
+                    Ativar assinatura
+                </button>
+            </form>
+            <div id="upgrade-error" class="mt-3 text-[13px] text-red-600 hidden"></div>
+        </div>
+        {% endif %}
     </div>
+
+    <!-- Tab: Historico -->
+    <div x-show="tab === 'history'" class="space-y-4">
+        <div class="surface-card">
+            <h3 class="text-[13px] font-semibold text-gray-500 uppercase tracking-wide mb-4">Ultimos eventos</h3>
+            {% if billing_history %}
+            <table class="w-full text-left text-[14px]">
+                <thead>
+                    <tr><th class="px-4 py-3 font-semibold text-gray-500 border-b border-gray-200 bg-gray-50">Data</th><th class="px-4 py-3 font-semibold text-gray-500 border-b border-gray-200 bg-gray-50">Evento</th><th class="px-4 py-3 font-semibold text-gray-500 border-b border-gray-200 bg-gray-50">Processado</th></tr>
+                </thead>
+                <tbody>
+                    {% for h in billing_history %}
+                    <tr class="hover:bg-gray-50">
+                        <td class="px-4 py-3 border-b border-gray-100 text-[13px]">{{ h.date|date:"d/m/Y H:i" }}</td>
+                        <td class="px-4 py-3 border-b border-gray-100">{{ h.event }}</td>
+                        <td class="px-4 py-3 border-b border-gray-100">
+                            <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium {% if h.processed %}bg-success-50 text-success-700{% else %}bg-amber-50 text-amber-700{% endif %}">
+                                {{ h.processed|yesno:"Sim,Nao" }}
+                            </span>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% else %}
+            <p class="text-[13px] text-gray-500 py-4">Nenhum evento de cobranca registrado.</p>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Tab: Cancelar -->
+    {% if subscription and subscription.status != 'CANCELED' %}
+    <div x-show="tab === 'cancel'" class="space-y-4">
+        <div class="surface-card border-l-4 border-l-red-500">
+            <h3 class="text-[14px] font-semibold text-red-700 mb-2">Cancelar assinatura</h3>
+            <p class="text-[13px] text-gray-600 mb-4">Ao cancelar, voce perdera acesso ao V-Com ao final do periodo atual. Esta acao nao pode ser desfeita.</p>
+            <form id="cancel-form" method="post" action="{% url 'billing:api-billing-cancel' %}">
+                {% csrf_token %}
+                <button type="submit" class="px-5 py-2.5 bg-red-600 text-white rounded-xl text-sm font-semibold hover:bg-red-700 transition"
+                        onclick="return confirm('Tem certeza que deseja cancelar sua assinatura?')">
+                    Cancelar assinatura
+                </button>
+            </form>
+            <div id="cancel-error" class="mt-3 text-[13px] text-red-600 hidden"></div>
+        </div>
+    </div>
+    {% endif %}
 </div>
 
-<div class="surface-card">
-    <h2 class="text-[13px] font-semibold text-gray-500 uppercase tracking-wide mb-4">Precisa de ajuda?</h2>
-    <p class="text-[14px] text-gray-600 mb-4">
-        Para alterar seu plano, atualizar forma de pagamento ou resolver problemas de faturamento,
-        entre em contato com nossa equipe de suporte.
-    </p>
-    <p class="text-[13px] text-gray-500">
-        Chave do pagamento: <code class="bg-gray-100 px-2 py-0.5 rounded text-[12px]">{{ subscription.gateway_subscription_id|default:"—" }}</code>
-    </p>
-</div>
+<script>
+    (function() {
+        var params = new URLSearchParams(window.location.search);
+        var status = params.get('status');
+        var preapprovalId = params.get('preapproval_id');
+        if (status === 'authorized' && preapprovalId) {
+            var msg = 'Assinatura ativada com sucesso!';
+            if (typeof showToast === 'function') {
+                showToast(msg, 'success');
+            } else {
+                var el = document.createElement('div');
+                el.className = 'bg-success-50 border border-success-200 text-success-700 p-3 rounded-lg text-sm mb-4';
+                el.textContent = msg;
+                document.querySelector('.surface-hero').after(el);
+            }
+            if (window.history && window.history.replaceState) {
+                window.history.replaceState({}, document.title, window.location.pathname);
+            }
+        }
+    })();
+
+    document.addEventListener('alpine:init', function() {
+        Alpine.data('billingApp', function() {
+            return {
+                tab: 'overview',
+            };
+        });
+    });
+
+    document.getElementById('upgrade-form')?.addEventListener('submit', async function(e) {
+        e.preventDefault();
+        var btn = this.querySelector('button[type="submit"]');
+        var err = document.getElementById('upgrade-error');
+        btn.disabled = true;
+        btn.textContent = 'Processando...';
+        err.classList.add('hidden');
+
+        try {
+            var form = new FormData(this);
+            var data = {};
+            form.forEach(function(v, k) { data[k] = v; });
+
+            var resp = await fetch(this.action, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
+                },
+                body: JSON.stringify(data),
+            });
+            var result = await resp.json();
+
+            if (resp.ok && result.init_point) {
+                window.location.href = result.init_point;
+            } else {
+                err.textContent = result.error || 'Erro ao criar assinatura.';
+                err.classList.remove('hidden');
+                btn.disabled = false;
+                btn.textContent = 'Ativar assinatura';
+            }
+        } catch(e) {
+            err.textContent = 'Erro de conexao. Tente novamente.';
+            err.classList.remove('hidden');
+            btn.disabled = false;
+            btn.textContent = 'Ativar assinatura';
+        }
+    });
+
+    document.getElementById('cancel-form')?.addEventListener('submit', async function(e) {
+        e.preventDefault();
+        if (!confirm('Tem certeza que deseja cancelar sua assinatura?')) return;
+        var btn = this.querySelector('button[type="submit"]');
+        var err = document.getElementById('cancel-error');
+        btn.disabled = true;
+        btn.textContent = 'Cancelando...';
+        err.classList.add('hidden');
+
+        try {
+            var resp = await fetch(this.action, {
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
+                },
+            });
+            var result = await resp.json();
+            if (resp.ok) {
+                window.location.reload();
+            } else {
+                err.textContent = result.error || 'Erro ao cancelar.';
+                err.classList.remove('hidden');
+                btn.disabled = false;
+                btn.textContent = 'Cancelar assinatura';
+            }
+        } catch(e) {
+            err.textContent = 'Erro de conexao.';
+            err.classList.remove('hidden');
+            btn.disabled = false;
+            btn.textContent = 'Cancelar assinatura';
+        }
+    });
+</script>
 
 {% endblock %}

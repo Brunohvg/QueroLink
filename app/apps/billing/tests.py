@@ -1,4 +1,5 @@
 from datetime import timedelta
+from unittest.mock import patch
 
 from django.test import TestCase, override_settings
 from django.utils import timezone
@@ -53,6 +54,27 @@ class TestTenantOperational(TestCase):
 
 
 class TestBillingWebhook(TestCase):
+    MP_PAYMENT_APPROVED = {
+        "id": 12345,
+        "external_reference": None,
+        "status": "approved",
+    }
+    MP_PAYMENT_REJECTED = {
+        "id": 12346,
+        "external_reference": None,
+        "status": "rejected",
+    }
+    MP_PREAPPROVAL_AUTHORIZED = {
+        "id": "sub_test123",
+        "external_reference": None,
+        "status": "authorized",
+    }
+    MP_PREAPPROVAL_CANCELLED = {
+        "id": "sub_test123",
+        "external_reference": None,
+        "status": "cancelled",
+    }
+
     def setUp(self):
         self.tenant = Tenant.objects.create(
             company_name='Billing WH', slug='billing-wh',
@@ -64,11 +86,20 @@ class TestBillingWebhook(TestCase):
             gateway_subscription_id='sub_test123',
             status=Subscription.Status.TRIALING,
         )
+        self.MP_PAYMENT_APPROVED['external_reference'] = str(self.tenant.uuid)
+        self.MP_PAYMENT_REJECTED['external_reference'] = str(self.tenant.uuid)
+        self.MP_PREAPPROVAL_AUTHORIZED['external_reference'] = str(self.tenant.uuid)
+        self.MP_PREAPPROVAL_CANCELLED['external_reference'] = str(self.tenant.uuid)
 
-    def test_charge_paid_makes_active(self):
+    @patch('app.services.gateway.mercadopago.MercadoPagoGateway')
+    def test_payment_approved_makes_active(self, MockGateway):
+        instance = MockGateway.return_value
+        instance.get_payment.return_value = self.MP_PAYMENT_APPROVED
+
         payload = {
-            'type': 'subscription.charge_paid',
-            'data': {'id': 'sub_test123', 'subscription_id': 'sub_test123'},
+            'type': 'payment',
+            'action': 'payment.created',
+            'data': {'id': '12345'},
         }
         event = WebhookEvent.objects.create(
             gateway='pagarme_billing', payload=payload,
@@ -81,10 +112,15 @@ class TestBillingWebhook(TestCase):
         self.assertEqual(self.sub.status, Subscription.Status.ACTIVE)
         self.assertIsNotNone(self.sub.current_period_end)
 
-    def test_charge_failed_makes_past_due(self):
+    @patch('app.services.gateway.mercadopago.MercadoPagoGateway')
+    def test_payment_rejected_makes_past_due(self, MockGateway):
+        instance = MockGateway.return_value
+        instance.get_payment.return_value = self.MP_PAYMENT_REJECTED
+
         payload = {
-            'type': 'subscription.charge_failed',
-            'data': {'id': 'sub_test123', 'subscription_id': 'sub_test123'},
+            'type': 'payment',
+            'action': 'payment.updated',
+            'data': {'id': '12346'},
         }
         event = WebhookEvent.objects.create(
             gateway='pagarme_billing', payload=payload,
@@ -96,10 +132,15 @@ class TestBillingWebhook(TestCase):
         self.sub.refresh_from_db()
         self.assertEqual(self.sub.status, Subscription.Status.PAST_DUE)
 
-    def test_canceled(self):
+    @patch('app.services.gateway.mercadopago.MercadoPagoGateway')
+    def test_subscription_cancelled(self, MockGateway):
+        instance = MockGateway.return_value
+        instance.get_preapproval.return_value = self.MP_PREAPPROVAL_CANCELLED
+
         payload = {
-            'type': 'subscription.canceled',
-            'data': {'id': 'sub_test123', 'subscription_id': 'sub_test123'},
+            'type': 'subscription_preapproval',
+            'action': 'subscription_preapproval.updated',
+            'data': {'id': 'sub_test123'},
         }
         event = WebhookEvent.objects.create(
             gateway='pagarme_billing', payload=payload,
@@ -110,3 +151,23 @@ class TestBillingWebhook(TestCase):
 
         self.sub.refresh_from_db()
         self.assertEqual(self.sub.status, Subscription.Status.CANCELED)
+
+    @patch('app.services.gateway.mercadopago.MercadoPagoGateway')
+    def test_subscription_authorized(self, MockGateway):
+        instance = MockGateway.return_value
+        instance.get_preapproval.return_value = self.MP_PREAPPROVAL_AUTHORIZED
+
+        payload = {
+            'type': 'subscription_preapproval',
+            'action': 'subscription_preapproval.updated',
+            'data': {'id': 'sub_test123'},
+        }
+        event = WebhookEvent.objects.create(
+            gateway='pagarme_billing', payload=payload,
+            gateway_event_id='evt_test4',
+        )
+        from app.apps.webhooks.tasks import process_billing_webhook
+        process_billing_webhook(event.id)
+
+        self.sub.refresh_from_db()
+        self.assertEqual(self.sub.status, Subscription.Status.ACTIVE)

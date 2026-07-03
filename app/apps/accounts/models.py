@@ -33,6 +33,7 @@ class Tenant(models.Model):
         help_text="Incluir PIX como metodo de pagamento nos links",
     )
     is_active = models.BooleanField(default=True)
+    billing_email = models.EmailField(blank=True, null=True)
     plan = models.CharField(max_length=20, choices=Plan.choices, default=Plan.ESSENCIAL)
     trial_ends_at = models.DateTimeField(null=True, blank=True)
     billing_cycle = models.CharField(max_length=10, choices=[('MONTHLY', 'Mensal'), ('YEARLY', 'Anual')], default='MONTHLY')

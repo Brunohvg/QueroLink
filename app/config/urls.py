@@ -29,6 +29,7 @@ urlpatterns = [
     path('', include('app.apps.accounts.urls')),
     path('', include('app.apps.orders.urls')),
     path('api/webhooks/', include('app.apps.webhooks.urls')),
+    path('api/billing/', include('app.apps.billing.urls')),
     path('api/', include('app.apps.api.urls')),
 ]
 

@@ -460,56 +460,155 @@ def process_pagarme_webhook(event_id):
     default_retry_delay=30,
 )
 def process_billing_webhook(event_id):
-    try:
-        event = WebhookEvent.objects.get(id=event_id, processed=False)
-    except WebhookEvent.DoesNotExist:
-        return
+    from django.db import transaction as db_transaction
 
-    from datetime import timedelta
-    from app.apps.billing.models import Subscription
+    with db_transaction.atomic():
+        try:
+            event = WebhookEvent.objects.select_for_update().get(
+                id=event_id, processed=False,
+            )
+        except WebhookEvent.DoesNotExist:
+            return
 
-    payload = event.payload
-    event_type = payload.get('type', '')
-    data = payload.get('data', {})
+        from datetime import timedelta
+        from app.apps.billing.models import Subscription
+        from app.apps.accounts.models import Tenant
+        from app.services.gateway.mercadopago import MercadoPagoGateway, MercadoPagoError
 
-    gateway_sub_id = data.get('subscription_id') or data.get('id', '')
+        payload = event.payload
+        mp_type = payload.get('type', '')
+        action = payload.get('action', '')
+        data = payload.get('data', {})
 
-    if not gateway_sub_id:
-        logger.warning("Billing webhook %s: sem subscription_id", event_id)
+        tenant = None
+        sub = None
+
+        if mp_type == 'payment' and data.get('id'):
+            payment_id = data['id']
+            try:
+                gateway = MercadoPagoGateway()
+                payment = gateway.get_payment(payment_id)
+            except (MercadoPagoError, Exception) as e:
+                logger.warning("Erro ao buscar payment %s: %s", payment_id, e)
+                event.processed = True
+                event.save(update_fields=['processed'])
+                return
+
+            external_ref = payment.get('external_reference', '')
+            if external_ref:
+                try:
+                    tenant = Tenant.objects.get(uuid=external_ref)
+                except Tenant.DoesNotExist:
+                    pass
+
+            if not tenant:
+                metadata = payment.get('metadata') or {}
+                preapproval_id = metadata.get('preapproval_id') or metadata.get('subscription_id', '')
+                if preapproval_id:
+                    try:
+                        sub = Subscription.objects.get(
+                            gateway_subscription_id=preapproval_id,
+                        )
+                        tenant = sub.tenant
+                    except Subscription.DoesNotExist:
+                        pass
+
+            if not tenant:
+                logger.warning(
+                    "Billing webhook: payment %s sem tenant via external_reference "
+                    "ou preapproval_id", payment_id,
+                )
+                event.processed = True
+                event.save(update_fields=['processed'])
+                return
+
+            event.tenant = tenant
+            event.save(update_fields=['tenant'])
+
+            if not sub:
+                try:
+                    sub = Subscription.objects.get(tenant=tenant)
+                except Subscription.DoesNotExist:
+                    logger.warning(
+                        "Billing webhook: subscription para tenant %s nao encontrada",
+                        external_ref,
+                    )
+                    event.processed = True
+                    event.save(update_fields=['processed'])
+                    return
+
+            payment_status = payment.get('status', '')
+            if payment_status == 'approved':
+                sub.status = Subscription.Status.ACTIVE
+                sub.current_period_end = timezone.now() + timedelta(days=30)
+                logger.info("Billing: tenant %s ACTIVE (payment approved)", external_ref)
+            elif payment_status == 'rejected':
+                sub.status = Subscription.Status.PAST_DUE
+                logger.warning("Billing: tenant %s PAST_DUE (payment rejected)", external_ref)
+            else:
+                logger.info(
+                    "Billing: payment %s com status %s ignorado",
+                    payment_id, payment_status,
+                )
+
+            sub.save(update_fields=['status', 'current_period_end', 'updated_at'])
+
+        elif mp_type == 'subscription_preapproval' and data.get('id'):
+            preapproval_id = data['id']
+            try:
+                gateway = MercadoPagoGateway()
+                preapproval = gateway.get_preapproval(preapproval_id)
+            except (MercadoPagoError, Exception) as e:
+                logger.warning("Erro ao buscar preapproval %s: %s", preapproval_id, e)
+                event.processed = True
+                event.save(update_fields=['processed'])
+                return
+
+            external_ref = preapproval.get('external_reference', '')
+            if not external_ref:
+                logger.warning("Billing webhook: preapproval %s sem external_reference", preapproval_id)
+                event.processed = True
+                event.save(update_fields=['processed'])
+                return
+
+            try:
+                tenant = Tenant.objects.get(uuid=external_ref)
+            except Tenant.DoesNotExist:
+                event.processed = True
+                event.save(update_fields=['processed'])
+                return
+
+            event.tenant = tenant
+            event.save(update_fields=['tenant'])
+
+            try:
+                sub = Subscription.objects.get(tenant=tenant)
+            except Subscription.DoesNotExist:
+                event.processed = True
+                event.save(update_fields=['processed'])
+                return
+
+            mp_status = preapproval.get('status', '')
+            if mp_status == 'authorized':
+                sub.status = Subscription.Status.ACTIVE
+            elif mp_status == 'cancelled':
+                sub.status = Subscription.Status.CANCELED
+            elif mp_status == 'past_due':
+                sub.status = Subscription.Status.PAST_DUE
+            else:
+                logger.info("Billing: preapproval %s status %s ignorado", preapproval_id, mp_status)
+                event.processed = True
+                event.save(update_fields=['processed'])
+                return
+
+            sub.save(update_fields=['status', 'updated_at'])
+            logger.info("Billing: subscription %s -> %s", preapproval_id, mp_status)
+
+        else:
+            logger.info("Billing webhook %s: tipo ignorado %s/%s", event_id, mp_type, action)
+
         event.processed = True
         event.save(update_fields=['processed'])
-        return
-
-    try:
-        sub = Subscription.objects.get(gateway_subscription_id=gateway_sub_id)
-    except Subscription.DoesNotExist:
-        logger.warning("Billing webhook %s: subscription %s nao encontrada", event_id, gateway_sub_id)
-        event.processed = True
-        event.save(update_fields=['processed'])
-        return
-
-    if event_type == 'subscription.charge_paid':
-        sub.status = Subscription.Status.ACTIVE
-        sub.current_period_end = timezone.now() + timedelta(days=30)
-        logger.info("Billing: subscription %s ACTIVE (charge_paid)", gateway_sub_id)
-
-    elif event_type == 'subscription.charge_failed':
-        sub.status = Subscription.Status.PAST_DUE
-        logger.warning("Billing: subscription %s PAST_DUE (charge_failed)", gateway_sub_id)
-
-    elif event_type == 'subscription.canceled':
-        sub.status = Subscription.Status.CANCELED
-        logger.info("Billing: subscription %s CANCELED", gateway_sub_id)
-
-    else:
-        logger.info("Billing webhook %s: tipo ignorado %s", event_id, event_type)
-        event.processed = True
-        event.save(update_fields=['processed'])
-        return
-
-    sub.save(update_fields=['status', 'current_period_end', 'updated_at'])
-    event.processed = True
-    event.save(update_fields=['processed'])
 
 
 @shared_task(soft_time_limit=300, time_limit=360)

@@ -80,6 +80,8 @@ def plano_expirado(request):
 def assinatura(request):
     tenant = request.user.tenant
     from app.apps.billing.models import Subscription
+    from app.apps.webhooks.models import WebhookEvent
+    from app.apps.sellers.models import Seller
     from django.conf import settings
 
     try:
@@ -88,15 +90,53 @@ def assinatura(request):
         sub = None
 
     limits = getattr(settings, 'PLAN_SELLER_LIMITS', {})
+    prices = getattr(settings, 'PLAN_PRICES', {})
     plan_limit = limits.get(tenant.plan, None)
-    from app.apps.sellers.models import Seller
+
     active_sellers = Seller.objects.filter(tenant=tenant, is_active=True).count()
+
+    billing_history = []
+    if sub and sub.gateway_subscription_id:
+        events = WebhookEvent.objects.filter(
+            gateway='pagarme_billing',
+        ).order_by('-received_at')[:50]
+
+        for ev in events:
+            p = ev.payload if isinstance(ev.payload, dict) else {}
+            data = p.get('data', {})
+            if str(data.get('id', '')) != str(sub.gateway_subscription_id):
+                continue
+            mp_type = p.get('type', '')
+            action = p.get('action', '')
+            billing_history.append({
+                'date': ev.received_at,
+                'event': f'{mp_type}.{action}' if action else mp_type,
+                'processed': ev.processed,
+            })
+            if len(billing_history) >= 12:
+                break
+
+    plan_names = dict(Tenant.Plan.choices)
+    all_plans = []
+    for key in ['ESSENCIAL', 'PROFISSIONAL', 'PLUS', 'ENTERPRISE']:
+        monthly = prices.get(key, 0)
+        yearly = int(monthly * 12 * 0.9) if monthly else 0
+        all_plans.append({
+            'id': key,
+            'name': plan_names.get(key, key),
+            'seller_limit': limits.get(key, '—'),
+            'price_monthly': monthly,
+            'price_yearly': yearly,
+            'is_current': tenant.plan == key,
+        })
 
     return render(request, 'dashboard/assinatura.html', {
         'tenant': tenant,
         'subscription': sub,
         'plan_limit': plan_limit,
         'active_sellers': active_sellers,
+        'billing_history': billing_history,
+        'all_plans': all_plans,
     })
 
 
