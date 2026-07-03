@@ -1,9 +1,0 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 44" fill="none">
-  <rect x="2" y="2" width="40" height="40" rx="10" fill="#111827"/>
-  <path d="M10 12 L14 12 L14 18 L20 28 L20 12 L24 12 L28 32 L24 32 L14 22 L14 32 L10 32 Z" fill="#FFFFFF" transform="translate(2,2)"/>
-  <path d="M15 12 L19 12 L19 18 L25 28 L25 12 L29 12 L29 32 L25 32 L19 22 L19 32 L15 32 Z" fill="#1463FF" transform="translate(2,2)"/>
-  <rect x="26" y="7" width="4" height="4" rx="1" fill="#1463FF" transform="translate(2,2)"/>
-  <rect x="31" y="3" width="3" height="3" rx="1" fill="#3B82F6" transform="translate(2,2)"/>
-  <text x="48" y="30" font-family="'Space Grotesk', 'Inter', sans-serif" font-weight="700" font-size="20" fill="#111827">Mérito</text>
-  <text x="48" y="42" font-family="'Inter', sans-serif" font-weight="500" font-size="9" fill="#6B7280">by Vidalys</text>
-</svg>
