@@ -15,6 +15,13 @@ CELERY_RESULT_BACKEND = CELERY_BROKER_URL
 CELERY_TASK_ALWAYS_EAGER = True
 CELERY_TASK_EAGER_PROPAGATES = True
 
+CACHES = {
+    'default': {
+        'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
+        'LOCATION': 'vcom-local',
+    }
+}
+
 CORS_ALLOW_ALL_ORIGINS = True
 SECURE_SSL_REDIRECT = False
 SESSION_COOKIE_SECURE = False

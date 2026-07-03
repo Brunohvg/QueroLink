@@ -1,16 +1,27 @@
+import logging
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib import messages
 from django.http import HttpResponse
 from django_ratelimit.decorators import ratelimit
 from app.apps.orders.models import Order
-from app.apps.accounts.models import Tenant
+from app.apps.accounts.models import Tenant, tenant_operational
 from app.apps.sellers.models import Seller
 from app.apps.orders.services import create_payment_link
+
+logger = logging.getLogger(__name__)
+
+
+def _check_tenant_operational(tenant_slug):
+    tenant = get_object_or_404(Tenant, slug=tenant_slug)
+    if not tenant_operational(tenant):
+        from django.http import Http404
+        raise Http404("Tenant nao encontrado ou inativo.")
+    return tenant
 
 
 def index(request, tenant_slug):
     """Renderiza a pagina de link de pagamento para um tenant especifico."""
-    tenant = get_object_or_404(Tenant, slug=tenant_slug, is_active=True)
+    tenant = _check_tenant_operational(tenant_slug)
     sellers = Seller.objects.filter(tenant=tenant, is_active=True)
     setup_needed = not sellers.exists()
     return render(request, "orders/index.html", {
@@ -22,7 +33,7 @@ def index(request, tenant_slug):
 
 @ratelimit(key='ip', rate='10/m', method='POST', block=True)
 def create_link(request, tenant_slug):
-    tenant = get_object_or_404(Tenant, slug=tenant_slug, is_active=True)
+    tenant = _check_tenant_operational(tenant_slug)
 
     if request.method == "POST":
         link_name = request.POST.get("linkName")
@@ -75,8 +86,12 @@ def create_link(request, tenant_slug):
 
             return redirect("orders:index", tenant_slug=tenant_slug)
 
+        except ValueError as e:
+            messages.error(request, str(e))
+            return redirect("orders:index", tenant_slug=tenant_slug)
         except Exception as e:
-            messages.error(request, f"Ocorreu um erro: {str(e)}")
+            logger.exception("Erro inesperado ao criar link de pagamento")
+            messages.error(request, "Ocorreu um erro inesperado. Tente novamente.")
             return redirect("orders:index", tenant_slug=tenant_slug)
 
     return HttpResponse("Erro: Metodo nao suportado.")

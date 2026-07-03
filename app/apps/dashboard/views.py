@@ -2,6 +2,7 @@ from django.shortcuts import render, redirect
 from django.contrib.auth import authenticate, login as auth_login, logout as auth_logout
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
+from django.utils import timezone
 from django.utils.http import url_has_allowed_host_and_scheme
 from django_ratelimit.decorators import ratelimit
 from app.apps.orders.models import Order
@@ -35,8 +36,9 @@ def login_view(request):
         if user is not None:
             auth_login(request, user)
 
-            # "Manter conectado" — 30 dias de sessao
-            if request.POST.get('remember_me'):
+            if user.role == User.Role.SELLER:
+                request.session.set_expiry(60 * 60 * 24 * 30)
+            elif request.POST.get('remember_me'):
                 request.session.set_expiry(60 * 60 * 24 * 30)
             else:
                 request.session.set_expiry(0)
@@ -58,6 +60,21 @@ def login_view(request):
 def logout_view(request):
     auth_logout(request)
     return redirect('dashboard:login')
+
+@login_required
+def plano_expirado(request):
+    tenant = request.user.tenant
+    trial_expired = (
+        tenant
+        and tenant.trial_ends_at
+        and tenant.trial_ends_at < timezone.now()
+    )
+    return render(request, 'dashboard/plano_expirado.html', {
+        'tenant': tenant,
+        'trial_expired': trial_expired,
+        'suspended': tenant and not tenant.is_active,
+    })
+
 
 @login_required
 def dashboard_home(request):

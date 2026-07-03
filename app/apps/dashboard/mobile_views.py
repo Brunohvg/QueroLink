@@ -59,23 +59,34 @@ def mobile_forgot_password(request):
                     'error': 'Senha deve ter pelo menos 8 caracteres.',
                 })
 
+            from app.apps.accounts.models import User as UserModel
             from app.apps.notifications.models import (
                 PasswordResetRequest as PRR,
             )
             from django.utils import timezone as tz
 
             try:
-                resets = PRR.objects.filter(
-                    used=False, expires_at__gt=tz.now(),
-                ).order_by('-expires_at')
-                reset = None
-                for r in resets:
-                    if r.check_pin(pin):
-                        reset = r
-                        break
-                if not reset:
-                    raise PRR.DoesNotExist
-            except PRR.DoesNotExist:
+                user = UserModel.objects.get(username=identifier)
+            except UserModel.DoesNotExist:
+                try:
+                    user = UserModel.objects.get(email=identifier)
+                except UserModel.DoesNotExist:
+                    return render(request, 'mobile/forgot_password.html', {
+                        'step': 'verify', 'identifier': identifier,
+                        'error': 'PIN invalido ou expirado.',
+                    })
+
+            resets = PRR.objects.filter(
+                user=user, used=False, expires_at__gt=tz.now(),
+            ).order_by('-expires_at')
+
+            reset = None
+            for r in resets:
+                if r.check_pin(pin):
+                    reset = r
+                    break
+
+            if not reset:
                 return render(request, 'mobile/forgot_password.html', {
                     'step': 'verify', 'identifier': identifier,
                     'error': 'PIN invalido ou expirado.',
@@ -89,15 +100,6 @@ def mobile_forgot_password(request):
                     'error': (
                         'Muitas tentativas. Solicite um novo PIN.'
                     ),
-                })
-
-            user = reset.user
-            if user.username != identifier and user.email != identifier:
-                reset.attempts += 1
-                reset.save()
-                return render(request, 'mobile/forgot_password.html', {
-                    'step': 'verify', 'identifier': identifier,
-                    'error': 'PIN nao corresponde ao usuario.',
                 })
 
             user.set_password(new_password)
@@ -114,26 +116,6 @@ def mobile_forgot_password(request):
 
         if identifier:
             from app.apps.accounts.models import User as UserModel
-            try:
-                user = UserModel.objects.get(username=identifier)
-            except UserModel.DoesNotExist:
-                try:
-                    user = UserModel.objects.get(email=identifier)
-                except UserModel.DoesNotExist:
-                    return render(request, 'mobile/forgot_password.html', {
-                        'step': 'request',
-                        'error': 'Usuario nao encontrado.',
-                    })
-
-            if not user.seller_profile:
-                return render(request, 'mobile/forgot_password.html', {
-                    'step': 'request',
-                    'error': (
-                        'Recuperacao de senha disponivel '
-                        'apenas para vendedores.'
-                    ),
-                })
-
             from app.apps.notifications.models import (
                 PasswordResetRequest as PRR,
             )
@@ -141,42 +123,52 @@ def mobile_forgot_password(request):
             from django.utils import timezone as tz
             from datetime import timedelta as td
 
-            pin = get_random_string(length=6, allowed_chars='0123456789')
-            reset = PRR(
-                user=user,
-                expires_at=tz.now() + td(minutes=10),
-            )
-            reset.set_pin(pin)
-            reset.save()
-
+            user = None
             try:
-                from app.apps.notifications.models import Notification
-                from app.apps.notifications.tasks import (
-                    send_whatsapp_notification,
+                user = UserModel.objects.get(username=identifier)
+            except UserModel.DoesNotExist:
+                try:
+                    user = UserModel.objects.get(email=identifier)
+                except UserModel.DoesNotExist:
+                    pass
+
+            if user and user.seller_profile:
+                pin = get_random_string(length=6, allowed_chars='0123456789')
+                reset = PRR(
+                    user=user,
+                    expires_at=tz.now() + td(minutes=10),
                 )
-                seller = user.seller_profile
-                if seller and seller.phone:
-                    notif = Notification.objects.create(
-                        tenant=seller.tenant, seller=seller,
-                        event_type='seller_credentials',
-                        channel='whatsapp',
-                        recipient=seller.phone,
-                        message_body=(
-                            f'Seu PIN de recuperacao de senha V-Com: '
-                            f'{pin}. Valido por 10 minutos.'
-                        ),
+                reset.set_pin(pin)
+                reset.save()
+
+                try:
+                    from app.apps.notifications.models import Notification
+                    from app.apps.notifications.tasks import (
+                        send_whatsapp_notification,
                     )
-                    send_whatsapp_notification.delay(notif.uuid)
-            except Exception:
-                logger.error(
-                    'Failed to send forgot-password notification to user %s',
-                    user.id, exc_info=True
-                )
+                    seller = user.seller_profile
+                    if seller and seller.phone:
+                        notif = Notification.objects.create(
+                            tenant=seller.tenant, seller=seller,
+                            event_type='seller_credentials',
+                            channel='whatsapp',
+                            recipient=seller.phone,
+                            message_body=(
+                                f'Seu PIN de recuperacao de senha V-Com: '
+                                f'{pin}. Valido por 10 minutos.'
+                            ),
+                        )
+                        send_whatsapp_notification.delay(notif.uuid)
+                except Exception:
+                    logger.error(
+                        'Failed to send forgot-password notification to user %s',
+                        user.id, exc_info=True
+                    )
 
             return render(request, 'mobile/forgot_password.html', {
                 'step': 'verify', 'identifier': identifier,
                 'message': (
-                    'Um PIN de 6 digitos foi enviado via WhatsApp.'
+                    'Se o usuario existir, um PIN foi enviado via WhatsApp.'
                 ),
             })
 
@@ -204,6 +196,7 @@ def mobile_home(request):
         month_total = Sale.objects.filter(
             seller=seller,
             origin=Sale.Origin.MANUAL,
+            status='ATIVA',
             sale_date__year=today.year,
             sale_date__month=today.month,
         ).aggregate(total=Sum('amount'))['total'] or 0
@@ -211,6 +204,7 @@ def mobile_home(request):
         month_link_total = Sale.objects.filter(
             seller=seller,
             origin=Sale.Origin.LINK,
+            status='ATIVA',
             sale_date__year=today.year,
             sale_date__month=today.month,
         ).aggregate(total=Sum('amount'))['total'] or 0
@@ -240,13 +234,13 @@ def mobile_home(request):
             )
             comissao_label = 'Estimada'
         elif sc_status == SellerCommission.Status.FECHADA:
-            comissao_valor = sc.frozen_commission_amount or sc.commission_amount
+            comissao_valor = sc.amount_due
             comissao_label = 'Fechada'
         elif sc_status == SellerCommission.Status.PAGA:
-            comissao_valor = sc.paid_amount or sc.frozen_commission_amount or sc.commission_amount
+            comissao_valor = sc.amount_due
             comissao_label = 'Paga'
         elif sc_status == SellerCommission.Status.AJUSTADA:
-            comissao_valor = sc.commission_amount
+            comissao_valor = sc.amount_due
             comissao_label = 'Ajustada'
         else:
             if not sc:
@@ -284,8 +278,9 @@ def mobile_home(request):
             'has_missing_past_days': has_missing_past_days,
         })
     except Exception as e:
+        logger.exception("Erro ao carregar mobile_home")
         return render(request, 'mobile/home.html', {
-            'error': f'Erro ao carregar pagina: {str(e)}',
+            'error': 'Ocorreu um erro inesperado. Tente novamente.',
         })
 
 
@@ -365,8 +360,13 @@ def mobile_lancar_venda(request):
             success = True
             last_amount = amount_cents
             was_update = existing is not None
-        except (ValueError, Exception) as e:
+        except ValueError as e:
             error = str(e)
+            last_amount = 0
+            was_update = False
+        except Exception as e:
+            logger.exception("Erro inesperado em mobile_lancar_venda")
+            error = 'Ocorreu um erro inesperado. Tente novamente.'
             last_amount = 0
             was_update = False
 
@@ -472,6 +472,7 @@ def mobile_meu_desempenho(request):
     month_total = Sale.objects.filter(
         seller=seller,
         origin=Sale.Origin.MANUAL,
+        status='ATIVA',
         sale_date__year=today.year,
         sale_date__month=today.month,
     ).aggregate(total=Sum('amount'))['total'] or 0

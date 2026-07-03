@@ -2,6 +2,7 @@ import uuid
 from django.db import models
 from django.contrib.auth.models import AbstractUser
 from django.utils.text import slugify
+from django.utils import timezone
 from .fields import EncryptedCharField, compute_hash
 
 
@@ -74,6 +75,14 @@ class Tenant(models.Model):
     @property
     def whatsapp_configured(self):
         return bool(self.whatsapp_token and self.whatsapp_instance_id)
+
+    @property
+    def is_trial_expired(self):
+        return bool(self.trial_ends_at and self.trial_ends_at < timezone.now())
+
+
+def tenant_operational(tenant):
+    return tenant.is_active and not tenant.is_trial_expired
 
 class User(AbstractUser):
     # Role.ADMIN é admin DENTRO do tenant (gerencia vendedores, fechamento, etc. da propria loja).

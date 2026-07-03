@@ -24,34 +24,48 @@ def _verify_webhook_token(tenant_uuid, token):
 
 
 @csrf_exempt
-def pagarme_webhook(request, tenant_slug=None):
+def pagarme_webhook(request, tenant_slug):
     if request.method != "POST":
         return JsonResponse({"error": "Method not allowed"}, status=405)
 
-    if tenant_slug:
-        from app.apps.accounts.models import Tenant as TenantModel
+    from app.apps.accounts.models import Tenant as TenantModel
+    try:
+        tenant = TenantModel.objects.get(slug=tenant_slug)
+    except TenantModel.DoesNotExist:
+        logger.warning("Webhook recebido para tenant_slug inexistente: %s", tenant_slug)
+        return JsonResponse({"error": "Not found"}, status=404)
+
+    from django.conf import settings
+    auth_required = getattr(settings, 'WEBHOOK_AUTH_REQUIRED', True)
+
+    if tenant.pagarme_webhook_username and tenant.pagarme_webhook_password:
+        auth_header = request.META.get('HTTP_AUTHORIZATION', '')
+        if not auth_header.startswith('Basic '):
+            logger.warning("Webhook sem Basic Auth para tenant %s", tenant_slug)
+            return JsonResponse({"error": "Unauthorized"}, status=401)
+
+        import base64
         try:
-            tenant = TenantModel.objects.get(slug=tenant_slug)
-            if tenant.pagarme_webhook_username and tenant.pagarme_webhook_password:
-                auth_header = request.META.get('HTTP_AUTHORIZATION', '')
-                if not auth_header.startswith('Basic '):
-                    logger.warning("Webhook sem Basic Auth para tenant %s", tenant_slug)
-                    return JsonResponse({"error": "Unauthorized"}, status=401)
+            decoded = base64.b64decode(auth_header[6:]).decode('utf-8')
+            username, password = decoded.split(':', 1)
+        except Exception:
+            logger.warning("Webhook Basic Auth mal formatado para tenant %s", tenant_slug)
+            return JsonResponse({"error": "Unauthorized"}, status=401)
 
-                import base64
-                try:
-                    decoded = base64.b64decode(auth_header[6:]).decode('utf-8')
-                    username, password = decoded.split(':', 1)
-                except Exception:
-                    logger.warning("Webhook Basic Auth mal formatado para tenant %s", tenant_slug)
-                    return JsonResponse({"error": "Unauthorized"}, status=401)
-
-                if username != tenant.pagarme_webhook_username or password != tenant.pagarme_webhook_password:
-                    logger.warning("Webhook credenciais invalidas para tenant %s", tenant_slug)
-                    return JsonResponse({"error": "Unauthorized"}, status=401)
-        except TenantModel.DoesNotExist:
-            logger.warning("Webhook recebido para tenant_slug inexistente: %s", tenant_slug)
-            return JsonResponse({"error": "Not found"}, status=404)
+        if username != tenant.pagarme_webhook_username or password != tenant.pagarme_webhook_password:
+            logger.warning("Webhook credenciais invalidas para tenant %s", tenant_slug)
+            return JsonResponse({"error": "Unauthorized"}, status=401)
+    elif auth_required:
+        logger.warning(
+            "Webhook rejeitado: tenant %s sem credenciais de webhook configuradas",
+            tenant_slug,
+        )
+        return JsonResponse({"error": "Unauthorized"}, status=401)
+    else:
+        logger.warning(
+            "Webhook permitido sem auth: tenant %s sem credenciais (WEBHOOK_AUTH_REQUIRED=False)",
+            tenant_slug,
+        )
 
     try:
         payload = json.loads(request.body)
@@ -65,18 +79,12 @@ def pagarme_webhook(request, tenant_slug=None):
             logger.info("Webhook duplicado ignorado: gateway_event_id=%s", gateway_event_id)
             return JsonResponse({"status": "duplicate"}, status=200)
 
-    event_kwargs = {
-        'gateway': 'pagarme',
-        'payload': sanitized,
-        'gateway_event_id': gateway_event_id or None,
-    }
-    if tenant_slug:
-        try:
-            tenant_obj = TenantModel.objects.get(slug=tenant_slug)
-            event_kwargs['tenant'] = tenant_obj
-        except TenantModel.DoesNotExist:
-            pass
-    event = WebhookEvent.objects.create(**event_kwargs)
+    event = WebhookEvent.objects.create(
+        gateway='pagarme',
+        payload=sanitized,
+        gateway_event_id=gateway_event_id or None,
+        tenant=tenant,
+    )
     from app.apps.webhooks.tasks import process_pagarme_webhook
     process_pagarme_webhook.delay(event.id)
     return JsonResponse({"status": "received"}, status=200)

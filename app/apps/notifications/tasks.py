@@ -138,7 +138,8 @@ def notify_commission_paid(seller_commission):
     seller = seller_commission.seller
     period = seller_commission.period
     from decimal import Decimal
-    amount = Decimal(str(seller_commission.commission_amount)) / Decimal('100')
+    amount_value = seller_commission.paid_amount if seller_commission.paid_amount is not None else seller_commission.amount_due
+    amount = Decimal(str(amount_value)) / Decimal('100')
     valor = f"R$ {amount:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
 
     create_and_send_notification(

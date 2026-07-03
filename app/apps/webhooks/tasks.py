@@ -103,7 +103,55 @@ def process_pagarme_webhook(event_id):
         if event_type in ('order.paid', 'charge.paid', 'payment-link.finished'):
             order = None
 
-            if event_type in ('order.paid', 'payment-link.finished'):
+            if event_type == 'order.paid':
+                code = data.get('code', '')
+                if code:
+                    try:
+                        from uuid import UUID
+                        UUID(code)
+                        try:
+                            order = Order.objects.select_related('tenant', 'seller').get(uuid=code)
+                            logger.info("order.paid resolvido via code (uuid)")
+                        except Order.DoesNotExist:
+                            pass
+                    except ValueError:
+                        pass
+
+                if not order:
+                    charges = data.get('charges', [])
+                    if charges:
+                        link_id = charges[0].get('payment_link_id', '')
+                        if link_id:
+                            try:
+                                payment_link = PaymentLink.objects.select_related('order').get(
+                                    gateway_link_id=link_id
+                                )
+                                order = payment_link.order
+                                logger.info("order.paid resolvido via charges[0].payment_link_id")
+                            except PaymentLink.DoesNotExist:
+                                pass
+
+                if not order:
+                    gateway_order_id = data.get('id', '')
+                    if gateway_order_id:
+                        try:
+                            payment = Payment.objects.select_related('order').get(
+                                gateway_order_id=gateway_order_id
+                            )
+                            order = payment.order
+                            logger.info("order.paid resolvido via Payment.gateway_order_id")
+                        except Payment.DoesNotExist:
+                            pass
+
+                if not order:
+                    _skip_foreign_event(
+                        event,
+                        f"Order nao encontrada para order.paid "
+                        f"(code={data.get('code')}, id={data.get('id')}, plataforma externa)",
+                    )
+                    return
+
+            elif event_type == 'payment-link.finished':
                 link_id = data.get('id')
                 try:
                     payment_link = PaymentLink.objects.select_related('order').get(
@@ -119,15 +167,29 @@ def process_pagarme_webhook(event_id):
 
             elif event_type == 'charge.paid':
                 order_data = data.get('order', {})
-                link_id = order_data.get('payment_link', {}).get('id') or data.get('payment_link_id')
-                if link_id:
+                order_code = order_data.get('code', '')
+                if order_code:
                     try:
-                        payment_link = PaymentLink.objects.select_related('order').get(
-                            gateway_link_id=link_id
-                        )
-                        order = payment_link.order
-                    except PaymentLink.DoesNotExist:
+                        from uuid import UUID
+                        UUID(order_code)
+                        try:
+                            order = Order.objects.select_related('tenant', 'seller').get(uuid=order_code)
+                            logger.info("charge.paid resolvido via order.code")
+                        except Order.DoesNotExist:
+                            pass
+                    except ValueError:
                         pass
+
+                if not order:
+                    link_id = order_data.get('payment_link', {}).get('id') or data.get('payment_link_id')
+                    if link_id:
+                        try:
+                            payment_link = PaymentLink.objects.select_related('order').get(
+                                gateway_link_id=link_id
+                            )
+                            order = payment_link.order
+                        except PaymentLink.DoesNotExist:
+                            pass
 
                 if not order:
                     gateway_txn_id = data.get('id')
@@ -165,10 +227,14 @@ def process_pagarme_webhook(event_id):
             if payment.status == Payment.Status.PAID:
                 logger.info(
                     "Payment %s already PAID, skipping duplicate webhook",
-                    payment.id,
+                    payment.uuid,
                 )
             else:
-                _populate_payment_from_webhook(payment, data, event_type)
+                if event_type == 'payment-link.finished':
+                    if not payment.paid_at:
+                        payment.paid_at = timezone.now()
+                else:
+                    _populate_payment_from_webhook(payment, data, event_type)
                 payment.status = Payment.Status.PAID
                 payment.raw_callback_payload = payload
                 payment.save()
@@ -273,7 +339,7 @@ def process_pagarme_webhook(event_id):
             payment.status = Payment.Status.REFUNDED
             payment.raw_callback_payload = payload
             payment.save()
-            Sale.objects.filter(order=order).delete()
+            Sale.objects.filter(order=order).update(status='ESTORNADA')
             if order.seller:
                 from app.apps.notifications.tasks import notify_seller_link_status
                 notify_seller_link_status(order.seller, order, 'payment_refunded')
@@ -339,12 +405,12 @@ def process_pagarme_webhook(event_id):
                 _skip_foreign_event(event, "Order nao encontrada para charge.chargedback")
                 return
             if payment.status == Payment.Status.CHARGEBACK:
-                logger.info("Payment %s already CHARGEBACK, skipping", payment.id)
+                logger.info("Payment %s already CHARGEBACK, skipping", payment.uuid)
             else:
                 payment.status = Payment.Status.CHARGEBACK
                 payment.raw_callback_payload = payload
                 payment.save(update_fields=['status', 'raw_callback_payload', 'updated_at'])
-                Sale.objects.filter(order=order).delete()
+                Sale.objects.filter(order=order).update(status='ESTORNADA')
                 if order.seller:
                     from app.apps.notifications.tasks import notify_seller_link_status
                     notify_seller_link_status(order.seller, order, 'payment_chargeback')

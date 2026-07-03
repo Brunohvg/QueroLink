@@ -23,6 +23,14 @@ DATABASES = {
 CELERY_BROKER_URL = config('REDIS_URL')
 CELERY_RESULT_BACKEND = CELERY_BROKER_URL
 
+CACHES = {
+    'default': {
+        'BACKEND': 'django.core.cache.backends.redis.RedisCache',
+        'LOCATION': config('REDIS_URL'),
+        'KEY_PREFIX': 'vcom',
+    }
+}
+
 SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 SECURE_SSL_REDIRECT = config('SECURE_SSL_REDIRECT', default=True, cast=bool)
 SECURE_REDIRECT_EXEMPT = [r'^health/$']

@@ -19,6 +19,11 @@ class Sale(models.Model):
         Order, on_delete=models.SET_NULL, null=True, blank=True, related_name='sale'
     )
     origin = models.CharField(max_length=10, choices=Origin.choices)
+    status = models.CharField(
+        max_length=10,
+        choices=[('ATIVA', 'Ativa'), ('ESTORNADA', 'Estornada')],
+        default='ATIVA',
+    )
     amount = models.PositiveIntegerField(help_text="Valor em centavos")
     sale_date = models.DateField()
     notes = models.CharField(max_length=255, blank=True, null=True)

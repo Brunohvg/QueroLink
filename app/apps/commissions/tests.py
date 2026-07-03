@@ -680,6 +680,68 @@ class TestCancelPeriod(BaseTest):
             cancel_period(period, 'Nao deve', self.manager)
 
 
+class TestAdjustedCommissionPayment(BaseTest):
+    def test_adjusted_commission_paid_with_new_amount(self):
+        self._create_manual_sale(self.seller, 1000000, 15)
+        period = self._create_period()
+        sync_period_seller_commissions(period)
+        sc = SellerCommission.objects.get(period=period, seller=self.seller)
+        close_seller_commissions(period, [sc.id], self.manager)
+        sc.refresh_from_db()
+        self.assertEqual(sc.frozen_commission_amount, 10000)
+
+        create_commission_adjustment(sc, 12000, 'Ajuste para 12000', self.manager)
+        sc.refresh_from_db()
+        self.assertEqual(sc.commission_amount, 12000)
+        self.assertEqual(sc.status, SellerCommission.Status.AJUSTADA)
+
+        pay_seller_commissions(period, [sc.id], self.manager, {
+            'payment_method': 'pix',
+        })
+        sc.refresh_from_db()
+        self.assertEqual(sc.status, SellerCommission.Status.PAGA)
+        self.assertEqual(sc.paid_amount, 12000)
+
+    def test_adjusted_commission_in_period_summary(self):
+        self._create_manual_sale(self.seller, 1000000, 15)
+        period = self._create_period()
+        sync_period_seller_commissions(period)
+        sc = SellerCommission.objects.get(period=period, seller=self.seller)
+        close_seller_commissions(period, [sc.id], self.manager)
+        sc.refresh_from_db()
+
+        create_commission_adjustment(sc, 12000, 'Ajuste para 12000', self.manager)
+        sc.refresh_from_db()
+
+        summary = calculate_period_summary(period)
+        self.assertEqual(summary['commission_fechada'], 12000)
+
+        pay_seller_commissions(period, [sc.id], self.manager, {
+            'payment_method': 'pix',
+        })
+        sc.refresh_from_db()
+
+        summary = calculate_period_summary(period)
+        self.assertEqual(summary['commission_paga'], 12000)
+
+    def test_closed_commission_paid_with_frozen_amount(self):
+        self._create_manual_sale(self.seller, 1000000, 15)
+        period = self._create_period()
+        sync_period_seller_commissions(period)
+        sc = SellerCommission.objects.get(period=period, seller=self.seller)
+        close_seller_commissions(period, [sc.id], self.manager)
+        sc.refresh_from_db()
+        frozen = sc.frozen_commission_amount
+        self.assertIsNotNone(frozen)
+
+        pay_seller_commissions(period, [sc.id], self.manager, {
+            'payment_method': 'pix',
+        })
+        sc.refresh_from_db()
+        self.assertEqual(sc.status, SellerCommission.Status.PAGA)
+        self.assertEqual(sc.paid_amount, frozen)
+
+
 class TestPaymentQueue(BaseTest):
     def setUp(self):
         super().setUp()

@@ -1,0 +1,26 @@
+{% extends 'dashboard/base_desktop.html' %}
+{% block title %}Assinatura — V-Com{% endblock %}
+{% block content %}
+
+<div class="surface-card border-l-4 border-l-danger-500 mb-6">
+    <p class="text-[14px] font-medium text-gray-900">Acesso Restrito</p>
+    <p class="text-[13px] text-gray-500 mt-1">
+        {% if suspended %}
+            Sua conta foi suspensa. Entre em contato com o suporte para reativar o acesso.
+        {% elif trial_expired %}
+            Seu período de trial expirou. Atualize seu plano para continuar usando o sistema.
+        {% else %}
+            Sua assinatura está inativa. Entre em contato com o suporte.
+        {% endif %}
+    </p>
+</div>
+
+<div class="surface-card">
+    <h2 class="text-[13px] font-semibold text-gray-500 uppercase tracking-wide mb-4">Precisa de ajuda?</h2>
+    <p class="text-[14px] text-gray-600">
+        Entre em contato com nossa equipe de suporte para regularizar sua assinatura
+        e continuar usando todos os recursos do V-Com.
+    </p>
+</div>
+
+{% endblock %}

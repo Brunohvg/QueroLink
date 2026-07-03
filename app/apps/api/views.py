@@ -441,6 +441,7 @@ class RankingView(generics.GenericAPIView):
         sales = Sale.objects.filter(
             tenant=tenant,
             origin=Sale.Origin.MANUAL,
+            status='ATIVA',
             sale_date__year=year,
             sale_date__month=month,
         ).values('seller__uuid', 'seller__name', 'seller__commission_rate').annotate(
@@ -602,10 +603,10 @@ class SellerDetailView(generics.GenericAPIView):
             sale_date__gte=start, sale_date__lte=end,
         ).order_by('-sale_date', '-created_at')
 
-        manual_total = manual_sales_qs.aggregate(
+        manual_total = manual_sales_qs.filter(status='ATIVA').aggregate(
             t=Sum('amount'),
         )['t'] or 0
-        link_total = link_sales_qs.aggregate(
+        link_total = link_sales_qs.filter(status='ATIVA').aggregate(
             t=Sum('amount'),
         )['t'] or 0
 
@@ -682,7 +683,7 @@ class SellerDetailView(generics.GenericAPIView):
                 'adjustments': adjustments_data,
             })
 
-        evo = manual_sales_qs.values(
+        evo = manual_sales_qs.filter(status='ATIVA').values(
             'sale_date',
         ).annotate(
             day_total=Sum('amount'),
@@ -703,12 +704,12 @@ class SellerDetailView(generics.GenericAPIView):
             me = date(cy, cm, calendar.monthrange(cy, cm)[1])
             mt = Sale.objects.filter(
                 tenant=tenant, seller=seller,
-                origin=Sale.Origin.MANUAL,
+                origin=Sale.Origin.MANUAL, status='ATIVA',
                 sale_date__gte=ms, sale_date__lte=me,
             ).aggregate(t=Sum('amount'))['t'] or 0
             mc = Sale.objects.filter(
                 tenant=tenant, seller=seller,
-                origin=Sale.Origin.MANUAL,
+                origin=Sale.Origin.MANUAL, status='ATIVA',
                 sale_date__gte=ms, sale_date__lte=me,
             ).count()
             sc_c = commissions.filter(

@@ -209,6 +209,7 @@ class SellerCommission(models.Model):
             tenant=self.period.tenant,
             seller=self.seller,
             origin=Sale.Origin.MANUAL,
+            status='ATIVA',
             sale_date__year=self.period.year,
             sale_date__month=self.period.month,
         ).dates('sale_date', 'day')
@@ -247,6 +248,7 @@ class SellerCommission(models.Model):
             tenant=self.period.tenant,
             seller=self.seller,
             origin=Sale.Origin.MANUAL,
+            status='ATIVA',
             sale_date__range=(start, end),
         ).aggregate(t=Sum('amount'))['t'] or 0
         self.total_sold_amount = total
@@ -281,10 +283,11 @@ class SellerCommission(models.Model):
             ])
 
     def mark_paid(self, user, payment_data, commit=True):
+        amount = self.amount_due
         self.status = self.Status.PAGA
         self.paid_by = user
         self.paid_at = timezone.now()
-        self.paid_amount = self.frozen_commission_amount if self.frozen_commission_amount is not None else self.commission_amount
+        self.paid_amount = amount
         self.payment_date = payment_data.get('payment_date')
         self.payment_method = (payment_data.get('payment_method') or '').strip() or None
         self.payment_notes = (payment_data.get('payment_notes') or '').strip() or None
@@ -322,6 +325,16 @@ class SellerCommission(models.Model):
     @property
     def is_paid(self):
         return self.status == self.Status.PAGA
+
+    @property
+    def amount_due(self):
+        if self.status == self.Status.PAGA and self.paid_amount is not None:
+            return self.paid_amount
+        if self.status == self.Status.AJUSTADA:
+            return self.commission_amount
+        if self.status == self.Status.FECHADA and self.frozen_commission_amount is not None:
+            return self.frozen_commission_amount
+        return self.commission_amount
 
 
 class CommissionAdjustment(models.Model):
