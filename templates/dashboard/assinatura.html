@@ -122,56 +122,77 @@
 
     <!-- Tab: Planos -->
     <div x-show="tab === 'plans'" class="space-y-6">
-        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
             {% for plan in all_plans %}
-            <div class="bg-white rounded-xl p-6 border-2 plan-card {% if plan.is_current %}plan-card-current{% else %}border-gray-100 hover:border-gray-200{% endif %} relative">
+            <div class="bg-white rounded-xl border-2 plan-card flex flex-col {% if plan.is_current %}plan-card-current{% else %}border-gray-100 hover:border-gray-200{% endif %} relative">
                 {% if plan.is_current %}
-                <div class="absolute -top-3 right-4">
+                <div class="absolute -top-3 right-4 z-10">
                     <span class="bg-brand-500 text-white text-[10px] font-bold px-3 py-1 rounded-full shadow-sm">Plano atual</span>
                 </div>
                 {% endif %}
-                <div class="mb-5">
-                    <p class="text-[15px] font-bold text-gray-900 mb-1">{{ plan.name }}</p>
-                    <p class="text-[12px] text-gray-500">{% if plan.seller_limit is None %}Sem limite de vendedores{% else %}Ate {{ plan.seller_limit }} vendedores{% endif %}</p>
+                <div class="p-6 flex-1">
+                    <div class="mb-4">
+                        <p class="text-[15px] font-bold text-gray-900 mb-1">{{ plan.name }}</p>
+                        <p class="text-[12px] text-gray-500">Sem limite de vendedores</p>
+                    </div>
+                    <div class="mb-5">
+                        {% if plan.price_monthly %}
+                        <p class="text-[28px] font-bold text-gray-900 tracking-tight">{{ plan.price_monthly|brl }}<span class="text-[13px] font-normal text-gray-400">/mes</span></p>
+                        <p class="text-[12px] text-gray-400 mt-1">{{ plan.price_yearly|brl }}/ano <span class="text-emerald-600 font-medium">economize 10%</span></p>
+                        {% else %}
+                        <p class="text-[20px] font-bold text-gray-300">Sob consulta</p>
+                        {% endif %}
+                    </div>
+                    <ul class="space-y-2.5 text-[13px] mb-6">
+                        {% for feat in plan.features %}
+                        <li class="flex items-start gap-2 text-gray-600">
+                            <svg class="w-4 h-4 text-emerald-500 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"></path></svg>
+                            {{ feat }}
+                        </li>
+                        {% endfor %}
+                    </ul>
                 </div>
-                <div class="mb-5">
-                    {% if plan.price_monthly %}
-                    <p class="text-[28px] font-bold text-gray-900 tracking-tight">{{ plan.price_monthly|brl }}<span class="text-[13px] font-normal text-gray-400">/mes</span></p>
-                    <p class="text-[12px] text-gray-400 mt-1">{{ plan.price_yearly|brl }}/ano <span class="text-emerald-600 font-medium">economize 10%</span></p>
+                {% if not subscription or subscription.status != 'ACTIVE' %}
+                <div class="px-6 pb-6">
+                    {% if plan.id == 'ENTERPRISE' %}
+                    <a href="mailto:suporte@vidalys.com.br" class="block w-full text-center py-2.5 border border-gray-200 rounded-lg text-sm font-semibold text-gray-600 hover:bg-gray-50 transition">Fale conosco</a>
                     {% else %}
-                    <p class="text-[20px] font-bold text-gray-300">Sob consulta</p>
+                    <button @click="selectedPlan = '{{ plan.id }}'; showForm = true" 
+                            class="w-full bg-brand-500 text-white py-2.5 rounded-lg text-sm font-semibold hover:bg-brand-600 transition">
+                        Assinar {{ plan.name }}
+                    </button>
                     {% endif %}
                 </div>
-                <ul class="space-y-2.5 text-[13px]">
-                    {% for feat in plan.features %}
-                    <li class="flex items-start gap-2 text-gray-600">
-                        <svg class="w-4 h-4 text-emerald-500 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"></path></svg>
-                        {{ feat }}
-                    </li>
-                    {% endfor %}
-                </ul>
+                {% endif %}
             </div>
             {% endfor %}
         </div>
 
-        {% if not subscription or subscription.status != 'ACTIVE' %}
-        <div class="bg-white rounded-xl p-6 shadow-sm border border-gray-100">
-            <h3 class="text-[15px] font-bold text-gray-900 mb-1">Ativar assinatura</h3>
-            <p class="text-[13px] text-gray-500 mb-5">Escolha o ciclo e forma de pagamento. Voce sera redirecionado ao Mercado Pago para autorizar.</p>
+        <!-- Formulario de assinatura (aparece ao clicar em Assinar) -->
+        <div x-show="showForm && selectedPlan" x-transition class="bg-white rounded-xl p-6 shadow-sm border border-gray-100">
+            <div class="flex items-center justify-between mb-4">
+                <div>
+                    <h3 class="text-[15px] font-bold text-gray-900">Assinar <span x-text="selectedPlan === 'STARTER' ? 'Starter' : 'Pro'"></span></h3>
+                    <p class="text-[13px] text-gray-500 mt-0.5">Preencha abaixo e confirme no Mercado Pago</p>
+                </div>
+                <button @click="showForm = false" class="text-gray-400 hover:text-gray-600 p-1">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                </button>
+            </div>
             {% if not tenant.billing_email %}
             <div class="bg-amber-50 border border-amber-200 rounded-lg p-3 mb-4 text-[13px] text-amber-700">
-                Configure seu email de cobranca na aba "Visao Geral" antes de ativar.
+                Configure seu email de cobranca na aba "Visao Geral" antes de assinar.
             </div>
             {% endif %}
             <form id="upgrade-form" method="post" action="{% url 'billing:api-billing-upgrade' %}">
                 {% csrf_token %}
-                <input type="hidden" name="plan" value="VCOM">
+                <input type="hidden" name="plan" :value="selectedPlan">
                 <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
                     <div>
                         <label class="block text-[12px] font-medium text-gray-600 mb-1">Ciclo</label>
                         <select name="billing_cycle" class="w-full px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-lg text-[14px] outline-none focus:border-brand-400">
-                            <option value="MONTHLY">Mensal — R$ 97/mes</option>
-                            <option value="YEARLY">Anual — R$ 990/ano (economize R$ 174)</option>
+                            <option value="MONTHLY">Mensal</option>
+                            <option value="YEARLY">Anual (10% off)</option>
                         </select>
                     </div>
                     <div>
@@ -183,14 +204,13 @@
                     </div>
                     <div class="flex items-end">
                         <button type="submit" class="w-full bg-brand-500 text-white py-2.5 px-5 rounded-lg text-sm font-semibold hover:bg-brand-600 transition disabled:bg-gray-300" {% if not tenant.billing_email %}disabled{% endif %}>
-                            Ativar agora
+                            Assinar agora
                         </button>
                     </div>
                 </div>
             </form>
             <div id="upgrade-error" class="text-[13px] text-red-600 hidden mt-2"></div>
         </div>
-        {% endif %}
     </div>
 
     <!-- Tab: Historico -->
@@ -257,7 +277,7 @@
 <script>
     document.addEventListener('alpine:init', function() {
         Alpine.data('billingApp', function() {
-            return { tab: 'overview', editingEmail: false };
+            return { tab: 'overview', editingEmail: false, selectedPlan: '', showForm: false };
         });
     });
 
