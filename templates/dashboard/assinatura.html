@@ -1,80 +1,79 @@
 {% extends 'dashboard/base_desktop.html' %}
 {% load static %}
+{% load currency_filters %}
 {% block title %}Assinatura — V-Com{% endblock %}
 {% block content %}
 
-<div class="surface-hero mb-6 flex items-center justify-between">
+<div class="surface-hero mb-6 flex items-center justify-between bg-gradient-to-r from-brand-500 to-brand-600 text-white border-none">
     <div>
-        <h1 class="text-[18px] font-semibold text-gray-900 mb-1">Assinatura</h1>
-        <p class="text-[13px] text-gray-500">Gerencie seu plano e pagamentos</p>
+        <h1 class="text-[20px] font-bold mb-1">Assinatura</h1>
+        <p class="text-[13px] text-white/80">Gerencie seu plano e pagamentos</p>
     </div>
     <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold
-        {% if subscription.status == 'ACTIVE' or subscription.status == 'TRIALING' %}bg-success-50 text-success-700
-        {% elif subscription.status == 'PAST_DUE' %}bg-amber-50 text-amber-700
-        {% elif subscription.status == 'CANCELED' %}bg-red-50 text-red-700
-        {% else %}bg-gray-100 text-gray-600{% endif %}">
+        {% if subscription.status == 'ACTIVE' or subscription.status == 'TRIALING' %}bg-white/20 text-white
+        {% elif subscription.status == 'PAST_DUE' %}bg-amber-400/30 text-amber-100
+        {% elif subscription.status == 'CANCELED' %}bg-red-400/30 text-red-100
+        {% else %}bg-white/10 text-white/60{% endif %}">
         {{ subscription.get_status_display|default:"Sem assinatura" }}
     </span>
 </div>
 
 {% if not subscription or subscription.status == 'CANCELED' %}
-<div class="surface-card border-l-4 border-l-amber-500 mb-6">
-    <p class="text-[14px] font-medium text-gray-900">Assine um plano para continuar usando o V-Com</p>
-    <p class="text-[13px] text-gray-500 mt-1">Escolha o plano ideal para sua loja abaixo.</p>
-</div>
-{% endif %}
-
-{% if messages %}
-<div class="mb-4">
-    {% for msg in messages %}
-    <div class="p-3 rounded-lg text-sm {% if msg.tags == 'error' %}bg-red-50 text-red-700 border border-red-200{% else %}bg-blue-50 text-blue-700 border border-blue-200{% endif %}">
-        {{ msg }}
-    </div>
-    {% endfor %}
+<div class="bg-amber-50 border border-amber-200 rounded-2xl p-5 mb-6">
+    <p class="text-[14px] font-semibold text-amber-800">Assine um plano para continuar usando o V-Com</p>
+    <p class="text-[13px] text-amber-600 mt-1">Escolha o plano ideal para sua loja abaixo.</p>
 </div>
 {% endif %}
 
 <div id="billing-app" x-data="billingApp()">
-    <div class="flex gap-2 mb-6 border-b border-gray-200">
-        <button @click="tab = 'overview'" :class="tab === 'overview' ? 'border-b-2 border-brand-500 text-brand-600' : 'text-gray-500'" class="px-4 py-3 text-sm font-medium transition">Visao Geral</button>
-        <button @click="tab = 'plans'" :class="tab === 'plans' ? 'border-b-2 border-brand-500 text-brand-600' : 'text-gray-500'" class="px-4 py-3 text-sm font-medium transition">Planos</button>
-        <button @click="tab = 'history'" :class="tab === 'history' ? 'border-b-2 border-brand-500 text-brand-600' : 'text-gray-500'" class="px-4 py-3 text-sm font-medium transition">Historico</button>
+
+    <!-- Abas -->
+    <div class="flex gap-1 mb-6 bg-white rounded-xl p-1 shadow-sm border border-gray-100">
+        <button @click="tab = 'overview'" :class="tab === 'overview' ? 'bg-brand-50 text-brand-600 font-semibold' : 'text-gray-500 hover:text-gray-700'" class="flex-1 px-4 py-2.5 text-sm rounded-lg transition">Visao Geral</button>
+        <button @click="tab = 'plans'" :class="tab === 'plans' ? 'bg-brand-50 text-brand-600 font-semibold' : 'text-gray-500 hover:text-gray-700'" class="flex-1 px-4 py-2.5 text-sm rounded-lg transition">Planos</button>
+        <button @click="tab = 'history'" :class="tab === 'history' ? 'bg-brand-50 text-brand-600 font-semibold' : 'text-gray-500 hover:text-gray-700'" class="flex-1 px-4 py-2.5 text-sm rounded-lg transition">Historico</button>
         {% if subscription and subscription.status != 'CANCELED' %}
-        <button @click="tab = 'cancel'" :class="tab === 'cancel' ? 'border-b-2 border-red-500 text-red-600' : 'text-gray-500'" class="px-4 py-3 text-sm font-medium transition">Cancelar</button>
+        <button @click="tab = 'cancel'" :class="tab === 'cancel' ? 'bg-red-50 text-red-600 font-semibold' : 'text-gray-500 hover:text-gray-700'" class="flex-1 px-4 py-2.5 text-sm rounded-lg transition">Cancelar</button>
         {% endif %}
     </div>
 
     <!-- Tab: Visao Geral -->
     <div x-show="tab === 'overview'" class="space-y-4">
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div class="surface-card">
-                <p class="text-[13px] font-semibold text-gray-500 uppercase tracking-wide mb-1">Plano atual</p>
-                <p class="font-display text-[24px] font-semibold text-gray-900">{{ tenant.get_plan_display }}</p>
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div class="bg-white rounded-2xl p-5 shadow-sm border border-gray-100">
+                <p class="text-[12px] font-semibold text-gray-400 uppercase tracking-wide mb-1">Plano atual</p>
+                <p class="text-[22px] font-bold text-gray-900">{{ tenant.get_plan_display }}</p>
             </div>
-            <div class="surface-card">
-                <p class="text-[13px] font-semibold text-gray-500 uppercase tracking-wide mb-1">Proximo vencimento</p>
-                <p class="font-display text-[24px] font-semibold text-gray-900">
+            <div class="bg-white rounded-2xl p-5 shadow-sm border border-gray-100">
+                <p class="text-[12px] font-semibold text-gray-400 uppercase tracking-wide mb-1">Proximo vencimento</p>
+                <p class="text-[22px] font-bold text-gray-900">
                     {% if subscription.current_period_end %}{{ subscription.current_period_end|date:"d/m/Y" }}{% else %}—{% endif %}
                 </p>
             </div>
-            <div class="surface-card">
-                <p class="text-[13px] font-semibold text-gray-500 uppercase tracking-wide mb-1">Valor</p>
-                <p class="font-display text-[24px] font-semibold text-gray-900">
-                    {% if subscription.amount %}R$ {{ subscription.amount|floatformat:2 }}{% else %}—{% endif %}
+            <div class="bg-white rounded-2xl p-5 shadow-sm border border-gray-100">
+                <p class="text-[12px] font-semibold text-gray-400 uppercase tracking-wide mb-1">Valor</p>
+                <p class="text-[22px] font-bold text-gray-900">
+                    {% if subscription.amount %}{{ subscription.amount|brl }}{% else %}—{% endif %}
                 </p>
             </div>
-            <div class="surface-card">
-                <p class="text-[13px] font-semibold text-gray-500 uppercase tracking-wide mb-1">Vendedores ativos</p>
-                <p class="font-display text-[24px] font-semibold text-gray-900">
+            <div class="bg-white rounded-2xl p-5 shadow-sm border border-gray-100">
+                <p class="text-[12px] font-semibold text-gray-400 uppercase tracking-wide mb-1">Vendedores</p>
+                <p class="text-[22px] font-bold text-gray-900">
                     {{ active_sellers }}{% if plan_limit %}/{{ plan_limit }}{% endif %}
                 </p>
             </div>
         </div>
-        <div class="surface-card">
-            <p class="text-[13px] font-semibold text-gray-500 uppercase tracking-wide mb-2">Email de cobranca</p>
-            <p class="text-[14px] text-gray-700">{{ tenant.billing_email|default:"Nao configurado" }}</p>
+
+        <div class="bg-white rounded-2xl p-5 shadow-sm border border-gray-100">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-[12px] font-semibold text-gray-400 uppercase tracking-wide mb-1">Email de cobranca</p>
+                    <p class="text-[14px] text-gray-700">{{ tenant.billing_email|default:"Nao configurado" }}</p>
+                </div>
+                <a href="{% url 'dashboard:gestor_configuracoes' %}" class="text-[13px] text-brand-500 hover:text-brand-600 font-medium">Configurar</a>
+            </div>
             {% if not tenant.billing_email %}
-            <p class="text-[12px] text-amber-600 mt-1">Configure o email nas configuracoes da loja para ativar a assinatura.</p>
+            <p class="text-[12px] text-amber-600 mt-2">Configure o email nas configuracoes para ativar a assinatura.</p>
             {% endif %}
         </div>
     </div>
@@ -83,76 +82,109 @@
     <div x-show="tab === 'plans'" class="space-y-4">
         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             {% for plan in all_plans %}
-            <div class="surface-card border-2 {% if plan.is_current %}border-brand-500{% else %}border-transparent{% endif %} relative">
+            <div class="bg-white rounded-2xl p-6 shadow-sm border-2 transition-all duration-200 hover:shadow-md {% if plan.is_current %}border-brand-500 ring-2 ring-brand-500/20{% else %}border-gray-100 hover:border-gray-200{% endif %} relative overflow-hidden">
                 {% if plan.is_current %}
-                <span class="absolute -top-2 -right-2 bg-brand-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full">Atual</span>
+                <div class="absolute top-0 right-0">
+                    <div class="bg-brand-500 text-white text-[10px] font-bold px-3 py-1 rounded-bl-xl">Atual</div>
+                </div>
                 {% endif %}
-                <p class="text-[13px] font-semibold text-gray-900 mb-2">{{ plan.name }}</p>
-                <p class="text-[12px] text-gray-500 mb-3">Ate {{ plan.seller_limit }} vendedores</p>
-                <p class="text-[20px] font-bold text-gray-900 mb-1">
-                    {% if plan.price_monthly %}R$ {{ plan.price_monthly|floatformat:2 }}/mes{% else %}Sob consulta{% endif %}
-                </p>
-                {% if plan.price_yearly %}
-                <p class="text-[11px] text-gray-400">R$ {{ plan.price_yearly|floatformat:2 }}/ano (10% off)</p>
-                {% endif %}
+                <div class="mb-4">
+                    <p class="text-[14px] font-bold text-gray-900 mb-1">{{ plan.name }}</p>
+                    <p class="text-[12px] text-gray-500">
+                        {% if plan.seller_limit is None %}Vendedores ilimitados{% else %}Ate {{ plan.seller_limit }} vendedores{% endif %}
+                    </p>
+                </div>
+                <div class="mb-4">
+                    {% if plan.price_monthly %}
+                    <p class="text-[28px] font-bold text-gray-900 tracking-tight">{{ plan.price_monthly|brl }}<span class="text-[14px] font-normal text-gray-400">/mes</span></p>
+                    {% if plan.price_yearly %}
+                    <p class="text-[12px] text-gray-400 mt-1">{{ plan.price_yearly|brl }}/ano <span class="text-success-600 font-medium">(10% off)</span></p>
+                    {% endif %}
+                    {% else %}
+                    <p class="text-[20px] font-bold text-gray-400">Sob consulta</p>
+                    {% endif %}
+                </div>
+                <div class="space-y-2 text-[13px] text-gray-600">
+                    {% if plan.id == 'ESSENCIAL' %}
+                    <p class="flex items-center gap-2"><svg class="w-4 h-4 text-success-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>Gerenciamento de comissoes</p>
+                    <p class="flex items-center gap-2"><svg class="w-4 h-4 text-success-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>Links de pagamento</p>
+                    <p class="flex items-center gap-2"><svg class="w-4 h-4 text-success-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>App do vendedor</p>
+                    {% elif plan.id == 'PROFISSIONAL' %}
+                    <p class="flex items-center gap-2"><svg class="w-4 h-4 text-success-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>Tudo do Essencial</p>
+                    <p class="flex items-center gap-2"><svg class="w-4 h-4 text-success-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>Ate 15 vendedores</p>
+                    <p class="flex items-center gap-2"><svg class="w-4 h-4 text-success-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>Relatorios em PDF</p>
+                    {% elif plan.id == 'PLUS' %}
+                    <p class="flex items-center gap-2"><svg class="w-4 h-4 text-success-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>Tudo do Profissional</p>
+                    <p class="flex items-center gap-2"><svg class="w-4 h-4 text-success-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>Ate 30 vendedores</p>
+                    <p class="flex items-center gap-2"><svg class="w-4 h-4 text-success-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>Suporte prioritario</p>
+                    {% elif plan.id == 'ENTERPRISE' %}
+                    <p class="flex items-center gap-2"><svg class="w-4 h-4 text-success-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>Tudo do Plus</p>
+                    <p class="flex items-center gap-2"><svg class="w-4 h-4 text-success-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>Vendedores ilimitados</p>
+                    <p class="flex items-center gap-2"><svg class="w-4 h-4 text-success-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>Suporte dedicado</p>
+                    {% endif %}
+                </div>
             </div>
             {% endfor %}
         </div>
 
         {% if not subscription or subscription.status != 'ACTIVE' %}
-        <div class="surface-card">
-            <h3 class="text-[14px] font-semibold text-gray-900 mb-4">Ativar plano</h3>
-            <p class="text-[13px] text-gray-500 mb-4">Apos escolher, voce sera redirecionado ao Mercado Pago para autorizar os pagamentos recorrentes.</p>
+        <div class="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
+            <h3 class="text-[15px] font-bold text-gray-900 mb-2">Ativar plano</h3>
+            <p class="text-[13px] text-gray-500 mb-5">Escolha o plano e ciclo de faturamento. Voce sera redirecionado ao Mercado Pago para autorizar.</p>
             <form id="upgrade-form" method="post" action="{% url 'billing:api-billing-upgrade' %}">
                 {% csrf_token %}
-                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-5">
                     <div>
-                        <label class="block text-[13px] font-medium text-gray-700 mb-1">Plano</label>
-                        <select name="plan" class="input-field">
+                        <label class="block text-[13px] font-medium text-gray-700 mb-1.5">Plano</label>
+                        <select name="plan" class="input-field w-full">
                             {% for plan in all_plans %}
                             <option value="{{ plan.id }}" {% if plan.is_current %}selected{% endif %}>{{ plan.name }}</option>
                             {% endfor %}
                         </select>
                     </div>
                     <div>
-                        <label class="block text-[13px] font-medium text-gray-700 mb-1">Ciclo</label>
-                        <select name="billing_cycle" class="input-field">
+                        <label class="block text-[13px] font-medium text-gray-700 mb-1.5">Ciclo</label>
+                        <select name="billing_cycle" class="input-field w-full">
                             <option value="MONTHLY">Mensal</option>
                             <option value="YEARLY">Anual (10% off)</option>
                         </select>
                     </div>
                     <div>
-                        <label class="block text-[13px] font-medium text-gray-700 mb-1">Pagamento</label>
-                        <select name="payment_method" class="input-field">
+                        <label class="block text-[13px] font-medium text-gray-700 mb-1.5">Pagamento</label>
+                        <select name="payment_method" class="input-field w-full">
                             <option value="boleto">Boleto</option>
                             <option value="credit_card">Cartao de credito</option>
                         </select>
                     </div>
+                    <div class="flex items-end">
+                        <button type="submit" class="w-full bg-brand-500 text-white py-2.5 px-5 rounded-xl text-sm font-semibold hover:bg-brand-600 transition disabled:bg-gray-300">
+                            Ativar assinatura
+                        </button>
+                    </div>
                 </div>
-                <button type="submit" class="btn-primary" style="width:auto;padding:0.75rem 2rem;">
-                    Ativar assinatura
-                </button>
             </form>
-            <div id="upgrade-error" class="mt-3 text-[13px] text-red-600 hidden"></div>
+            <div id="upgrade-error" class="text-[13px] text-red-600 hidden mt-2"></div>
         </div>
         {% endif %}
     </div>
 
     <!-- Tab: Historico -->
     <div x-show="tab === 'history'" class="space-y-4">
-        <div class="surface-card">
-            <h3 class="text-[13px] font-semibold text-gray-500 uppercase tracking-wide mb-4">Ultimos eventos</h3>
+        <div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+            <div class="p-5 border-b border-gray-100">
+                <h3 class="text-[13px] font-semibold text-gray-500 uppercase tracking-wide">Ultimos eventos</h3>
+            </div>
             {% if billing_history %}
             <table class="w-full text-left text-[14px]">
                 <thead>
-                    <tr><th class="px-4 py-3 font-semibold text-gray-500 border-b border-gray-200 bg-gray-50">Data</th><th class="px-4 py-3 font-semibold text-gray-500 border-b border-gray-200 bg-gray-50">Evento</th><th class="px-4 py-3 font-semibold text-gray-500 border-b border-gray-200 bg-gray-50">Processado</th></tr>
+                    <tr><th class="px-5 py-3 font-semibold text-gray-500 border-b border-gray-100 bg-gray-50/50 text-[12px] uppercase tracking-wide">Data</th><th class="px-5 py-3 font-semibold text-gray-500 border-b border-gray-100 bg-gray-50/50 text-[12px] uppercase tracking-wide">Evento</th><th class="px-5 py-3 font-semibold text-gray-500 border-b border-gray-100 bg-gray-50/50 text-[12px] uppercase tracking-wide">Processado</th></tr>
                 </thead>
                 <tbody>
                     {% for h in billing_history %}
                     <tr class="hover:bg-gray-50">
-                        <td class="px-4 py-3 border-b border-gray-100 text-[13px]">{{ h.date|date:"d/m/Y H:i" }}</td>
-                        <td class="px-4 py-3 border-b border-gray-100">{{ h.event }}</td>
-                        <td class="px-4 py-3 border-b border-gray-100">
+                        <td class="px-5 py-3 border-b border-gray-50 text-[13px]">{{ h.date|date:"d/m/Y H:i" }}</td>
+                        <td class="px-5 py-3 border-b border-gray-50">{{ h.event }}</td>
+                        <td class="px-5 py-3 border-b border-gray-50">
                             <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium {% if h.processed %}bg-success-50 text-success-700{% else %}bg-amber-50 text-amber-700{% endif %}">
                                 {{ h.processed|yesno:"Sim,Nao" }}
                             </span>
@@ -162,7 +194,7 @@
                 </tbody>
             </table>
             {% else %}
-            <p class="text-[13px] text-gray-500 py-4">Nenhum evento de cobranca registrado.</p>
+            <p class="text-[13px] text-gray-500 py-8 text-center">Nenhum evento de cobranca registrado.</p>
             {% endif %}
         </div>
     </div>
@@ -170,17 +202,24 @@
     <!-- Tab: Cancelar -->
     {% if subscription and subscription.status != 'CANCELED' %}
     <div x-show="tab === 'cancel'" class="space-y-4">
-        <div class="surface-card border-l-4 border-l-red-500">
-            <h3 class="text-[14px] font-semibold text-red-700 mb-2">Cancelar assinatura</h3>
-            <p class="text-[13px] text-gray-600 mb-4">Ao cancelar, voce perdera acesso ao V-Com ao final do periodo atual. Esta acao nao pode ser desfeita.</p>
-            <form id="cancel-form" method="post" action="{% url 'billing:api-billing-cancel' %}">
-                {% csrf_token %}
-                <button type="submit" class="px-5 py-2.5 bg-red-600 text-white rounded-xl text-sm font-semibold hover:bg-red-700 transition"
-                        onclick="return confirm('Tem certeza que deseja cancelar sua assinatura?')">
-                    Cancelar assinatura
-                </button>
-            </form>
-            <div id="cancel-error" class="mt-3 text-[13px] text-red-600 hidden"></div>
+        <div class="bg-white rounded-2xl p-6 shadow-sm border border-red-100">
+            <div class="flex items-start gap-4">
+                <div class="w-10 h-10 bg-red-100 rounded-xl flex items-center justify-center flex-shrink-0">
+                    <svg class="w-5 h-5 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"></path></svg>
+                </div>
+                <div>
+                    <h3 class="text-[15px] font-bold text-gray-900 mb-1">Cancelar assinatura</h3>
+                    <p class="text-[13px] text-gray-500 mb-4">Ao cancelar, voce perdera acesso ao V-Com ao final do periodo atual. Esta acao nao pode ser desfeita.</p>
+                    <form id="cancel-form" method="post" action="{% url 'billing:api-billing-cancel' %}">
+                        {% csrf_token %}
+                        <button type="submit" class="px-5 py-2.5 bg-red-600 text-white rounded-xl text-sm font-semibold hover:bg-red-700 transition"
+                                onclick="return confirm('Tem certeza que deseja cancelar sua assinatura?')">
+                            Cancelar assinatura
+                        </button>
+                    </form>
+                    <div id="cancel-error" class="text-[13px] text-red-600 hidden mt-2"></div>
+                </div>
+            </div>
         </div>
     </div>
     {% endif %}
@@ -199,7 +238,7 @@
                 var el = document.createElement('div');
                 el.className = 'bg-success-50 border border-success-200 text-success-700 p-3 rounded-lg text-sm mb-4';
                 el.textContent = msg;
-                document.querySelector('.surface-hero').after(el);
+                document.querySelector('.bg-gradient-to-r').after(el);
             }
             if (window.history && window.history.replaceState) {
                 window.history.replaceState({}, document.title, window.location.pathname);
@@ -209,9 +248,7 @@
 
     document.addEventListener('alpine:init', function() {
         Alpine.data('billingApp', function() {
-            return {
-                tab: 'overview',
-            };
+            return { tab: 'overview' };
         });
     });
 
@@ -266,9 +303,7 @@
         try {
             var resp = await fetch(this.action, {
                 method: 'POST',
-                headers: {
-                    'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
-                },
+                headers: { 'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value },
             });
             var result = await resp.json();
             if (resp.ok) {

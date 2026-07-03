@@ -103,6 +103,10 @@ def gestor_configuracoes(request):
     ]
 
     if request.method == 'POST':
+        billing_email = request.POST.get('billing_email', '').strip()
+        if billing_email:
+            tenant.billing_email = billing_email
+
         pagarme_api_key = request.POST.get('pagarme_api_key', '').strip()
         whatsapp_instance_id = request.POST.get('whatsapp_instance_id', '').strip()
         commission_rate = request.POST.get('default_commission_rate', '').strip()
