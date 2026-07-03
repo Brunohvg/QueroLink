@@ -30,6 +30,11 @@ class MercadoPagoGateway:
                            amount, frequency=1, frequency_type='months',
                            back_url=None):
         self._check()
+        if frequency not in (1, 12):
+            raise MercadoPagoError(
+                f"Frequencia invalida: {frequency}. "
+                "Valores permitidos: 1 (mensal) ou 12 (anual)."
+            )
         payload = {
             "reason": reason,
             "external_reference": str(external_reference),

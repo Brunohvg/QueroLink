@@ -5,10 +5,11 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from django.conf import settings
+from django.core.cache import cache
 from django.urls import reverse
 
 from app.apps.accounts.models import Tenant
-from app.apps.billing.models import Subscription
+from app.apps.billing.models import Subscription, plan_amount
 from app.apps.billing.serializers import UpgradeSerializer
 from app.apps.api.permissions import IsManagerOrAdmin
 from app.services.gateway.mercadopago import MercadoPagoGateway, MercadoPagoError
@@ -26,7 +27,7 @@ class PlanListView(APIView):
         data = []
         for key in ['STARTER', 'PRO', 'ENTERPRISE']:
             monthly = prices.get(key, 0)
-            yearly = int(monthly * 12 * 0.9) if monthly else 0
+            yearly = plan_amount(key, 'YEARLY') if monthly else 0
             data.append({
                 'id': key,
                 'name': plan_names.get(key, key),
@@ -59,10 +60,7 @@ class UpgradeSubscriptionView(APIView):
             )
 
         prices = getattr(settings, 'PLAN_PRICES', {})
-        amount = prices.get(plan, 0)
-        if billing_cycle == 'YEARLY':
-            amount = int(amount * 12 * 0.9)
-
+        amount = plan_amount(plan, billing_cycle)
         if amount <= 0:
             return Response(
                 {'error': 'Plano sem preco configurado. Entre em contato com o suporte.'},
@@ -93,11 +91,14 @@ class UpgradeSubscriptionView(APIView):
             back_url = request.build_absolute_uri(
                 reverse('dashboard:assinatura'),
             )
+            frequency = 12 if billing_cycle == 'YEARLY' else 1
             result = gateway.create_preapproval(
                 reason=f"Plano {dict(Tenant.Plan.choices)[plan]} - V-Com",
                 external_reference=str(tenant.uuid),
                 payer_email=tenant.billing_email,
                 amount=amount / 100,
+                frequency=frequency,
+                frequency_type='months',
                 back_url=back_url,
             )
         except (MercadoPagoError, Exception) as e:
@@ -111,11 +112,10 @@ class UpgradeSubscriptionView(APIView):
         sub.billing_cycle = billing_cycle
         sub.amount = amount
         sub.gateway_subscription_id = result.get('id')
-        sub.status = Subscription.Status.TRIALING
+        sub.status = Subscription.Status.PENDING
         sub.save()
 
-        tenant.plan = plan
-        tenant.save(update_fields=['plan', 'updated_at'])
+        cache.delete(f'tenant_operational:{tenant.uuid}')
 
         init_point = result.get('init_point', '')
         return Response({
@@ -156,5 +156,7 @@ class CancelSubscriptionView(APIView):
 
         sub.status = Subscription.Status.CANCELED
         sub.save(update_fields=['status', 'updated_at'])
+
+        cache.delete(f'tenant_operational:{tenant.uuid}')
 
         return Response({'status': 'canceled', 'message': 'Assinatura cancelada.'})

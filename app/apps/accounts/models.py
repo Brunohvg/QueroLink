@@ -1,5 +1,6 @@
 import uuid
 from django.db import models
+from django.core.cache import cache
 from django.contrib.auth.models import AbstractUser
 from django.utils.text import slugify
 from django.utils import timezone
@@ -56,7 +57,23 @@ class Tenant(models.Model):
             self.slug = slug
         if self.cnpj and (not self.cnpj_hash or self._cnpj_changed()):
             self.cnpj_hash = compute_hash(self.cnpj)
+
+        _field_changed = False
+        if self.pk:
+            try:
+                old = Tenant.objects.get(pk=self.pk)
+                _field_changed = (
+                    old.plan != self.plan
+                    or old.is_active != self.is_active
+                    or old.trial_ends_at != self.trial_ends_at
+                )
+            except Tenant.DoesNotExist:
+                _field_changed = True
+
         super().save(*args, **kwargs)
+
+        if _field_changed:
+            cache.delete(f'tenant_operational:{self.uuid}')
 
     def _cnpj_changed(self):
         if not self.pk:
@@ -95,7 +112,7 @@ def tenant_operational(tenant):
     from app.apps.billing.models import Subscription
     try:
         sub = Subscription.objects.get(tenant=tenant)
-        if sub.status in ('ACTIVE', 'TRIALING'):
+        if sub.status == 'ACTIVE':
             return True
         if sub.status == 'PAST_DUE' and sub.current_period_end:
             from datetime import timedelta

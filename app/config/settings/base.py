@@ -227,14 +227,14 @@ from datetime import timedelta
 WEBHOOK_AUTH_REQUIRED = config('WEBHOOK_AUTH_REQUIRED', default=True, cast=bool)
 
 PLAN_PRICES = {
-    'STARTER': config('PLAN_PRICE_STARTER', default=4900, cast=int),
-    'PRO': config('PLAN_PRICE_PRO', default=9700, cast=int),
-    'ENTERPRISE': config('PLAN_PRICE_ENTERPRISE', default=29700, cast=int),
+    'STARTER': config('PLAN_PRICE_STARTER', default=9700, cast=int),
+    'PRO': config('PLAN_PRICE_PRO', default=24700, cast=int),
+    'ENTERPRISE': config('PLAN_PRICE_ENTERPRISE', default=49700, cast=int),
 }
 PLAN_SELLER_LIMITS = {
-    'STARTER': None,
-    'PRO': None,
-    'ENTERPRISE': None,
+    'STARTER': 5,
+    'PRO': 15,
+    'ENTERPRISE': 40,
 }
 
 MP_ACCESS_TOKEN = config('MP_ACCESS_TOKEN', default='')

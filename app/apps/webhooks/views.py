@@ -164,6 +164,12 @@ def billing_webhook(request):
         import hashlib
         import hmac
 
+        x_request_id = request.META.get('HTTP_X_REQUEST_ID', '')
+        data_id = request.GET.get('data.id', '')
+
+        if data_id:
+            data_id = data_id.lower()
+
         parts = {}
         for pair in x_sig.split(','):
             if '=' in pair:
@@ -177,19 +183,25 @@ def billing_webhook(request):
             logger.warning("Billing webhook x-signature mal formatada: %s", x_sig)
             return JsonResponse({"error": "Forbidden"}, status=403)
 
-        data_id = str(payload.get('data', {}).get('id', ''))
-        template = f"id:{data_id};ts:{ts};{raw_body.decode('utf-8')}"
+        manifest_parts = []
+        if data_id:
+            manifest_parts.append(f"id:{data_id};")
+        if x_request_id:
+            manifest_parts.append(f"request-id:{x_request_id};")
+        manifest_parts.append(f"ts:{ts};")
+        manifest = ''.join(manifest_parts)
+
         expected = hmac.new(
             webhook_secret.encode('utf-8'),
-            template.encode('utf-8'),
+            manifest.encode('utf-8'),
             hashlib.sha256,
         ).hexdigest()
 
         if not hmac.compare_digest(expected, v1):
-            logger.warning("Billing webhook x-signature invalida: esperado=%s recebido=%s", expected, v1)
+            logger.warning("Billing webhook x-signature invalida (data_id=%s)", data_id)
             return JsonResponse({"error": "Forbidden"}, status=403)
 
-        logger.info("Billing webhook x-signature OK (data_id=%s)", data_id)
+        logger.info("Billing webhook x-signature OK (data_id=%s, manifest=%s)", data_id, manifest)
 
     event = WebhookEvent.objects.create(
         gateway='mercadopago',

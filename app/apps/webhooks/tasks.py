@@ -1,6 +1,7 @@
 import logging
 
 from celery import shared_task
+from django.core.cache import cache
 from django.db import transaction, IntegrityError
 from django.utils import timezone
 
@@ -460,155 +461,203 @@ def process_pagarme_webhook(event_id):
     default_retry_delay=30,
 )
 def process_billing_webhook(event_id):
+    from datetime import timedelta
     from django.db import transaction as db_transaction
+    from app.apps.billing.models import Subscription
+    from app.apps.accounts.models import Tenant
+    from app.services.gateway.mercadopago import MercadoPagoGateway, MercadoPagoError
 
-    with db_transaction.atomic():
+    # ---------------------------------------------------------------
+    # FASE 1 (sem transacao): buscar event, fazer chamadas HTTP,
+    # resolver tenant/sub/novo status em memoria.
+    # ---------------------------------------------------------------
+    try:
+        event = WebhookEvent.objects.get(id=event_id)
+    except WebhookEvent.DoesNotExist:
+        return
+
+    if event.processed:
+        return
+
+    payload = event.payload
+    mp_type = payload.get('type', '')
+    action = payload.get('action', '')
+    data = payload.get('data', {})
+
+    tenant = None
+    sub = None
+    new_sub_status = None
+    new_period_end = None
+    sync_plan = False
+
+    if mp_type == 'payment' and data.get('id'):
+        payment_id = data['id']
         try:
-            event = WebhookEvent.objects.select_for_update().get(
-                id=event_id, processed=False,
-            )
-        except WebhookEvent.DoesNotExist:
+            gateway = MercadoPagoGateway()
+            payment = gateway.get_payment(payment_id)
+        except (MercadoPagoError, Exception) as e:
+            logger.warning("Erro ao buscar payment %s: %s", payment_id, e)
+            event.processed = True
+            event.skip_reason = str(e)[:500]
+            event.save(update_fields=['processed', 'skip_reason'])
             return
 
-        from datetime import timedelta
-        from app.apps.billing.models import Subscription
-        from app.apps.accounts.models import Tenant
-        from app.services.gateway.mercadopago import MercadoPagoGateway, MercadoPagoError
-
-        payload = event.payload
-        mp_type = payload.get('type', '')
-        action = payload.get('action', '')
-        data = payload.get('data', {})
-
-        tenant = None
-        sub = None
-
-        if mp_type == 'payment' and data.get('id'):
-            payment_id = data['id']
-            try:
-                gateway = MercadoPagoGateway()
-                payment = gateway.get_payment(payment_id)
-            except (MercadoPagoError, Exception) as e:
-                logger.warning("Erro ao buscar payment %s: %s", payment_id, e)
-                event.processed = True
-                event.save(update_fields=['processed'])
-                return
-
-            external_ref = payment.get('external_reference', '')
-            if external_ref:
-                try:
-                    tenant = Tenant.objects.get(uuid=external_ref)
-                except Tenant.DoesNotExist:
-                    pass
-
-            if not tenant:
-                metadata = payment.get('metadata') or {}
-                preapproval_id = metadata.get('preapproval_id') or metadata.get('subscription_id', '')
-                if preapproval_id:
-                    try:
-                        sub = Subscription.objects.get(
-                            gateway_subscription_id=preapproval_id,
-                        )
-                        tenant = sub.tenant
-                    except Subscription.DoesNotExist:
-                        pass
-
-            if not tenant:
-                logger.warning(
-                    "Billing webhook: payment %s sem tenant via external_reference "
-                    "ou preapproval_id", payment_id,
-                )
-                event.processed = True
-                event.save(update_fields=['processed'])
-                return
-
-            event.tenant = tenant
-            event.save(update_fields=['tenant'])
-
-            if not sub:
-                try:
-                    sub = Subscription.objects.get(tenant=tenant)
-                except Subscription.DoesNotExist:
-                    logger.warning(
-                        "Billing webhook: subscription para tenant %s nao encontrada",
-                        external_ref,
-                    )
-                    event.processed = True
-                    event.save(update_fields=['processed'])
-                    return
-
-            payment_status = payment.get('status', '')
-            if payment_status == 'approved':
-                sub.status = Subscription.Status.ACTIVE
-                sub.current_period_end = timezone.now() + timedelta(days=30)
-                logger.info("Billing: tenant %s ACTIVE (payment approved)", external_ref)
-            elif payment_status == 'rejected':
-                sub.status = Subscription.Status.PAST_DUE
-                logger.warning("Billing: tenant %s PAST_DUE (payment rejected)", external_ref)
-            else:
-                logger.info(
-                    "Billing: payment %s com status %s ignorado",
-                    payment_id, payment_status,
-                )
-
-            sub.save(update_fields=['status', 'current_period_end', 'updated_at'])
-
-        elif mp_type == 'subscription_preapproval' and data.get('id'):
-            preapproval_id = data['id']
-            try:
-                gateway = MercadoPagoGateway()
-                preapproval = gateway.get_preapproval(preapproval_id)
-            except (MercadoPagoError, Exception) as e:
-                logger.warning("Erro ao buscar preapproval %s: %s", preapproval_id, e)
-                event.processed = True
-                event.save(update_fields=['processed'])
-                return
-
-            external_ref = preapproval.get('external_reference', '')
-            if not external_ref:
-                logger.warning("Billing webhook: preapproval %s sem external_reference", preapproval_id)
-                event.processed = True
-                event.save(update_fields=['processed'])
-                return
-
+        external_ref = payment.get('external_reference', '')
+        if external_ref:
             try:
                 tenant = Tenant.objects.get(uuid=external_ref)
             except Tenant.DoesNotExist:
-                event.processed = True
-                event.save(update_fields=['processed'])
-                return
+                pass
 
-            event.tenant = tenant
-            event.save(update_fields=['tenant'])
+        if not tenant:
+            metadata = payment.get('metadata') or {}
+            preapproval_id = metadata.get('preapproval_id') or metadata.get('subscription_id', '')
+            if preapproval_id:
+                try:
+                    sub = Subscription.objects.get(
+                        gateway_subscription_id=preapproval_id,
+                    )
+                    tenant = sub.tenant
+                except Subscription.DoesNotExist:
+                    pass
 
+        if not tenant:
+            logger.warning(
+                "Billing webhook: payment %s sem tenant via external_reference "
+                "ou preapproval_id", payment_id,
+            )
+            event.processed = True
+            event.skip_reason = 'tenant not found'
+            event.save(update_fields=['processed', 'skip_reason'])
+            return
+
+        if not sub:
             try:
                 sub = Subscription.objects.get(tenant=tenant)
             except Subscription.DoesNotExist:
+                logger.warning(
+                    "Billing webhook: subscription para tenant %s nao encontrada",
+                    external_ref,
+                )
                 event.processed = True
-                event.save(update_fields=['processed'])
+                event.skip_reason = 'subscription not found'
+                event.save(update_fields=['processed', 'skip_reason'])
                 return
 
-            mp_status = preapproval.get('status', '')
-            if mp_status == 'authorized':
-                sub.status = Subscription.Status.ACTIVE
-            elif mp_status == 'cancelled':
-                sub.status = Subscription.Status.CANCELED
-            elif mp_status == 'past_due':
-                sub.status = Subscription.Status.PAST_DUE
-            else:
-                logger.info("Billing: preapproval %s status %s ignorado", preapproval_id, mp_status)
-                event.processed = True
-                event.save(update_fields=['processed'])
+        payment_status = payment.get('status', '')
+        if payment_status == 'approved':
+            new_sub_status = Subscription.Status.ACTIVE
+            period_days = 365 if sub.billing_cycle == 'YEARLY' else 30
+            new_period_end = timezone.now() + timedelta(days=period_days)
+            sync_plan = (tenant.plan != sub.plan)
+        elif payment_status == 'rejected':
+            new_sub_status = Subscription.Status.PAST_DUE
+
+    elif mp_type == 'subscription_preapproval' and data.get('id'):
+        preapproval_id = data['id']
+        try:
+            gateway = MercadoPagoGateway()
+            preapproval = gateway.get_preapproval(preapproval_id)
+        except (MercadoPagoError, Exception) as e:
+            logger.warning("Erro ao buscar preapproval %s: %s", preapproval_id, e)
+            event.processed = True
+            event.skip_reason = str(e)[:500]
+            event.save(update_fields=['processed', 'skip_reason'])
+            return
+
+        external_ref = preapproval.get('external_reference', '')
+        if not external_ref:
+            logger.warning("Billing webhook: preapproval %s sem external_reference", preapproval_id)
+            event.processed = True
+            event.skip_reason = 'no external_reference'
+            event.save(update_fields=['processed', 'skip_reason'])
+            return
+
+        try:
+            tenant = Tenant.objects.get(uuid=external_ref)
+        except Tenant.DoesNotExist:
+            event.processed = True
+            event.skip_reason = 'tenant not found'
+            event.save(update_fields=['processed', 'skip_reason'])
+            return
+
+        try:
+            sub = Subscription.objects.get(tenant=tenant)
+        except Subscription.DoesNotExist:
+            event.processed = True
+            event.skip_reason = 'subscription not found'
+            event.save(update_fields=['processed', 'skip_reason'])
+            return
+
+        mp_status = preapproval.get('status', '')
+        if mp_status == 'authorized':
+            new_sub_status = Subscription.Status.ACTIVE
+            sync_plan = (tenant.plan != sub.plan)
+        elif mp_status == 'cancelled':
+            new_sub_status = Subscription.Status.CANCELED
+        elif mp_status == 'past_due':
+            new_sub_status = Subscription.Status.PAST_DUE
+
+    # ---------------------------------------------------------------
+    # FASE 2 (transacao curta): lock nas linhas, aplicar mudancas.
+    # ---------------------------------------------------------------
+    if new_sub_status is None and not sync_plan:
+        with db_transaction.atomic():
+            try:
+                event = WebhookEvent.objects.select_for_update().get(
+                    id=event_id, processed=False,
+                )
+            except WebhookEvent.DoesNotExist:
+                return
+            event.processed = True
+            event.save(update_fields=['processed'])
+        return
+
+    def _apply_changes():
+        with db_transaction.atomic():
+            try:
+                locked_event = WebhookEvent.objects.select_for_update().get(
+                    id=event_id, processed=False,
+                )
+            except WebhookEvent.DoesNotExist:
                 return
 
-            sub.save(update_fields=['status', 'updated_at'])
-            logger.info("Billing: subscription %s -> %s", preapproval_id, mp_status)
+            locked_sub = Subscription.objects.select_for_update().get(pk=sub.pk)
+            locked_tenant = Tenant.objects.select_for_update().get(pk=tenant.pk)
 
-        else:
-            logger.info("Billing webhook %s: tipo ignorado %s/%s", event_id, mp_type, action)
+            if locked_event.tenant is None and tenant:
+                locked_event.tenant = tenant
 
-        event.processed = True
-        event.save(update_fields=['processed'])
+            if new_sub_status is not None:
+                locked_sub.status = new_sub_status
+            if new_period_end is not None:
+                locked_sub.current_period_end = new_period_end
+
+            update_fields = ['status', 'updated_at']
+            if new_period_end is not None:
+                update_fields.append('current_period_end')
+
+            locked_sub.save(update_fields=update_fields)
+
+            if sync_plan:
+                locked_tenant.plan = locked_sub.plan
+                locked_tenant.save(update_fields=['plan', 'updated_at'])
+
+            locked_event.processed = True
+            locked_event.save(update_fields=['processed', 'tenant'])
+
+            db_transaction.on_commit(
+                lambda: cache.delete(f'tenant_operational:{tenant.uuid}')
+            )
+
+            if new_sub_status == Subscription.Status.ACTIVE:
+                logger.info("Billing: tenant %s ACTIVE", external_ref)
+            elif new_sub_status == Subscription.Status.PAST_DUE:
+                logger.warning("Billing: tenant %s PAST_DUE", external_ref)
+            elif new_sub_status == Subscription.Status.CANCELED:
+                logger.info("Billing: subscription %s cancelada", preapproval_id)
+
+    _apply_changes()
 
 
 @shared_task(soft_time_limit=300, time_limit=360)
@@ -635,83 +684,102 @@ def reconcile_pending_orders():
 
     for order in orders:
         counted += 1
-        tenant = order.tenant
-
-        if tenant.uuid not in tenant_gateways:
-            if not tenant.pagarme_api_key:
-                logger.info(
-                    "Reconcile: tenant %s sem chave Pagar.me, pulando order %s",
-                    tenant.slug, order.uuid,
-                )
-                continue
-            try:
-                tenant_gateways[tenant.uuid] = PagarMeGateway(
-                    api_key=tenant.pagarme_api_key,
-                )
-            except PagarMeError:
-                logger.warning(
-                    "Reconcile: erro ao criar gateway para tenant %s",
-                    tenant.slug,
-                )
-                continue
-
-        gateway = tenant_gateways[tenant.uuid]
-
         try:
-            remote_order = gateway.find_order_by_code(str(order.uuid))
-        except PagarMeError as e:
-            logger.warning(
-                "Reconcile: erro ao consultar order %s: %s",
-                order.uuid, e,
+            tenant = order.tenant
+
+            if tenant.uuid not in tenant_gateways:
+                if not tenant.pagarme_api_key:
+                    logger.info(
+                        "Reconcile: tenant %s sem chave Pagar.me, pulando order %s",
+                        tenant.slug, order.uuid,
+                    )
+                    continue
+                try:
+                    tenant_gateways[tenant.uuid] = PagarMeGateway(
+                        api_key=tenant.pagarme_api_key,
+                    )
+                except PagarMeError:
+                    logger.warning(
+                        "Reconcile: erro ao criar gateway para tenant %s",
+                        tenant.slug,
+                    )
+                    continue
+
+            gateway = tenant_gateways[tenant.uuid]
+
+            try:
+                remote_order = gateway.find_order_by_code(str(order.uuid))
+            except PagarMeError as e:
+                logger.warning(
+                    "Reconcile: erro ao consultar order %s: %s",
+                    order.uuid, e,
+                )
+                continue
+
+            if remote_order is None:
+                link = order.payment_link
+                if link and link.expires_at and link.expires_at < timezone.now() - timedelta(hours=24):
+                    order.status = Order.Status.EXPIRED
+                    order.save(update_fields=['status', 'updated_at'])
+                    expired_count += 1
+                continue
+
+            remote_status = remote_order.get('status', '')
+
+            event_id_str = f'reconcile_{order.uuid}'
+            existing = WebhookEvent.objects.filter(gateway_event_id=event_id_str).first()
+            if existing:
+                if existing.processed and order.status == Order.Status.PENDING:
+                    logger.warning(
+                        "Reconcile: evento %s ja processado mas order %s segue PENDING "
+                        "(skip_reason=%s) — investigar correlacao",
+                        event_id_str, order.uuid, existing.skip_reason,
+                    )
+                continue
+
+            if remote_status == 'paid':
+                synthetic_payload = {
+                    'type': 'order.paid',
+                    'data': remote_order,
+                    'id': event_id_str,
+                }
+                event = WebhookEvent.objects.create(
+                    gateway='pagarme',
+                    payload=synthetic_payload,
+                    gateway_event_id=event_id_str,
+                    tenant=tenant,
+                )
+                process_pagarme_webhook.delay(event.id)
+                paid_count += 1
+
+            elif remote_status in ('failed', 'canceled'):
+                synthetic_payload = {
+                    'type': 'order.payment_failed',
+                    'data': remote_order,
+                    'id': event_id_str,
+                }
+                event = WebhookEvent.objects.create(
+                    gateway='pagarme',
+                    payload=synthetic_payload,
+                    gateway_event_id=event_id_str,
+                    tenant=tenant,
+                )
+                process_pagarme_webhook.delay(event.id)
+                failed_count += 1
+
+            else:
+                link = order.payment_link
+                if link and link.expires_at and link.expires_at < timezone.now() - timedelta(hours=24):
+                    order.status = Order.Status.EXPIRED
+                    order.save(update_fields=['status', 'updated_at'])
+                    expired_count += 1
+
+        except Exception:
+            logger.exception(
+                "Reconcile: erro inesperado processando order %s, continuando batch",
+                order.uuid,
             )
             continue
-
-        if remote_order is None:
-            link = order.payment_link
-            if link and link.expires_at and link.expires_at < timezone.now() - timedelta(hours=24):
-                order.status = Order.Status.EXPIRED
-                order.save(update_fields=['status', 'updated_at'])
-                expired_count += 1
-            continue
-
-        remote_status = remote_order.get('status', '')
-
-        if remote_status == 'paid':
-            synthetic_payload = {
-                'type': 'order.paid',
-                'data': remote_order,
-                'id': f'reconcile_{order.uuid}',
-            }
-            event = WebhookEvent.objects.create(
-                gateway='pagarme',
-                payload=synthetic_payload,
-                gateway_event_id=f'reconcile_{order.uuid}',
-                tenant=tenant,
-            )
-            process_pagarme_webhook.delay(event.id)
-            paid_count += 1
-
-        elif remote_status in ('failed', 'canceled'):
-            synthetic_payload = {
-                'type': 'order.payment_failed',
-                'data': remote_order,
-                'id': f'reconcile_{order.uuid}',
-            }
-            event = WebhookEvent.objects.create(
-                gateway='pagarme',
-                payload=synthetic_payload,
-                gateway_event_id=f'reconcile_{order.uuid}',
-                tenant=tenant,
-            )
-            process_pagarme_webhook.delay(event.id)
-            failed_count += 1
-
-        else:
-            link = order.payment_link
-            if link and link.expires_at and link.expires_at < timezone.now() - timedelta(hours=24):
-                order.status = Order.Status.EXPIRED
-                order.save(update_fields=['status', 'updated_at'])
-                expired_count += 1
 
     logger.info(
         "Reconciliacao: %d verificadas, %d pagas, %d falhas, %d expiradas",

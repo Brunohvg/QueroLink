@@ -6,7 +6,9 @@ from django.test import TestCase, override_settings
 from django.utils import timezone
 
 from app.apps.accounts.models import Tenant, User, tenant_operational
+from app.apps.billing.models import Subscription
 from app.apps.sellers.models import Seller
+from app.apps.webhooks.models import WebhookEvent
 
 
 class BaseTrialTest(TestCase):
@@ -96,3 +98,93 @@ class TestTrialEnforcementMiddleware(BaseTrialTest):
         )
         resp = self.client.get(f'/loja/{self.tenant.slug}/')
         self.assertEqual(resp.status_code, 200)
+
+
+class TestActiveSubBypassesExpiredTrial(TestCase):
+    def setUp(self):
+        self.tenant = Tenant.objects.create(
+            company_name='Sub Test', slug='sub-test',
+            is_active=True,
+            trial_ends_at=timezone.now() - timedelta(days=10),
+        )
+        self.user = User.objects.create_user(
+            username='sub_mgr', password='test123',
+            role=User.Role.MANAGER, tenant=self.tenant,
+        )
+        self.client.login(username='sub_mgr', password='test123')
+
+    def test_expired_trial_with_active_sub_allows_access(self):
+        sub = Subscription.objects.create(
+            tenant=self.tenant,
+            plan='PRO',
+            status=Subscription.Status.ACTIVE,
+            current_period_end=timezone.now() + timedelta(days=20),
+        )
+        resp = self.client.get('/dashboard/gestor/fechamento/')
+        self.assertNotEqual(resp.status_code, 302)
+        self.assertNotEqual(resp.status_code, 402)
+
+    def test_expired_trial_with_past_due_within_tolerance_allows_access(self):
+        sub = Subscription.objects.create(
+            tenant=self.tenant,
+            plan='PRO',
+            status=Subscription.Status.PAST_DUE,
+            current_period_end=timezone.now() - timedelta(days=3),
+        )
+        resp = self.client.get('/dashboard/gestor/fechamento/')
+        self.assertNotEqual(resp.status_code, 302)
+        self.assertNotEqual(resp.status_code, 402)
+
+    def test_expired_trial_with_past_due_outside_tolerance_blocks(self):
+        sub = Subscription.objects.create(
+            tenant=self.tenant,
+            plan='PRO',
+            status=Subscription.Status.PAST_DUE,
+            current_period_end=timezone.now() - timedelta(days=10),
+        )
+        resp = self.client.get('/dashboard/gestor/fechamento/')
+        self.assertEqual(resp.status_code, 302)
+        self.assertIn('plano-expirado', resp.url)
+
+    def test_expired_trial_no_sub_blocked_but_assinatura_accessible(self):
+        resp = self.client.get('/dashboard/gestor/fechamento/')
+        self.assertEqual(resp.status_code, 302)
+        self.assertIn('plano-expirado', resp.url)
+
+        dashboard_resp = self.client.get('/dashboard/assinatura/')
+        self.assertEqual(dashboard_resp.status_code, 200)
+
+    @patch('app.services.gateway.mercadopago.MercadoPagoGateway')
+    def test_cache_invalidation_after_webhook_activation(self, MockGateway):
+        instance = MockGateway.return_value
+        instance.get_preapproval.return_value = {
+            'id': 'sub_cache_test',
+            'external_reference': str(self.tenant.uuid),
+            'status': 'authorized',
+        }
+
+        sub = Subscription.objects.create(
+            tenant=self.tenant,
+            plan='PRO',
+            gateway_subscription_id='sub_cache_test',
+            status=Subscription.Status.PENDING,
+        )
+
+        resp_before = self.client.get('/dashboard/gestor/fechamento/')
+        self.assertEqual(resp_before.status_code, 302)
+
+        event = WebhookEvent.objects.create(
+            gateway='mercadopago',
+            payload={
+                'type': 'subscription_preapproval',
+                'data': {'id': 'sub_cache_test'},
+            },
+            gateway_event_id='evt_cache_inv',
+        )
+
+        from app.apps.webhooks.tasks import process_billing_webhook
+        process_billing_webhook(event.id)
+
+        resp_after = self.client.get('/dashboard/gestor/fechamento/')
+        self.assertNotEqual(resp_after.status_code, 302)
+        self.assertNotEqual(resp_after.status_code, 402)

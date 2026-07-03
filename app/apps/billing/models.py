@@ -1,10 +1,20 @@
 import uuid
 from django.db import models
+from django.conf import settings
 from app.apps.accounts.models import Tenant
+
+
+def plan_amount(plan, billing_cycle):
+    prices = getattr(settings, 'PLAN_PRICES', {})
+    monthly = prices.get(plan, 0)
+    if billing_cycle == 'YEARLY':
+        return int(monthly * 10)
+    return monthly
 
 
 class Subscription(models.Model):
     class Status(models.TextChoices):
+        PENDING = 'PENDING', 'Pending'
         TRIALING = 'TRIALING', 'Trialing'
         ACTIVE = 'ACTIVE', 'Active'
         PAST_DUE = 'PAST_DUE', 'Past Due'

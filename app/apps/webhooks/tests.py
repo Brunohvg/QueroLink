@@ -362,3 +362,123 @@ class TestChargeRefunded(BaseWebhookTest):
 
         self.payment.refresh_from_db()
         self.assertEqual(self.payment.status, Payment.Status.REFUNDED)
+
+
+class TestReconcileDedup(TestCase):
+    def setUp(self):
+        self.tenant = Tenant.objects.create(
+            company_name='Dedup Test', slug='dedup-test',
+            is_active=True, pagarme_api_key='sk_test_fakekey123456',
+        )
+        self.seller_user = User.objects.create_user(
+            username='dedup_seller', password='test123',
+            role=User.Role.SELLER, tenant=self.tenant,
+        )
+        self.seller = Seller.objects.create(
+            tenant=self.tenant,
+            user=self.seller_user,
+            name='Dedup Seller',
+            is_active=True,
+        )
+        self.order = Order.objects.create(
+            tenant=self.tenant,
+            seller=self.seller,
+            customer_name='Dedup Customer',
+            total_amount=15000,
+            status=Order.Status.PENDING,
+        )
+        Order.objects.filter(pk=self.order.pk).update(
+            created_at=timezone.now() - timezone.timedelta(hours=12),
+        )
+        self.order.refresh_from_db()
+        self.payment = Payment.objects.create(
+            order=self.order,
+            gateway_name='pagarme',
+            status=Payment.Status.PENDING,
+        )
+        PaymentLink.objects.create(
+            order=self.order,
+            gateway_url='https://pagar.me/link/dedup',
+            gateway_link_id='pl_dedup123',
+        )
+
+    @patch('app.apps.webhooks.tasks.process_pagarme_webhook.delay')
+    @patch('app.services.gateway.pagar_me.PagarMeGateway.find_order_by_code')
+    def test_second_reconcile_does_not_create_duplicate_event(self, mock_find, mock_process):
+        mock_find.return_value = {
+            'id': 'or_dedup',
+            'code': str(self.order.uuid),
+            'status': 'paid',
+        }
+
+        from app.apps.webhooks.tasks import reconcile_pending_orders
+        with patch('app.apps.notifications.tasks.create_and_send_notification', return_value=None):
+            reconcile_pending_orders()
+
+        first_count = WebhookEvent.objects.filter(
+            gateway_event_id=f'reconcile_{self.order.uuid}',
+        ).count()
+        self.assertEqual(first_count, 1)
+
+        # Reset order to pending so the order still qualifies for reconciliation
+        self.order.status = Order.Status.PENDING
+        self.order.save(update_fields=['status'])
+
+        with patch('app.apps.notifications.tasks.create_and_send_notification', return_value=None):
+            reconcile_pending_orders()
+
+        second_count = WebhookEvent.objects.filter(
+            gateway_event_id=f'reconcile_{self.order.uuid}',
+        ).count()
+        self.assertEqual(second_count, 1)
+
+    @patch('app.apps.webhooks.tasks.process_pagarme_webhook.delay')
+    @patch('app.services.gateway.pagar_me.PagarMeGateway.find_order_by_code')
+    def test_exception_in_one_order_does_not_abort_batch(self, mock_find, mock_process):
+        order2 = Order.objects.create(
+            tenant=self.tenant,
+            seller=self.seller,
+            customer_name='Order 2',
+            total_amount=20000,
+            status=Order.Status.PENDING,
+        )
+        Order.objects.filter(pk=order2.pk).update(
+            created_at=timezone.now() - timezone.timedelta(hours=12),
+        )
+        order2.refresh_from_db()
+        Payment.objects.create(
+            order=order2,
+            gateway_name='pagarme',
+            status=Payment.Status.PENDING,
+        )
+        PaymentLink.objects.create(
+            order=order2,
+            gateway_url='https://pagar.me/link/dedup2',
+            gateway_link_id='pl_dedup456',
+        )
+
+        call_count = 0
+
+        def side_effect(order_code):
+            nonlocal call_count
+            call_count += 1
+            if call_count == 1:
+                raise Exception("Simulated failure in first order")
+            return {
+                'id': 'or_dedup2',
+                'code': str(order2.uuid),
+                'status': 'paid',
+            }
+
+        mock_find.side_effect = side_effect
+
+        from app.apps.webhooks.tasks import reconcile_pending_orders
+        with patch('app.apps.notifications.tasks.create_and_send_notification', return_value=None):
+            reconcile_pending_orders()
+
+        # The second order should have been processed
+        event = WebhookEvent.objects.filter(
+            gateway_event_id=f'reconcile_{order2.uuid}',
+        ).first()
+        self.assertIsNotNone(event)
+        self.assertEqual(event.payload['type'], 'order.paid')
