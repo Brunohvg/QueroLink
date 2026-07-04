@@ -85,8 +85,9 @@ CELERY_BEAT_SCHEDULE = {
     },
 }
 
-# E-mail em producao
-EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+# E-mail em producao — respeita env var, default SMTP
+EMAIL_BACKEND = config('EMAIL_BACKEND', default='django.core.mail.backends.smtp.EmailBackend')
+EMAIL_USE_SSL = config('EMAIL_USE_SSL', default=False, cast=bool)
 
 # Logging
 LOGGING = {
