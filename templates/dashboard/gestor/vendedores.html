@@ -95,7 +95,15 @@
                   </div>
                   <div>
                     <a :href="'/dashboard/gestor/vendedores/' + s.uuid + '/'" class="text-[14px] font-semibold text-gray-900 hover:text-brand-600 transition-colors" x-text="s.name"></a>
-                    <p class="text-[11px] text-gray-400" x-text="s.phone || 'Sem telefone'"></p>
+                    <p class="text-[11px] text-gray-400">
+                      <span x-text="s.phone || 'Sem telefone'"></span>
+                      <template x-if="s.cpf_formatted">
+                        <span> • <span class="text-gray-500" x-text="s.cpf_formatted"></span></span>
+                      </template>
+                      <template x-if="!s.cpf_formatted">
+                        <span class="text-amber-500 ml-1">⚠ sem CPF</span>
+                      </template>
+                    </p>
                   </div>
                 </div>
               </td>
@@ -201,20 +209,26 @@
                  class="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-[14px] outline-none transition-all focus:border-brand-400 focus:ring-2 focus:ring-brand-100 focus:bg-white"
                  placeholder="Nome completo">
         </div>
-        <div>
-          <label class="block text-[13px] font-medium text-gray-700 mb-1.5">Telefone</label>
-          <input type="text" x-model="form.phone" @input="maskPhone('form.phone')" required
-                 class="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-[14px] outline-none transition-all focus:border-brand-400 focus:ring-2 focus:ring-brand-100 focus:bg-white"
-                 placeholder="(31) 99999-9999">
-        </div>
-        <div x-show="editing">
-          <label class="block text-[13px] font-medium text-gray-700 mb-1.5">Taxa de Comissao (%)</label>
-          <div class="relative max-w-[160px]">
-            <input type="number" x-model="form.commission_rate" step="0.01" min="0" max="100"
-                   class="w-full px-4 py-2.5 pr-8 bg-gray-50 border border-gray-200 rounded-xl text-[14px] outline-none transition-all focus:border-brand-400 focus:ring-2 focus:ring-brand-100 focus:bg-white">
-            <span class="absolute right-3 top-1/2 -translate-y-1/2 text-[14px] text-gray-400 font-medium">%</span>
-          </div>
-        </div>
+          <div>
+           <label class="block text-[13px] font-medium text-gray-700 mb-1.5">Telefone</label>
+           <input type="text" x-model="form.phone" @input="maskPhone('form.phone')" required
+                  class="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-[14px] outline-none transition-all focus:border-brand-400 focus:ring-2 focus:ring-brand-100 focus:bg-white"
+                  placeholder="(31) 99999-9999">
+         </div>
+         <div>
+           <label class="block text-[13px] font-medium text-gray-700 mb-1.5">CPF <span class="text-gray-400 font-normal">(opcional)</span></label>
+           <input type="text" x-model="form.cpf" @input="maskCpf('form.cpf')"
+                  class="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-[14px] outline-none transition-all focus:border-brand-400 focus:ring-2 focus:ring-brand-100 focus:bg-white"
+                  placeholder="000.000.000-00">
+         </div>
+         <div x-show="editing">
+           <label class="block text-[13px] font-medium text-gray-700 mb-1.5">Taxa de Comissao (%)</label>
+           <div class="relative max-w-[160px]">
+             <input type="number" x-model="form.commission_rate" step="0.01" min="0" max="100"
+                    class="w-full px-4 py-2.5 pr-8 bg-gray-50 border border-gray-200 rounded-xl text-[14px] outline-none transition-all focus:border-brand-400 focus:ring-2 focus:ring-brand-100 focus:bg-white">
+             <span class="absolute right-3 top-1/2 -translate-y-1/2 text-[14px] text-gray-400 font-medium">%</span>
+           </div>
+         </div>
         <div class="flex gap-3 justify-end pt-2">
           <button type="button" @click="showModal=false" class="px-5 py-2.5 bg-white border border-gray-200 text-gray-700 font-medium rounded-xl transition-all text-[14px] hover:bg-gray-50 active:scale-[0.97]">Cancelar</button>
           <button type="submit" class="px-5 py-2.5 bg-gray-900 hover:bg-gray-800 text-white font-semibold rounded-xl transition-all text-[14px] shadow-sm active:scale-[0.97]" x-text="editing?'Salvar':'Criar'"></button>
@@ -324,6 +338,16 @@ function maskPhone(path) {
     this.setPropertyAtPath(path, formatted.slice(0, 16));
 }
 
+function maskCpf(path) {
+    var digits = this.getPropertyAtPath(path).replace(/\D/g, '').slice(0, 11);
+    var formatted = '';
+    if (digits.length > 0) formatted = digits.slice(0, 3);
+    if (digits.length > 3) formatted += '.' + digits.slice(3, 6);
+    if (digits.length > 6) formatted += '.' + digits.slice(6, 9);
+    if (digits.length > 9) formatted += '-' + digits.slice(9);
+    this.setPropertyAtPath(path, formatted);
+}
+
 function vendedoresPage() {
     return {
         sellers: [], search: '', filterStatus: 'todos',
@@ -332,7 +356,7 @@ function vendedoresPage() {
         showDeleteModal: false, deletingSeller: null,
         dragOver: false,
         passwordResult: {}, passwordAction: '',
-        form: { name: '', phone: '', commission_rate: '1.00' },
+        form: { name: '', phone: '', cpf: '', commission_rate: '1.00' },
         stats: { total: 0, ativos: 0, comVendaNoMes: 0, semLancamento: 0, semLancamentoHoje: 0, prontos: 0, pendentes: 0, cancelados: 0, comissaoAberta: 0, comissaoPaga: 0, comissaoCancelada: 0, comissaoFechada: 0 },
 
         get filteredSellers() {
@@ -395,16 +419,19 @@ function vendedoresPage() {
             this.stats.comissaoFechada = enriched.reduce((a, s) => s.financial_status === 'FECHADA' || s.financial_status === 'PARCIALMENTE_FECHADA' ? a + (s.commission_amount || 0) : a, 0);
             this.stats.comissaoCancelada = enriched.reduce((a, s) => s.financial_status === 'CANCELADA' ? a + (s.commission_amount || 0) : a, 0);
         },
-        openCreateModal() { this.editing = false; this.form = { name: '', phone: '', commission_rate: '1.00' }; this.showModal = true; },
-        openEditModal(s) { this.editing = true; this.form = { uuid: s.uuid, name: s.name, phone: s.phone, commission_rate: String(parseFloat(s.commission_rate)*100) }; this.showModal = true; },
+        openCreateModal() { this.editing = false; this.form = { name: '', phone: '', cpf: '', commission_rate: '1.00' }; this.showModal = true; },
+        openEditModal(s) { this.editing = true; this.form = { uuid: s.uuid, name: s.name, phone: s.phone, cpf: s.cpf_formatted || s.cpf || '', commission_rate: String(parseFloat(s.commission_rate)*100) }; this.showModal = true; },
         async createSeller() {
-            var r = await fetch('/api/sellers/', { method:'POST', headers:{'Content-Type':'application/json', 'X-CSRFToken': getCSRFToken()}, body: JSON.stringify({name:this.form.name, phone:this.form.phone}) });
+            var body = { name:this.form.name, phone:this.form.phone };
+            if (this.form.cpf) body.cpf = this.form.cpf;
+            var r = await fetch('/api/sellers/', { method:'POST', headers:{'Content-Type':'application/json', 'X-CSRFToken': getCSRFToken()}, body: JSON.stringify(body) });
             var d = await r.json();
             if (r.ok) { this.showModal = false; this.passwordResult = d; this.passwordAction = 'create'; this.showPasswordModal = true; this.loadSellers(); }
             else showToast(Object.values(d).flat().join('\n'), 'error');
         },
         async updateSeller() {
             var b = { name:this.form.name, phone:this.form.phone, commission_rate: String(parseFloat(this.form.commission_rate)/100) };
+            if (this.form.cpf) b.cpf = this.form.cpf;
             var r = await fetch(`/api/sellers/${this.form.uuid}/`, { method:'PATCH', headers:{'Content-Type':'application/json', 'X-CSRFToken': getCSRFToken()}, body: JSON.stringify(b) });
             if (r.ok) { this.showModal = false; this.loadSellers(); } else { var d = await r.json(); showToast(Object.values(d).flat().join('\n'), 'error'); }
         },

@@ -33,14 +33,15 @@ def _check_seller_limit(tenant):
 
 class SellerSerializer(serializers.ModelSerializer):
     username = serializers.CharField(source='user.username', read_only=True)
+    cpf_formatted = serializers.CharField(read_only=True)
 
     class Meta:
         model = Seller
         fields = [
-            'uuid', 'name', 'phone', 'cpf', 'commission_rate',
+            'uuid', 'name', 'phone', 'cpf', 'cpf_formatted', 'commission_rate',
             'is_active', 'username', 'created_at',
         ]
-        read_only_fields = ['uuid', 'username', 'created_at']
+        read_only_fields = ['uuid', 'username', 'created_at', 'cpf_formatted']
 
     def validate_phone(self, value):
         cleaned = clean_phone(value)
