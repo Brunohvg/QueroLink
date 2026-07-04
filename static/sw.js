@@ -1,4 +1,4 @@
-var CACHE_NAME = 'querolink-static-v2';
+var CACHE_NAME = 'querolink-static-v3';
 var ASSETS = [
     '/static/js/alpine.min.js',
     '/static/js/format.js',

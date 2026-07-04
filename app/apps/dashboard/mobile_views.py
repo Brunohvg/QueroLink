@@ -229,7 +229,7 @@ def mobile_home(request):
         is_editable = sc.is_editable if sc else True
 
         if sc_status in (SellerCommission.Status.ABERTA, SellerCommission.Status.REABERTA):
-            comissao_valor, month_total = calculate_estimated_commission(
+            comissao_valor, _ = calculate_estimated_commission(
                 seller, today.month, today.year,
             )
             comissao_label = 'Estimada'
@@ -489,6 +489,10 @@ def mobile_meu_desempenho(request):
 
     from app.apps.commissions.services import calculate_estimated_commission
 
+    comissao_estimada, _ = calculate_estimated_commission(
+        seller, today.month, today.year,
+    )
+
     commissions = SellerCommission.objects.filter(
         seller=seller,
     ).select_related('period').order_by('-period__year', '-period__month')
@@ -521,6 +525,7 @@ def mobile_meu_desempenho(request):
     return render(request, 'mobile/meu_desempenho.html', {
         'seller': seller,
         'month_total': month_total,
+        'comissao_estimada': comissao_estimada,
         'commissions': commissions_data,
         'current_month': f'{today.month:02d}/{today.year}',
         'current_estimate': current_estimate,
