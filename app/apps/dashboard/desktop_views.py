@@ -513,7 +513,11 @@ def gestor_vendedor_detalhe(request, seller_id):
 def gestor_fechamento(request):
     if not _check_role(request, User.Role.MANAGER, User.Role.ADMIN):
         return redirect('dashboard:home')
-    return render(request, 'dashboard/gestor/fechamento.html')
+    tenant = request.user.tenant
+    has_export = bool(
+        tenant and getattr(settings, 'PLAN_FEATURES', {}).get(tenant.plan, {}).get('export_contabil', False)
+    )
+    return render(request, 'dashboard/gestor/fechamento.html', {'has_export': has_export})
 
 
 @login_required

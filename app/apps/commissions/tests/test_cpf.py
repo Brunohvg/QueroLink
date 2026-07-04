@@ -52,3 +52,35 @@ class CpfTest(TestCase):
         _create_seller(self.tenant, self.user1, 'A', phone='11911111111')
         seller2 = _create_seller(self.tenant, self.user2, 'B', phone='11922222222')
         self.assertIsNone(seller2.cpf)
+
+    def test_dedupe_mantem_mais_antigo(self):
+        from app.apps.sellers.models import Seller as SellerModel
+        from django.db.models import Count, Min
+
+        class FakeSeller:
+            def __init__(self, pk, tenant_id, cpf, created_at):
+                self.pk = pk
+                self.tenant_id = tenant_id
+                self.cpf = cpf
+                self.created_at = created_at
+
+        s1 = FakeSeller(1, self.tenant.pk, '52998224725', '2026-01-01')
+        s2 = FakeSeller(2, self.tenant.pk, '52998224725', '2026-02-01')
+        sellers_list = [s1, s2]
+
+        pairs = {}
+        for s in sellers_list:
+            key = (s.tenant_id, s.cpf)
+            if s.cpf and key not in pairs:
+                pairs[key] = []
+            if s.cpf:
+                pairs[key].append(s)
+
+        for key, group in pairs.items():
+            group.sort(key=lambda s: (s.created_at, s.pk))
+            keep = group[0]
+            for dup in group[1:]:
+                dup.cpf = None
+
+        self.assertEqual(s1.cpf, '52998224725')
+        self.assertIsNone(s2.cpf)

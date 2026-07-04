@@ -7,18 +7,17 @@
     <div class="flex items-center justify-between">
       <div>
         <h1 class="font-display text-[22px] font-bold text-gray-900 tracking-tight">Competencias</h1>
-        <p class="text-[13px] text-gray-500 mt-0.5">
-          <span x-show="!showFinished">Competencias em aberto e parcialmente fechadas/pagas</span>
-          <span x-show="showFinished">Todas as competencias, incluindo finalizadas</span>
-        </p>
+        <p class="text-[13px] text-gray-500 mt-0.5" x-text="tab==='active' ? 'Gerencie fechamento, envio e pagamento' : 'Competencias finalizadas e pagas'"></p>
       </div>
       <div class="flex items-center gap-2">
-        <button @click="toggleScope()"
-                :class="showFinished ? 'bg-gray-200 text-gray-800' : 'bg-white text-gray-500'"
-                class="inline-flex items-center gap-2 border border-gray-200 hover:border-gray-300 font-medium py-2.5 px-4 rounded-xl transition-all text-[13px] shadow-sm active:scale-[0.97]">
-          <template x-if="!showFinished"><span>Mostrar finalizadas</span></template>
-          <template x-if="showFinished"><span>Ocultar finalizadas</span></template>
-        </button>
+        <div class="flex gap-0 bg-white rounded-xl p-1 border border-gray-200 shadow-sm">
+          <button @click="switchTab('active')"
+                  :class="tab === 'active' ? 'bg-gray-900 text-white' : 'text-gray-500 hover:text-gray-700'"
+                  class="px-4 py-2 rounded-lg text-[13px] font-medium transition-all">Operacional</button>
+          <button @click="switchTab('historico')"
+                  :class="tab === 'historico' ? 'bg-gray-900 text-white' : 'text-gray-500 hover:text-gray-700'"
+                  class="px-4 py-2 rounded-lg text-[13px] font-medium transition-all">Historico</button>
+        </div>
         <button @click="load()"
                 class="inline-flex items-center gap-2 bg-white border border-gray-200 hover:border-gray-300 text-gray-700 font-medium py-2.5 px-4 rounded-xl transition-all text-[14px] shadow-sm hover:shadow active:scale-[0.97]">
           <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
@@ -37,6 +36,8 @@
       </div>
     </div>
   </div>
+
+  <div x-show="tab === 'active'">
 
   <div x-show="!periods.length" class="text-center py-20">
     <div class="w-16 h-16 mx-auto mb-4 rounded-2xl bg-gray-50 flex items-center justify-center">
@@ -92,11 +93,16 @@
               <span class="w-1.5 h-1.5 rounded-full bg-sky-500"></span>
               Enviada a contabilidade
             </span>
+            <span x-show="nextAction(p)"
+                  class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-brand-50 text-brand-700">
+              <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6"/></svg>
+              <span x-text="nextAction(p)"></span>
+            </span>
           </div>
         </div>
       </div>
 
-      <div class="px-6 py-3 border-b border-gray-100 flex items-center gap-2 flex-wrap">
+      <div x-show="nextAction(p) !== null" class="px-6 py-3 border-b border-gray-100 flex items-center gap-2 flex-wrap">
         <span class="text-[12px] text-gray-400 font-medium mr-1">Selecionar:</span>
         <button @click="selectAbertos(p)" class="text-[12px] px-3 py-1.5 rounded-lg bg-gray-100 hover:bg-brand-50 hover:text-brand-600 text-gray-600 font-medium transition">Abertos</button>
         <button @click="selectFechados(p)" class="text-[12px] px-3 py-1.5 rounded-lg bg-gray-100 hover:bg-brand-50 hover:text-brand-600 text-gray-600 font-medium transition">Fechados</button>
@@ -115,19 +121,22 @@
             <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
             Cancelar
           </button>
-          <a :href="'/api/financial/commissions/'+p.uuid+'/csv/'"
-             class="text-[12px] px-3 py-1.5 rounded-lg hover:bg-gray-100 text-gray-600 font-medium transition flex items-center gap-1.5">
-            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
-            CSV
-          </a>
-          <a :href="'/api/commissions/periods/'+p.uuid+'/receipts/'"
-             x-show="p.status==='PAGA'||p.status==='PARCIALMENTE_PAGA'"
-             target="_blank"
-             class="text-[12px] px-3 py-1.5 rounded-lg hover:bg-brand-50 text-brand-600 font-medium transition flex items-center gap-1.5">
-            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
-            Recibos do periodo (PDF)
-          </a>
         </div>
+      </div>
+
+      <div class="px-6 py-2 border-b border-gray-100 flex items-center gap-2">
+        <a :href="'/api/financial/commissions/'+p.uuid+'/csv/'"
+           class="text-[12px] px-3 py-1.5 rounded-lg hover:bg-gray-100 text-gray-600 font-medium transition flex items-center gap-1.5">
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+          CSV
+        </a>
+        <a :href="'/api/commissions/periods/'+p.uuid+'/receipts/'"
+           x-show="p.status==='PAGA'||p.status==='PARCIALMENTE_PAGA'"
+           target="_blank"
+           class="text-[12px] px-3 py-1.5 rounded-lg hover:bg-brand-50 text-brand-600 font-medium transition flex items-center gap-1.5">
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+          Recibos do periodo (PDF)
+        </a>
       </div>
 
       <template x-if="p.seller_commissions && p.seller_commissions.length">
@@ -196,7 +205,7 @@
 
       <p x-show="!p.seller_commissions||!p.seller_commissions.length" class="text-[13px] text-gray-500 py-6 text-center">Nenhum vendedor sincronizado nesta competencia.</p>
 
-      <div x-show="selectedCount(p) > 0" class="px-6 py-4 border-t border-gray-100 bg-gray-50/50 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+      <div x-show="selectedCount(p) > 0 && nextAction(p) !== null" class="px-6 py-4 border-t border-gray-100 bg-gray-50/50 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
         <p class="text-[13px] text-gray-600">
           <span class="font-semibold text-gray-800" x-text="selectedCount(p)"></span> selecionado(s) — Comissao total: <strong class="text-brand-600" x-text="selectedTotal(p)"></strong>
         </p>
@@ -409,6 +418,88 @@
       </div>
     </div>
   </div>
+
+  </div>
+
+  <div x-show="tab === 'historico'" class="space-y-4">
+    <div class="flex flex-wrap items-center gap-3 mb-4">
+      <select x-model="finishedFilterMonth" @change="loadFinished()" class="px-3 py-2 bg-white border border-gray-200 rounded-xl text-[13px] outline-none">
+        <option value="">Todos os meses</option>
+        <template x-for="m in 12" :key="m"><option :value="m" x-text="String(m).padStart(2,'0')"></option></template>
+      </select>
+      <select x-model="finishedFilterYear" @change="loadFinished()" class="px-3 py-2 bg-white border border-gray-200 rounded-xl text-[13px] outline-none">
+        <option value="">Todos os anos</option>
+        <template x-for="y in [2024,2025,2026,2027,2028]" :key="y"><option :value="y" x-text="y"></option></template>
+      </select>
+      <select x-model="finishedFilterSeller" class="px-3 py-2 bg-white border border-gray-200 rounded-xl text-[13px] outline-none">
+        <option value="">Todos os vendedores</option>
+        <template x-for="s in finishedSellers()" :key="s"><option :value="s" x-text="s"></option></template>
+      </select>
+      <select x-model="finishedFilterStatus" class="px-3 py-2 bg-white border border-gray-200 rounded-xl text-[13px] outline-none">
+        <option value="">Todos os status</option>
+        <option value="PAGA">Paga</option>
+        <option value="CANCELADA">Cancelada</option>
+      </select>
+    </div>
+
+    <div x-show="finishedLoading" class="text-center py-10 text-gray-400 text-[14px]">Carregando...</div>
+
+    <div x-show="!finishedLoading && !filteredFinished().length" class="text-center py-16">
+      <div class="w-14 h-14 mx-auto mb-4 rounded-2xl bg-gray-50 flex items-center justify-center">
+        <svg class="w-7 h-7 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4"/></svg>
+      </div>
+      <p class="text-[14px] font-medium text-gray-500">Nenhuma competencia finalizada ainda.</p>
+    </div>
+
+    <template x-if="!finishedLoading && filteredFinished().length">
+      <div class="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+        <div class="overflow-x-auto">
+          <table class="w-full text-left">
+            <thead>
+              <tr class="bg-gray-50/80">
+                <th class="px-4 py-3 text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Competencia</th>
+                <th class="px-4 py-3 text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Status</th>
+                <th class="px-4 py-3 text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Vendedores</th>
+                <th class="px-4 py-3 text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Comissoes</th>
+                <th class="px-4 py-3 text-[11px] font-semibold text-gray-500 uppercase tracking-wider hidden md:table-cell">Fechada em</th>
+                <th class="px-4 py-3 text-[11px] font-semibold text-gray-500 uppercase tracking-wider hidden md:table-cell">Enviada em</th>
+                <th class="px-4 py-3 text-[11px] font-semibold text-gray-500 uppercase tracking-wider hidden md:table-cell">Paga em</th>
+                <th class="px-4 py-3 text-[11px] font-semibold text-gray-500 uppercase tracking-wider text-right">Acoes</th>
+              </tr>
+            </thead>
+            <tbody>
+              <template x-for="p in filteredFinished()" :key="p.uuid">
+                <tr class="border-b border-gray-50 hover:bg-gray-50/50 transition-colors">
+                  <td class="px-4 py-3.5 font-semibold text-[14px] text-gray-900" x-text="String(p.month).padStart(2,'0')+'/'+p.year"></td>
+                  <td class="px-4 py-3.5">
+                    <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-medium"
+                          :class="{'bg-emerald-50 text-emerald-700': p.status==='PAGA', 'bg-red-50 text-red-700': p.status==='CANCELADA'}">
+                      <span class="w-1.5 h-1.5 rounded-full" :class="{'bg-emerald-500': p.status==='PAGA', 'bg-red-500': p.status==='CANCELADA'}"></span>
+                      <span x-text="p.status==='PAGA'?'Paga':'Cancelada'"></span>
+                    </span>
+                  </td>
+                  <td class="px-4 py-3.5 text-[13px] text-gray-700" x-text="(p.seller_commissions||[]).length"></td>
+                  <td class="px-4 py-3.5 font-semibold text-[13px] text-brand-600" x-text="formatMoneyBRL(totalComissao(p))"></td>
+                  <td class="px-4 py-3.5 text-[13px] text-gray-500 hidden md:table-cell" x-text="finishedClosedAt(p) ? new Date(finishedClosedAt(p)).toLocaleDateString('pt-BR') : '—'"></td>
+                  <td class="px-4 py-3.5 text-[13px] text-gray-500 hidden md:table-cell" x-text="p.sent_to_accounting_at ? new Date(p.sent_to_accounting_at).toLocaleDateString('pt-BR') : '—'"></td>
+                  <td class="px-4 py-3.5 text-[13px] text-gray-500 hidden md:table-cell" x-text="finishedPaidAt(p) ? new Date(finishedPaidAt(p)).toLocaleDateString('pt-BR') : '—'"></td>
+                  <td class="px-4 py-3.5 text-right">
+                    <a :href="'/api/reports/accounting/'+p.year+'/'+p.month+'/'" target="_blank"
+                       class="text-[12px] font-medium text-brand-600 hover:text-brand-700 px-2 py-1 rounded-lg hover:bg-brand-50 transition"
+                       :title="hasExportFeature() ? 'Baixar pacote ZIP' : 'Disponivel no plano Pro'">
+                      <svg class="w-4 h-4 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+                      Baixar
+                    </a>
+                  </td>
+                </tr>
+              </template>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </template>
+  </div>
+
 </div>
 
 <script>
@@ -433,18 +524,63 @@ function fechamentoPage() {
         showPayModal: false, payPeriod: null, paySellers: [], payDate: '', payMethod: '', payNotes: '',
         showReopenModal: false, reopenPeriod: null, reopenSellers: [], reopenReason: '',
         selected: new Map(),
-        showFinished: false,
+        tab: 'active',
+        finishedPeriods: [],
+        finishedFilterMonth: '', finishedFilterYear: '', finishedFilterSeller: '', finishedFilterStatus: '',
+        finishedLoading: false,
+        switchTab(t) {
+            this.tab = t;
+            if (t === 'historico' && !this.finishedPeriods.length) this.loadFinished();
+        },
         async load() {
             var url = '/api/commissions/periods/?scope=active';
-            if (this.showFinished) url = '/api/commissions/periods/?scope=all';
             var r = await fetch(url);
             this.periods = await r.json();
             this.selected = new Map();
         },
-        toggleScope() {
-            this.showFinished = !this.showFinished;
-            this.load();
+        async loadFinished() {
+            this.finishedLoading = true;
+            var url = '/api/commissions/periods/?scope=finished';
+            if (this.finishedFilterMonth) url += '&month=' + this.finishedFilterMonth;
+            if (this.finishedFilterYear) url += '&year=' + this.finishedFilterYear;
+            var r = await fetch(url);
+            this.finishedPeriods = await r.json();
+            this.finishedLoading = false;
         },
+        finishedSellers() {
+            var sellers = new Set();
+            this.finishedPeriods.forEach(function(p) {
+                (p.seller_commissions || []).forEach(function(sc) {
+                    sellers.add(sc.seller_name);
+                });
+            });
+            return Array.from(sellers).sort();
+        },
+        filteredFinished() {
+            var list = this.finishedPeriods;
+            if (this.finishedFilterSeller) {
+                list = list.filter(function(p) {
+                    return (p.seller_commissions || []).some(function(sc) {
+                        return sc.seller_name === this.finishedFilterSeller;
+                    });
+                }.bind(this));
+            }
+            if (this.finishedFilterStatus) {
+                list = list.filter(function(p) { return p.status === this.finishedFilterStatus; }.bind(this));
+            }
+            return list;
+        },
+        finishedClosedAt(p) {
+            var dates = (p.seller_commissions || []).map(function(sc) { return sc.closed_at; }).filter(Boolean);
+            if (!dates.length) return p.closed_at;
+            return dates.reduce(function(a,b) { return a > b ? a : b; });
+        },
+        finishedPaidAt(p) {
+            var dates = (p.seller_commissions || []).map(function(sc) { return sc.payment_date; }).filter(Boolean);
+            if (!dates.length) return p.paid_at;
+            return dates.reduce(function(a,b) { return a > b ? a : b; });
+        },
+        hasExportFeature() { return {{ has_export|yesno:"true,false" }}; },
         showError(d) {
             showToast(d.error || d.detail || d.message || 'Erro inesperado', 'error');
         },
@@ -459,6 +595,16 @@ function fechamentoPage() {
         selectFechados(p) { this.getCommissions(p).forEach(sc => { if (sc.status==='FECHADA') this.selected.set(sc.id, sc); }); },
         selectProntos(p) { this.getCommissions(p).forEach(sc => { if (sc.operational_status==='PRONTO'&&(sc.status==='ABERTA'||sc.status==='REABERTA')) this.selected.set(sc.id, sc); }); },
         clearSelection(p) { var ids = new Set(this.getCommissions(p).map(sc => sc.id)); this.selected.forEach((v,k) => { if (ids.has(k)) this.selected.delete(k); }); },
+        nextAction(p) {
+            if (p.status === 'PAGA' || p.status === 'CANCELADA') return null;
+            var scs = p.seller_commissions || [];
+            var hasOpen = scs.some(function(sc){ return sc.status === 'ABERTA' || sc.status === 'REABERTA'; });
+            if (hasOpen) return 'Fechar comissoes';
+            if (!p.sent_to_accounting_at) return 'Enviar a contabilidade';
+            var hasClosed = scs.some(function(sc){ return sc.status === 'FECHADA' || sc.status === 'AJUSTADA'; });
+            if (hasClosed) return 'Registrar pagamento';
+            return 'Concluir pagamentos';
+        },
         openCreateModal() {
             var d = new Date();
             var tryMonth = d.getMonth() + 1;

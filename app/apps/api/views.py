@@ -224,6 +224,12 @@ class SaleViewSet(viewsets.ModelViewSet):
 class CommissionPeriodViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated, IsManagerOrAdmin]
 
+    EDITABLE_STATUSES = (
+        CommissionPeriod.Status.ABERTA,
+        CommissionPeriod.Status.PARCIALMENTE_FECHADA,
+        CommissionPeriod.Status.PARCIALMENTE_PAGA,
+    )
+
     def get_serializer_class(self):
         if self.action == 'create':
             return CommissionPeriodCreateSerializer
@@ -255,13 +261,19 @@ class CommissionPeriodViewSet(viewsets.ModelViewSet):
 
         return qs.prefetch_related('seller_commissions__seller')
 
+    def list(self, request, *args, **kwargs):
+        from app.apps.commissions.services import sync_period_seller_commissions
+        editable = self.get_queryset().filter(status__in=self.EDITABLE_STATUSES)[:6]
+        for period in editable:
+            try:
+                sync_period_seller_commissions(period)
+            except Exception:
+                logger.exception('Auto-sync falhou para period %s', period.pk)
+        return super().list(request, *args, **kwargs)
+
     def retrieve(self, request, *args, **kwargs):
         period = self.get_object()
-        if period.status in (
-            CommissionPeriod.Status.ABERTA,
-            CommissionPeriod.Status.PARCIALMENTE_FECHADA,
-            CommissionPeriod.Status.PARCIALMENTE_PAGA,
-        ):
+        if period.status in self.EDITABLE_STATUSES:
             from app.apps.commissions.services import sync_period_seller_commissions
             sync_period_seller_commissions(period)
         return super().retrieve(request, *args, **kwargs)
