@@ -1,4 +1,5 @@
 from django.utils import timezone
+from django.conf import settings
 
 
 def trial_status(request):
@@ -28,3 +29,9 @@ def trial_status(request):
         }
 
     return {'trial_days_left': None, 'show_trial_banner': False}
+
+
+def global_context(request):
+    return {
+        'VAPID_PUBLIC_KEY': getattr(settings, 'VAPID_PUBLIC_KEY', ''),
+    }

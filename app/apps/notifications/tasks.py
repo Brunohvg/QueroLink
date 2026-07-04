@@ -132,7 +132,19 @@ def create_and_send_notification(*, tenant, event_type, channel, recipient, cont
         message_body=message_body,
     )
 
-    send_whatsapp_notification.delay(notification.uuid)
+    if channel == MessageTemplate.Channel.WHATSAPP:
+        send_whatsapp_notification.delay(notification.uuid)
+
+    if seller and seller.user:
+        from app.services.messaging.push import send_push_notification
+        send_push_notification(
+            user=seller.user,
+            title=_push_title(event_type),
+            body=message_body[:200],
+            url='/dashboard/mobile/',
+            icon='/static/icons/icon-192.png',
+        )
+
     return notification
 
 
@@ -311,6 +323,17 @@ def requeue_stuck_notifications():
 
     if count:
         logger.info("Requeued %d stuck notifications (PENDING, never attempted)", count)
+
+
+def _push_title(event_type):
+    titles = {
+        MessageTemplate.EventType.DAILY_REMINDER: 'Lancar vendas',
+        MessageTemplate.EventType.COMMISSION_PAID: 'Comissao paga!',
+        MessageTemplate.EventType.PAYMENT_PAID: 'Link pago!',
+        MessageTemplate.EventType.SELLER_CREDENTIALS: 'Acesso criado',
+        MessageTemplate.EventType.COMMISSION_ADJUSTED: 'Comissao ajustada',
+    }
+    return titles.get(event_type, 'Merito')
 
 
 def format_brl_cents(amount_cents):

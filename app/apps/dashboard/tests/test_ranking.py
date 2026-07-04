@@ -404,3 +404,120 @@ class MobileCSRFTest(TestCase):
         self.assertIsNotNone(match, 'CSRF meta tag must exist')
         token = match.group(1)
         self.assertRegex(token, r'^[A-Za-z0-9]{32,}$', 'CSRF token must be alphanumeric string, not HTML markup')
+
+
+class SellerStatementTest(TestCase):
+    def setUp(self):
+        self.tenant = Tenant.objects.create(
+            company_name='Test Statement',
+            slug='test-statement',
+            default_commission_rate=Decimal('0.01'),
+            is_active=True,
+        )
+        self.user = User.objects.create_user(
+            username='seller_statement',
+            password='test123',
+            role=User.Role.SELLER,
+            tenant=self.tenant,
+        )
+        self.seller = Seller.objects.create(
+            tenant=self.tenant,
+            user=self.user,
+            name='Statement Seller',
+            phone='55999999999',
+            commission_rate=Decimal('0.01'),
+            is_active=True,
+        )
+
+        self.user2 = User.objects.create_user(
+            username='seller_statement2',
+            password='test123',
+            role=User.Role.SELLER,
+            tenant=self.tenant,
+        )
+        self.seller2 = Seller.objects.create(
+            tenant=self.tenant,
+            user=self.user2,
+            name='Other Seller',
+            phone='55988888888',
+            commission_rate=Decimal('0.01'),
+            is_active=True,
+        )
+
+    def test_pdf_generated_with_sales(self):
+        today = timezone.localdate()
+        Sale.objects.create(
+            tenant=self.tenant, seller=self.seller,
+            origin='MANUAL', amount=50000, status='ATIVA',
+            sale_date=date(today.year, today.month, 1),
+        )
+        Sale.objects.create(
+            tenant=self.tenant, seller=self.seller,
+            origin='MANUAL', amount=30000, status='ESTORNADA',
+            sale_date=date(today.year, today.month, 2),
+        )
+
+        from django.test import RequestFactory
+        from app.apps.api.views import SellerStatementView
+
+        factory = RequestFactory()
+        request = factory.get(f'/api/seller/statement/{today.year}/{today.month}/')
+        request.user = self.user
+
+        response = SellerStatementView.as_view()(request, year=today.year, month=today.month)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response['Content-Type'], 'application/pdf')
+        self.assertTrue(response.content.startswith(b'%PDF'), 'Response should be a PDF')
+
+    def test_pdf_empty_when_no_sales(self):
+        today = timezone.localdate()
+
+        from django.test import RequestFactory
+        from app.apps.api.views import SellerStatementView
+
+        factory = RequestFactory()
+        request = factory.get(f'/api/seller/statement/{today.year}/{today.month}/')
+        request.user = self.user
+
+        response = SellerStatementView.as_view()(request, year=today.year, month=today.month)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response['Content-Type'], 'application/pdf')
+
+    def test_seller_a_cannot_access_seller_b(self):
+        today = timezone.localdate()
+        Sale.objects.create(
+            tenant=self.tenant, seller=self.seller2,
+            origin='MANUAL', amount=50000, status='ATIVA',
+            sale_date=date(today.year, today.month, 1),
+        )
+
+        from django.test import RequestFactory
+        from app.apps.api.views import SellerStatementView
+
+        factory = RequestFactory()
+        request = factory.get(f'/api/seller/statement/{today.year}/{today.month}/')
+        request.user = self.user
+
+        response = SellerStatementView.as_view()(request, year=today.year, month=today.month)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response['Content-Type'], 'application/pdf')
+        self.assertTrue(response.content.startswith(b'%PDF'))
+
+    def test_estornada_sale_rendered_in_pdf(self):
+        today = timezone.localdate()
+        Sale.objects.create(
+            tenant=self.tenant, seller=self.seller,
+            origin='MANUAL', amount=99999, status='ESTORNADA',
+            sale_date=date(today.year, today.month, 1),
+        )
+
+        from django.test import RequestFactory
+        from app.apps.api.views import SellerStatementView
+
+        factory = RequestFactory()
+        request = factory.get(f'/api/seller/statement/{today.year}/{today.month}/')
+        request.user = self.user
+
+        response = SellerStatementView.as_view()(request, year=today.year, month=today.month)
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.content.startswith(b'%PDF'))

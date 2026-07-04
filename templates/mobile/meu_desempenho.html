@@ -96,6 +96,21 @@
           <p class="text-[16px] font-bold text-emerald-700 mt-1">{{ sc.commission_amount|brl }}</p>
         </div>
       </div>
+      <div class="border-t border-gray-50 px-5 py-3 flex items-center justify-center">
+        <a href="{% url 'api-seller-statement' year=sc.period.year month=sc.period.month %}"
+           target="_blank" rel="noopener"
+           x-data="{loading: false}" @click="loading=true; setTimeout(function(){loading=false}, 10000)"
+           class="inline-flex items-center gap-1.5 text-[11px] font-medium text-gray-400 hover:text-brand-500 transition-colors tap-target py-1"
+           :class="loading ? 'opacity-50 pointer-events-none' : ''">
+          <span x-show="!loading">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"/></svg>
+            PDF
+          </span>
+          <span x-show="loading" class="inline-flex items-center gap-1">
+            <svg class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>
+          </span>
+        </a>
+      </div>
     </div>
     {% endfor %}
   </div>

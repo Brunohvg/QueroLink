@@ -285,6 +285,8 @@ def mobile_home(request):
             'goal_progress': goal_progress,
             'goal_remaining': goal_remaining,
             'combined_month_total': combined_month_total,
+            'current_year': today.year,
+            'current_month': today.month,
         })
     except Exception as e:
         logger.exception("Erro ao carregar mobile_home")

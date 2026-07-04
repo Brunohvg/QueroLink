@@ -1365,3 +1365,139 @@ class WebhookStatusView(generics.GenericAPIView):
             }
 
         return Response(status_data)
+
+
+class PushSubscribeView(generics.GenericAPIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        try:
+            endpoint = request.data['endpoint']
+            keys = request.data['keys']
+            p256dh = keys['p256dh']
+            auth = keys['auth']
+        except (KeyError, TypeError):
+            return Response({'error': 'Dados invalidos. Envie endpoint, keys.p256dh e keys.auth.'}, status=400)
+
+        from app.apps.notifications.models import PushSubscription
+
+        sub, created = PushSubscription.objects.update_or_create(
+            user=request.user,
+            endpoint=endpoint,
+            defaults={
+                'tenant': request.user.tenant,
+                'p256dh': p256dh,
+                'auth': auth,
+                'is_active': True,
+            },
+        )
+        return Response({'status': 'subscribed', 'created': created}, status=201 if created else 200)
+
+
+class PushUnsubscribeView(generics.GenericAPIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        endpoint = request.data.get('endpoint', '')
+        if not endpoint:
+            return Response({'error': 'endpoint e obrigatorio.'}, status=400)
+
+        from app.apps.notifications.models import PushSubscription
+
+        PushSubscription.objects.filter(
+            user=request.user, endpoint=endpoint,
+        ).update(is_active=False)
+        return Response(status=204)
+
+
+@extend_schema(responses={(200, 'application/pdf'): OpenApiTypes.BINARY})
+class SellerStatementView(generics.GenericAPIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, year=None, month=None):
+        if request.user.role != request.user.Role.SELLER:
+            return Response({'error': 'Apenas vendedores.'}, status=403)
+
+        try:
+            seller = request.user.seller_profile
+        except ObjectDoesNotExist:
+            return Response({'error': 'Perfil de vendedor nao encontrado.'}, status=404)
+
+        today = timezone.localdate()
+        try:
+            year_int = int(year) if year else today.year
+            month_int = int(month) if month else today.month
+        except (ValueError, TypeError):
+            return Response({'error': 'Mes/ano invalidos.'}, status=400)
+
+        sales = Sale.objects.filter(
+            seller=seller,
+            sale_date__year=year_int,
+            sale_date__month=month_int,
+        ).order_by('sale_date')
+
+        sales_ativas = [s for s in sales if s.status == 'ATIVA']
+        sales_estornadas = [s for s in sales if s.status == 'ESTORNADA']
+        total_ativas = sum(s.amount for s in sales_ativas)
+        total_estornos = sum(s.amount for s in sales_estornadas)
+
+        from app.apps.commissions.services import calculate_estimated_commission
+
+        commission = SellerCommission.objects.filter(
+            seller=seller,
+            period__month=month_int,
+            period__year=year_int,
+        ).select_related('period').first()
+
+        if commission:
+            comissao_valor = commission.commission_amount
+            comissao_taxa = float(commission.commission_rate) * 100
+            comissao_status = commission.get_status_display()
+        else:
+            est, _ = calculate_estimated_commission(seller, month_int, year_int)
+            comissao_valor = est
+            comissao_taxa = float(seller.commission_rate) * 100
+            comissao_status = 'Estimativa'
+
+        from app.apps.sellers.models import SellerGoal
+        goal = SellerGoal.objects.filter(
+            seller=seller, month=month_int, year=year_int,
+        ).first()
+
+        semana = ['Segunda', 'Terca', 'Quarta', 'Quinta', 'Sexta', 'Sabado', 'Domingo']
+        sales_data = []
+        for s in sales:
+            sales_data.append({
+                'date': s.sale_date.strftime('%d/%m/%Y'),
+                'weekday': semana[s.sale_date.weekday()],
+                'amount': s.amount,
+                'origin': 'Link' if s.origin == Sale.Origin.LINK else 'Manual',
+                'notes': s.notes or '',
+                'status': 'Estornada' if s.status == 'ESTORNADA' else 'Ativa',
+                'is_estornada': s.status == 'ESTORNADA',
+            })
+
+        from django.template.loader import render_to_string
+        from weasyprint import HTML
+
+        html = render_to_string('reports/extrato_vendedor.html', {
+            'seller': seller,
+            'tenant': seller.tenant,
+            'competencia': f'{month_int:02d}/{year_int}',
+            'data_geracao': today.strftime('%d/%m/%Y'),
+            'sales_data': sales_data,
+            'total_ativas': total_ativas,
+            'total_estornos': total_estornos,
+            'comissao_valor': comissao_valor,
+            'comissao_taxa': comissao_taxa,
+            'comissao_status': comissao_status,
+            'goal': goal,
+        })
+
+        pdf = HTML(string=html).write_pdf()
+
+        response = HttpResponse(pdf, content_type='application/pdf')
+        response['Content-Disposition'] = (
+            f'attachment; filename="extrato_{seller.name}_{year_int}_{month_int:02d}.pdf"'
+        )
+        return response

@@ -32,6 +32,10 @@ WHATSAPP_ALLOW_SHARED_INSTANCE = config('WHATSAPP_ALLOW_SHARED_INSTANCE', defaul
 SERVICE_FQDN_WEB = config('SERVICE_FQDN_WEB', default='localhost')
 FERNET_KEY = config('FERNET_KEY', default='')
 
+VAPID_PUBLIC_KEY = config('VAPID_PUBLIC_KEY', default='')
+VAPID_PRIVATE_KEY = config('VAPID_PRIVATE_KEY', default='')
+VAPID_CONTACT_EMAIL = config('VAPID_CONTACT_EMAIL', default='contato@vidalys.com.br')
+
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = config('DEBUG', default=False, cast=bool)
 
@@ -93,6 +97,7 @@ TEMPLATES = [
                 "django.contrib.auth.context_processors.auth",
                 "django.contrib.messages.context_processors.messages",
                 "app.apps.accounts.context_processors.trial_status",
+                "app.apps.accounts.context_processors.global_context",
             ],
         },
     },

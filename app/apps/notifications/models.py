@@ -116,6 +116,26 @@ class Notification(models.Model):
         super().save(*args, **kwargs)
 
 
+class PushSubscription(models.Model):
+    user = models.ForeignKey(
+        'accounts.User', on_delete=models.CASCADE, related_name='push_subscriptions',
+    )
+    tenant = models.ForeignKey(Tenant, on_delete=models.CASCADE, related_name='push_subscriptions')
+    endpoint = models.TextField()
+    p256dh = models.CharField(max_length=255)
+    auth = models.CharField(max_length=255)
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=['user', 'endpoint'], name='unique_user_endpoint'),
+        ]
+
+    def __str__(self):
+        return f'Push {self.user.username} ({self.endpoint[:40]}...)'
+
+
 class PasswordResetRequest(models.Model):
     uuid = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     user = models.ForeignKey('accounts.User', on_delete=models.CASCADE, related_name='password_resets')

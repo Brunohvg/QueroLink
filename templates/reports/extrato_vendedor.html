@@ -1,0 +1,101 @@
+{% load currency_filters %}
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <title>Extrato de Vendas — {{ seller.name }} — {{ competencia }}</title>
+    <style>
+        @page { size: A4; margin: 2cm; }
+        body { font-family: 'Inter', system-ui, sans-serif; color: #1e293b; font-size: 10pt; line-height: 1.5; }
+        .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2pt solid #1463FF; padding-bottom: 12pt; margin-bottom: 16pt; }
+        .header img { height: 32pt; }
+        .header-right { text-align: right; }
+        .header-right h1 { font-size: 14pt; font-weight: 700; color: #1e293b; margin: 0; }
+        .header-right p { font-size: 9pt; color: #64748b; margin: 2pt 0; }
+        .info { margin-bottom: 14pt; font-size: 9pt; color: #475569; }
+        .info strong { color: #1e293b; }
+        h2 { font-size: 11pt; font-weight: 700; color: #1463FF; margin: 16pt 0 8pt; border-bottom: 1pt solid #e2e8f0; padding-bottom: 4pt; }
+        table { width: 100%; border-collapse: collapse; margin-top: 6pt; }
+        th { background: #f1f5f9; font-weight: 600; padding: 5pt 8pt; text-align: left; font-size: 9pt; color: #475569; }
+        td { padding: 4pt 8pt; border-bottom: 1pt solid #e2e8f0; font-size: 9pt; }
+        .value { text-align: right; font-variant-numeric: tabular-nums; }
+        .estornada td { color: #94a3b8; }
+        .estornada .amount { text-decoration: line-through; }
+        .total-row td { font-weight: 700; border-top: 2pt solid #1e293b; background: #f8fafc; }
+        .summary-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10pt; margin-top: 14pt; }
+        .summary-card { background: #f8fafc; border-radius: 6pt; padding: 10pt; }
+        .summary-card .label { font-size: 8pt; color: #64748b; text-transform: uppercase; margin-bottom: 4pt; }
+        .summary-card .val { font-size: 14pt; font-weight: 700; color: #1e293b; }
+        .summary-card .sub { font-size: 8pt; color: #94a3b8; margin-top: 2pt; }
+        .footer { margin-top: 24pt; font-size: 8pt; color: #94a3b8; text-align: center; border-top: 1pt solid #e2e8f0; padding-top: 8pt; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <img src="file:///home/bruno/projects/QueroLink/static/img/vidalys-merito-logo.png" alt="Mérito by Vidalys">
+        <div class="header-right">
+            <h1>{{ tenant.company_name }}</h1>
+            <p>Extrato de Vendas</p>
+        </div>
+    </div>
+
+    <div class="info">
+        <strong>Vendedor:</strong> {{ seller.name }} &nbsp;&nbsp;
+        <strong>Competencia:</strong> {{ competencia }} &nbsp;&nbsp;
+        <strong>Gerado em:</strong> {{ data_geracao }}
+    </div>
+
+    <h2>Vendas do Mes</h2>
+
+    {% if sales_data %}
+    <table>
+        <thead>
+            <tr><th>Data</th><th>Dia</th><th class="value">Valor</th><th>Origem</th><th>Observacao</th><th>Status</th></tr>
+        </thead>
+        <tbody>
+            {% for s in sales_data %}
+            <tr {% if s.is_estornada %}class="estornada"{% endif %}>
+                <td>{{ s.date }}</td>
+                <td>{{ s.weekday }}</td>
+                <td class="value"><span {% if s.is_estornada %}class="amount"{% endif %}>{{ s.amount|brl }}</span></td>
+                <td>{{ s.origin }}</td>
+                <td>{{ s.notes }}</td>
+                <td>{{ s.status }}</td>
+            </tr>
+            {% endfor %}
+            <tr class="total-row">
+                <td colspan="2"><strong>Total vendas ativas:</strong></td>
+                <td class="value"><strong>{{ total_ativas|brl }}</strong></td>
+                <td colspan="3">{% if total_estornos > 0 %}Estornos: {{ total_estornos|brl }}{% endif %}</td>
+            </tr>
+        </tbody>
+    </table>
+    {% else %}
+    <p style="text-align: center; color: #94a3b8; padding: 20pt 0;">Nenhuma venda registrada neste periodo.</p>
+    {% endif %}
+
+    <div class="summary-grid">
+        <div class="summary-card">
+            <div class="label">Comissao</div>
+            <div class="val">{{ comissao_valor|brl }}</div>
+            <div class="sub">Taxa: {{ comissao_taxa|floatformat:2 }}% · {{ comissao_status }}</div>
+        </div>
+        {% if goal %}
+        <div class="summary-card">
+            <div class="label">Meta do Mes</div>
+            <div class="val">{{ goal.target_amount|brl }}</div>
+            <div class="sub">Atingido: {{ total_ativas|brl }} ({{ goal.progress_percent }}%)</div>
+        </div>
+        {% endif %}
+        <div class="summary-card">
+            <div class="label">Vendas Ativas</div>
+            <div class="val">{{ total_ativas|brl }}</div>
+            <div class="sub">{{ sales_data|length }} registro{{ sales_data|length|pluralize }}</div>
+        </div>
+    </div>
+
+    <div class="footer">
+        Documento gerado automaticamente pelo Merito by Vidalys · vidalys.com.br · {{ data_geracao }}
+    </div>
+</body>
+</html>

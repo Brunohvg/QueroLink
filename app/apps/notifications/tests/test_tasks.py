@@ -1,9 +1,10 @@
 from unittest.mock import patch, MagicMock
 from django.test import TestCase, override_settings
+from django.conf import settings
 from app.apps.accounts.models import Tenant, User
 from app.apps.sellers.models import Seller
 from app.apps.commissions.models import CommissionPeriod, SellerCommission
-from app.apps.notifications.models import Notification, MessageTemplate
+from app.apps.notifications.models import Notification, MessageTemplate, PushSubscription
 from datetime import timedelta
 from django.utils import timezone as dtz
 
@@ -518,3 +519,81 @@ class RetryAndRescueTest(TestCase):
         requeue_stuck_notifications()
 
         mock_delay.assert_not_called()
+
+
+class WebPushTest(TestCase):
+    def setUp(self):
+        self.tenant = Tenant.objects.create(company_name="PushTest", cnpj="66666666666666")
+        self.user = User.objects.create_user(
+            username="push_seller",
+            password="pass",
+            role=User.Role.SELLER,
+            tenant=self.tenant,
+        )
+
+    def test_push_subscribe_creates_subscription(self):
+        sub = PushSubscription.objects.create(
+            user=self.user,
+            tenant=self.tenant,
+            endpoint='https://fcm.googleapis.com/fcm/send/test123',
+            p256dh='BP123abc==',
+            auth='auth123==',
+        )
+        self.assertTrue(sub.is_active)
+        self.assertEqual(sub.user, self.user)
+
+    def test_push_with_410_endpoint_marked_inactive(self):
+        sub = PushSubscription.objects.create(
+            user=self.user,
+            tenant=self.tenant,
+            endpoint='https://expired.endpoint/',
+            p256dh='BP123abc==',
+            auth='auth123==',
+        )
+
+        from unittest.mock import patch, MagicMock
+        from app.services.messaging.push import send_push_notification
+        from pywebpush import WebPushException
+
+        with patch('pywebpush.webpush') as mock_webpush:
+            mock_webpush.side_effect = WebPushException(
+                'Gone', response=MagicMock(status_code=410),
+            )
+            with patch.object(settings, 'VAPID_PRIVATE_KEY', 'test-key', create=True):
+                send_push_notification(
+                    user=self.user,
+                    title='Test',
+                    body='Test body',
+                )
+
+        sub.refresh_from_db()
+        self.assertFalse(sub.is_active)
+
+    def test_send_push_notification_called_for_active_subs(self):
+        from unittest.mock import patch
+
+        sub1 = PushSubscription.objects.create(
+            user=self.user,
+            tenant=self.tenant,
+            endpoint='https://endpoint1.test/',
+            p256dh='BP1==',
+            auth='auth1==',
+        )
+        sub2 = PushSubscription.objects.create(
+            user=self.user,
+            tenant=self.tenant,
+            endpoint='https://endpoint2.test/',
+            p256dh='BP2==',
+            auth='auth2==',
+        )
+
+        with patch('pywebpush.webpush') as mock_webpush:
+            with patch.object(settings, 'VAPID_PRIVATE_KEY', 'test-key', create=True):
+                from app.services.messaging.push import send_push_notification
+                send_push_notification(
+                    user=self.user,
+                    title='Test',
+                    body='Test body',
+                )
+
+        self.assertEqual(mock_webpush.call_count, 2)
