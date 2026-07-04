@@ -3,7 +3,7 @@ import logging
 from celery import shared_task
 from django.conf import settings
 from django.utils import timezone
-from django.core.mail import send_mail
+from django.core.mail import send_mail, EmailMessage
 from django.db.models import Sum as DSum, Q
 from app.apps.notifications.models import Notification, MessageTemplate, LifecycleEmail
 from app.services.messaging.whatsapp import WhatsappClient, InvalidNumberError
@@ -462,3 +462,184 @@ def send_lifecycle_emails():
                 body += f"O Merito esta pronto para ajudar. Acesse: {settings.SERVICE_FQDN_WEB}/dashboard/gestor/"
                 send_mail('Sentimos sua falta', body, settings.DEFAULT_FROM_EMAIL, [email])
                 LifecycleEmail.objects.create(tenant=tenant, trigger='inactive_7d')
+
+
+@shared_task(bind=True, max_retries=3, default_retry_delay=120, soft_time_limit=120, time_limit=180)
+def send_accounting_package_email(self, tenant_uuid, month, year, requested_by_user_id=None):
+    from app.apps.accounts.models import Tenant, tenant_operational
+    from app.apps.audit.utils import log_action as audit_log
+
+    try:
+        tenant = Tenant.objects.get(uuid=tenant_uuid)
+    except Tenant.DoesNotExist:
+        logger.warning("send_accounting_package_email: tenant %s not found", tenant_uuid)
+        return
+
+    if not getattr(settings, 'PLAN_FEATURES', {}).get(tenant.plan, {}).get('export_contabil'):
+        return
+
+    if not tenant.accountant_email:
+        logger.info("send_accounting_package_email: tenant %s has no accountant email", tenant_uuid)
+        return
+
+    from datetime import timedelta
+    uma_semana = timezone.now() - timedelta(days=7)
+
+    existing = False
+    try:
+        from app.apps.audit.models import AuditLog
+        existing = AuditLog.objects.filter(
+            tenant=tenant, action='accounting_email_sent',
+            created_at__gte=uma_semana,
+        ).exists()
+    except Exception:
+        pass
+    if existing:
+        logger.info("send_accounting_package_email: already sent for %s/%s/%s in last 7 days", tenant_uuid, month, year)
+        return
+
+    from zipfile import ZipFile
+    from io import BytesIO
+    from django.template.loader import render_to_string
+    from weasyprint import HTML
+    from app.apps.commissions.services import calculate_estimated_commission, get_commission_rate
+    from app.apps.sales.models import Sale as SModel
+    from app.apps.sellers.models import Seller as SellerM
+    from app.apps.commissions.models import SellerCommission, CommissionAdjustment, CommissionPeriod
+
+    year_int = int(year)
+    month_int = int(month)
+
+    buf = BytesIO()
+    with ZipFile(buf, 'w') as zf:
+        sales = SModel.objects.filter(
+            tenant=tenant, sale_date__year=year_int, sale_date__month=month_int,
+        ).select_related('seller').order_by('sale_date', 'seller__name')
+
+        csv1_lines = ['Data;Vendedor;CPF Vendedor;Valor (R$);Origem;Status;Observacao']
+        for s in sales:
+            cpf = getattr(s.seller, 'cpf', '') or 'Nao informado'
+            valor = f'{s.amount/100:,.2f}'.replace(',', 'X').replace('.', ',').replace('X', '.')
+            origin = 'Link' if s.origin == SModel.Origin.LINK else 'Manual'
+            status = 'Estornada' if s.status == 'ESTORNADA' else 'Ativa'
+            csv1_lines.append(f'{s.sale_date.strftime("%d/%m/%Y")};{s.seller.name};{cpf};{valor};{origin};{status};{s.notes or ""}')
+        zf.writestr(f'vendas_{month_int:02d}_{year_int}.csv', '\n'.join(csv1_lines).encode('utf-8-sig'))
+
+        csv2_lines = ['Vendedor;CPF Vendedor;Total Vendido (R$);Taxa (%);Comissao Bruta (R$);Ajustes (R$);Comissao Liquida (R$);Status;Data Pagamento']
+        for seller in SellerM.objects.filter(tenant=tenant, is_active=True):
+            sc = SellerCommission.objects.filter(
+                seller=seller, period__month=month_int, period__year=year_int,
+            ).select_related('period').first()
+            if sc:
+                est_comm, est_total = calculate_estimated_commission(seller, month_int, year_int)
+                comissao = sc.commission_amount
+                total = sc.total_sold_amount if sc.total_sold_amount else est_total
+                status_label = sc.get_status_display()
+                payment_date = sc.payment_date.strftime('%d/%m/%Y') if sc.payment_date else ''
+                ads = CommissionAdjustment.objects.filter(seller_commission=sc)
+                total_adj = sum(a.difference for a in ads)
+                liquida = (sc.paid_amount or sc.amount_due) + total_adj
+            else:
+                est_comm, est_total = calculate_estimated_commission(seller, month_int, year_int)
+                total = est_total
+                comissao = est_comm
+                status_label = 'Estimativa'
+                payment_date = ''
+                total_adj = 0
+                liquida = comissao
+
+            cpf = getattr(seller, 'cpf', '') or 'Nao informado'
+            taxa = f'{float(get_commission_rate(seller))*100:.2f}'.replace('.', ',')
+            csv2_lines.append(
+                f'{seller.name};{cpf};'
+                f'{_fmt_br(total)};{taxa};{_fmt_br(comissao)};{_fmt_br(total_adj)};{_fmt_br(liquida)};{status_label};{payment_date}'
+            )
+        zf.writestr(f'comissoes_{month_int:02d}_{year_int}.csv', '\n'.join(csv2_lines).encode('utf-8-sig'))
+
+        total_sold_all = sum(s.amount for s in sales if s.status == 'ATIVA')
+        total_comm_all = 0
+        for seller in SellerM.objects.filter(tenant=tenant, is_active=True):
+            c, _ = calculate_estimated_commission(seller, month_int, year_int)
+            total_comm_all += c
+        cnpj_val = 'Nao informado'
+        try:
+            cnpj_val = tenant.cnpj or 'Nao informado'
+        except Exception:
+            pass
+        csv3 = (
+            f'Empresa;CNPJ;Competencia;Total Vendido;Total Comissoes;Qtd Vendedores\n'
+            f'{tenant.company_name};{cnpj_val};{month_int:02d}/{year_int};{_fmt_br(total_sold_all)};'
+            f'{_fmt_br(total_comm_all)};{SellerM.objects.filter(tenant=tenant, is_active=True).count()}'
+        )
+        zf.writestr(f'resumo_{month_int:02d}_{year_int}.csv', csv3.encode('utf-8-sig'))
+
+        sellers_for_pdf = []
+        total_sold_pdf = 0
+        for seller in SellerM.objects.filter(tenant=tenant, is_active=True):
+            est_comm, est_total = calculate_estimated_commission(seller, month_int, year_int)
+            sc = SellerCommission.objects.filter(
+                seller=seller, period__month=month_int, period__year=year_int,
+            ).select_related('period').first()
+            status_label = sc.get_status_display() if sc else 'Estimativa'
+            commission_amount = sc.commission_amount if sc else est_comm
+            comm_rate = float(sc.commission_rate if sc else seller.commission_rate) * 100
+            sellers_for_pdf.append({
+                'name': seller.name, 'total_sold': est_total,
+                'commission': commission_amount, 'commission_rate': comm_rate,
+                'status': status_label,
+            })
+            total_sold_pdf += est_total
+        sellers_for_pdf.sort(key=lambda s: s['total_sold'], reverse=True)
+
+        prev_month = month_int - 1
+        prev_year = year_int
+        if prev_month == 0:
+            prev_month = 12
+            prev_year -= 1
+        prev_total = SModel.objects.filter(
+            tenant=tenant, status='ATIVA', sale_date__month=prev_month, sale_date__year=prev_year,
+        ).aggregate(t=DSum('amount'))['t'] or 0
+        variacao = round((total_sold_pdf - prev_total) / prev_total * 100) if prev_total > 0 else None
+
+        pdf_html = render_to_string('reports/relatorio_mensal.html', {
+            'tenant': tenant, 'competencia': f'{month_int:02d}/{year_int}',
+            'data_geracao': timezone.now().strftime('%d/%m/%Y'),
+            'sellers_data': sellers_for_pdf, 'total_sold': total_sold_pdf,
+            'total_commissions': total_comm_all, 'total_aberta': 0, 'total_fechada': 0,
+            'total_paga': 0, 'num_sellers': SellerM.objects.filter(tenant=tenant, is_active=True).count(),
+            'prev_total': prev_total, 'variacao': variacao,
+        })
+        zf.writestr(f'resumo_{month_int:02d}_{year_int}.pdf', HTML(string=pdf_html).write_pdf())
+
+    competencia = f'{month_int:02d}/{year_int}'
+    senders = SellerM.objects.filter(tenant=tenant, is_active=True).count()
+    msg = EmailMessage(
+        subject=f'[{tenant.company_name}] Fechamento de comissoes — {competencia}',
+        body=f'Competencia: {competencia}\n'
+             f'Vendedores ativos: {senders}\n'
+             f'Total vendido: {_fmt_br(total_sold_all)}\n\n'
+             f'Segue em anexo o pacote contabil com vendas, comissoes e resumo.\n'
+             f'Gerado automaticamente pelo Merito by Vidalys.',
+        from_email=settings.DEFAULT_FROM_EMAIL,
+        to=[tenant.accountant_email],
+    )
+    msg.attach(f'contabilidade_{year_int}_{month_int:02d}.zip', buf.getvalue(), 'application/zip')
+    msg.send()
+
+    audit_log(
+        None, 'accounting_email_sent',
+        tenant=tenant,
+        changes={
+            'month': month_int, 'year': year_int,
+            'auto': not bool(requested_by_user_id),
+            'recipient': tenant.accountant_email,
+        },
+    )
+    logger.info(
+        "send_accounting_package_email: sent to %s for %s/%s",
+        tenant.accountant_email, month_int, year_int,
+    )
+
+
+def _fmt_br(val):
+    return f'{val/100:,.2f}'.replace(',', 'X').replace('.', ',').replace('X', '.')

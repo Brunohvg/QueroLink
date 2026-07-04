@@ -10,6 +10,7 @@ from django.utils import timezone
 from django.db import transaction
 from django.db.models import Sum, Q
 from django.http import HttpResponse
+from django.conf import settings
 from django_ratelimit.decorators import ratelimit
 from django.utils.decorators import method_decorator
 from rest_framework_simplejwt.views import TokenObtainPairView
@@ -1729,11 +1730,21 @@ class AccountingExportView(generics.GenericAPIView):
         except (ValueError, TypeError):
             return Response({'error': 'Mes/ano invalidos.'}, status=400)
 
+        features = getattr(settings, 'PLAN_FEATURES', {}).get(tenant.plan, {})
+        if not features.get('export_contabil'):
+            return Response(
+                {'detail': 'Disponivel a partir do plano Pro. Faca upgrade em Configuracoes > Assinatura.',
+                 'upgrade_required': True},
+                status=403,
+            )
+
         from zipfile import ZipFile
         from io import BytesIO
         from django.template.loader import render_to_string
         from weasyprint import HTML
-        from app.apps.commissions.services import calculate_estimated_commission
+        from app.apps.commissions.services import (
+            calculate_estimated_commission, get_commission_rate,
+        )
 
         buf = BytesIO()
         with ZipFile(buf, 'w') as zf:
@@ -1754,7 +1765,7 @@ class AccountingExportView(generics.GenericAPIView):
                     f'{"Estornada" if s.status == "ESTORNADA" else "Ativa"};'
                     f'{s.notes or ""}'
                 )
-            zf.writestr(f'vendas_{month_int:02d}_{year_int}.csv', '\ufeff' + '\n'.join(csv1_lines).encode('utf-8-sig'))
+            zf.writestr(f'vendas_{month_int:02d}_{year_int}.csv', '\n'.join(csv1_lines).encode('utf-8-sig'))
 
             # comissoes CSV
             csv2_lines = ['Vendedor;CPF Vendedor;Total Vendido (R$);Taxa (%);Comissao Bruta (R$);Ajustes (R$);Comissao Liquida (R$);Status;Data Pagamento']
@@ -1769,7 +1780,7 @@ class AccountingExportView(generics.GenericAPIView):
                     total = sc.total_sold_amount if sc.total_sold_amount else est_total
                     status = sc.get_status_display()
                     payment_date = sc.payment_date.strftime('%d/%m/%Y') if sc.payment_date else ''
-                    adjustments = CommissionAdjustment.objects.filter(commission=sc)
+                    adjustments = CommissionAdjustment.objects.filter(seller_commission=sc)
                     total_adj = sum(a.difference for a in adjustments)
                     liquida = (sc.paid_amount or sc.amount_due) + total_adj
                 else:
@@ -1782,7 +1793,7 @@ class AccountingExportView(generics.GenericAPIView):
                     liquida = comissao
 
                 cpf = getattr(seller, 'cpf', '') or 'Nao informado'
-                taxa = f'{float(seller.commission_rate)*100:.2f}'.replace('.', ',')
+                taxa = f'{float(get_commission_rate(seller))*100:.2f}'.replace('.', ',')
                 valor_total = f'{total/100:,.2f}'.replace(',', 'X').replace('.', ',').replace('X', '.')
                 valor_bruta = f'{comissao/100:,.2f}'.replace(',', 'X').replace('.', ',').replace('X', '.')
                 valor_adj = f'{total_adj/100:,.2f}'.replace(',', 'X').replace('.', ',').replace('X', '.')
@@ -1790,7 +1801,7 @@ class AccountingExportView(generics.GenericAPIView):
                 csv2_lines.append(
                     f'{seller.name};{cpf};{valor_total};{taxa};{valor_bruta};{valor_adj};{valor_liq};{status};{payment_date}'
                 )
-            zf.writestr(f'comissoes_{month_int:02d}_{year_int}.csv', '\ufeff' + '\n'.join(csv2_lines).encode('utf-8-sig'))
+            zf.writestr(f'comissoes_{month_int:02d}_{year_int}.csv', '\n'.join(csv2_lines).encode('utf-8-sig'))
 
             # resumo CSV
             total_sold_all = sum(s.amount for s in sales if s.status == 'ATIVA')
@@ -1809,7 +1820,7 @@ class AccountingExportView(generics.GenericAPIView):
                 f'Empresa;CNPJ;Competencia;Total Vendido;Total Comissoes;Qtd Vendedores\n'
                 f'{tenant.company_name};{cnpj_val};{month_int:02d}/{year_int};{valor_total};{valor_comm};{sellers.count()}'
             )
-            zf.writestr(f'resumo_{month_int:02d}_{year_int}.csv', '\ufeff' + csv3.encode('utf-8-sig'))
+            zf.writestr(f'resumo_{month_int:02d}_{year_int}.csv', csv3.encode('utf-8-sig'))
 
             # PDF do relatorio (gerado inline para evitar import circular)
             sellers_for_pdf = []
@@ -1851,3 +1862,30 @@ class AccountingExportView(generics.GenericAPIView):
         resp = HttpResponse(buf.getvalue(), content_type='application/zip')
         resp['Content-Disposition'] = f'attachment; filename="contabilidade_{year_int}_{month_int:02d}.zip"'
         return resp
+
+
+class AccountingEmailView(generics.GenericAPIView):
+    permission_classes = [IsAuthenticated, IsFinancialOrAdmin | IsManagerOrAdmin]
+
+    def post(self, request, year=None, month=None):
+        tenant = request.user.tenant
+        features = getattr(settings, 'PLAN_FEATURES', {}).get(tenant.plan, {})
+        if not features.get('export_contabil'):
+            return Response(
+                {'detail': 'Disponivel a partir do plano Pro.', 'upgrade_required': True},
+                status=403,
+            )
+        if not tenant.accountant_email:
+            return Response(
+                {'detail': 'Cadastre o e-mail do contador em Configuracoes.'},
+                status=400,
+            )
+        try:
+            year_int = int(year)
+            month_int = int(month)
+        except (ValueError, TypeError):
+            return Response({'error': 'Mes/ano invalidos.'}, status=400)
+
+        from app.apps.notifications.tasks import send_accounting_package_email
+        send_accounting_package_email.delay(str(tenant.uuid), month_int, year_int)
+        return Response({'detail': f'Envio agendado para {tenant.accountant_email}.'}, status=202)

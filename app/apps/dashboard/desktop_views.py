@@ -199,6 +199,8 @@ def gestor_configuracoes(request):
 
         tenant.pix_enabled = request.POST.get('pix_enabled') == '1'
         tenant.ranking_visible_to_sellers = request.POST.get('ranking_visible_to_sellers') == '1'
+        tenant.accountant_email = request.POST.get('accountant_email', '').strip() or None
+        tenant.accountant_auto_send = request.POST.get('accountant_auto_send') == '1'
 
         tenant.save()
 
@@ -879,4 +881,67 @@ def admin_metrics(request):
         'notificacoes_30d': notificacoes_30d,
         'top_tenants': top_tenants,
         'recentes_data': recentes_data,
+    })
+
+
+@login_required
+def gestor_contabilidade(request):
+    if not _check_role(request, User.Role.MANAGER, User.Role.ADMIN):
+        return redirect('dashboard:home')
+
+    tenant = request.user.tenant
+    hoje = timezone.localdate()
+
+    from app.apps.commissions.services import calculate_estimated_commission
+    from app.apps.commissions.models import CommissionPeriod, SellerCommission
+    from app.apps.sales.models import Sale as SModel
+
+    competencias = []
+    for i in range(12):
+        month = hoje.month - i
+        year = hoje.year
+        while month <= 0:
+            month += 12
+            year -= 1
+
+        total_sold = SModel.objects.filter(
+            tenant=tenant, status='ATIVA',
+            sale_date__month=month, sale_date__year=year,
+        ).aggregate(t=Sum('amount'))['t'] or 0
+
+        total_comm = 0
+        sellers_qs = Seller.objects.filter(tenant=tenant, is_active=True)
+        for s in sellers_qs:
+            c, _ = calculate_estimated_commission(s, month, year)
+            total_comm += c
+
+        period = CommissionPeriod.objects.filter(tenant=tenant, month=month, year=year).first()
+        if period:
+            scs = SellerCommission.objects.filter(period=period)
+            all_paid = scs.exists() and not scs.exclude(
+                status__in=[SellerCommission.Status.PAGA, SellerCommission.Status.CANCELADA],
+            ).exists()
+            status = period.get_status_display()
+        else:
+            all_paid = False
+            status = 'Sem fechamento'
+
+        competencias.append({
+            'month': month,
+            'year': year,
+            'label': f'{month:02d}/{year}',
+            'total_sold': total_sold,
+            'total_comm': total_comm,
+            'status': status,
+            'is_complete': all_paid,
+        })
+
+    has_export = getattr(settings, 'PLAN_FEATURES', {}).get(tenant.plan, {}).get('export_contabil', False)
+
+    return render(request, 'dashboard/gestor/contabilidade.html', {
+        'competencias': competencias,
+        'accountant_email': tenant.accountant_email,
+        'accountant_auto_send': tenant.accountant_auto_send,
+        'has_export': has_export,
+        'tenant': tenant,
     })

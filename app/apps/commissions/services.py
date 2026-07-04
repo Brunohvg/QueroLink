@@ -309,6 +309,23 @@ def pay_seller_commissions(period, seller_commission_ids, user, payment_data):
                 exc_info=True,
             )
 
+    try:
+        tenant = period.tenant
+        if tenant.accountant_email and tenant.accountant_auto_send:
+            all_paid = not SellerCommission.objects.filter(period=period).exclude(
+                status__in=[SellerCommission.Status.PAGA, SellerCommission.Status.CANCELADA],
+            ).exists()
+            if all_paid:
+                from app.apps.notifications.tasks import send_accounting_package_email
+                send_accounting_package_email.delay(
+                    str(tenant.uuid), period.month, period.year,
+                )
+    except Exception:
+        logger.error(
+            'Failed to schedule auto accounting email for period %s', period.id,
+            exc_info=True,
+        )
+
     return list(commissions)
 
 

@@ -37,7 +37,7 @@ class SellerSerializer(serializers.ModelSerializer):
     class Meta:
         model = Seller
         fields = [
-            'uuid', 'name', 'phone', 'commission_rate',
+            'uuid', 'name', 'phone', 'cpf', 'commission_rate',
             'is_active', 'username', 'created_at',
         ]
         read_only_fields = ['uuid', 'username', 'created_at']
@@ -62,6 +62,7 @@ class SellerSerializer(serializers.ModelSerializer):
 class SellerCreateSerializer(serializers.Serializer):
     name = serializers.CharField(max_length=100)
     phone = serializers.CharField(max_length=20)
+    cpf = serializers.CharField(max_length=14, required=False, allow_blank=True)
 
     def validate_phone(self, value):
         cleaned = clean_phone(value)
@@ -107,6 +108,7 @@ class SellerCreateSerializer(serializers.Serializer):
                 user=user,
                 name=validated_data['name'],
                 phone=validated_data['phone'],
+                cpf=validated_data.get('cpf', '') or None,
                 commission_rate=tenant.default_commission_rate,
             )
 

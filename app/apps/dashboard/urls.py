@@ -16,6 +16,7 @@ urlpatterns = [
     path('gestor/importar-vendas/', desktop_views.gestor_importar_vendas, name='gestor_importar_vendas'),
     path('gestor/vendedores/<uuid:seller_id>/', desktop_views.gestor_vendedor_detalhe, name='gestor_vendedor_detalhe'),
     path('gestor/fechamento/', desktop_views.gestor_fechamento, name='gestor_fechamento'),
+    path('gestor/contabilidade/', desktop_views.gestor_contabilidade, name='gestor_contabilidade'),
     path('gestor/previa-fechamento/', desktop_views.gestor_previa_fechamento, name='gestor_previa_fechamento'),
     path('gestor/configuracoes/', desktop_views.gestor_configuracoes, name='gestor_configuracoes'),
     path('gestor/configuracoes/whatsapp/qrcode/', desktop_views.whatsapp_instance_status, name='whatsapp_qrcode'),

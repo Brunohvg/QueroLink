@@ -1,5 +1,6 @@
 import uuid
 from django.db import models
+from django.core.exceptions import ValidationError
 from django.conf import settings
 from app.apps.accounts.models import Tenant
 from app.apps.accounts.fields import EncryptedCharField, compute_hash
@@ -16,6 +17,10 @@ class Seller(models.Model):
     phone = EncryptedCharField(max_length=600)
     phone_hash = models.CharField(max_length=64, blank=True, null=True)
     commission_rate = models.DecimalField(max_digits=5, decimal_places=4, default=0.01)
+    cpf = models.CharField(
+        max_length=14, blank=True, null=True,
+        help_text='CPF do vendedor (para folha/contabilidade). Formato: 000.000.000-00',
+    )
     is_active = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
@@ -43,6 +48,25 @@ class Seller(models.Model):
             return old.phone != self.phone
         except Seller.DoesNotExist:
             return True
+
+    def clean(self):
+        if self.cpf:
+            digits = ''.join(filter(str.isdigit, self.cpf))
+            if len(digits) != 11:
+                raise ValidationError({'cpf': 'CPF deve ter 11 digitos.'})
+            if digits == digits[0] * 11:
+                raise ValidationError({'cpf': 'CPF invalido.'})
+            s1 = sum(int(digits[i]) * (10 - i) for i in range(9))
+            d1 = (s1 * 10) % 11
+            if d1 == 10:
+                d1 = 0
+            s2 = sum(int(digits[i]) * (11 - i) for i in range(10))
+            d2 = (s2 * 10) % 11
+            if d2 == 10:
+                d2 = 0
+            if int(digits[9]) != d1 or int(digits[10]) != d2:
+                raise ValidationError({'cpf': 'CPF invalido.'})
+            self.cpf = f'{digits[:3]}.{digits[3:6]}.{digits[6:9]}-{digits[9:]}'
 
     def __str__(self):
         return self.name

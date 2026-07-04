@@ -44,6 +44,14 @@ class Tenant(models.Model):
         default=False,
         help_text="Exibe nomes dos colegas no ranking do app (valores nunca sao exibidos)",
     )
+    accountant_email = models.EmailField(
+        blank=True, null=True,
+        help_text='E-mail da contabilidade para envio automatico do fechamento mensal',
+    )
+    accountant_auto_send = models.BooleanField(
+        default=False,
+        help_text='Enviar automaticamente o pacote contabil quando todas as comissoes da competencia forem pagas',
+    )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

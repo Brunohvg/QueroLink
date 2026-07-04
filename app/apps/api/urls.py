@@ -21,6 +21,7 @@ urlpatterns = [
     path('seller/statement/<int:year>/<int:month>/', views.SellerStatementView.as_view(), name='api-seller-statement'),
     path('reports/monthly/<int:year>/<int:month>/', views.MonthlyReportView.as_view(), name='api-monthly-report'),
     path('reports/accounting/<int:year>/<int:month>/', views.AccountingExportView.as_view(), name='api-accounting-export'),
+    path('reports/accounting/<int:year>/<int:month>/send/', views.AccountingEmailView.as_view(), name='api-accounting-send'),
     path('push/subscribe/', views.PushSubscribeView.as_view(), name='api-push-subscribe'),
     path('push/unsubscribe/', views.PushUnsubscribeView.as_view(), name='api-push-unsubscribe'),
     path('manager/sales/', views.ManagerSalesListView.as_view(), name='api-manager-sales'),
