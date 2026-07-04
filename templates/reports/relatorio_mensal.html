@@ -1,0 +1,94 @@
+{% load currency_filters %}
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <title>Relatorio Mensal — {{ competencia }}</title>
+    <style>
+        @page { size: A4 landscape; margin: 1.5cm; }
+        body { font-family: 'Inter', system-ui, sans-serif; color: #1e293b; font-size: 9pt; line-height: 1.4; }
+        .cover { text-align: center; padding: 60pt 0; page-break-after: always; }
+        .cover img { height: 40pt; margin-bottom: 20pt; }
+        .cover h1 { font-size: 20pt; font-weight: 700; color: #1463FF; margin: 0 0 8pt; }
+        .cover p { font-size: 10pt; color: #64748b; margin: 4pt 0; }
+        h2 { font-size: 11pt; font-weight: 700; color: #1463FF; margin: 16pt 0 8pt; border-bottom: 1pt solid #e2e8f0; padding-bottom: 4pt; }
+        .kpi-grid { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 8pt; margin-bottom: 16pt; }
+        .kpi { background: #f8fafc; border-radius: 6pt; padding: 10pt; text-align: center; }
+        .kpi .label { font-size: 7pt; color: #64748b; text-transform: uppercase; margin-bottom: 4pt; }
+        .kpi .val { font-size: 16pt; font-weight: 700; color: #1e293b; }
+        .kpi .sub { font-size: 7pt; color: #94a3b8; margin-top: 2pt; }
+        .bar { display: flex; align-items: center; gap: 6pt; margin: 4pt 0; }
+        .bar .name { width: 100pt; font-size: 8pt; text-align: right; }
+        .bar .fill { height: 14pt; background: linear-gradient(90deg, #1463FF, #15CFEA); border-radius: 3pt; min-width: 2pt; }
+        .bar .amount { font-size: 8pt; font-weight: 600; margin-left: 4pt; }
+        table { width: 100%; border-collapse: collapse; margin-top: 8pt; }
+        th { background: #f1f5f9; font-weight: 600; padding: 5pt 6pt; text-align: left; font-size: 8pt; color: #475569; }
+        td { padding: 4pt 6pt; border-bottom: 1pt solid #e2e8f0; font-size: 8pt; }
+        .num { text-align: right; }
+        .footer { margin-top: 24pt; font-size: 7pt; color: #94a3b8; text-align: center; border-top: 1pt solid #e2e8f0; padding-top: 8pt; }
+    </style>
+</head>
+<body>
+    <div class="cover">
+        <img src="file:///home/bruno/projects/QueroLink/static/img/vidalys-merito-logo.png" alt="Merito by Vidalys">
+        <h1>Relatorio Mensal de Vendas e Comissoes</h1>
+        <p>{{ tenant.company_name }}</p>
+        <p>Competencia: {{ competencia }} · Gerado em: {{ data_geracao }}</p>
+    </div>
+
+    <h2>Resumo do Mes</h2>
+    <div class="kpi-grid">
+        <div class="kpi"><div class="label">Total Vendido</div><div class="val">{{ total_sold|brl }}</div></div>
+        <div class="kpi"><div class="label">Total Comissoes</div><div class="val">{{ total_commissions|brl }}</div></div>
+        <div class="kpi"><div class="label">Vendedores Ativos</div><div class="val">{{ num_sellers }}</div></div>
+        <div class="kpi">
+            <div class="label">vs Mes Anterior</div>
+            <div class="val">{% if variacao is not None %}{% if variacao >= 0 %}↑{% else %}↓{% endif %} {{ variacao }}%{% else %}—{% endif %}</div>
+        </div>
+    </div>
+
+    <h2>Ranking de Vendedores</h2>
+    {% if sellers_data %}
+    {% with max_total=sellers_data.0.total_sold %}
+    {% for s in sellers_data %}
+    <div class="bar">
+        <span class="name">{{ s.name }}</span>
+        <div class="fill" style="width: {% widthratio s.total_sold max_total 100 %}%"></div>
+        <span class="amount">{{ s.total_sold|brl }}</span>
+    </div>
+    {% endfor %}
+    {% endwith %}
+    {% endif %}
+
+    <h2>Detalhamento</h2>
+    <table>
+        <thead><tr><th>#</th><th>Vendedor</th><th class="num">Total vendido</th><th class="num">%</th><th class="num">Taxa</th><th class="num">Comissao</th><th>Status</th></tr></thead>
+        <tbody>
+            {% for s in sellers_data %}
+            <tr>
+                <td>{{ forloop.counter }}</td>
+                <td>{{ s.name }}</td>
+                <td class="num">{{ s.total_sold|brl }}</td>
+                <td class="num">{% widthratio s.total_sold total_sold 100 %}%</td>
+                <td class="num">{{ s.commission_rate|floatformat:2 }}%</td>
+                <td class="num">{{ s.commission|brl }}</td>
+                <td>{{ s.status }}</td>
+            </tr>
+            {% endfor %}
+            <tr style="font-weight:700; border-top: 2pt solid #1e293b; background:#f8fafc;">
+                <td colspan="2">TOTAL</td>
+                <td class="num">{{ total_sold|brl }}</td>
+                <td class="num">100%</td>
+                <td class="num"></td>
+                <td class="num">{{ total_commissions|brl }}</td>
+                <td></td>
+            </tr>
+        </tbody>
+    </table>
+    <p style="font-size:7pt; color:#94a3b8; margin-top:8pt;">Valores de comissao em aberto sao estimativas e podem mudar ate o fechamento.</p>
+
+    <div class="footer">
+        Merito by Vidalys · {{ tenant.company_name }} · Gerado em {{ data_geracao }}
+    </div>
+</body>
+</html>

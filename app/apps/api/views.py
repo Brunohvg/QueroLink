@@ -141,6 +141,72 @@ class SaleViewSet(viewsets.ModelViewSet):
         log_action(self.request, 'sale.deleted', instance=instance)
         instance.delete()
 
+    @action(detail=False, methods=['post'], permission_classes=[IsAuthenticated, IsManagerOrAdmin], url_path='import')
+    def import_sales(self, request):
+        sales_data = request.data.get('sales', [])
+        if not isinstance(sales_data, list):
+            return Response({'error': 'sales deve ser uma lista.'}, status=400)
+        if len(sales_data) > 500:
+            return Response({'error': 'Maximo 500 vendas por vez.'}, status=400)
+
+        tenant = request.user.tenant
+        imported = 0
+        skipped = 0
+        errors = []
+
+        with transaction.atomic():
+            for idx, item in enumerate(sales_data):
+                try:
+                    seller_uuid = item.get('seller_uuid')
+                    amount_cents = item.get('amount_cents')
+                    date_str = item.get('date')
+                    notes = item.get('notes', '')
+
+                    if not seller_uuid or not amount_cents or not date_str:
+                        errors.append({'index': idx, 'error': 'Campos obrigatorios: seller_uuid, amount_cents, date'})
+                        continue
+
+                    seller = Seller.objects.filter(uuid=seller_uuid, tenant=tenant).first()
+                    if not seller:
+                        errors.append({'index': idx, 'error': f'Vendedor nao encontrado: {seller_uuid}'})
+                        continue
+
+                    try:
+                        sale_date = date.fromisoformat(date_str)
+                    except (ValueError, TypeError):
+                        errors.append({'index': idx, 'error': f'Data invalida: {date_str}'})
+                        continue
+
+                    if amount_cents <= 0:
+                        errors.append({'index': idx, 'error': 'Valor deve ser maior que zero.'})
+                        continue
+
+                    exists = Sale.objects.filter(
+                        seller=seller, sale_date=sale_date, amount=amount_cents, tenant=tenant,
+                    ).exists()
+                    if exists:
+                        skipped += 1
+                        continue
+
+                    Sale.objects.create(
+                        tenant=tenant,
+                        seller=seller,
+                        origin=Sale.Origin.MANUAL,
+                        amount=amount_cents,
+                        sale_date=sale_date,
+                        notes=str(notes)[:500] if notes else '',
+                        created_by=request.user,
+                    )
+                    imported += 1
+                except Exception as e:
+                    errors.append({'index': idx, 'error': str(e)})
+
+            if errors and not imported:
+                transaction.set_rollback(True)
+                return Response({'error': 'Nenhuma venda importada. Corrija os erros.', 'errors': errors}, status=400)
+
+        return Response({'imported': imported, 'skipped': skipped, 'errors': errors})
+
 
 class CommissionPeriodViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated, IsManagerOrAdmin]
@@ -418,6 +484,52 @@ class CommissionPeriodViewSet(viewsets.ModelViewSet):
         pdf = HTML(string=full_html).write_pdf()
         return HttpResponse(pdf, content_type='application/pdf')
 
+    @action(detail=False, methods=['get'], permission_classes=[IsAuthenticated, IsManagerOrAdmin], url_path='preview')
+    def preview(self, request):
+        from datetime import date
+        from app.apps.commissions.services import (
+            calculate_estimated_commission, get_missing_days_before_today,
+        )
+
+        tenant = request.user.tenant
+        hoje = timezone.localdate()
+        month = int(request.query_params.get('month', hoje.month))
+        year = int(request.query_params.get('year', hoje.year))
+
+        sellers = Seller.objects.filter(tenant=tenant, is_active=True)
+        sellers_data = []
+        total_sold = 0
+        total_commission = 0
+
+        for seller in sellers:
+            est_commission, est_total = calculate_estimated_commission(seller, month, year)
+            try:
+                missing_days = get_missing_days_before_today(seller, month, year)
+            except Exception:
+                missing_days = []
+            sellers_data.append({
+                'name': seller.name,
+                'uuid': str(seller.uuid),
+                'total_sold': est_total,
+                'commission_rate': float(seller.commission_rate),
+                'commission_amount': est_commission,
+                'has_missing_days': len(missing_days) > 0,
+                'missing_days_count': len(missing_days),
+            })
+            total_sold += est_total
+            total_commission += est_commission
+
+        sellers_data.sort(key=lambda s: s['total_sold'], reverse=True)
+
+        return Response({
+            'sellers': sellers_data,
+            'totals': {
+                'total_sold': total_sold,
+                'total_commission': total_commission,
+            },
+            'month': month,
+            'year': year,
+        })
 
 @extend_schema(
     responses={200: dict},
@@ -1501,3 +1613,234 @@ class SellerStatementView(generics.GenericAPIView):
             f'attachment; filename="extrato_{seller.name}_{year_int}_{month_int:02d}.pdf"'
         )
         return response
+
+
+@extend_schema(responses={(200, 'application/pdf'): OpenApiTypes.BINARY})
+class MonthlyReportView(generics.GenericAPIView):
+    permission_classes = [IsAuthenticated, IsManagerOrAdmin]
+
+    def get(self, request, year=None, month=None):
+        tenant = request.user.tenant
+        hoje = timezone.localdate()
+        try:
+            year_int = int(year) if year else hoje.year
+            month_int = int(month) if month else hoje.month
+        except (ValueError, TypeError):
+            return Response({'error': 'Mes/ano invalidos.'}, status=400)
+
+        from app.apps.commissions.services import calculate_estimated_commission
+        sellers = Seller.objects.filter(tenant=tenant, is_active=True)
+        sellers_data = []
+        total_sold = 0
+        total_commission_aberta = 0
+        total_commission_fechada = 0
+        total_commission_paga = 0
+
+        for seller in sellers:
+            est_commission, est_total = calculate_estimated_commission(seller, month_int, year_int)
+            sc = SellerCommission.objects.filter(
+                seller=seller,
+                period__month=month_int,
+                period__year=year_int,
+            ).select_related('period').first()
+
+            if sc:
+                if sc.status in ('FECHADA', 'PAGA', 'AJUSTADA'):
+                    st = sc
+                    commission_amount = sc.commission_amount
+                else:
+                    commission_amount = est_commission
+                    st = sc
+            else:
+                commission_amount = est_commission
+                st = None
+
+            status = st.get_status_display() if st else 'Estimativa'
+            if st and st.status == 'FECHADA':
+                total_commission_fechada += commission_amount
+            elif st and st.status == 'PAGA':
+                total_commission_paga += commission_amount
+            else:
+                total_commission_aberta += commission_amount
+
+            sellers_data.append({
+                'name': seller.name,
+                'total_sold': est_total,
+                'commission': commission_amount,
+                'commission_rate': float(seller.commission_rate) * 100,
+                'status': status,
+            })
+            total_sold += est_total
+
+        sellers_data.sort(key=lambda s: s['total_sold'], reverse=True)
+        total_commissions = total_commission_aberta + total_commission_fechada + total_commission_paga
+
+        prev_month = month_int - 1
+        prev_year = year_int
+        if prev_month == 0:
+            prev_month = 12
+            prev_year -= 1
+        prev_total = Sale.objects.filter(
+            tenant=tenant, status='ATIVA',
+            sale_date__month=prev_month, sale_date__year=prev_year,
+        ).aggregate(t=Sum('amount'))['t'] or 0
+        variacao = round((total_sold - prev_total) / prev_total * 100) if prev_total > 0 else None
+
+        from django.template.loader import render_to_string
+        from weasyprint import HTML
+
+        html = render_to_string('reports/relatorio_mensal.html', {
+            'tenant': tenant,
+            'competencia': f'{month_int:02d}/{year_int}',
+            'data_geracao': hoje.strftime('%d/%m/%Y'),
+            'sellers_data': sellers_data,
+            'total_sold': total_sold,
+            'total_commissions': total_commissions,
+            'total_aberta': total_commission_aberta,
+            'total_fechada': total_commission_fechada,
+            'total_paga': total_commission_paga,
+            'num_sellers': sellers.count(),
+            'prev_total': prev_total,
+            'variacao': variacao,
+        })
+
+        pdf = HTML(string=html).write_pdf()
+        response = HttpResponse(pdf, content_type='application/pdf')
+        response['Content-Disposition'] = f'attachment; filename="relatorio_{year_int}_{month_int:02d}.pdf"'
+        return response
+
+
+class AccountingExportView(generics.GenericAPIView):
+    permission_classes = [IsAuthenticated, IsFinancialOrAdmin | IsManagerOrAdmin]
+
+    def get(self, request, year=None, month=None):
+        tenant = request.user.tenant
+        hoje = timezone.localdate()
+        try:
+            year_int = int(year) if year else hoje.year
+            month_int = int(month) if month else hoje.month
+        except (ValueError, TypeError):
+            return Response({'error': 'Mes/ano invalidos.'}, status=400)
+
+        from zipfile import ZipFile
+        from io import BytesIO
+        from django.template.loader import render_to_string
+        from weasyprint import HTML
+        from app.apps.commissions.services import calculate_estimated_commission
+
+        buf = BytesIO()
+        with ZipFile(buf, 'w') as zf:
+            sales = Sale.objects.filter(
+                tenant=tenant,
+                sale_date__year=year_int,
+                sale_date__month=month_int,
+            ).select_related('seller').order_by('sale_date', 'seller__name')
+
+            # vendas CSV
+            csv1_lines = ['Data;Vendedor;CPF Vendedor;Valor (R$);Origem;Status;Observacao']
+            for s in sales:
+                cpf = getattr(s.seller, 'cpf', '') or 'Nao informado'
+                valor = f'{s.amount/100:,.2f}'.replace(',', 'X').replace('.', ',').replace('X', '.')
+                csv1_lines.append(
+                    f'{s.sale_date.strftime("%d/%m/%Y")};{s.seller.name};{cpf};'
+                    f'{valor};{"Link" if s.origin == Sale.Origin.LINK else "Manual"};'
+                    f'{"Estornada" if s.status == "ESTORNADA" else "Ativa"};'
+                    f'{s.notes or ""}'
+                )
+            zf.writestr(f'vendas_{month_int:02d}_{year_int}.csv', '\ufeff' + '\n'.join(csv1_lines).encode('utf-8-sig'))
+
+            # comissoes CSV
+            csv2_lines = ['Vendedor;CPF Vendedor;Total Vendido (R$);Taxa (%);Comissao Bruta (R$);Ajustes (R$);Comissao Liquida (R$);Status;Data Pagamento']
+            sellers = Seller.objects.filter(tenant=tenant, is_active=True)
+            for seller in sellers:
+                sc = SellerCommission.objects.filter(
+                    seller=seller, period__month=month_int, period__year=year_int,
+                ).select_related('period').first()
+                if sc:
+                    est_comm, est_total = calculate_estimated_commission(seller, month_int, year_int)
+                    comissao = sc.commission_amount
+                    total = sc.total_sold_amount if sc.total_sold_amount else est_total
+                    status = sc.get_status_display()
+                    payment_date = sc.payment_date.strftime('%d/%m/%Y') if sc.payment_date else ''
+                    adjustments = CommissionAdjustment.objects.filter(commission=sc)
+                    total_adj = sum(a.difference for a in adjustments)
+                    liquida = (sc.paid_amount or sc.amount_due) + total_adj
+                else:
+                    est_comm, est_total = calculate_estimated_commission(seller, month_int, year_int)
+                    total = est_total
+                    comissao = est_comm
+                    status = 'Estimativa'
+                    payment_date = ''
+                    total_adj = 0
+                    liquida = comissao
+
+                cpf = getattr(seller, 'cpf', '') or 'Nao informado'
+                taxa = f'{float(seller.commission_rate)*100:.2f}'.replace('.', ',')
+                valor_total = f'{total/100:,.2f}'.replace(',', 'X').replace('.', ',').replace('X', '.')
+                valor_bruta = f'{comissao/100:,.2f}'.replace(',', 'X').replace('.', ',').replace('X', '.')
+                valor_adj = f'{total_adj/100:,.2f}'.replace(',', 'X').replace('.', ',').replace('X', '.')
+                valor_liq = f'{liquida/100:,.2f}'.replace(',', 'X').replace('.', ',').replace('X', '.')
+                csv2_lines.append(
+                    f'{seller.name};{cpf};{valor_total};{taxa};{valor_bruta};{valor_adj};{valor_liq};{status};{payment_date}'
+                )
+            zf.writestr(f'comissoes_{month_int:02d}_{year_int}.csv', '\ufeff' + '\n'.join(csv2_lines).encode('utf-8-sig'))
+
+            # resumo CSV
+            total_sold_all = sum(s.amount for s in sales if s.status == 'ATIVA')
+            total_comm_all = 0
+            for seller in sellers:
+                est_comm, _ = calculate_estimated_commission(seller, month_int, year_int)
+                total_comm_all += est_comm
+            cnpj_val = 'Nao informado'
+            try:
+                cnpj_val = tenant.cnpj or 'Nao informado'
+            except Exception:
+                pass
+            valor_total = f'{total_sold_all/100:,.2f}'.replace(',', 'X').replace('.', ',').replace('X', '.')
+            valor_comm = f'{total_comm_all/100:,.2f}'.replace(',', 'X').replace('.', ',').replace('X', '.')
+            csv3 = (
+                f'Empresa;CNPJ;Competencia;Total Vendido;Total Comissoes;Qtd Vendedores\n'
+                f'{tenant.company_name};{cnpj_val};{month_int:02d}/{year_int};{valor_total};{valor_comm};{sellers.count()}'
+            )
+            zf.writestr(f'resumo_{month_int:02d}_{year_int}.csv', '\ufeff' + csv3.encode('utf-8-sig'))
+
+            # PDF do relatorio (gerado inline para evitar import circular)
+            sellers_for_pdf = []
+            total_sold_pdf = 0
+            for seller in Seller.objects.filter(tenant=tenant, is_active=True):
+                est_comm, est_total = calculate_estimated_commission(seller, month_int, year_int)
+                sc = SellerCommission.objects.filter(
+                    seller=seller, period__month=month_int, period__year=year_int,
+                ).select_related('period').first()
+                status = sc.get_status_display() if sc else 'Estimativa'
+                commission_amount = sc.commission_amount if sc else est_comm
+                comm_rate = float(sc.commission_rate if sc else seller.commission_rate) * 100
+                sellers_for_pdf.append({
+                    'name': seller.name, 'total_sold': est_total,
+                    'commission': commission_amount, 'commission_rate': comm_rate,
+                    'status': status,
+                })
+                total_sold_pdf += est_total
+            sellers_for_pdf.sort(key=lambda s: s['total_sold'], reverse=True)
+
+            pdf_html = render_to_string('reports/relatorio_mensal.html', {
+                'tenant': tenant,
+                'competencia': f'{month_int:02d}/{year_int}',
+                'data_geracao': hoje.strftime('%d/%m/%Y'),
+                'sellers_data': sellers_for_pdf,
+                'total_sold': total_sold_pdf,
+                'total_commissions': total_comm_all,
+                'total_aberta': 0, 'total_fechada': 0, 'total_paga': 0,
+                'num_sellers': sellers.count(),
+                'prev_total': 0, 'variacao': None,
+            })
+            pdf_bytes = HTML(string=pdf_html).write_pdf()
+            zf.writestr(f'resumo_{month_int:02d}_{year_int}.pdf', pdf_bytes)
+
+        log_action(request, 'accounting_export', changes={
+            'month': month_int, 'year': year_int, 'tenant': str(tenant.uuid),
+        })
+
+        resp = HttpResponse(buf.getvalue(), content_type='application/zip')
+        resp['Content-Disposition'] = f'attachment; filename="contabilidade_{year_int}_{month_int:02d}.zip"'
+        return resp

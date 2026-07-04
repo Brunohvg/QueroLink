@@ -1,4 +1,5 @@
 {% extends 'dashboard/base_desktop.html' %}
+{% load currency_filters %}
 {% block title %}Painel do Gestor — Mérito{% endblock %}
 {% block content %}
 <div x-data="gestorHomePage()" x-init="loadSummary()">
@@ -10,6 +11,81 @@
     <a href="{% url 'dashboard:gestor_configuracoes' %}" class="inline-block mt-3 bg-brand-500 hover:bg-brand-600 text-white font-medium px-5 py-2.5 rounded-xl transition text-[14px]">Configurar agora</a>
 </div>
 {% endif %}
+
+<div class="mb-6">
+    <h2 class="text-[14px] font-bold text-gray-900 mb-3">Saude da operacao</h2>
+    <div class="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        <div class="surface-card">
+            <div class="flex items-center gap-2 mb-1.5">
+                <svg class="w-4 h-4 {% if is_domingo or lancados_hoje == vendedores_ativos %}text-emerald-500{% else %}text-amber-500{% endif %}" fill="none" stroke="currentColor" viewBox="0 0 24 24">{% if is_domingo or lancados_hoje == vendedores_ativos %}<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>{% else %}<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"/>{% endif %}</svg>
+                <p class="text-[11px] font-semibold text-gray-400 uppercase tracking-wider">Lancamentos hoje</p>
+            </div>
+            {% if is_domingo %}
+            <p class="text-[13px] font-medium text-gray-500">Domingo — sem lancamentos</p>
+            {% else %}
+            <p class="font-display text-[22px] font-bold text-gray-900">{{ lancados_hoje }} de {{ vendedores_ativos }}</p>
+            <div class="h-1.5 rounded-full bg-gray-100 mt-2 overflow-hidden">
+                <div class="h-full rounded-full transition-all {% if lancados_hoje == vendedores_ativos %}bg-emerald-500{% else %}bg-amber-500{% endif %}"
+                     style="width: {% widthratio lancados_hoje vendedores_ativos 100 %}%"></div>
+            </div>
+            {% if sellers_sem_lancamento %}
+            <p class="text-[11px] text-amber-600 mt-1.5 truncate">
+                Faltam: {{ sellers_sem_lancamento|join:", " }}
+            </p>
+            {% endif %}
+            {% endif %}
+        </div>
+
+        <div class="surface-card">
+            <div class="flex items-center gap-2 mb-1.5">
+                <svg class="w-4 h-4 {% if whatsapp_ok and pagarme_ok %}text-emerald-500{% else %}text-red-500{% endif %}" fill="none" stroke="currentColor" viewBox="0 0 24 24">{% if whatsapp_ok and pagarme_ok %}<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>{% else %}<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>{% endif %}</svg>
+                <p class="text-[11px] font-semibold text-gray-400 uppercase tracking-wider">Integracoes</p>
+            </div>
+            <div class="space-y-1.5">
+                <div class="flex items-center gap-1.5 text-[13px]">
+                    <span class="w-2 h-2 rounded-full {% if pagarme_ok %}bg-emerald-500{% else %}bg-red-500{% endif %}"></span>
+                    <span class="{% if pagarme_ok %}text-gray-700{% else %}text-red-600{% endif %}">Pagar.me</span>
+                </div>
+                <div class="flex items-center gap-1.5 text-[13px]">
+                    <span class="w-2 h-2 rounded-full {% if whatsapp_ok %}bg-emerald-500{% else %}bg-red-500{% endif %}"></span>
+                    <span class="{% if whatsapp_ok %}text-gray-700{% else %}text-red-600{% endif %}">WhatsApp</span>
+                </div>
+            </div>
+            {% if not whatsapp_ok or not pagarme_ok %}
+            <a href="{% url 'dashboard:gestor_configuracoes' %}" class="inline-block text-[11px] font-medium text-brand-600 hover:text-brand-700 mt-2">Configuracoes →</a>
+            {% endif %}
+        </div>
+
+        <div class="surface-card">
+            <div class="flex items-center gap-2 mb-1.5">
+                <svg class="w-4 h-4 {% if webhooks_pendentes == 0 %}text-emerald-500{% else %}text-red-500{% endif %}" fill="none" stroke="currentColor" viewBox="0 0 24 24">{% if webhooks_pendentes == 0 %}<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>{% else %}<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"/>{% endif %}</svg>
+                <p class="text-[11px] font-semibold text-gray-400 uppercase tracking-wider">Webhooks</p>
+            </div>
+            {% if webhooks_pendentes == 0 %}
+            <p class="text-[13px] font-medium text-emerald-600">Fila limpa</p>
+            {% else %}
+            <p class="font-display text-[20px] font-bold text-red-600">{{ webhooks_pendentes }}</p>
+            <p class="text-[11px] text-red-500">pendentes ha +10min</p>
+            <a href="{% url 'dashboard:gestor_webhooks' %}" class="inline-block text-[11px] font-medium text-brand-600 hover:text-brand-700 mt-1">Ver webhooks →</a>
+            {% endif %}
+        </div>
+
+        <div class="surface-card">
+            <div class="flex items-center gap-2 mb-1.5">
+                <svg class="w-4 h-4 {% if variacao_semanal is not None and variacao_semanal >= 0 %}text-emerald-500{% elif variacao_semanal is not None %}text-red-500{% else %}text-gray-400{% endif %}" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"/></svg>
+                <p class="text-[11px] font-semibold text-gray-400 uppercase tracking-wider">Hoje vs sem. passada</p>
+            </div>
+            <p class="font-display text-[18px] font-bold text-gray-900">{{ vendas_hoje|brl }}</p>
+            {% if variacao_semanal is not None %}
+            <p class="text-[12px] font-medium {% if variacao_semanal >= 0 %}text-emerald-600{% else %}text-red-600{% endif %}">
+                {% if variacao_semanal >= 0 %}↑{% else %}↓{% endif %} {{ variacao_semanal|floatformat:"0" }}%
+            </p>
+            {% else %}
+            <p class="text-[11px] text-gray-400">Primeiro registro</p>
+            {% endif %}
+        </div>
+    </div>
+</div>
 
 <div class="bg-white rounded-2xl p-4 mb-6 shadow-sm flex items-center gap-4 flex-wrap" style="box-shadow: 0 1px 2px rgba(11,17,32,0.04), 0 2px 8px rgba(11,17,32,0.04);">
     <div class="flex items-center gap-3">

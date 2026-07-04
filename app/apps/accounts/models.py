@@ -11,7 +11,8 @@ class Tenant(models.Model):
     class Plan(models.TextChoices):
         STARTER = 'STARTER', 'Starter'
         PRO = 'PRO', 'Pro'
-        ENTERPRISE = 'ENTERPRISE', 'Enterprise'
+        BUSINESS = 'BUSINESS', 'Business'
+        ENTERPRISE = 'ENTERPRISE', 'Enterprise'  # legado
 
     uuid = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     company_name = models.CharField(max_length=255)
@@ -121,6 +122,13 @@ def tenant_operational(tenant):
         return False
     except Subscription.DoesNotExist:
         return not tenant.is_trial_expired
+
+
+def tenant_has_feature(tenant, feature_name):
+    from django.conf import settings
+    features = getattr(settings, 'PLAN_FEATURES', {}).get(tenant.plan, {})
+    return features.get(feature_name, False)
+
 
 class User(AbstractUser):
     # Role.ADMIN é admin DENTRO do tenant (gerencia vendedores, fechamento, etc. da propria loja).

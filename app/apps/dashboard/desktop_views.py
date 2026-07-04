@@ -32,6 +32,8 @@ def gestor_home(request):
         return redirect('dashboard:home')
 
     from app.apps.commissions.services import get_dashboard_data
+    from datetime import timedelta
+
     data = get_dashboard_data(tenant)
 
     hoje = timezone.localdate()
@@ -52,18 +54,64 @@ def gestor_home(request):
 
     total_comissao = data['commission_aberta'] + data['commission_fechada'] + data['commission_paga']
 
+    vendedores_ativos = data.get('vendedores_ativos', 0)
+
+    sellers_sem_lancamento = []
+    if hoje.weekday() != 6:
+        all_sellers = Seller.objects.filter(tenant=tenant, is_active=True)
+        sellers_com_venda = Sale.objects.filter(
+            tenant=tenant, origin=Sale.Origin.MANUAL, status='ATIVA',
+            sale_date=hoje,
+        ).values_list('seller_id', flat=True).distinct()
+        sellers_sem_lancamento = list(
+            all_sellers.exclude(uuid__in=sellers_com_venda).values_list('name', flat=True)
+        )
+
+    whatsapp_ok = bool(tenant.whatsapp_instance_id and tenant.whatsapp_token)
+    pagarme_ok = tenant.pagarme_configured
+
+    from app.apps.webhooks.models import WebhookEvent
+    webhooks_pendentes = WebhookEvent.objects.filter(
+        tenant=tenant, processed=False,
+        created_at__lt=timezone.now() - timedelta(minutes=10),
+    ).count()
+
+    vendas_hoje = Sale.objects.filter(
+        tenant=tenant, status='ATIVA', sale_date=hoje,
+    ).aggregate(total=Sum('amount'))['total'] or 0
+    dia_semana_passada = hoje - timedelta(days=7)
+    vendas_semana_passada = Sale.objects.filter(
+        tenant=tenant, status='ATIVA', sale_date=dia_semana_passada,
+    ).aggregate(total=Sum('amount'))['total'] or 0
+    variacao_semanal = (
+        round((vendas_hoje - vendas_semana_passada) / vendas_semana_passada * 100)
+        if vendas_semana_passada > 0 else None
+    )
+
+    from app.apps.billing.models import Subscription
+    sub = Subscription.objects.filter(tenant=tenant).first()
+
     return render(request, 'dashboard/gestor/home.html', {
         'total_mes': data['total_vendido'],
         'total_mes_fmt': _fmt(data['total_vendido']),
         'comissao_estimada': total_comissao,
         'comissao_estimada_fmt': _fmt(total_comissao),
         'competencia': competencia,
-        'vendedores_ativos': data['vendedores_ativos'],
+        'vendedores_ativos': vendedores_ativos,
         'config_ok': config_ok,
         'total_orders': data['links_gerados'],
         'paid_orders_count': data['links_pagos'],
         'public_url': public_url,
         'dashboard_data': data,
+        'sellers_sem_lancamento': sellers_sem_lancamento,
+        'lancados_hoje': vendedores_ativos - len(sellers_sem_lancamento) if hoje.weekday() != 6 else None,
+        'is_domingo': hoje.weekday() == 6,
+        'whatsapp_ok': whatsapp_ok,
+        'pagarme_ok': pagarme_ok,
+        'webhooks_pendentes': webhooks_pendentes,
+        'vendas_hoje': vendas_hoje,
+        'vendas_semana_passada': vendas_semana_passada,
+        'variacao_semanal': variacao_semanal,
     })
 
 
@@ -422,6 +470,13 @@ def gestor_vendedores(request):
 
 
 @login_required
+def gestor_importar_vendas(request):
+    if not _check_role(request, User.Role.MANAGER, User.Role.ADMIN):
+        return redirect('dashboard:home')
+    return render(request, 'dashboard/gestor/importar_vendas.html')
+
+
+@login_required
 def gestor_vendedor_detalhe(request, seller_id):
     if not _check_role(request, User.Role.MANAGER, User.Role.ADMIN):
         return redirect('dashboard:home')
@@ -449,6 +504,18 @@ def gestor_fechamento(request):
     if not _check_role(request, User.Role.MANAGER, User.Role.ADMIN):
         return redirect('dashboard:home')
     return render(request, 'dashboard/gestor/fechamento.html')
+
+
+@login_required
+def gestor_previa_fechamento(request):
+    if not _check_role(request, User.Role.MANAGER, User.Role.ADMIN):
+        return redirect('dashboard:home')
+    hoje = timezone.localdate()
+    return render(request, 'dashboard/gestor/previa_fechamento.html', {
+        'current_month': hoje.month,
+        'current_year': hoje.year,
+        'years': list(range(hoje.year - 2, hoje.year + 1)),
+    })
 
 
 @login_required
