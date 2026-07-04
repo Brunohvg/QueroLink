@@ -44,7 +44,7 @@ def dedupe_cpf(apps, schema_editor):
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('sellers', '0011_normalize_cpf_digits'),
+        ('sellers', '0010_add_unique_cpf'),
     ]
 
     operations = [
