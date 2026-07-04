@@ -141,7 +141,13 @@
 <script>
 function sellerLinksPage() {
     return {
-        orders: JSON.parse(document.getElementById('orders-data').textContent || '[]'),
+        orders: (function() {
+            try {
+                var p = JSON.parse(document.getElementById('orders-data').textContent || '[]');
+                p = typeof p === 'string' ? JSON.parse(p) : p;
+                return Array.isArray(p) ? p : [];
+            } catch (e) { return []; }
+        })(),
         filteredOrders: [],
         showForm: false,
         creating: false,

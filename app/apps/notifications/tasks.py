@@ -408,66 +408,69 @@ def send_lifecycle_emails():
     tenants = Tenant.objects.filter(is_active=True)
 
     for tenant in tenants:
-        email = getattr(tenant, 'billing_email', None)
-        if not email:
-            from app.apps.accounts.models import User as U
-            email = U.objects.filter(tenant=tenant, role__in=['ADMIN', 'MANAGER']).values_list('email', flat=True).first()
-        if not email:
-            continue
-
-        sub = None
         try:
-            from app.apps.billing.models import Subscription
-            sub = Subscription.objects.get(tenant=tenant)
+            email = getattr(tenant, 'billing_email', None)
+            if not email:
+                from app.apps.accounts.models import User as U
+                email = U.objects.filter(tenant=tenant, role__in=['ADMIN', 'MANAGER']).values_list('email', flat=True).first()
+            if not email:
+                continue
+
+            sub = None
+            try:
+                from app.apps.billing.models import Subscription
+                sub = Subscription.objects.get(tenant=tenant)
+            except Exception:
+                pass
+
+            is_pagante = sub and sub.status == 'ACTIVE'
+            trial_end = tenant.trial_ends_at
+
+            triggers_handled = set(
+                LifecycleEmail.objects.filter(tenant=tenant).values_list('trigger', flat=True)
+            )
+
+            if trial_end and not is_pagante:
+                days_left = (timezone.localtime(trial_end).date() - hoje).days
+                if 6 <= days_left <= 7 and 'trial_d7' not in triggers_handled:
+                    vendors = Seller.objects.filter(tenant=tenant, is_active=True).count()
+                    sales_count = Sale.objects.filter(tenant=tenant, status='ATIVA').count()
+                    body = f"Ola! Seu periodo de teste do Merito termina em 7 dias.\n\n"
+                    body += f"Voce ja cadastrou {vendors} vendedores e registrou {sales_count} vendas. "
+                    body += f"Para continuar usando todas as funcionalidades, assine um plano.\n\n"
+                    body += f"Acesse: https://{settings.SERVICE_FQDN_WEB}/dashboard/assinatura/"
+                    send_mail('Seu trial termina em 7 dias', body, settings.DEFAULT_FROM_EMAIL, [email])
+                    LifecycleEmail.objects.create(tenant=tenant, trigger='trial_d7')
+
+                elif 2 <= days_left <= 3 and 'trial_d3' not in triggers_handled:
+                    body = f"ATENCAO: Seu trial do Merito expira em {days_left} dias.\n\n"
+                    body += f"Sem assinatura, voce perdera acesso aos relatorios, exportacao e mais.\n"
+                    body += f"Assine agora: https://{settings.SERVICE_FQDN_WEB}/dashboard/assinatura/"
+                    send_mail('Ultimos dias de trial', body, settings.DEFAULT_FROM_EMAIL, [email])
+                    LifecycleEmail.objects.create(tenant=tenant, trigger='trial_d3')
+
+                elif -1 <= days_left <= 0 and 'trial_d0' not in triggers_handled:
+                    body = f"Seu trial do Merito expirou.\n\n"
+                    body += f"Para reativar sua conta e continuar usando o sistema, escolha um plano:\n"
+                    body += f"https://{settings.SERVICE_FQDN_WEB}/dashboard/assinatura/"
+                    send_mail('Seu trial expirou', body, settings.DEFAULT_FROM_EMAIL, [email])
+                    LifecycleEmail.objects.create(tenant=tenant, trigger='trial_d0')
+
+            if is_pagante:
+                last_sale = Sale.objects.filter(tenant=tenant, status='ATIVA').order_by('-sale_date').first()
+                if last_sale and last_sale.sale_date < hoje - timedelta(days=7) and 'inactive_7d' not in triggers_handled:
+                    body = f"Sentimos sua falta! Sua equipe nao registra vendas ha mais de 7 dias.\n\n"
+                    body += f"O Merito esta pronto para ajudar. Acesse: https://{settings.SERVICE_FQDN_WEB}/dashboard/gestor/"
+                    send_mail('Sentimos sua falta', body, settings.DEFAULT_FROM_EMAIL, [email])
+                    LifecycleEmail.objects.create(tenant=tenant, trigger='inactive_7d')
         except Exception:
-            pass
-
-        is_pagante = sub and sub.status == 'ACTIVE'
-        trial_end = tenant.trial_ends_at
-
-        triggers_handled = set(
-            LifecycleEmail.objects.filter(tenant=tenant).values_list('trigger', flat=True)
-        )
-
-        if trial_end and not is_pagante:
-            days_left = (trial_end - hoje).days
-            if 6 <= days_left <= 7 and 'trial_d7' not in triggers_handled:
-                vendors = Seller.objects.filter(tenant=tenant, is_active=True).count()
-                sales_count = Sale.objects.filter(tenant=tenant, status='ATIVA').count()
-                body = f"Ola! Seu periodo de teste do Merito termina em 7 dias.\n\n"
-                body += f"Voce ja cadastrou {vendors} vendedores e registrou {sales_count} vendas. "
-                body += f"Para continuar usando todas as funcionalidades, assine um plano.\n\n"
-                body += f"Acesse: {settings.SERVICE_FQDN_WEB}/dashboard/assinatura/"
-                send_mail('Seu trial termina em 7 dias', body, settings.DEFAULT_FROM_EMAIL, [email])
-                LifecycleEmail.objects.create(tenant=tenant, trigger='trial_d7')
-
-            elif 2 <= days_left <= 3 and 'trial_d3' not in triggers_handled:
-                body = f"ATENCAO: Seu trial do Merito expira em {days_left} dias.\n\n"
-                body += f"Sem assinatura, voce perdera acesso aos relatorios, exportacao e mais.\n"
-                body += f"Assine agora: {settings.SERVICE_FQDN_WEB}/dashboard/assinatura/"
-                send_mail('Ultimos dias de trial', body, settings.DEFAULT_FROM_EMAIL, [email])
-                LifecycleEmail.objects.create(tenant=tenant, trigger='trial_d3')
-
-            elif -1 <= days_left <= 0 and 'trial_d0' not in triggers_handled:
-                body = f"Seu trial do Merito expirou.\n\n"
-                body += f"Para reativar sua conta e continuar usando o sistema, escolha um plano:\n"
-                body += f"{settings.SERVICE_FQDN_WEB}/dashboard/assinatura/"
-                send_mail('Seu trial expirou', body, settings.DEFAULT_FROM_EMAIL, [email])
-                LifecycleEmail.objects.create(tenant=tenant, trigger='trial_d0')
-
-        if is_pagante:
-            last_sale = Sale.objects.filter(tenant=tenant, status='ATIVA').order_by('-sale_date').first()
-            if last_sale and last_sale.sale_date < hoje - timedelta(days=7) and 'inactive_7d' not in triggers_handled:
-                body = f"Sentimos sua falta! Sua equipe nao registra vendas ha mais de 7 dias.\n\n"
-                body += f"O Merito esta pronto para ajudar. Acesse: {settings.SERVICE_FQDN_WEB}/dashboard/gestor/"
-                send_mail('Sentimos sua falta', body, settings.DEFAULT_FROM_EMAIL, [email])
-                LifecycleEmail.objects.create(tenant=tenant, trigger='inactive_7d')
+            logger.exception('send_lifecycle_emails: falha no tenant %s, continuando', tenant.pk)
+            continue
 
 
 @shared_task(bind=True, max_retries=3, default_retry_delay=120, soft_time_limit=120, time_limit=180)
 def send_accounting_package_email(self, tenant_uuid, month, year, requested_by_user_id=None):
     from app.apps.accounts.models import Tenant, tenant_operational
-    from app.apps.audit.utils import log_action as audit_log
 
     try:
         tenant = Tenant.objects.get(uuid=tenant_uuid)
@@ -482,134 +485,40 @@ def send_accounting_package_email(self, tenant_uuid, month, year, requested_by_u
         logger.info("send_accounting_package_email: tenant %s has no accountant email", tenant_uuid)
         return
 
-    from datetime import timedelta
-    uma_semana = timezone.now() - timedelta(days=7)
-
-    existing = False
-    try:
-        from app.apps.audit.models import AuditLog
-        existing = AuditLog.objects.filter(
-            tenant=tenant, action='accounting_email_sent',
-            created_at__gte=uma_semana,
-        ).exists()
-    except Exception:
-        pass
-    if existing:
-        logger.info("send_accounting_package_email: already sent for %s/%s/%s in last 7 days", tenant_uuid, month, year)
-        return
-
-    from zipfile import ZipFile
-    from io import BytesIO
-    from django.template.loader import render_to_string
-    from weasyprint import HTML
-    from app.apps.commissions.services import calculate_estimated_commission, get_commission_rate
-    from app.apps.sales.models import Sale as SModel
-    from app.apps.sellers.models import Seller as SellerM
-    from app.apps.commissions.models import SellerCommission, CommissionAdjustment, CommissionPeriod
-
-    year_int = int(year)
     month_int = int(month)
+    year_int = int(year)
 
-    buf = BytesIO()
-    with ZipFile(buf, 'w') as zf:
-        sales = SModel.objects.filter(
-            tenant=tenant, sale_date__year=year_int, sale_date__month=month_int,
-        ).select_related('seller').order_by('sale_date', 'seller__name')
-
-        csv1_lines = ['Data;Vendedor;CPF Vendedor;Valor (R$);Origem;Status;Observacao']
-        for s in sales:
-            cpf = getattr(s.seller, 'cpf', '') or 'Nao informado'
-            valor = f'{s.amount/100:,.2f}'.replace(',', 'X').replace('.', ',').replace('X', '.')
-            origin = 'Link' if s.origin == SModel.Origin.LINK else 'Manual'
-            status = 'Estornada' if s.status == 'ESTORNADA' else 'Ativa'
-            csv1_lines.append(f'{s.sale_date.strftime("%d/%m/%Y")};{s.seller.name};{cpf};{valor};{origin};{status};{s.notes or ""}')
-        zf.writestr(f'vendas_{month_int:02d}_{year_int}.csv', '\n'.join(csv1_lines).encode('utf-8-sig'))
-
-        csv2_lines = ['Vendedor;CPF Vendedor;Total Vendido (R$);Taxa (%);Comissao Bruta (R$);Ajustes (R$);Comissao Liquida (R$);Status;Data Pagamento']
-        for seller in SellerM.objects.filter(tenant=tenant, is_active=True):
-            sc = SellerCommission.objects.filter(
-                seller=seller, period__month=month_int, period__year=year_int,
-            ).select_related('period').first()
-            if sc:
-                est_comm, est_total = calculate_estimated_commission(seller, month_int, year_int)
-                comissao = sc.commission_amount
-                total = sc.total_sold_amount if sc.total_sold_amount else est_total
-                status_label = sc.get_status_display()
-                payment_date = sc.payment_date.strftime('%d/%m/%Y') if sc.payment_date else ''
-                ads = CommissionAdjustment.objects.filter(seller_commission=sc)
-                total_adj = sum(a.difference for a in ads)
-                liquida = (sc.paid_amount or sc.amount_due) + total_adj
-            else:
-                est_comm, est_total = calculate_estimated_commission(seller, month_int, year_int)
-                total = est_total
-                comissao = est_comm
-                status_label = 'Estimativa'
-                payment_date = ''
-                total_adj = 0
-                liquida = comissao
-
-            cpf = getattr(seller, 'cpf', '') or 'Nao informado'
-            taxa = f'{float(get_commission_rate(seller))*100:.2f}'.replace('.', ',')
-            csv2_lines.append(
-                f'{seller.name};{cpf};'
-                f'{_fmt_br(total)};{taxa};{_fmt_br(comissao)};{_fmt_br(total_adj)};{_fmt_br(liquida)};{status_label};{payment_date}'
-            )
-        zf.writestr(f'comissoes_{month_int:02d}_{year_int}.csv', '\n'.join(csv2_lines).encode('utf-8-sig'))
-
-        total_sold_all = sum(s.amount for s in sales if s.status == 'ATIVA')
-        total_comm_all = 0
-        for seller in SellerM.objects.filter(tenant=tenant, is_active=True):
-            c, _ = calculate_estimated_commission(seller, month_int, year_int)
-            total_comm_all += c
-        cnpj_val = 'Nao informado'
+    if not requested_by_user_id:
+        from datetime import timedelta
+        from app.apps.audit.models import AuditLog
+        uma_semana = timezone.now() - timedelta(days=7)
         try:
-            cnpj_val = tenant.cnpj or 'Nao informado'
+            existing = AuditLog.objects.filter(
+                tenant=tenant,
+                action='accounting_email_sent',
+                created_at__gte=uma_semana,
+                changes__month=month_int,
+                changes__year=year_int,
+            ).exists()
         except Exception:
-            pass
-        csv3 = (
-            f'Empresa;CNPJ;Competencia;Total Vendido;Total Comissoes;Qtd Vendedores\n'
-            f'{tenant.company_name};{cnpj_val};{month_int:02d}/{year_int};{_fmt_br(total_sold_all)};'
-            f'{_fmt_br(total_comm_all)};{SellerM.objects.filter(tenant=tenant, is_active=True).count()}'
-        )
-        zf.writestr(f'resumo_{month_int:02d}_{year_int}.csv', csv3.encode('utf-8-sig'))
+            existing = False
+        if existing:
+            logger.info(
+                "send_accounting_package_email: auto-send ja realizado para %s %s/%s",
+                tenant_uuid, month, year,
+            )
+            return
 
-        sellers_for_pdf = []
-        total_sold_pdf = 0
-        for seller in SellerM.objects.filter(tenant=tenant, is_active=True):
-            est_comm, est_total = calculate_estimated_commission(seller, month_int, year_int)
-            sc = SellerCommission.objects.filter(
-                seller=seller, period__month=month_int, period__year=year_int,
-            ).select_related('period').first()
-            status_label = sc.get_status_display() if sc else 'Estimativa'
-            commission_amount = sc.commission_amount if sc else est_comm
-            comm_rate = float(sc.commission_rate if sc else seller.commission_rate) * 100
-            sellers_for_pdf.append({
-                'name': seller.name, 'total_sold': est_total,
-                'commission': commission_amount, 'commission_rate': comm_rate,
-                'status': status_label,
-            })
-            total_sold_pdf += est_total
-        sellers_for_pdf.sort(key=lambda s: s['total_sold'], reverse=True)
+    from app.apps.commissions.exports import build_accounting_zip, _fmt_br
+    from app.apps.sellers.models import Seller as SellerM
+    from app.apps.sales.models import Sale as SModel
 
-        prev_month = month_int - 1
-        prev_year = year_int
-        if prev_month == 0:
-            prev_month = 12
-            prev_year -= 1
-        prev_total = SModel.objects.filter(
-            tenant=tenant, status='ATIVA', sale_date__month=prev_month, sale_date__year=prev_year,
-        ).aggregate(t=DSum('amount'))['t'] or 0
-        variacao = round((total_sold_pdf - prev_total) / prev_total * 100) if prev_total > 0 else None
+    zip_bytes = build_accounting_zip(tenant, month_int, year_int)
 
-        pdf_html = render_to_string('reports/relatorio_mensal.html', {
-            'tenant': tenant, 'competencia': f'{month_int:02d}/{year_int}',
-            'data_geracao': timezone.now().strftime('%d/%m/%Y'),
-            'sellers_data': sellers_for_pdf, 'total_sold': total_sold_pdf,
-            'total_commissions': total_comm_all, 'total_aberta': 0, 'total_fechada': 0,
-            'total_paga': 0, 'num_sellers': SellerM.objects.filter(tenant=tenant, is_active=True).count(),
-            'prev_total': prev_total, 'variacao': variacao,
-        })
-        zf.writestr(f'resumo_{month_int:02d}_{year_int}.pdf', HTML(string=pdf_html).write_pdf())
+    total_sold_all = SModel.objects.filter(
+        tenant=tenant, status='ATIVA',
+        sale_date__year=year_int, sale_date__month=month_int,
+    ).aggregate(t=DSum('amount'))['t'] or 0
 
     competencia = f'{month_int:02d}/{year_int}'
     senders = SellerM.objects.filter(tenant=tenant, is_active=True).count()
@@ -623,23 +532,28 @@ def send_accounting_package_email(self, tenant_uuid, month, year, requested_by_u
         from_email=settings.DEFAULT_FROM_EMAIL,
         to=[tenant.accountant_email],
     )
-    msg.attach(f'contabilidade_{year_int}_{month_int:02d}.zip', buf.getvalue(), 'application/zip')
+    msg.attach(f'contabilidade_{year_int}_{month_int:02d}.zip', zip_bytes, 'application/zip')
     msg.send()
 
-    audit_log(
-        None, 'accounting_email_sent',
-        tenant=tenant,
-        changes={
-            'month': month_int, 'year': year_int,
-            'auto': not bool(requested_by_user_id),
-            'recipient': tenant.accountant_email,
-        },
-    )
+    try:
+        from app.apps.audit.models import AuditLog
+        AuditLog.objects.create(
+            user=None,
+            tenant=tenant,
+            action='accounting_email_sent',
+            changes={
+                'month': month_int, 'year': year_int,
+                'auto': not bool(requested_by_user_id),
+                'recipient': tenant.accountant_email,
+            },
+        )
+    except Exception:
+        logger.exception('Falha ao registrar audit do envio contabil')
+
     logger.info(
         "send_accounting_package_email: sent to %s for %s/%s",
         tenant.accountant_email, month_int, year_int,
     )
 
 
-def _fmt_br(val):
-    return f'{val/100:,.2f}'.replace(',', 'X').replace('.', ',').replace('X', '.')
+

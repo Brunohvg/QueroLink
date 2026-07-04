@@ -703,5 +703,5 @@ def mobile_links(request):
             'created_at': o.created_at.isoformat(),
         })
     return render(request, 'mobile/links.html', {
-        'seller': seller, 'orders_json': json.dumps(orders_data),
+        'seller': seller, 'orders_json': orders_data,
     })

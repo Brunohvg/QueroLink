@@ -156,7 +156,9 @@ function gestorLinksPage() {
 
         init() {
             try {
-                this.orders = JSON.parse(document.getElementById('orders-data')?.textContent || '[]');
+                var _parsed = JSON.parse(document.getElementById('orders-data')?.textContent || '[]');
+                this.orders = typeof _parsed === 'string' ? JSON.parse(_parsed) : _parsed;
+                if (!Array.isArray(this.orders)) this.orders = [];
             } catch(e) { this.orders = []; }
             this.filter();
         },

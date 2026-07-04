@@ -4,7 +4,7 @@ import uuid
 from django.shortcuts import render, redirect, get_object_or_404
 
 logger = logging.getLogger(__name__)
-from django.http import JsonResponse
+from django.http import JsonResponse, HttpResponseForbidden
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.utils import timezone
@@ -630,9 +630,10 @@ def gestor_links(request):
     seller_uuid = request.GET.get('seller')
     orders = Order.objects.filter(
         tenant=tenant,
-    ).select_related('seller', 'payment_link').order_by('-created_at')[:100]
+    ).select_related('seller', 'payment_link').order_by('-created_at')
     if seller_uuid:
         orders = orders.filter(seller__uuid=seller_uuid)
+    orders = orders[:100]
 
     logger.info("gestor_links: tenant=%s orders_count=%d", tenant.pk, orders.count())
 
@@ -668,7 +669,7 @@ def gestor_links(request):
     logger.info("gestor_links: returning %d orders, %d sellers", len(orders_data), len(sellers))
 
     return render(request, 'dashboard/gestor/links.html', {
-        'orders_json': json.dumps(orders_data),
+        'orders_json': orders_data,
         'sellers': sellers,
     })
 

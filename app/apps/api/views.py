@@ -1738,128 +1738,15 @@ class AccountingExportView(generics.GenericAPIView):
                 status=403,
             )
 
-        from zipfile import ZipFile
-        from io import BytesIO
-        from django.template.loader import render_to_string
-        from weasyprint import HTML
-        from app.apps.commissions.services import (
-            calculate_estimated_commission, get_commission_rate,
-        )
+        from app.apps.commissions.exports import build_accounting_zip
 
-        buf = BytesIO()
-        with ZipFile(buf, 'w') as zf:
-            sales = Sale.objects.filter(
-                tenant=tenant,
-                sale_date__year=year_int,
-                sale_date__month=month_int,
-            ).select_related('seller').order_by('sale_date', 'seller__name')
-
-            # vendas CSV
-            csv1_lines = ['Data;Vendedor;CPF Vendedor;Valor (R$);Origem;Status;Observacao']
-            for s in sales:
-                cpf = getattr(s.seller, 'cpf', '') or 'Nao informado'
-                valor = f'{s.amount/100:,.2f}'.replace(',', 'X').replace('.', ',').replace('X', '.')
-                csv1_lines.append(
-                    f'{s.sale_date.strftime("%d/%m/%Y")};{s.seller.name};{cpf};'
-                    f'{valor};{"Link" if s.origin == Sale.Origin.LINK else "Manual"};'
-                    f'{"Estornada" if s.status == "ESTORNADA" else "Ativa"};'
-                    f'{s.notes or ""}'
-                )
-            zf.writestr(f'vendas_{month_int:02d}_{year_int}.csv', '\n'.join(csv1_lines).encode('utf-8-sig'))
-
-            # comissoes CSV
-            csv2_lines = ['Vendedor;CPF Vendedor;Total Vendido (R$);Taxa (%);Comissao Bruta (R$);Ajustes (R$);Comissao Liquida (R$);Status;Data Pagamento']
-            sellers = Seller.objects.filter(tenant=tenant, is_active=True)
-            for seller in sellers:
-                sc = SellerCommission.objects.filter(
-                    seller=seller, period__month=month_int, period__year=year_int,
-                ).select_related('period').first()
-                if sc:
-                    est_comm, est_total = calculate_estimated_commission(seller, month_int, year_int)
-                    comissao = sc.commission_amount
-                    total = sc.total_sold_amount if sc.total_sold_amount else est_total
-                    status = sc.get_status_display()
-                    payment_date = sc.payment_date.strftime('%d/%m/%Y') if sc.payment_date else ''
-                    adjustments = CommissionAdjustment.objects.filter(seller_commission=sc)
-                    total_adj = sum(a.difference for a in adjustments)
-                    liquida = (sc.paid_amount or sc.amount_due) + total_adj
-                else:
-                    est_comm, est_total = calculate_estimated_commission(seller, month_int, year_int)
-                    total = est_total
-                    comissao = est_comm
-                    status = 'Estimativa'
-                    payment_date = ''
-                    total_adj = 0
-                    liquida = comissao
-
-                cpf = getattr(seller, 'cpf', '') or 'Nao informado'
-                taxa = f'{float(get_commission_rate(seller))*100:.2f}'.replace('.', ',')
-                valor_total = f'{total/100:,.2f}'.replace(',', 'X').replace('.', ',').replace('X', '.')
-                valor_bruta = f'{comissao/100:,.2f}'.replace(',', 'X').replace('.', ',').replace('X', '.')
-                valor_adj = f'{total_adj/100:,.2f}'.replace(',', 'X').replace('.', ',').replace('X', '.')
-                valor_liq = f'{liquida/100:,.2f}'.replace(',', 'X').replace('.', ',').replace('X', '.')
-                csv2_lines.append(
-                    f'{seller.name};{cpf};{valor_total};{taxa};{valor_bruta};{valor_adj};{valor_liq};{status};{payment_date}'
-                )
-            zf.writestr(f'comissoes_{month_int:02d}_{year_int}.csv', '\n'.join(csv2_lines).encode('utf-8-sig'))
-
-            # resumo CSV
-            total_sold_all = sum(s.amount for s in sales if s.status == 'ATIVA')
-            total_comm_all = 0
-            for seller in sellers:
-                est_comm, _ = calculate_estimated_commission(seller, month_int, year_int)
-                total_comm_all += est_comm
-            cnpj_val = 'Nao informado'
-            try:
-                cnpj_val = tenant.cnpj or 'Nao informado'
-            except Exception:
-                pass
-            valor_total = f'{total_sold_all/100:,.2f}'.replace(',', 'X').replace('.', ',').replace('X', '.')
-            valor_comm = f'{total_comm_all/100:,.2f}'.replace(',', 'X').replace('.', ',').replace('X', '.')
-            csv3 = (
-                f'Empresa;CNPJ;Competencia;Total Vendido;Total Comissoes;Qtd Vendedores\n'
-                f'{tenant.company_name};{cnpj_val};{month_int:02d}/{year_int};{valor_total};{valor_comm};{sellers.count()}'
-            )
-            zf.writestr(f'resumo_{month_int:02d}_{year_int}.csv', csv3.encode('utf-8-sig'))
-
-            # PDF do relatorio (gerado inline para evitar import circular)
-            sellers_for_pdf = []
-            total_sold_pdf = 0
-            for seller in Seller.objects.filter(tenant=tenant, is_active=True):
-                est_comm, est_total = calculate_estimated_commission(seller, month_int, year_int)
-                sc = SellerCommission.objects.filter(
-                    seller=seller, period__month=month_int, period__year=year_int,
-                ).select_related('period').first()
-                status = sc.get_status_display() if sc else 'Estimativa'
-                commission_amount = sc.commission_amount if sc else est_comm
-                comm_rate = float(sc.commission_rate if sc else seller.commission_rate) * 100
-                sellers_for_pdf.append({
-                    'name': seller.name, 'total_sold': est_total,
-                    'commission': commission_amount, 'commission_rate': comm_rate,
-                    'status': status,
-                })
-                total_sold_pdf += est_total
-            sellers_for_pdf.sort(key=lambda s: s['total_sold'], reverse=True)
-
-            pdf_html = render_to_string('reports/relatorio_mensal.html', {
-                'tenant': tenant,
-                'competencia': f'{month_int:02d}/{year_int}',
-                'data_geracao': hoje.strftime('%d/%m/%Y'),
-                'sellers_data': sellers_for_pdf,
-                'total_sold': total_sold_pdf,
-                'total_commissions': total_comm_all,
-                'total_aberta': 0, 'total_fechada': 0, 'total_paga': 0,
-                'num_sellers': sellers.count(),
-                'prev_total': 0, 'variacao': None,
-            })
-            pdf_bytes = HTML(string=pdf_html).write_pdf()
-            zf.writestr(f'resumo_{month_int:02d}_{year_int}.pdf', pdf_bytes)
+        zip_bytes = build_accounting_zip(tenant, month_int, year_int)
 
         log_action(request, 'accounting_export', changes={
             'month': month_int, 'year': year_int, 'tenant': str(tenant.uuid),
         })
 
-        resp = HttpResponse(buf.getvalue(), content_type='application/zip')
+        resp = HttpResponse(zip_bytes, content_type='application/zip')
         resp['Content-Disposition'] = f'attachment; filename="contabilidade_{year_int}_{month_int:02d}.zip"'
         return resp
 
@@ -1887,5 +1774,8 @@ class AccountingEmailView(generics.GenericAPIView):
             return Response({'error': 'Mes/ano invalidos.'}, status=400)
 
         from app.apps.notifications.tasks import send_accounting_package_email
-        send_accounting_package_email.delay(str(tenant.uuid), month_int, year_int)
+        send_accounting_package_email.delay(
+            str(tenant.uuid), month_int, year_int,
+            requested_by_user_id=str(request.user.pk),
+        )
         return Response({'detail': f'Envio agendado para {tenant.accountant_email}.'}, status=202)
