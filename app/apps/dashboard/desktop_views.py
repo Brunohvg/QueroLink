@@ -31,6 +31,13 @@ def gestor_home(request):
     if not tenant:
         return redirect('dashboard:home')
 
+    if request.method == 'POST' and request.POST.get('action') == 'dismiss_onboarding':
+        from app.apps.accounts.models import OnboardingProgress
+        ob, _ = OnboardingProgress.objects.get_or_create(tenant=tenant)
+        ob.dismissed = True
+        ob.save()
+        return redirect('dashboard:gestor_home')
+
     from app.apps.commissions.services import get_dashboard_data
     from datetime import timedelta
 
@@ -112,6 +119,7 @@ def gestor_home(request):
         'vendas_hoje': vendas_hoje,
         'vendas_semana_passada': vendas_semana_passada,
         'variacao_semanal': variacao_semanal,
+        'onboarding': getattr(tenant, 'onboarding', None),
     })
 
 
@@ -193,6 +201,12 @@ def gestor_configuracoes(request):
         tenant.ranking_visible_to_sellers = request.POST.get('ranking_visible_to_sellers') == '1'
 
         tenant.save()
+
+        from app.apps.accounts.models import mark_onboarding_step
+        if tenant.whatsapp_instance_id and tenant.whatsapp_token:
+            mark_onboarding_step(tenant, 'step_whatsapp')
+        if tenant.default_commission_rate and float(tenant.default_commission_rate) > 0:
+            mark_onboarding_step(tenant, 'step_commission_rate')
 
         for event_type, _label in TEMPLATE_EVENTS:
             body = request.POST.get(f'template_{event_type}', '').strip()
@@ -786,3 +800,83 @@ def gestor_link_estornar(request, order_uuid):
 
     msg = 'Estorno parcial' if is_partial else 'Estorno total'
     return JsonResponse({'message': f'{msg} realizado com sucesso.'})
+
+
+@login_required
+def admin_metrics(request):
+    if not request.user.is_superuser:
+        return HttpResponseForbidden('Acesso restrito.')
+
+    from datetime import timedelta
+    from django.db.models import Sum as DSum, Count as DCount
+    from app.apps.accounts.models import Tenant, OnboardingProgress
+    from app.apps.billing.models import Subscription
+    from app.apps.sales.models import Sale
+    from app.apps.notifications.models import Notification
+    from app.apps.sellers.models import Seller
+
+    hoje = timezone.localdate()
+    trinta_dias = hoje - timedelta(days=30)
+
+    total_tenants = Tenant.objects.filter(is_active=True).count()
+    trial_ativos = Tenant.objects.filter(
+        is_active=True, trial_ends_at__gt=timezone.now(),
+    ).exclude(subscription__status='ACTIVE').count()
+    pagantes = Subscription.objects.filter(status='ACTIVE').count()
+    churn_30d = Subscription.objects.filter(
+        status='CANCELED', updated_at__date__gte=trinta_dias,
+    ).count()
+    mrr = Subscription.objects.filter(status='ACTIVE').aggregate(
+        total=DSum('amount'),
+    )['total'] or 0
+
+    criados_30d = Tenant.objects.filter(created_at__date__gte=trinta_dias).count()
+    ativados_30d = OnboardingProgress.objects.filter(
+        completed_at__isnull=False, completed_at__date__gte=trinta_dias,
+    ).count()
+    taxa_ativacao = round(ativados_30d / criados_30d * 100) if criados_30d > 0 else 0
+
+    vendas_30d = Sale.objects.filter(created_at__date__gte=trinta_dias, status='ATIVA').count()
+    notificacoes_30d = Notification.objects.filter(
+        created_at__date__gte=trinta_dias, status='SENT',
+    ).count()
+
+    top_tenants = Sale.objects.filter(
+        sale_date__month=hoje.month, sale_date__year=hoje.year, status='ATIVA',
+    ).values('tenant__company_name').annotate(
+        total=DSum('amount'), count=DCount('id'),
+    ).order_by('-total')[:5]
+
+    recentes = Tenant.objects.filter(is_active=True).order_by('-created_at')[:10]
+    recentes_data = []
+    for t in recentes:
+        sub = Subscription.objects.filter(tenant=t).first()
+        sellers_count = Seller.objects.filter(tenant=t, is_active=True).count()
+        ob = OnboardingProgress.objects.filter(tenant=t).first()
+        recentes_data.append({
+            'name': t.company_name,
+            'plan': t.get_plan_display(),
+            'created': t.created_at.strftime('%d/%m/%Y'),
+            'status': sub.status if sub else ('trial' if t.trial_ends_at and t.trial_ends_at > timezone.now() else 'expirado'),
+            'sellers': sellers_count,
+            'onboarding': 'Sim' if ob and ob.completed_at else 'Nao',
+        })
+
+    def _fmt(val):
+        r = val // 100
+        c = val % 100
+        return f'{r:,}.{c:02d}'.replace(',', '.')
+
+    return render(request, 'dashboard/admin/metrics.html', {
+        'total_tenants': total_tenants,
+        'trial_ativos': trial_ativos,
+        'pagantes': pagantes,
+        'mrr': mrr,
+        'mrr_fmt': _fmt(mrr),
+        'churn_30d': churn_30d,
+        'taxa_ativacao': taxa_ativacao,
+        'vendas_30d': vendas_30d,
+        'notificacoes_30d': notificacoes_30d,
+        'top_tenants': top_tenants,
+        'recentes_data': recentes_data,
+    })

@@ -136,6 +136,17 @@ class PushSubscription(models.Model):
         return f'Push {self.user.username} ({self.endpoint[:40]}...)'
 
 
+class LifecycleEmail(models.Model):
+    tenant = models.ForeignKey(Tenant, on_delete=models.CASCADE, related_name='lifecycle_emails')
+    trigger = models.CharField(max_length=30)
+    sent_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=['tenant', 'trigger'], name='unique_tenant_trigger'),
+        ]
+
+
 class PasswordResetRequest(models.Model):
     uuid = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     user = models.ForeignKey('accounts.User', on_delete=models.CASCADE, related_name='password_resets')

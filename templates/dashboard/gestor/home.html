@@ -12,6 +12,10 @@
 </div>
 {% endif %}
 
+{% if onboarding and not onboarding.completed_at and not onboarding.dismissed %}
+{% include 'components/_onboarding_wizard.html' with ob=onboarding %}
+{% endif %}
+
 <div class="mb-6">
     <h2 class="text-[14px] font-bold text-gray-900 mb-3">Saude da operacao</h2>
     <div class="grid grid-cols-2 lg:grid-cols-4 gap-3">

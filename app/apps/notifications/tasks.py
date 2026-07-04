@@ -3,7 +3,9 @@ import logging
 from celery import shared_task
 from django.conf import settings
 from django.utils import timezone
-from app.apps.notifications.models import Notification, MessageTemplate
+from django.core.mail import send_mail
+from django.db.models import Sum as DSum, Q
+from app.apps.notifications.models import Notification, MessageTemplate, LifecycleEmail
 from app.services.messaging.whatsapp import WhatsappClient, InvalidNumberError
 
 logger = logging.getLogger(__name__)
@@ -149,6 +151,9 @@ def create_and_send_notification(*, tenant, event_type, channel, recipient, cont
 
 
 def notify_seller_credentials(seller, password):
+    from app.apps.accounts.models import mark_onboarding_step
+    mark_onboarding_step(seller.tenant, 'step_first_invite')
+
     create_and_send_notification(
         tenant=seller.tenant,
         event_type=MessageTemplate.EventType.SELLER_CREDENTIALS,
@@ -390,3 +395,70 @@ def _fallback_body(event_type, context):
     if event_type in (MessageTemplate.EventType.PAYMENT_REFUNDED,):
         return f"Ola {v}! O pagamento de {val} do(a) {cli} foi estornado."
     return ""
+
+
+@shared_task(soft_time_limit=300, time_limit=360)
+def send_lifecycle_emails():
+    from datetime import timedelta
+    from app.apps.accounts.models import Tenant
+    from app.apps.sellers.models import Seller
+    from app.apps.sales.models import Sale
+
+    hoje = timezone.localdate()
+    tenants = Tenant.objects.filter(is_active=True)
+
+    for tenant in tenants:
+        email = getattr(tenant, 'billing_email', None)
+        if not email:
+            from app.apps.accounts.models import User as U
+            email = U.objects.filter(tenant=tenant, role__in=['ADMIN', 'MANAGER']).values_list('email', flat=True).first()
+        if not email:
+            continue
+
+        sub = None
+        try:
+            from app.apps.billing.models import Subscription
+            sub = Subscription.objects.get(tenant=tenant)
+        except Exception:
+            pass
+
+        is_pagante = sub and sub.status == 'ACTIVE'
+        trial_end = tenant.trial_ends_at
+
+        triggers_handled = set(
+            LifecycleEmail.objects.filter(tenant=tenant).values_list('trigger', flat=True)
+        )
+
+        if trial_end and not is_pagante:
+            days_left = (trial_end - hoje).days
+            if 6 <= days_left <= 7 and 'trial_d7' not in triggers_handled:
+                vendors = Seller.objects.filter(tenant=tenant, is_active=True).count()
+                sales_count = Sale.objects.filter(tenant=tenant, status='ATIVA').count()
+                body = f"Ola! Seu periodo de teste do Merito termina em 7 dias.\n\n"
+                body += f"Voce ja cadastrou {vendors} vendedores e registrou {sales_count} vendas. "
+                body += f"Para continuar usando todas as funcionalidades, assine um plano.\n\n"
+                body += f"Acesse: {settings.SERVICE_FQDN_WEB}/dashboard/assinatura/"
+                send_mail('Seu trial termina em 7 dias', body, settings.DEFAULT_FROM_EMAIL, [email])
+                LifecycleEmail.objects.create(tenant=tenant, trigger='trial_d7')
+
+            elif 2 <= days_left <= 3 and 'trial_d3' not in triggers_handled:
+                body = f"ATENCAO: Seu trial do Merito expira em {days_left} dias.\n\n"
+                body += f"Sem assinatura, voce perdera acesso aos relatorios, exportacao e mais.\n"
+                body += f"Assine agora: {settings.SERVICE_FQDN_WEB}/dashboard/assinatura/"
+                send_mail('Ultimos dias de trial', body, settings.DEFAULT_FROM_EMAIL, [email])
+                LifecycleEmail.objects.create(tenant=tenant, trigger='trial_d3')
+
+            elif -1 <= days_left <= 0 and 'trial_d0' not in triggers_handled:
+                body = f"Seu trial do Merito expirou.\n\n"
+                body += f"Para reativar sua conta e continuar usando o sistema, escolha um plano:\n"
+                body += f"{settings.SERVICE_FQDN_WEB}/dashboard/assinatura/"
+                send_mail('Seu trial expirou', body, settings.DEFAULT_FROM_EMAIL, [email])
+                LifecycleEmail.objects.create(tenant=tenant, trigger='trial_d0')
+
+        if is_pagante:
+            last_sale = Sale.objects.filter(tenant=tenant, status='ATIVA').order_by('-sale_date').first()
+            if last_sale and last_sale.sale_date < hoje - timedelta(days=7) and 'inactive_7d' not in triggers_handled:
+                body = f"Sentimos sua falta! Sua equipe nao registra vendas ha mais de 7 dias.\n\n"
+                body += f"O Merito esta pronto para ajudar. Acesse: {settings.SERVICE_FQDN_WEB}/dashboard/gestor/"
+                send_mail('Sentimos sua falta', body, settings.DEFAULT_FROM_EMAIL, [email])
+                LifecycleEmail.objects.create(tenant=tenant, trigger='inactive_7d')

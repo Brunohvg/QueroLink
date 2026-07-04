@@ -2,8 +2,10 @@
 {% load currency_filters %}
 {% block title %}Minhas Vendas — Mérito{% endblock %}
 {% block content %}
-<div class="space-y-4 fade-up" x-data="minhasVendas()">
-  <div class="flex items-center gap-3">
+<div class="min-h-[80vh]" x-data="minhasVendas()">
+
+  <!-- Header -->
+  <div class="flex items-center gap-3 mb-4">
     <a href="{% url 'dashboard:mobile_home' %}"
        class="w-10 h-10 bg-white rounded-xl card-shadow flex items-center justify-center tap-target text-gray-400 hover:text-brand-500 transition-all active:scale-[0.95]">
       <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
@@ -12,43 +14,56 @@
   </div>
 
   {% if error %}
-  <script>showToast("{{ error|escapejs }}", "error");</script>
+  <div class="bg-red-50 border border-red-200 text-red-700 px-3.5 py-2.5 rounded-xl text-[12px] font-medium mb-4">
+    {{ error }}
+  </div>
   {% endif %}
 
-  <div class="bg-white rounded-2xl p-3 card-shadow">
-    <select x-model="filterMonth" @change="resetPagination()"
-            class="w-full px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-[13px] outline-none transition-all focus:border-brand-400 focus:ring-2 focus:ring-brand-100 appearance-none"
-            style="background-image:url('data:image/svg+xml;utf8,<svg xmlns=%22http://www.w3.org/2000/svg%22 width=%2216%22 height=%2216%22 viewBox=%220 0 24 24%22 fill=%22none%22 stroke=%22%239ca3af%22 stroke-width=%222%22><path stroke-linecap=%22round%22 stroke-linejoin=%22round%22 d=%22M6 9l6 6 6-6%22/></svg>');background-repeat:no-repeat;background-position:right 10px center;">
-      <option value="">Todos os meses</option>
-      {% for m in months %}
-      <option value="{{ m.value }}">{{ m.label }}</option>
-      {% endfor %}
-    </select>
+  <!-- Filtro de mês -->
+  <div class="bg-white rounded-2xl p-3 card-shadow mb-3">
+    <div class="flex items-center gap-2">
+      <label class="text-[11px] font-semibold text-gray-500 uppercase tracking-wide flex-shrink-0">Mês:</label>
+      <select x-model="filterMonth" @change="resetPagination()"
+              class="flex-1 px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-[13px] font-medium outline-none transition-all focus:border-brand-400 focus:ring-2 focus:ring-brand-100 appearance-none"
+              style="background-image:url('data:image/svg+xml;utf8,<svg xmlns=%22http://www.w3.org/2000/svg%22 width=%2216%22 height=%2216%22 viewBox=%220 0 24 24%22 fill=%22none%22 stroke=%22%239ca3af%22 stroke-width=%222%22><path stroke-linecap=%22round%22 stroke-linejoin=%22round%22 d=%22M6 9l6 6 6-6%22/></svg>');background-repeat:no-repeat;background-position:right 10px center;">
+        <option value="">Todos os meses</option>
+        {% for m in months %}
+        <option value="{{ m.value }}">{{ m.label }}</option>
+        {% endfor %}
+      </select>
+    </div>
   </div>
 
   {% if not sales %}
+  <!-- Estado vazio -->
   <div class="text-center pt-16">
     <div class="w-16 h-16 rounded-2xl bg-gray-100 flex items-center justify-center mx-auto mb-4">
       <svg class="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
     </div>
-    <p class="text-gray-500 font-medium text-[15px]">Nenhuma venda ainda.</p>
+    <p class="text-gray-500 font-medium text-[15px]">Nenhuma venda registrada.</p>
+    <p class="text-gray-400 text-[13px] mt-1 mb-5">Lance sua primeira venda para começar.</p>
     <a href="{% url 'dashboard:mobile_lancar_venda' %}"
-       class="inline-block mt-5 btn-primary shadow-lg shadow-brand-100">
-      Lancar primeira venda
+       class="inline-block btn-primary shadow-lg shadow-brand-100">
+      Lançar primeira venda
     </a>
   </div>
   {% else %}
-  <div class="bg-brand-50/60 border border-brand-100 text-brand-800 px-3.5 py-2.5 rounded-2xl text-[12px] flex items-start gap-2">
-    <svg class="w-4 h-4 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-    <p class="text-[11px] leading-relaxed">Voce pode editar ou excluir lancamentos manuais enquanto a comissao estiver aberta.</p>
+
+  <!-- Dica -->
+  <div class="bg-brand-50/60 border border-brand-100 text-brand-800 px-3.5 py-2.5 rounded-2xl text-[12px] flex items-start gap-2 mb-3">
+    <svg class="w-4 h-4 flex-shrink-0 mt-0.5 text-brand-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+    <p class="text-[11px] leading-relaxed">Você pode editar ou excluir lançamentos manuais enquanto a comissão estiver aberta.</p>
   </div>
   {% endif %}
 
+  <!-- Lista de vendas agrupadas por semana (Alpine) -->
   <div id="sales-list" class="space-y-3">
     <template x-for="(week, wIdx) in visibleWeeks" :key="week.key">
       <div class="bg-white rounded-2xl card-shadow overflow-hidden">
-        <div @click="toggleWeek(week.key)"
-             class="flex items-center justify-between px-4 py-3 cursor-pointer hover:bg-gray-50/50 transition-colors">
+
+        <!-- Header da semana -->
+        <button @click="toggleWeek(week.key)"
+                class="w-full text-left flex items-center justify-between px-4 py-3 cursor-pointer hover:bg-gray-50/50 transition-colors active:bg-gray-50">
           <div class="flex items-center gap-2.5 min-w-0">
             <svg class="w-4 h-4 text-gray-400 flex-shrink-0 transition-transform duration-200"
                  :class="expandedWeeks[week.key] ? 'rotate-90' : ''"
@@ -58,35 +73,46 @@
               <p class="text-[11px] text-gray-400" x-text="week.range + ' · ' + week.sales.length + ' venda' + (week.sales.length !== 1 ? 's' : '')"></p>
             </div>
           </div>
-          <p class="text-[13px] font-bold text-gray-800 flex-shrink-0 ml-3" x-text="formatMoneyBRL(week.total)"></p>
-        </div>
+          <div class="text-right flex-shrink-0 ml-3">
+            <p class="text-[14px] font-bold text-gray-800" x-text="formatMoneyBRL(week.total)"></p>
+          </div>
+        </button>
 
-        <div x-show="expandedWeeks[week.key]">
+        <!-- Vendas da semana (expansível) -->
+        <div x-show="expandedWeeks[week.key]" x-transition:enter="transition ease-out duration-150" x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100">
           <div class="border-t border-gray-50">
             <template x-for="sale in week.sales" :key="sale.uuid">
               <div class="flex items-center justify-between px-4 py-2.5 border-b border-gray-50 last:border-0 hover:bg-gray-50/30 transition-colors"
                    x-show="!sale._deleted">
                 <div class="flex items-center gap-2.5 min-w-0 flex-1">
-                  <span class="text-[12px] font-medium text-gray-500 w-7 flex-shrink-0 text-right" x-text="sale.day"></span>
-                  <span class="text-[10px] text-gray-400 w-7 flex-shrink-0" x-text="sale.weekday"></span>
+                  <div class="flex flex-col items-center w-8 flex-shrink-0">
+                    <span class="text-[12px] font-medium text-gray-500" x-text="String(sale.day).padStart(2, '0')"></span>
+                    <span class="text-[10px] text-gray-400" x-text="sale.weekday"></span>
+                  </div>
                   <span class="w-1.5 h-1.5 rounded-full flex-shrink-0"
                         :class="sale.status === 'ESTORNADA' ? 'bg-red-400' : (sale.origin === 'LINK' ? 'bg-brand-400' : 'bg-emerald-400')"></span>
-                  <span class="font-semibold text-[14px] truncate"
-                        :class="sale.status === 'ESTORNADA' ? 'text-gray-800 line-through opacity-60' : 'text-gray-800'"
-                        x-text="formatMoneyBRL(sale.amount)"></span>
-                  <span x-show="sale.status === 'ESTORNADA'"
-                        class="inline-flex items-center px-1.5 py-0.5 rounded-full text-[9px] font-semibold bg-red-50 text-red-600 flex-shrink-0">Estornada</span>
-                  <span x-show="sale.notes" class="text-[11px] text-gray-400 truncate hidden sm:inline" x-text="'— ' + sale.notes"></span>
+                  <div class="min-w-0 flex-1">
+                    <span class="font-semibold text-[14px] truncate block"
+                          :class="sale.status === 'ESTORNADA' ? 'text-gray-400 line-through' : 'text-gray-800'"
+                          x-text="formatMoneyBRL(sale.amount)"></span>
+                    <div class="flex items-center gap-1.5 mt-0.5">
+                      <span x-show="sale.origin === 'LINK'"
+                            class="inline-flex items-center px-1.5 py-0.5 rounded-full text-[9px] font-semibold bg-brand-50 text-brand-600">Link</span>
+                      <span x-show="sale.status === 'ESTORNADA'"
+                            class="inline-flex items-center px-1.5 py-0.5 rounded-full text-[9px] font-semibold bg-red-50 text-red-600">Estornada</span>
+                      <span x-show="sale.notes" class="text-[11px] text-gray-400 truncate" x-text="sale.notes"></span>
+                    </div>
+                  </div>
                 </div>
                 <div class="flex items-center gap-0.5 flex-shrink-0 ml-2">
                   <a :href="'/dashboard/mobile/lancar/?date=' + sale.date_iso"
                      x-show="sale.canEdit"
-                     class="tap-target flex items-center justify-center w-9 h-9 text-gray-300 hover:text-brand-500 transition rounded-lg hover:bg-brand-50">
+                     class="tap-target flex items-center justify-center w-9 h-9 text-gray-300 hover:text-brand-500 transition rounded-lg hover:bg-brand-50 active:scale-[0.95]">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
                   </a>
                   <button @click="deleteSale(sale)"
                           x-show="sale.canDelete"
-                          class="tap-target flex items-center justify-center w-9 h-9 text-gray-300 hover:text-red-500 transition rounded-lg hover:bg-red-50">
+                          class="tap-target flex items-center justify-center w-9 h-9 text-gray-300 hover:text-red-500 transition rounded-lg hover:bg-red-50 active:scale-[0.95]">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
                   </button>
                 </div>
@@ -97,20 +123,24 @@
       </div>
     </template>
 
+    <!-- Botão mostrar mais -->
     <button @click="showMore()"
             x-show="hasMore"
-            class="w-full py-3 bg-white rounded-2xl card-shadow text-[13px] font-medium text-brand-600 hover:text-brand-700 hover:bg-brand-50/50 transition tap-target">
+            class="w-full py-3 bg-white rounded-2xl card-shadow text-[13px] font-medium text-brand-600 hover:text-brand-700 hover:bg-brand-50/50 transition tap-target active:scale-[0.98]">
       <span x-text="'Mostrar mais ' + hiddenWeeksCount + ' semana' + (hiddenWeeksCount !== 1 ? 's' : '')"></span>
     </button>
 
+    <!-- Nenhuma venda neste período -->
     <template x-if="filteredSales.length === 0 && sales.length > 0">
       <div class="text-center py-10">
-        <p class="text-gray-400 text-[13px] font-medium">Nenhuma venda neste periodo.</p>
+        <p class="text-gray-400 text-[13px] font-medium">Nenhuma venda neste período.</p>
       </div>
     </template>
-    <p class="text-[10px] text-gray-400 text-center mt-2" x-show="sales.some(s => s.status === 'ESTORNADA')">Vendas estornadas nao entram nos totais.</p>
+
+    <p class="text-[10px] text-gray-400 text-center mt-2" x-show="sales.some(s => s.status === 'ESTORNADA')">Vendas estornadas não entram nos totais.</p>
   </div>
 
+  <!-- Fallback server-rendered (exibido se Alpine falhar) -->
   {% if sales %}
   <div class="space-y-3" id="sales-fallback">
     {% for s in sales|slice:":20" %}
@@ -147,34 +177,43 @@ function getWeekNumber(day) {
 function getWeekRange(weekNum, monthSales) {
     if (!monthSales.length) return '';
     var days = monthSales.map(function(s) { return parseInt(s.day, 10); });
-    var minDay = Math.min.apply(null, days.filter(function(d) {
-        return getWeekNumber(d) === weekNum;
-    }));
-    var maxDay = Math.max.apply(null, days.filter(function(d) {
-        return getWeekNumber(d) === weekNum;
-    }));
+    var filtered = days.filter(function(d) { return getWeekNumber(d) === weekNum; });
+    if (!filtered.length) return '';
+    var minDay = Math.min.apply(null, filtered);
+    var maxDay = Math.max.apply(null, filtered);
     var month = monthSales[0].month;
     return String(minDay).padStart(2,'0') + '/' + month + ' - ' + String(maxDay).padStart(2,'0') + '/' + month;
 }
 
 function minhasVendas() {
+    // Parse seguro — trata caso de dupla serialização como fallback
+    var raw = [];
+    try {
+        var el = document.getElementById('sales-data');
+        if (el && el.textContent) {
+            var parsed = JSON.parse(el.textContent);
+            // Se veio como string (dupla serialização legada), parse de novo
+            raw = typeof parsed === 'string' ? JSON.parse(parsed) : parsed;
+        }
+    } catch (e) {
+        console.error('Erro ao parsear sales-data:', e);
+    }
+
     return {
-        sales: JSON.parse(document.getElementById('sales-data').textContent),
+        sales: Array.isArray(raw) ? raw : [],
         currentMonth: {{ current_month }},
-        filterMonth: {{ current_month }},
+        filterMonth: String({{ current_month }}),
         visibleWeeksCount: 3,
         expandedWeeks: {},
         _confirmIds: {},
-        WEEKDAYS: WEEKDAYS,
 
         init() {
-            var self = this;
+            // Esconder fallback se Alpine renderizou com sucesso
             var fb = document.getElementById('sales-fallback');
-            this.$nextTick(function() {
-                if (fb) fb.style.display = 'none';
-                self.filterMonth = self.currentMonth;
-                self.filterSales();
-            });
+            if (fb && this.sales.length > 0) {
+                fb.style.display = 'none';
+            }
+            this.filterSales();
         },
 
         get filteredSales() {
@@ -201,7 +240,9 @@ function minhasVendas() {
                 var key = month + '-W' + wn;
                 if (!groups[key]) groups[key] = { key: key, weekNum: wn, month: month, sales: [], total: 0 };
                 groups[key].sales.push(s);
-                groups[key].total += s.amount;
+                if (s.status !== 'ESTORNADA') {
+                    groups[key].total += s.amount;
+                }
             });
             var result = [];
             Object.keys(groups).forEach(function(k) {
@@ -254,7 +295,7 @@ function minhasVendas() {
         deleteSale(sale) {
             if (!sale.canDelete) return;
             if (!this._confirmIds[sale.uuid]) {
-                showToast('Toque novamente para confirmar a exclusao.', 'warning');
+                showToast('Toque novamente para confirmar a exclusão.', 'warning');
                 this._confirmIds[sale.uuid] = true;
                 var self = this;
                 setTimeout(function() { delete self._confirmIds[sale.uuid]; }, 3000);
@@ -267,11 +308,11 @@ function minhasVendas() {
             }).then(function(r) {
                 if (r.ok || r.status === 204) {
                     sale._deleted = true;
-                    showToast('Venda excluida.', 'success');
+                    showToast('Venda excluída.', 'success');
                 } else {
                     r.json().then(function(j) { showToast(j.detail || 'Erro ao excluir.', 'error'); });
                 }
-            }).catch(function() { showToast('Erro de conexao.', 'error'); });
+            }).catch(function() { showToast('Erro de conexão.', 'error'); });
         }
     }
 }

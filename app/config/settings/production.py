@@ -77,7 +77,11 @@ CELERY_BEAT_SCHEDULE = {
     },
     'requeue-stuck-notifications': {
         'task': 'app.apps.notifications.tasks.requeue_stuck_notifications',
-        'schedule': 600.0,  # a cada 10 minutos
+        'schedule': 600.0,
+    },
+    'send-lifecycle-emails': {
+        'task': 'app.apps.notifications.tasks.send_lifecycle_emails',
+        'schedule': crontab(hour=9, minute=0),
     },
 }
 

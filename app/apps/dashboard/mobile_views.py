@@ -371,6 +371,9 @@ def mobile_lancar_venda(request):
             success = True
             last_amount = amount_cents
             was_update = existing is not None
+
+            from app.apps.accounts.models import mark_onboarding_step
+            mark_onboarding_step(seller.tenant, 'step_first_sale')
         except ValueError as e:
             error = str(e)
             last_amount = 0
@@ -442,7 +445,6 @@ def mobile_minhas_vendas(request):
         ).values_list('period__month', 'period__year')
     )
 
-    import json as json_module
     today = timezone.localdate()
     sales_data = []
     for s in sales:
@@ -463,7 +465,7 @@ def mobile_minhas_vendas(request):
     return render(request, 'mobile/minhas_vendas.html', {
         'seller': seller,
         'sales': sales,
-        'sales_json': json_module.dumps(sales_data),
+        'sales_json': sales_data,
         'current_month': today.month,
         'current_year': today.year,
         'months': [

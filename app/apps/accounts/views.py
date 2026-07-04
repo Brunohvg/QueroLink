@@ -75,3 +75,9 @@ def landing_view(request):
     if request.user.is_authenticated:
         return redirect('dashboard:home')
     return render(request, 'accounts/landing.html')
+
+
+def landing_page(request):
+    if request.user.is_authenticated:
+        return redirect('dashboard:home')
+    return render(request, 'accounts/landing.html')

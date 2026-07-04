@@ -130,6 +130,40 @@ def tenant_has_feature(tenant, feature_name):
     return features.get(feature_name, False)
 
 
+def mark_onboarding_step(tenant, step_name):
+    ob, _ = OnboardingProgress.objects.get_or_create(tenant=tenant)
+    if ob.completed_at or ob.dismissed:
+        return
+    if not getattr(ob, step_name):
+        setattr(ob, step_name, True)
+        if all([ob.step_whatsapp, ob.step_sellers, ob.step_commission_rate,
+                ob.step_first_invite, ob.step_first_sale]):
+            ob.completed_at = timezone.now()
+        ob.save()
+
+
+class OnboardingProgress(models.Model):
+    tenant = models.OneToOneField(Tenant, on_delete=models.CASCADE, related_name='onboarding')
+    step_whatsapp = models.BooleanField(default=False)
+    step_sellers = models.BooleanField(default=False)
+    step_commission_rate = models.BooleanField(default=False)
+    step_first_invite = models.BooleanField(default=False)
+    step_first_sale = models.BooleanField(default=False)
+    completed_at = models.DateTimeField(null=True, blank=True)
+    dismissed = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f'Onboarding {self.tenant.company_name} ({self.completed_steps}/5)'
+
+    @property
+    def completed_steps(self):
+        return sum([
+            self.step_whatsapp, self.step_sellers, self.step_commission_rate,
+            self.step_first_invite, self.step_first_sale,
+        ])
+
+
 class User(AbstractUser):
     # Role.ADMIN é admin DENTRO do tenant (gerencia vendedores, fechamento, etc. da propria loja).
     # is_superuser=True é admin do SaaS inteiro (Bruno) — acesso a TODOS os tenants e Django Admin geral.

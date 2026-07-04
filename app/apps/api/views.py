@@ -60,6 +60,10 @@ class SellerViewSet(viewsets.ModelViewSet):
         result = serializer.save()
         seller = self.get_queryset().get(uuid=result['uuid'])
         log_action(request, 'seller.created', instance=seller)
+
+        from app.apps.accounts.models import mark_onboarding_step
+        mark_onboarding_step(request.user.tenant, 'step_sellers')
+
         return Response(result, status=status.HTTP_201_CREATED)
 
     @action(detail=True, methods=['post'])
@@ -126,6 +130,9 @@ class SaleViewSet(viewsets.ModelViewSet):
     def perform_create(self, serializer):
         sale = serializer.save()
         log_action(self.request, 'sale.created', instance=sale)
+
+        from app.apps.accounts.models import mark_onboarding_step
+        mark_onboarding_step(self.request.user.tenant, 'step_first_sale')
 
     def perform_update(self, serializer):
         serializer.save(updated_by=self.request.user)
