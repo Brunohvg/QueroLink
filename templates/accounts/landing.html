@@ -124,68 +124,59 @@
             <span class="text-[14px] font-medium" :class="anual ? 'text-gray-900' : 'text-gray-400'">Anual <span class="text-success-700 text-[12px]">(-17%)</span></span>
         </div>
 
-        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            <!-- Essencial -->
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 max-w-3xl mx-auto">
+            <!-- Starter -->
             <div class="bg-white rounded-2xl border border-gray-200 p-6 flex flex-col">
-                <p class="text-[13px] font-semibold text-gray-500 uppercase tracking-wide mb-2">Essencial</p>
+                <p class="text-[13px] font-semibold text-gray-500 uppercase tracking-wide mb-2">Starter</p>
+                <p class="text-[11px] text-gray-400 mb-3">Para começar a organizar as comissoes</p>
                 <p class="font-display text-[32px] font-semibold text-gray-900 mb-1">
-                    <span x-text="anual ? 'R$ 65' : 'R$ 79'"></span>
+                    <span x-text="anual ? 'R$ 122' : 'R$ 147'"></span>
                 </p>
-                <p class="text-[13px] text-gray-500 mb-4" x-text="anual ? '/mes (R$ 790/ano)' : '/mes'"></p>
+                <p class="text-[13px] text-gray-500 mb-4" x-text="anual ? '/mes (R$ 1.470/ano)' : '/mes'"></p>
                 <ul class="space-y-2 mb-6 flex-1">
                     <li class="text-[13px] text-gray-600 flex items-center gap-2"><span class="text-success-500 font-bold">✓</span> Ate 5 vendedores</li>
-                    <li class="text-[13px] text-gray-600 flex items-center gap-2"><span class="text-success-500 font-bold">✓</span> Fechamento automatico</li>
-                    <li class="text-[13px] text-gray-600 flex items-center gap-2"><span class="text-success-500 font-bold">✓</span> App mobile vendedor</li>
-                    <li class="text-[13px] text-gray-600 flex items-center gap-2"><span class="text-success-500 font-bold">✓</span> Dashboard do gestor</li>
+                    <li class="text-[13px] text-gray-600 flex items-center gap-2"><span class="text-success-500 font-bold">✓</span> App do vendedor + dashboard do gestor</li>
+                    <li class="text-[13px] text-gray-600 flex items-center gap-2"><span class="text-success-500 font-bold">✓</span> Fechamento de comissoes</li>
+                    <li class="text-[13px] text-gray-600 flex items-center gap-2"><span class="text-success-500 font-bold">✓</span> Links de pagamento</li>
+                    <li class="text-[13px] text-gray-600 flex items-center gap-2"><span class="text-success-500 font-bold">✓</span> Lembretes automaticos por WhatsApp</li>
                 </ul>
-                <a href="{% url 'accounts:signup' %}?plano=essencial&ciclo=monthly" class="block text-center bg-brand-500 hover:bg-brand-600 text-white font-semibold py-3 rounded-xl text-[14px] transition">Comecar gratis</a>
+                <a :href="'{% url 'accounts:signup' %}?plano=starter&ciclo=' + (anual ? 'yearly' : 'monthly')" class="block text-center bg-brand-500 hover:bg-brand-600 text-white font-semibold py-3 rounded-xl text-[14px] transition">Comecar gratis</a>
             </div>
 
-            <!-- Profissional -->
+            <!-- Pro (Mais popular) -->
             <div class="bg-white rounded-2xl border-2 border-brand-500 p-6 flex flex-col relative">
                 <span class="absolute -top-3 left-1/2 -translate-x-1/2 bg-brand-500 text-white text-[11px] font-semibold px-4 py-1 rounded-full">Mais popular</span>
-                <p class="text-[13px] font-semibold text-gray-500 uppercase tracking-wide mb-2">Profissional</p>
+                <p class="text-[13px] font-semibold text-gray-500 uppercase tracking-wide mb-2">Pro</p>
+                <p class="text-[11px] text-gray-400 mb-3">Para quem quer folha e contabilidade sem planilha</p>
                 <p class="font-display text-[32px] font-semibold text-gray-900 mb-1">
-                    <span x-text="anual ? 'R$ 124' : 'R$ 149'"></span>
+                    <span x-text="anual ? 'R$ 247' : 'R$ 297'"></span>
                 </p>
-                <p class="text-[13px] text-gray-500 mb-4" x-text="anual ? '/mes (R$ 1.490/ano)' : '/mes'"></p>
+                <p class="text-[13px] text-gray-500 mb-4" x-text="anual ? '/mes (R$ 2.970/ano)' : '/mes'"></p>
                 <ul class="space-y-2 mb-6 flex-1">
                     <li class="text-[13px] text-gray-600 flex items-center gap-2"><span class="text-success-500 font-bold">✓</span> Ate 15 vendedores</li>
-                    <li class="text-[13px] text-gray-600 flex items-center gap-2"><span class="text-success-500 font-bold">✓</span> Tudo do Essencial</li>
-                    <li class="text-[13px] text-gray-600 flex items-center gap-2"><span class="text-success-500 font-bold">✓</span> Links de pagamento</li>
-                    <li class="text-[13px] text-gray-600 flex items-center gap-2"><span class="text-success-500 font-bold">✓</span> Exportacao CSV/Excel/PDF</li>
+                    <li class="text-[13px] text-gray-600 flex items-center gap-2"><span class="text-success-500 font-bold">✓</span> Tudo do Starter</li>
+                    <li class="text-[13px] text-gray-600 flex items-center gap-2"><span class="text-success-500 font-bold">✓</span> Pacote contabil automatico por e-mail</li>
+                    <li class="text-[13px] text-gray-600 flex items-center gap-2"><span class="text-success-500 font-bold">✓</span> Relatorios em PDF e previa de fechamento</li>
+                    <li class="text-[13px] text-gray-600 flex items-center gap-2"><span class="text-success-500 font-bold">✓</span> Importacao de vendas por CSV</li>
+                    <li class="text-[13px] text-gray-600 flex items-center gap-2"><span class="text-success-500 font-bold">✓</span> Notificacoes push no celular do vendedor</li>
                 </ul>
-                <a href="{% url 'accounts:signup' %}?plano=profissional&ciclo=monthly" class="block text-center bg-brand-500 hover:bg-brand-600 text-white font-semibold py-3 rounded-xl text-[14px] transition">Comecar gratis</a>
+                <a :href="'{% url 'accounts:signup' %}?plano=pro&ciclo=' + (anual ? 'yearly' : 'monthly')" class="block text-center bg-brand-500 hover:bg-brand-600 text-white font-semibold py-3 rounded-xl text-[14px] transition">Comecar gratis</a>
             </div>
 
-            <!-- Plus -->
+            <!-- Business -->
             <div class="bg-white rounded-2xl border border-gray-200 p-6 flex flex-col">
-                <p class="text-[13px] font-semibold text-gray-500 uppercase tracking-wide mb-2">Plus</p>
+                <p class="text-[13px] font-semibold text-gray-500 uppercase tracking-wide mb-2">Business</p>
+                <p class="text-[11px] text-gray-400 mb-3">Para operacoes maiores</p>
                 <p class="font-display text-[32px] font-semibold text-gray-900 mb-1">
-                    <span x-text="anual ? 'R$ 207' : 'R$ 249'"></span>
+                    <span x-text="anual ? 'R$ 414' : 'R$ 497'"></span>
                 </p>
-                <p class="text-[13px] text-gray-500 mb-4" x-text="anual ? '/mes (R$ 2.490/ano)' : '/mes'"></p>
+                <p class="text-[13px] text-gray-500 mb-4" x-text="anual ? '/mes (R$ 4.970/ano)' : '/mes'"></p>
                 <ul class="space-y-2 mb-6 flex-1">
-                    <li class="text-[13px] text-gray-600 flex items-center gap-2"><span class="text-success-500 font-bold">✓</span> Ate 30 vendedores</li>
-                    <li class="text-[13px] text-gray-600 flex items-center gap-2"><span class="text-success-500 font-bold">✓</span> Tudo do Profissional</li>
-                    <li class="text-[13px] text-gray-600 flex items-center gap-2"><span class="text-success-500 font-bold">✓</span> Notificacao WhatsApp</li>
-                    <li class="text-[13px] text-gray-600 flex items-center gap-2"><span class="text-success-500 font-bold">✓</span> Relatorio da contabilidade</li>
-                </ul>
-                <a href="{% url 'accounts:signup' %}?plano=plus&ciclo=monthly" class="block text-center bg-brand-500 hover:bg-brand-600 text-white font-semibold py-3 rounded-xl text-[14px] transition">Comecar gratis</a>
-            </div>
-
-            <!-- Enterprise -->
-            <div class="bg-white rounded-2xl border border-gray-200 p-6 flex flex-col">
-                <p class="text-[13px] font-semibold text-gray-500 uppercase tracking-wide mb-2">Enterprise</p>
-                <p class="font-display text-[32px] font-semibold text-gray-900 mb-1">Sob consulta</p>
-                <p class="text-[13px] text-gray-500 mb-4">&nbsp;</p>
-                <ul class="space-y-2 mb-6 flex-1">
-                    <li class="text-[13px] text-gray-600 flex items-center gap-2"><span class="text-success-500 font-bold">✓</span> Vendedores ilimitados</li>
-                    <li class="text-[13px] text-gray-600 flex items-center gap-2"><span class="text-success-500 font-bold">✓</span> Tudo do Plus</li>
+                    <li class="text-[13px] text-gray-600 flex items-center gap-2"><span class="text-success-500 font-bold">✓</span> Ate 50 vendedores</li>
+                    <li class="text-[13px] text-gray-600 flex items-center gap-2"><span class="text-success-500 font-bold">✓</span> Tudo do Pro</li>
                     <li class="text-[13px] text-gray-600 flex items-center gap-2"><span class="text-success-500 font-bold">✓</span> Suporte prioritario</li>
-                    <li class="text-[13px] text-gray-600 flex items-center gap-2"><span class="text-success-500 font-bold">✓</span> Onboarding dedicado</li>
                 </ul>
-                <a href="{% url 'accounts:signup' %}?plano=enterprise&ciclo=monthly" class="block text-center bg-gray-100 hover:bg-gray-200 text-gray-700 font-semibold py-3 rounded-xl text-[14px] transition">Falar com vendas</a>
+                <a :href="'{% url 'accounts:signup' %}?plano=business&ciclo=' + (anual ? 'yearly' : 'monthly')" class="block text-center bg-brand-500 hover:bg-brand-600 text-white font-semibold py-3 rounded-xl text-[14px] transition">Comecar gratis</a>
             </div>
         </div>
     </div>

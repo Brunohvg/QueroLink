@@ -212,7 +212,7 @@
         <div x-show="showForm && selectedPlan" x-transition class="bg-white rounded-xl p-6 shadow-sm border border-gray-100">
             <div class="flex items-center justify-between mb-4">
                 <div>
-                    <h3 class="text-[15px] font-bold text-gray-900">Assinar <span x-text="{'STARTER':'Starter','PRO':'Pro','ENTERPRISE':'Enterprise'}[selectedPlan] || selectedPlan"></span></h3>
+                    <h3 class="text-[15px] font-bold text-gray-900">Assinar <span x-text="{'STARTER':'Starter','PRO':'Pro','BUSINESS':'Business','ENTERPRISE':'Enterprise'}[selectedPlan] || selectedPlan"></span></h3>
                     <p class="text-[13px] text-gray-500 mt-0.5">Preencha abaixo e confirme no Mercado Pago</p>
                 </div>
                 <button @click="showForm = false" class="text-gray-400 hover:text-gray-600 p-1">

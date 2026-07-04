@@ -127,36 +127,38 @@ def assinatura(request):
 
     PLAN_FEATURES = {
         'STARTER': [
-            'App do vendedor',
+            'Ate 5 vendedores',
+            'App do vendedor + dashboard do gestor',
+            'Fechamento de comissoes',
             'Links de pagamento',
-            'Fechamento de comissao',
-            'Dashboard gestor',
-            'Notificacoes WhatsApp',
+            'Lembretes automaticos por WhatsApp',
         ],
         'PRO': [
+            'Ate 15 vendedores',
             'Tudo do Starter',
-            'Vendedores ilimitados',
-            'Recibo PDF de comissao',
-            'Metas mensais',
-            'Ranking de vendas',
-            'Lembrete diario WhatsApp',
-            'Exportacao CSV/XLSX',
+            'Pacote contabil automatico por e-mail para seu contador',
+            'Relatorios em PDF e previa de fechamento',
+            'Importacao de vendas por CSV',
+            'Notificacoes push no celular do vendedor',
+        ],
+        'BUSINESS': [
+            'Ate 50 vendedores',
+            'Tudo do Pro',
             'Suporte prioritario',
         ],
         'ENTERPRISE': [
-            'Tudo do Pro',
-            'SLA dedicado',
-            'Onboarding personalizado',
-            'Suporte telefonico',
-            'Integracoes sob demanda',
-            'Contrato anual',
+            'Vendedores ilimitados (legado)',
+            'Tudo do Business',
+            'Suporte dedicado',
         ],
     }
 
     has_active_sub = sub and sub.status not in ('CANCELED',)
     plan_names = dict(Tenant.Plan.choices)
+    if 'ENTERPRISE' not in dict(plan_names):
+        plan_names['ENTERPRISE'] = 'Enterprise (legado)'
     all_plans = []
-    for key in ['STARTER', 'PRO', 'ENTERPRISE']:
+    for key in ['STARTER', 'PRO', 'BUSINESS']:
         monthly = prices.get(key, 0)
         yearly = plan_amount(key, 'YEARLY') if monthly else 0
         all_plans.append({
