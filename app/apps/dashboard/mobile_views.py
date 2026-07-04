@@ -541,32 +541,36 @@ def mobile_ranking(request):
     ).order_by('-total')
 
     ranking = list(ranking_qs)
+    seller_uuid_str = str(seller.uuid)
     seller_pos = None
+    my_total = 0
     for i, r in enumerate(ranking):
-        if r['seller__uuid'] == str(seller.uuid):
+        if str(r['seller__uuid']) == seller_uuid_str:
             seller_pos = i + 1
+            my_total = r['total']
             break
 
     visible_to_sellers = seller.tenant.ranking_visible_to_sellers
-    if not visible_to_sellers:
-        first_total = ranking[0]['total'] if ranking else 0
-        ranking = [
-            {'seller__uuid': r['seller__uuid'],
-             'seller__name': r['seller__name'] if str(r['seller__uuid']) == str(seller.uuid) else '—',
-             'total': r['total'],
-             'is_me': str(r['seller__uuid']) == str(seller.uuid)}
+    total_sellers = len(ranking)
+
+    if visible_to_sellers:
+        ranking_display = [
+            {
+                'name': r['seller__name'],
+                'is_me': str(r['seller__uuid']) == seller_uuid_str,
+                'total': r['total'] if str(r['seller__uuid']) == seller_uuid_str else None,
+            }
             for r in ranking
         ]
     else:
-        ranking = [
-            {**r, 'is_me': str(r['seller__uuid']) == str(seller.uuid)}
-            for r in ranking
-        ]
+        ranking_display = []
 
     return render(request, 'mobile/ranking.html', {
         'seller': seller,
-        'ranking': ranking,
+        'ranking': ranking_display,
         'seller_pos': seller_pos,
+        'my_total': my_total,
+        'total_sellers': total_sellers,
         'visible_to_sellers': visible_to_sellers,
         'current_month': f'{today.month:02d}/{today.year}',
     })

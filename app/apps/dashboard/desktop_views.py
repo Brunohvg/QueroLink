@@ -142,6 +142,7 @@ def gestor_configuracoes(request):
                 pass
 
         tenant.pix_enabled = request.POST.get('pix_enabled') == '1'
+        tenant.ranking_visible_to_sellers = request.POST.get('ranking_visible_to_sellers') == '1'
 
         tenant.save()
 

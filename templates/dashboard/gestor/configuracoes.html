@@ -394,6 +394,20 @@ showToast("{{ message|escapejs }}", "{% if message.tags == 'error' %}error{% eli
           <svg class="w-3.5 h-3.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
           Ex: 1,00 = 1% de comissao sobre as vendas.
         </p>
+
+        <div class="border-t border-gray-100 pt-5 mt-5">
+          <label for="ranking_visible_to_sellers" class="block text-[13px] font-medium text-gray-700 mb-3">Ranking de Vendedores</label>
+          <label class="flex items-start gap-3 cursor-pointer">
+            <input type="checkbox" id="ranking_visible_to_sellers" name="ranking_visible_to_sellers" value="1"
+                   class="w-5 h-5 rounded border-gray-300 text-brand-500 focus:ring-brand-500 mt-0.5"
+                   {% if tenant.ranking_visible_to_sellers %}checked{% endif %}>
+            <div>
+              <span class="text-[13px] font-medium text-gray-700">Exibir nomes no ranking dos vendedores</span>
+              <p class="text-[12px] text-gray-400 mt-0.5">Quando ativado, cada vendedor ve a ordem e os nomes dos colegas no ranking do app. <strong>Os valores vendidos pelos colegas nunca sao exibidos</strong>, independentemente desta opcao.</p>
+            </div>
+          </label>
+        </div>
+
         <div class="flex justify-end pt-4 border-t border-gray-100 mt-5">
           <button type="submit"
                   class="inline-flex items-center gap-2 bg-gray-900 hover:bg-gray-800 text-white font-semibold py-2.5 px-6 rounded-xl transition-all text-[14px] shadow-sm hover:shadow-md active:scale-[0.97]">

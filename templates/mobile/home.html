@@ -120,7 +120,7 @@
       <p class="font-display text-[15px] font-bold {% if goal_progress >= 100 %}text-emerald-600{% else %}text-brand-500{% endif %}">{{ goal_progress }}%</p>
     </div>
     <div class="h-2.5 rounded-full bg-gray-100 mb-2 overflow-hidden">
-      <div class="h-full rounded-full transition-all duration-500" style="width: min({{ goal_progress }}, 100)%; background: linear-gradient(90deg, #1463FF, #15CFEA);"></div>
+      <div class="h-full rounded-full transition-all duration-500" style="width: {% if goal_progress > 100 %}100{% else %}{{ goal_progress }}{% endif %}%; background: linear-gradient(90deg, #1463FF, #15CFEA);"></div>
     </div>
     <div class="flex items-center justify-between text-[12px]">
       <span class="text-gray-600 font-medium">{{ combined_month_total|brl }} de {{ goal.target_amount|brl }}</span>

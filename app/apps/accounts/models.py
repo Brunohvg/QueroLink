@@ -40,8 +40,8 @@ class Tenant(models.Model):
     daily_reminder_enabled = models.BooleanField(default=False)
     daily_reminder_time = models.TimeField(default='20:00')
     ranking_visible_to_sellers = models.BooleanField(
-        default=True,
-        help_text="Vendedor ve ranking completo com nomes dos colegas",
+        default=False,
+        help_text="Exibe nomes dos colegas no ranking do app (valores nunca sao exibidos)",
     )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)

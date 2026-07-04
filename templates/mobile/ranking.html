@@ -19,11 +19,22 @@
     <div class="relative">
       <p class="text-[11px] font-semibold text-gray-400 uppercase tracking-[0.08em] mb-1">Sua posicao</p>
       <p class="font-display text-[40px] font-bold leading-none tracking-tight">#{{ seller_pos }}</p>
+      <p class="text-[13px] text-gray-400 mt-2">
+        de {{ total_sellers }} vendedor{{ total_sellers|pluralize:"es" }} &middot; {{ my_total|brl }} no mes
+      </p>
     </div>
+  </div>
+  {% else %}
+  <div class="bg-white rounded-2xl p-6 card-shadow text-center">
+    <div class="w-12 h-12 rounded-2xl bg-gray-100 flex items-center justify-center mx-auto mb-3">
+      <svg class="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"/></svg>
+    </div>
+    <p class="text-[14px] font-medium text-gray-700 mb-1">Voce ainda nao pontuou este mes.</p>
+    <p class="text-[12px] text-gray-400">Lance sua primeira venda!</p>
   </div>
   {% endif %}
 
-  {% if ranking %}
+  {% if visible_to_sellers and ranking %}
   <div class="space-y-2">
     {% for r in ranking %}
     <div class="bg-white rounded-2xl p-4 flex items-center gap-3 card-shadow {% if r.is_me %}ring-2 ring-brand-500 bg-brand-50/50{% endif %}">
@@ -36,19 +47,27 @@
       </div>
       <div class="flex-1 min-w-0">
         <p class="text-[14px] font-semibold text-gray-900 truncate">
-          {{ r.seller__name }}
+          {{ r.name }}
           {% if r.is_me %}<span class="text-[12px] font-normal text-brand-600 ml-1">(voce)</span>{% endif %}
         </p>
       </div>
-      <p class="font-display text-[15px] font-bold text-gray-900 flex-shrink-0">{{ r.total|brl }}</p>
+      <p class="font-display text-[15px] font-bold text-gray-900 flex-shrink-0">
+        {% if r.total is not None %}{{ r.total|brl }}{% endif %}
+      </p>
     </div>
     {% endfor %}
   </div>
-
-  {% if not visible_to_sellers %}
-  <p class="text-[11px] text-gray-400 text-center mt-3">Seu gestor optou por exibir apenas a sua posicao.</p>
+  {% elif not visible_to_sellers and seller_pos %}
+  <div class="text-center py-6">
+    <p class="text-[13px] text-gray-400">O ranking detalhado esta desativado pelo seu gestor.</p>
+  </div>
+  {% elif not visible_to_sellers and not seller_pos %}
+  <div class="text-center py-6">
+    <p class="text-[13px] text-gray-400">O ranking detalhado esta desativado pelo seu gestor.</p>
+  </div>
   {% endif %}
-  {% else %}
+
+  {% if not ranking and visible_to_sellers and not seller_pos %}
   <div class="text-center py-10">
     <p class="text-[14px] text-gray-400">Nenhuma venda registrada neste mes ainda.</p>
   </div>
