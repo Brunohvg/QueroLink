@@ -80,7 +80,10 @@
             </label>
         </form>
 
-        <div class="text-center mt-6">
+        <div class="text-center mt-6 space-y-2">
+            <p class="text-[13px] text-gray-400">
+                <a href="{% url 'password_reset' %}" class="text-gray-500 hover:text-brand-600 font-medium">Esqueci minha senha</a>
+            </p>
             <p class="text-[13px] text-gray-400">
                 Ainda nao tem uma conta?
                 <a href="{% url 'accounts:signup' %}" class="text-brand-600 hover:text-brand-700 font-medium">Cadastre-se</a>

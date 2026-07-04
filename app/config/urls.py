@@ -1,7 +1,8 @@
 from django.conf import settings
 from django.conf.urls.static import static
 from django.contrib import admin
-from django.urls import path, include
+from django.contrib.auth import views as auth_views
+from django.urls import path, include, reverse_lazy
 from django.http import JsonResponse
 from django.db import connections
 from django.db.utils import OperationalError
@@ -34,6 +35,22 @@ urlpatterns = [
     path('api/webhooks/', include('app.apps.webhooks.urls')),
     path('api/billing/', include('app.apps.billing.urls')),
     path('api/', include('app.apps.api.urls')),
+
+    path('dashboard/esqueci-senha/', auth_views.PasswordResetView.as_view(
+        template_name='registration/password_reset_form.html',
+        email_template_name='registration/password_reset_email.html',
+        success_url=reverse_lazy('password_reset_done'),
+    ), name='password_reset'),
+    path('dashboard/esqueci-senha/enviado/', auth_views.PasswordResetDoneView.as_view(
+        template_name='registration/password_reset_done.html',
+    ), name='password_reset_done'),
+    path('dashboard/redefinir-senha/<uidb64>/<token>/', auth_views.PasswordResetConfirmView.as_view(
+        template_name='registration/password_reset_confirm.html',
+        success_url=reverse_lazy('password_reset_complete'),
+    ), name='password_reset_confirm'),
+    path('dashboard/redefinir-senha/concluido/', auth_views.PasswordResetCompleteView.as_view(
+        template_name='registration/password_reset_complete.html',
+    ), name='password_reset_complete'),
 ]
 
 if settings.DEBUG:

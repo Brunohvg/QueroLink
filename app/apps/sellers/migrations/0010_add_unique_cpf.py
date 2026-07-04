@@ -8,7 +8,7 @@ class Migration(migrations.Migration):
 
     dependencies = [
         ('accounts', '0019_accountant_fields'),
-        ('sellers', '0012_dedupe_cpf'),
+        ('sellers', '0011_normalize_cpf_digits'),
         migrations.swappable_dependency(settings.AUTH_USER_MODEL),
     ]
 
