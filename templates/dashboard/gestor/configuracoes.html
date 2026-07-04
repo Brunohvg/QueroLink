@@ -423,7 +423,7 @@ showToast("{{ message|escapejs }}", "{% if message.tags == 'error' %}error{% eli
     </form>
   </div>
 
-  <div x-show="tab==='messages'">
+  <div x-show="tab==='messages'" x-data="messageEditor()">
     <form method="post" action="{% url 'dashboard:gestor_configuracoes' %}" class="bg-white rounded-2xl border border-gray-100 shadow-[0_1px_3px_-1px_rgba(0,0,0,0.04),0_4px_16px_-4px_rgba(67,97,238,0.06)] overflow-hidden">
       {% csrf_token %}
       <div class="px-6 py-5 border-b border-gray-100">
@@ -433,30 +433,54 @@ showToast("{{ message|escapejs }}", "{% if message.tags == 'error' %}error{% eli
           </div>
           <div>
             <h2 class="text-[15px] font-semibold text-gray-900">Templates de Mensagem</h2>
-            <p class="text-[12px] text-gray-400">Mensagens enviadas automaticamente aos vendedores</p>
+            <p class="text-[12px] text-gray-400">Personalize as mensagens enviadas automaticamente por WhatsApp</p>
           </div>
         </div>
       </div>
       <div class="px-6 py-5 space-y-4">
-        <p class="text-[12px] text-gray-500 flex items-center gap-1.5">
-          <svg class="w-3.5 h-3.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-          Use as variaveis:
-          <code class="text-brand-600 bg-brand-50 px-1.5 py-0.5 rounded text-[11px]">{"{"}}vendedor{"}"}</code>
-          <code class="text-brand-600 bg-brand-50 px-1.5 py-0.5 rounded text-[11px]">{"{"}}valor{"}"}</code>
-          <code class="text-brand-600 bg-brand-50 px-1.5 py-0.5 rounded text-[11px]">{"{"}}periodo{"}"}</code>
-          <code class="text-brand-600 bg-brand-50 px-1.5 py-0.5 rounded text-[11px]">{"{"}}cliente{"}"}</code>
-          <code class="text-brand-600 bg-brand-50 px-1.5 py-0.5 rounded text-[11px]">{"{"}}link{"}"}</code>
-        </p>
+        <div>
+          <label class="block text-[13px] font-medium text-gray-700 mb-1.5">Evento</label>
+          <select x-model="selectedEvent" @change="updatePreview()" class="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-[14px] outline-none transition-all focus:border-amber-400 focus:ring-2 focus:ring-amber-100">
+            {% for event_type, label, body, variables in link_events %}
+            <option value="{{ event_type }}">{{ label }}</option>
+            {% endfor %}
+          </select>
+        </div>
 
-        <div class="grid grid-cols-1 gap-4">
-          {% for event_type, label, body in link_events %}
-          <div>
-            <label for="template_{{ event_type }}" class="block text-[13px] font-medium text-gray-700 mb-1.5">{{ label }}</label>
-            <textarea id="template_{{ event_type }}" name="template_{{ event_type }}"
-                      class="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-[13px] outline-none transition-all focus:border-amber-400 focus:ring-2 focus:ring-amber-100"
-                      rows="2" placeholder="{{ label }}">{{ body }}</textarea>
+        <div>
+          <p class="text-[11px] font-medium text-gray-500 uppercase tracking-wider mb-1.5">Variaveis disponiveis para este evento</p>
+          <div class="flex flex-wrap gap-1.5">
+            <template x-for="v in currentVariables" :key="v">
+              <button type="button" @click="insertVariable(v)"
+                      class="px-2.5 py-1 rounded-lg text-[11px] font-medium bg-brand-50 text-brand-600 hover:bg-brand-100 hover:text-brand-700 transition border border-brand-100 cursor-pointer">
+                <span x-text="'{{' + v + '}}'"></span>
+              </button>
+            </template>
+            <span x-show="!currentVariables.length" class="text-[12px] text-gray-400">Nenhuma variavel disponivel</span>
           </div>
-          {% endfor %}
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+          <div class="lg:col-span-2">
+            {% for event_type, label, body, variables in link_events %}
+            <div x-show="selectedEvent === '{{ event_type }}'">
+              <label class="block text-[13px] font-medium text-gray-700 mb-1.5">Corpo da mensagem</label>
+              <textarea x-ref="textarea_{{ event_type }}" id="template_{{ event_type }}" name="template_{{ event_type }}"
+                        @input="updatePreview()"
+                        class="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-[13px] outline-none transition-all focus:border-amber-400 focus:ring-2 focus:ring-amber-100 font-mono"
+                        rows="4" placeholder="Digite a mensagem...">{{ body }}</textarea>
+            </div>
+            {% endfor %}
+          </div>
+          <div class="lg:col-span-1">
+            <label class="block text-[13px] font-medium text-gray-700 mb-1.5">Preview <span class="text-gray-400 font-normal">(simulado)</span></label>
+            <div class="bg-[#e5ddd5] rounded-xl p-4 min-h-[140px] flex flex-col items-end">
+              <div class="max-w-[90%] bg-[#dcf8c6] rounded-lg rounded-tr-sm px-3 py-2 shadow-sm">
+                <p class="text-[12px] text-gray-800 whitespace-pre-wrap leading-relaxed" x-text="previewText || 'Selecione um evento...'" style="font-family: -apple-system, sans-serif;"></p>
+                <p class="text-[10px] text-gray-400 text-right mt-1" x-text="new Date().toLocaleTimeString('pt-BR', {hour:'2-digit',minute:'2-digit'})" style="font-family: -apple-system, sans-serif;"></p>
+              </div>
+            </div>
+          </div>
         </div>
 
         <div class="flex justify-end pt-4 border-t border-gray-100">
@@ -519,6 +543,56 @@ showToast("{{ message|escapejs }}", "{% if message.tags == 'error' %}error{% eli
 </div>
 
 <script>
+document.addEventListener('alpine:init', function() {
+    Alpine.data('messageEditor', function() {
+        var eventVars = {{ event_vars_json|safe }};
+        var sampleCtx = {
+            vendedor: 'Fulano', usuario: 'fulano', senha: '********',
+            periodo: '06/2026', valor: 'R$ 1.234,56',
+            cliente: 'Cliente Exemplo', link: 'pagar.exemplo.com/abc',
+            motivo: 'Cartao recusado',
+        };
+        return {
+            selectedEvent: '{{ link_events.0.0 }}',
+            previewText: '',
+            get currentVariables() {
+                return eventVars[this.selectedEvent] || [];
+            },
+            init() {
+                this.updatePreview();
+            },
+            insertVariable(v) {
+                var ref = 'textarea_' + this.selectedEvent;
+                var ta = this.$refs[ref];
+                if (!ta) return;
+                var tag = '{{' + v + '}}';
+                var start = ta.selectionStart;
+                var end = ta.selectionEnd;
+                var before = ta.value.substring(0, start);
+                var after = ta.value.substring(end);
+                ta.value = before + tag + after;
+                ta.selectionStart = ta.selectionEnd = start + tag.length;
+                ta.focus();
+                ta.dispatchEvent(new Event('input', {bubbles: true}));
+            },
+            updatePreview() {
+                var ref = 'textarea_' + this.selectedEvent;
+                var ta = this.$refs[ref];
+                if (!ta) { this.previewText = ''; return; }
+                var text = ta.value || '';
+                var ctx = {};
+                var vars = this.currentVariables;
+                for (var i = 0; i < vars.length; i++) {
+                    ctx[vars[i]] = sampleCtx[vars[i]] || ('[' + vars[i] + ']');
+                }
+                this.previewText = text.replace(/{{(\w+)}}/g, function(m, key) {
+                    return ctx.hasOwnProperty(key) ? ctx[key] : '[' + key + ']';
+                });
+            }
+        };
+    });
+});
+
 function webhookCard() {
     return {
         status: { webhook_url: '', last_event: null },

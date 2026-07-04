@@ -111,6 +111,12 @@ def create_and_send_notification(*, tenant, event_type, channel, recipient, cont
         tenant=tenant, event_type=event_type, channel=channel, is_active=True
     ).first()
 
+    from app.apps.notifications.models import EVENT_VARIABLES
+    valid_vars = EVENT_VARIABLES.get(event_type, [])
+    for v in valid_vars:
+        if v not in context:
+            context[v] = ''
+
     if template:
         try:
             message_body = template.render_body(context)

@@ -19,6 +19,38 @@ SAMPLE_CONTEXT = {
     'motivo': 'Cartao recusado',
 }
 
+EVENT_VARIABLES = {
+    'seller_credentials': ['vendedor', 'usuario', 'senha'],
+    'commission_paid': ['vendedor', 'periodo', 'valor'],
+    'commission_adjusted': ['vendedor', 'periodo', 'valor'],
+    'link_created': ['vendedor', 'cliente', 'valor', 'link'],
+    'payment_paid': ['vendedor', 'cliente', 'valor', 'link'],
+    'link_canceled': ['vendedor', 'cliente', 'valor', 'link'],
+    'payment_expired': ['vendedor', 'cliente', 'valor', 'link'],
+    'payment_failed': ['vendedor', 'cliente', 'valor', 'link', 'motivo'],
+    'payment_refunded': ['vendedor', 'cliente', 'valor', 'link'],
+    'payment_chargeback': ['vendedor', 'cliente', 'valor', 'link', 'motivo'],
+    'link_opened': ['vendedor', 'cliente', 'valor', 'link'],
+    'checkout_started': ['vendedor', 'cliente', 'valor', 'link'],
+    'daily_reminder': ['vendedor'],
+}
+
+EVENT_LABELS = {
+    'seller_credentials': 'Credenciais do vendedor',
+    'commission_paid': 'Comissao paga',
+    'commission_adjusted': 'Comissao ajustada',
+    'link_created': 'Link criado',
+    'payment_paid': 'Link pago',
+    'link_canceled': 'Link cancelado',
+    'payment_expired': 'Link expirado',
+    'payment_failed': 'Pagamento falhou',
+    'payment_refunded': 'Pagamento estornado',
+    'payment_chargeback': 'Chargeback',
+    'link_opened': 'Link aberto',
+    'checkout_started': 'Checkout iniciado',
+    'daily_reminder': 'Lembrete diario',
+}
+
 
 class MessageTemplate(models.Model):
     class EventType(models.TextChoices):

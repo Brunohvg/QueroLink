@@ -80,16 +80,10 @@
         <svg class="w-4 h-4 text-accent flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
         <span>Seu periodo de teste termina em {{ trial_days_left }} dia{{ trial_days_left|pluralize }}.</span>
         <a href="{% url 'dashboard:assinatura' %}" class="text-accent font-semibold whitespace-nowrap">Assinar agora →</a>
-        <button onclick="document.getElementById('trial-banner').remove(); sessionStorage.setItem('trial_banner_dismissed', '1');" class="text-white/50 hover:text-white p-1 ml-1">
+        <button onclick="document.getElementById('trial-banner').remove(); document.cookie='trial_banner_dismissed=1;path=/;max-age=604800';" class="text-white/50 hover:text-white p-1 ml-1">
             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
         </button>
     </div>
-    <script>
-        if (sessionStorage.getItem('trial_banner_dismissed')) {
-            var b = document.getElementById('trial-banner');
-            if (b) b.remove();
-        }
-    </script>
     {% endif %}
 
     <div class="flex h-screen overflow-hidden">

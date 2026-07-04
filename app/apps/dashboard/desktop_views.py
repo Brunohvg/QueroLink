@@ -132,30 +132,20 @@ def gestor_configuracoes(request):
     if not tenant:
         return redirect('dashboard:home')
 
-    from app.apps.notifications.models import MessageTemplate
+    from app.apps.notifications.models import MessageTemplate, EVENT_VARIABLES, EVENT_LABELS
 
-    TEMPLATE_EVENTS = [
-        ('seller_credentials', 'Credenciais do vendedor'),
-        ('commission_paid', 'Comissao paga'),
-        ('commission_adjusted', 'Comissao ajustada'),
-        ('link_created', 'Link criado'),
-        ('payment_paid', 'Link pago'),
-        ('link_canceled', 'Link cancelado'),
-        ('payment_expired', 'Link expirado'),
-        ('payment_refunded', 'Pagamento estornado'),
-        ('payment_failed', 'Pagamento falhou'),
-    ]
+    event_types = list(EVENT_LABELS.keys())
 
     templates_dict = {
         t.event_type: t.body
         for t in MessageTemplate.objects.filter(
             tenant=tenant, channel='whatsapp',
-            event_type__in=[e for e, _l in TEMPLATE_EVENTS],
+            event_type__in=event_types,
         )
     }
     template_events_with_body = [
-        (e, l, templates_dict.get(e, ''))
-        for e, l in TEMPLATE_EVENTS
+        (e, EVENT_LABELS[e], templates_dict.get(e, ''), EVENT_VARIABLES.get(e, []))
+        for e in event_types
     ]
 
     if request.method == 'POST':
@@ -185,9 +175,11 @@ def gestor_configuracoes(request):
                 ) / 100
             except ValueError:
                 messages.error(request, 'Taxa de comissao invalida.')
+                import json as _json_err
                 return render(request, 'dashboard/gestor/configuracoes.html', {
                     'tenant': tenant, 'link_events': template_events_with_body,
-                    'commission_rate_display': float(tenant.default_commission_rate) * 100,
+                    'commission_rate_display': float(tenant.default_commission_rate or 0) * 100,
+                    'event_vars_json': _json_err.dumps(EVENT_VARIABLES),
                 })
 
         link_expires = request.POST.get('link_expires_in', '').strip()
@@ -210,7 +202,7 @@ def gestor_configuracoes(request):
         if tenant.default_commission_rate and float(tenant.default_commission_rate) > 0:
             mark_onboarding_step(tenant, 'step_commission_rate')
 
-        for event_type, _label in TEMPLATE_EVENTS:
+        for event_type in event_types:
             body = request.POST.get(f'template_{event_type}', '').strip()
             if body:
                 MessageTemplate.objects.update_or_create(
@@ -221,10 +213,12 @@ def gestor_configuracoes(request):
         messages.success(request, 'Configuracoes salvas com sucesso.')
         return redirect('dashboard:gestor_configuracoes')
 
+    import json as _json
     return render(request, 'dashboard/gestor/configuracoes.html', {
         'tenant': tenant,
         'link_events': template_events_with_body,
         'commission_rate_display': float(tenant.default_commission_rate) * 100,
+        'event_vars_json': _json.dumps(EVENT_VARIABLES),
     })
 
 

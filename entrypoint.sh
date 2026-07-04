@@ -110,11 +110,14 @@ from app.apps.notifications.models import MessageTemplate
 DEFAULT = [
     ('seller_credentials','whatsapp','Ola {{vendedor}}! Seu acesso ao sistema de comissoes foi criado.\nUsuario: {{usuario}}\nSenha temporaria: {{senha}}\nAcesse e troque sua senha no primeiro login.'),
     ('commission_paid','whatsapp','Ola {{vendedor}}! Sua comissao de {{periodo}} no valor de {{valor}} foi paga. Confira os detalhes no app.'),
+    ('commission_adjusted','whatsapp','Sua comissao do periodo {{periodo}} recebeu um ajuste de {{valor}}. Acesse o sistema para conferir os detalhes.'),
     ('link_created','whatsapp','Ola {{vendedor}}! Seu link de {{valor}} para {{cliente}} foi gerado com sucesso.'),
     ('payment_paid','whatsapp','Ola {{vendedor}}! O link de {{valor}} do(a) {{cliente}} foi pago!'),
     ('link_canceled','whatsapp','Ola {{vendedor}}! O link de {{valor}} do(a) {{cliente}} foi cancelado.'),
     ('payment_expired','whatsapp','Ola {{vendedor}}! O link de {{valor}} do(a) {{cliente}} expirou.'),
+    ('payment_failed','whatsapp','Ola {{vendedor}}! O pagamento de {{valor}} do(a) {{cliente}} falhou. Motivo: {{motivo}}'),
     ('payment_refunded','whatsapp','Ola {{vendedor}}! O pagamento de {{valor}} do(a) {{cliente}} foi estornado.'),
+    ('daily_reminder','whatsapp','Ola {{vendedor}}! Voce ainda nao lancou suas vendas de hoje. Lance agora pelo app para manter sua comissao em dia.'),
 ]
 for t in Tenant.objects.all():
     for et, ch, body in DEFAULT:

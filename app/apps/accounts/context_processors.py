@@ -23,6 +23,8 @@ def trial_status(request):
 
     remaining = (tenant.trial_ends_at - timezone.now()).days
     if remaining <= 7 and remaining >= 0:
+        if request.COOKIES.get('trial_banner_dismissed'):
+            return {'trial_days_left': None, 'show_trial_banner': False}
         return {
             'trial_days_left': remaining,
             'show_trial_banner': True,
