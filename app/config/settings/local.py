@@ -3,6 +3,9 @@ from .base import *
 DEBUG = True
 ALLOWED_HOSTS = ['*']
 
+# Evolution API para testes locais
+WHATSAPP_API_BASE_URL = config('WHATSAPP_API_BASE_URL', default='http://localhost:8080')
+
 DATABASES = {
     "default": {
         "ENGINE": "django.db.backends.sqlite3",

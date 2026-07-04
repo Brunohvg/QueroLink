@@ -75,6 +75,10 @@ CELERY_BEAT_SCHEDULE = {
         'task': 'app.apps.webhooks.tasks.cleanup_old_webhook_events',
         'schedule': 86400.0,  # diariamente
     },
+    'requeue-stuck-notifications': {
+        'task': 'app.apps.notifications.tasks.requeue_stuck_notifications',
+        'schedule': 600.0,  # a cada 10 minutos
+    },
 }
 
 # E-mail em producao

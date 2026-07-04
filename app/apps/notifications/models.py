@@ -1,11 +1,23 @@
 import uuid
 from django.db import models
-from django.template import Template, Context
+from django.core.exceptions import ValidationError
+from django.template import Template, Context, TemplateSyntaxError
 from app.apps.accounts.models import Tenant
 from app.apps.accounts.fields import EncryptedCharField, EncryptedTextField
 from app.apps.orders.models import Order
 from app.apps.sellers.models import Seller
 from app.apps.commissions.models import CommissionPeriod
+
+SAMPLE_CONTEXT = {
+    'vendedor': 'Fulano',
+    'usuario': 'fulano',
+    'senha': '********',
+    'periodo': '06/2026',
+    'valor': 'R$ 1.234,56',
+    'cliente': 'Cliente Exemplo',
+    'link': 'https://exemplo.com/pagar/abc',
+    'motivo': 'Cartao recusado',
+}
 
 
 class MessageTemplate(models.Model):
@@ -48,6 +60,19 @@ class MessageTemplate(models.Model):
         template = Template(self.body)
         context = Context(context_dict)
         return template.render(context)
+
+    def clean(self):
+        if not self.body:
+            return
+        if '{%' in self.body:
+            raise ValidationError(
+                "Apenas variaveis {{...}} sao permitidas; tags {%%} nao sao suportadas."
+            )
+        try:
+            template = Template(self.body)
+            template.render(Context(SAMPLE_CONTEXT))
+        except TemplateSyntaxError as e:
+            raise ValidationError(f"Template invalido: {e}")
 
 
 class Notification(models.Model):

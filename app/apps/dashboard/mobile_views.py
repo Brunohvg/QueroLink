@@ -254,13 +254,10 @@ def mobile_home(request):
 
         periodo_status = period.status if period else None
 
-        from app.apps.sellers.models import SellerGoal
-        goal = SellerGoal.objects.filter(
-            seller=seller, month=today.month, year=today.year,
-        ).first()
-        goal_progress = goal.progress_percent if goal else None
-        goal_remaining = max(0, goal.target_amount - (month_total + month_link_total)) if goal else None
         combined_month_total = month_total + month_link_total
+        goal, goal_progress, goal_remaining = get_seller_goal_context(
+            seller, today, combined_month_total,
+        )
 
         missing_past_days = []
         has_missing_past_days = False
@@ -497,6 +494,7 @@ def mobile_meu_desempenho(request):
     ).select_related('period').order_by('-period__year', '-period__month')
 
     commissions_data = []
+    has_current_month_sc = False
     for sc in commissions:
         if sc.period.status == CommissionPeriod.Status.ABERTA:
             est, total_est = calculate_estimated_commission(
@@ -504,14 +502,49 @@ def mobile_meu_desempenho(request):
             )
             sc.total_sold_amount = total_est
             sc.commission_amount = est
+        if sc.period.month == today.month and sc.period.year == today.year:
+            has_current_month_sc = True
         commissions_data.append(sc)
+
+    current_estimate = None
+    if not has_current_month_sc:
+        est, total_est = calculate_estimated_commission(
+            seller, today.month, today.year,
+        )
+        current_estimate = {
+            'month': today.month,
+            'year': today.year,
+            'total_sold': total_est,
+            'commission': est,
+        }
 
     return render(request, 'mobile/meu_desempenho.html', {
         'seller': seller,
         'month_total': month_total,
         'commissions': commissions_data,
         'current_month': f'{today.month:02d}/{today.year}',
+        'current_estimate': current_estimate,
     })
+
+
+RANKING_TIPS = [
+    'Lance suas vendas todos os dias — dias sem lancamento derrubam sua posicao.',
+    'Ofereca o link de pagamento para fechar clientes indecisos na hora.',
+    'Venda adicionais: um item a mais por atendimento muda seu total do mes.',
+    'Comece o dia conferindo sua meta — quem acompanha, bate.',
+    'Cliente atendido bem volta. Recompra tambem conta para seu ranking.',
+    'Registre a venda na hora, no balcao. Depois a memoria falha.',
+]
+
+
+def get_seller_goal_context(seller, today, combined_month_total):
+    from app.apps.sellers.models import SellerGoal
+    goal = SellerGoal.objects.filter(
+        seller=seller, month=today.month, year=today.year,
+    ).first()
+    if not goal:
+        return None, None, None
+    return goal, goal.progress_percent, max(0, goal.target_amount - combined_month_total)
 
 
 def _get_seller_profile(request):
@@ -530,6 +563,7 @@ def mobile_ranking(request):
     today = timezone.localdate()
     from app.apps.sales.models import Sale
     from django.db.models import Sum
+    from app.apps.commissions.services import calculate_estimated_commission
 
     ranking_qs = Sale.objects.filter(
         tenant=seller.tenant,
@@ -565,14 +599,53 @@ def mobile_ranking(request):
     else:
         ranking_display = []
 
+    my_estimated_commission = 0
+    try:
+        _, my_estimated_commission = calculate_estimated_commission(
+            seller, today.month, today.year,
+        )
+    except Exception:
+        pass
+
+    month_total_manual = Sale.objects.filter(
+        seller=seller,
+        origin=Sale.Origin.MANUAL,
+        status='ATIVA',
+        sale_date__year=today.year,
+        sale_date__month=today.month,
+    ).aggregate(total=Sum('amount'))['total'] or 0
+    month_link_total = Sale.objects.filter(
+        seller=seller,
+        origin=Sale.Origin.LINK,
+        status='ATIVA',
+        sale_date__year=today.year,
+        sale_date__month=today.month,
+    ).aggregate(total=Sum('amount'))['total'] or 0
+    combined_month_total = month_total_manual + month_link_total
+
+    goal, goal_progress, goal_remaining = get_seller_goal_context(
+        seller, today, combined_month_total,
+    )
+
+    start = today.toordinal() % len(RANKING_TIPS)
+    tips = []
+    for j in range(3):
+        tips.append(RANKING_TIPS[(start + j) % len(RANKING_TIPS)])
+
     return render(request, 'mobile/ranking.html', {
         'seller': seller,
         'ranking': ranking_display,
         'seller_pos': seller_pos,
         'my_total': my_total,
+        'my_estimated_commission': my_estimated_commission,
         'total_sellers': total_sellers,
         'visible_to_sellers': visible_to_sellers,
         'current_month': f'{today.month:02d}/{today.year}',
+        'goal': goal,
+        'goal_progress': goal_progress,
+        'goal_remaining': goal_remaining,
+        'combined_month_total': combined_month_total,
+        'tips': tips,
     })
 
 

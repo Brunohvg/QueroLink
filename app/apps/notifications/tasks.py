@@ -2,8 +2,9 @@ import logging
 
 from celery import shared_task
 from django.conf import settings
+from django.utils import timezone
 from app.apps.notifications.models import Notification, MessageTemplate
-from app.services.messaging.whatsapp import WhatsappClient
+from app.services.messaging.whatsapp import WhatsappClient, InvalidNumberError
 
 logger = logging.getLogger(__name__)
 
@@ -24,6 +25,10 @@ def send_whatsapp_notification(self, notification_id):
         logger.info("Notification %s already processed, skipping", notification_id)
         return
 
+    if notification.channel != MessageTemplate.Channel.WHATSAPP:
+        logger.warning("Notification %s channel is not WhatsApp (%s), skipping", notification_id, notification.channel)
+        return
+
     if not notification.recipient:
         logger.warning("Notification %s has no recipient, skipping", notification_id)
         notification.status = Notification.Status.FAILED
@@ -33,36 +38,63 @@ def send_whatsapp_notification(self, notification_id):
 
     try:
         tenant = notification.tenant
+        instance = tenant.whatsapp_instance_id
+        api_key = tenant.whatsapp_token
+
+        if not instance:
+            if getattr(settings, 'WHATSAPP_ALLOW_SHARED_INSTANCE', False):
+                instance = settings.WHATSAPP_INSTANCE
+                api_key = api_key or settings.WHATSAPP_API_KEY
+                logger.info(
+                    "Notification %s usando instancia compartilhada (tenant %s sem instancia propria)",
+                    notification_id, tenant.slug,
+                )
+            else:
+                notification.status = Notification.Status.FAILED
+                notification.error_log = 'Tenant sem instancia WhatsApp configurada. Conecte o WhatsApp em Configuracoes.'
+                notification.save(update_fields=['status', 'error_log', 'updated_at'])
+                return
+
         client = WhatsappClient(
-            instance=tenant.whatsapp_instance_id or getattr(settings, 'WHATSAPP_INSTANCE', ''),
-            api_key=tenant.whatsapp_token or getattr(settings, 'WHATSAPP_API_KEY', ''),
+            instance=instance,
+            api_key=api_key,
         )
         client.send_message(notification.recipient, notification.message_body)
 
         notification.status = Notification.Status.SENT
         notification.save(update_fields=["status", "updated_at"])
 
-    except Exception as e:
-        notification.retry_count += 1
+    except InvalidNumberError as e:
+        notification.status = Notification.Status.FAILED
         notification.error_log = str(e)[:1000]
-        notification.save(update_fields=["retry_count", "error_log", "updated_at"])
+        notification.save(update_fields=['status', 'error_log', 'updated_at'])
+        logger.warning("WhatsApp notification %s failed: invalid number — %s", notification_id, e)
 
-        retry_count = notification.retry_count
+    except Exception as e:
+        celery_retries = self.request.retries if hasattr(self, 'request') and self.request is not None else 0
+        base_retries = max(celery_retries, notification.retry_count)
+        attempt = base_retries + 1
+
+        notification.retry_count = attempt
+        notification.error_log = str(e)[:1000]
+
+        if attempt >= MAX_RETRIES:
+            notification.status = Notification.Status.FAILED
+            notification.error_log = f"Max retries ({MAX_RETRIES}). Ultimo erro: {str(e)[:800]}"
+            notification.save(update_fields=['retry_count', 'status', 'error_log', 'updated_at'])
+            logger.warning(
+                "WhatsApp notification %s failed (attempt %d/%d): %s",
+                notification_id, attempt, MAX_RETRIES, e,
+            )
+            return
+
+        notification.save(update_fields=['retry_count', 'error_log', 'updated_at'])
         logger.warning(
             "WhatsApp notification %s failed (attempt %d/%d): %s",
-            notification_id, retry_count, MAX_RETRIES, e,
+            notification_id, attempt, MAX_RETRIES, e,
         )
-
-        if retry_count < MAX_RETRIES:
-            countdown = 60 * (2 ** (retry_count - 1))
-            try:
-                raise self.retry(countdown=countdown)
-            except Exception:
-                raise
-        else:
-            notification.status = Notification.Status.FAILED
-            notification.error_log = f"Max retries ({MAX_RETRIES}) exceeded. Last error: {str(e)[:800]}"
-            notification.save(update_fields=["status", "error_log", "updated_at"])
+        if hasattr(self, 'request') and self.request is not None:
+            raise self.retry(exc=e, countdown=60 * (2 ** self.request.retries))
 
 
 def create_and_send_notification(*, tenant, event_type, channel, recipient, context, seller=None, order=None, commission_period=None):
@@ -78,7 +110,14 @@ def create_and_send_notification(*, tenant, event_type, channel, recipient, cont
     ).first()
 
     if template:
-        message_body = template.render_body(context)
+        try:
+            message_body = template.render_body(context)
+        except Exception:
+            logger.exception(
+                "Template render failed for tenant=%s event=%s, using fallback",
+                tenant.pk, event_type,
+            )
+            message_body = _fallback_body(event_type, context)
     else:
         message_body = _fallback_body(event_type, context)
 
@@ -116,7 +155,7 @@ def notify_seller_link_status(seller, order, event_type, motivo=''):
     if not seller or not seller.phone:
         logger.warning("Seller %s has no phone, skipping link notification", seller.id if seller else '?')
         return None
-    valor = f"R$ {order.total_amount // 100},{order.total_amount % 100:02d}"
+    valor = format_brl_cents(order.total_amount)
     create_and_send_notification(
         tenant=seller.tenant,
         event_type=event_type,
@@ -137,10 +176,8 @@ def notify_seller_link_status(seller, order, event_type, motivo=''):
 def notify_commission_paid(seller_commission):
     seller = seller_commission.seller
     period = seller_commission.period
-    from decimal import Decimal
     amount_value = seller_commission.paid_amount if seller_commission.paid_amount is not None else seller_commission.amount_due
-    amount = Decimal(str(amount_value)) / Decimal('100')
-    valor = f"R$ {amount:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+    valor = format_brl_cents(amount_value)
 
     create_and_send_notification(
         tenant=seller.tenant,
@@ -221,7 +258,7 @@ def send_daily_entry_reminders():
 
         sellers_to_remind = Seller.objects.filter(
             tenant=tenant, is_active=True,
-        ).exclude(id__in=sellers_with_sale_today).select_related('user')
+        ).exclude(uuid__in=sellers_with_sale_today).select_related('user')
 
         for seller in sellers_to_remind:
             if not seller.phone:
@@ -250,6 +287,36 @@ def send_daily_entry_reminders():
         "Daily reminder: %d enviados, %d sem telefone",
         sent_count, skipped_no_phone,
     )
+
+
+@shared_task(soft_time_limit=300, time_limit=360)
+def requeue_stuck_notifications():
+    from datetime import timedelta
+
+    now = timezone.now()
+    window_start = now - timedelta(hours=48)
+    window_end = now - timedelta(minutes=15)
+
+    stuck = Notification.objects.filter(
+        status=Notification.Status.PENDING,
+        retry_count=0,
+        created_at__gte=window_start,
+        created_at__lte=window_end,
+    )[:100]
+
+    count = 0
+    for n in stuck:
+        send_whatsapp_notification.delay(n.uuid)
+        count += 1
+
+    if count:
+        logger.info("Requeued %d stuck notifications (PENDING, never attempted)", count)
+
+
+def format_brl_cents(amount_cents):
+    from decimal import Decimal
+    amount = Decimal(str(amount_cents)) / Decimal('100')
+    return f"R$ {amount:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
 
 
 def _fallback_body(event_type, context):

@@ -3,9 +3,14 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
-    "build:css": "tailwindcss -i ./static/css/input.css -o ./static/css/tailwind.css --minify"
+    "build:css": "tailwindcss -i ./static/css/input.css -o ./static/css/tailwind.css --minify",
+    "build:js": "node -e \"require('fs').copyFileSync('node_modules/alpinejs/dist/cdn.min.js','static/js/alpine.min.js')\"",
+    "build": "npm run build:css && npm run build:js"
   },
   "devDependencies": {
     "tailwindcss": "^3.4.0"
+  },
+  "dependencies": {
+    "alpinejs": "3.14.9"
   }
 }

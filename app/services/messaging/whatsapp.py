@@ -29,7 +29,14 @@ class MessageSendError(WhatsAppError):
     pass
 
 
-class ConnectionError(WhatsAppError):
+class EvolutionConnectionError(WhatsAppError):
+    pass
+
+
+ConnectionError = EvolutionConnectionError  # alias backward compatibility
+
+
+class InvalidNumberError(WhatsAppError):
     pass
 
 
@@ -45,10 +52,7 @@ class WhatsappClient:
     def __init__(self, instance=None, api_key=None, webhook_url=None):
         self.instance = instance or getattr(settings, 'WHATSAPP_INSTANCE', '')
         self.api_key = api_key or getattr(settings, 'WHATSAPP_API_KEY', '')
-        self.api_base_url = getattr(
-            settings, 'WHATSAPP_API_BASE_URL',
-            'https://api.lojabibelo.com.br',
-        ).rstrip('/')
+        self.api_base_url = getattr(settings, 'WHATSAPP_API_BASE_URL', '').rstrip('/')
         self.timeout = getattr(
             settings, 'WHATSAPP_TIMEOUT', DEFAULT_TIMEOUT,
         )
@@ -58,6 +62,8 @@ class WhatsappClient:
         self.webhook_url = webhook_url
 
     def send_message(self, number, text):
+        if not self.api_base_url:
+            raise WhatsAppError("Evolution API nao configurada (WHATSAPP_API_BASE_URL).")
         number = self._format_number(number)
         payload = {
             "number": number,
@@ -103,43 +109,7 @@ class WhatsappClient:
                 f"Erro na comunicacao com Evolution API: {e}",
             )
 
-        if response.status_code == 401:
-            logger.error("Evolution API unauthorized: instance=%s", self.instance)
-            raise AuthenticationError(
-                "Chave de API da Evolution API invalida. "
-                "Verifique a configuracao de WHATSAPP_API_KEY.",
-                http_status=401,
-            )
-        if response.status_code == 404:
-            logger.error("Evolution API instance not found: %s", self.instance)
-            raise InstanceNotFoundError(
-                f"Instancia WhatsApp '{self.instance}' nao encontrada. "
-                "Verifique a configuracao de WHATSAPP_INSTANCE.",
-                http_status=404,
-            )
-        if response.status_code == 403:
-            logger.error("Evolution API forbidden: instance=%s", self.instance)
-            raise AuthenticationError(
-                "Acesso negado pela Evolution API. "
-                "Verifique as permissoes da chave de API.",
-                http_status=403,
-            )
-
-        response.raise_for_status()
-
-        try:
-            data = response.json()
-        except ValueError:
-            logger.error("Evolution API response is not valid JSON")
-            raise WhatsAppError("Resposta invalida da Evolution API.")
-
-        if isinstance(data, dict) and data.get('error'):
-            error_msg = data['error'].get('message', str(data['error']))
-            logger.error("Evolution API error response: %s", error_msg)
-            raise MessageSendError(
-                f"Evolution API: {error_msg}",
-                code=data['error'].get('code'),
-            )
+        data = self._handle_response(response)
 
         msg_id = data.get('key', {}) if isinstance(data, dict) else {}
         logger.info(
@@ -234,6 +204,8 @@ class WhatsappClient:
         self._delete(f"/instance/delete/{self.instance}")
 
     def _request(self, method, path, **kwargs):
+        if not self.api_base_url:
+            raise WhatsAppError("Evolution API nao configurada (WHATSAPP_API_BASE_URL).")
         url = f"{self.api_base_url}{path}"
         headers = {"apikey": self.api_key}
         if 'json' in kwargs:
@@ -283,21 +255,23 @@ class WhatsappClient:
         return data
 
     def _format_number(self, number):
+        """
+        Normaliza numero de WhatsApp para o padrao internacional brasileiro.
+
+        O sistema é BR-only. Numeros cadastrados entram como DDD + numero
+        (SEM codigo de pais). A ambiguidade "11 digitos comecando com 55"
+        é resolvida a favor do DDD 55 (regiao de Santa Maria/RS), pois o
+        cadastro coleta DDD + numero, nunca codigo de pais.
+        """
         cleaned = ''.join(filter(str.isdigit, str(number)))
+        cleaned = cleaned.lstrip('0')
 
-        if cleaned.startswith('55'):
-            if len(cleaned) in (12, 13):
-                pass
+        if len(cleaned) in (10, 11):
+            cleaned = '55' + cleaned
+        elif len(cleaned) in (12, 13) and cleaned.startswith('55'):
+            pass
         else:
-            if len(cleaned) in (10, 11):
-                cleaned = '55' + cleaned
-            elif len(cleaned) == 12:
-                cleaned = '55' + cleaned
-
-        if len(cleaned) < 12:
-            logger.warning(
-                "WhatsApp number may be invalid: original=%s cleaned=%s (%d digits)",
-                number, cleaned, len(cleaned),
+            raise InvalidNumberError(
+                f"Numero de WhatsApp invalido apos normalizacao: {len(cleaned)} digitos."
             )
-
         return cleaned

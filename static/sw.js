@@ -1,5 +1,6 @@
 var CACHE_NAME = 'querolink-static-v2';
 var ASSETS = [
+    '/static/js/alpine.min.js',
     '/static/js/format.js',
     '/static/icons/icon-192.png',
     '/static/icons/icon-512.png',

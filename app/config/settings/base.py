@@ -27,6 +27,8 @@ SECRET_KEY = config('SECRET_KEY')
 # APIs e Integrações
 WHATSAPP_API_KEY = config('WHATSAPP_API_KEY', default=config('API_KEY_INSTANCIA', default=''))
 WHATSAPP_INSTANCE = config('WHATSAPP_INSTANCE', default=config('INSTANCE', default=''))
+WHATSAPP_API_BASE_URL = config('WHATSAPP_API_BASE_URL', default='')
+WHATSAPP_ALLOW_SHARED_INSTANCE = config('WHATSAPP_ALLOW_SHARED_INSTANCE', default=False, cast=bool)
 SERVICE_FQDN_WEB = config('SERVICE_FQDN_WEB', default='localhost')
 FERNET_KEY = config('FERNET_KEY', default='')
 
