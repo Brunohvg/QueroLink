@@ -80,7 +80,7 @@ def gestor_home(request):
     from app.apps.webhooks.models import WebhookEvent
     webhooks_pendentes = WebhookEvent.objects.filter(
         tenant=tenant, processed=False,
-        created_at__lt=timezone.now() - timedelta(minutes=10),
+        received_at__lt=timezone.now() - timedelta(minutes=10),
     ).count()
 
     vendas_hoje = Sale.objects.filter(
