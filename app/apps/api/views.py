@@ -132,6 +132,9 @@ class SaleViewSet(viewsets.ModelViewSet):
         sale = serializer.save()
         log_action(self.request, 'sale.created', instance=sale)
 
+        from app.apps.commissions.services import ensure_seller_commission
+        ensure_seller_commission(sale.seller, sale.sale_date)
+
         from app.apps.accounts.models import mark_onboarding_step
         mark_onboarding_step(self.request.user.tenant, 'step_first_sale')
 
@@ -196,7 +199,7 @@ class SaleViewSet(viewsets.ModelViewSet):
                         skipped += 1
                         continue
 
-                    Sale.objects.create(
+                    sale_obj = Sale.objects.create(
                         tenant=tenant,
                         seller=seller,
                         origin=Sale.Origin.MANUAL,
@@ -205,6 +208,8 @@ class SaleViewSet(viewsets.ModelViewSet):
                         notes=str(notes)[:500] if notes else '',
                         created_by=request.user,
                     )
+                    from app.apps.commissions.services import ensure_seller_commission
+                    ensure_seller_commission(seller, sale_date)
                     imported += 1
                 except Exception as e:
                     errors.append({'index': idx, 'error': str(e)})
@@ -225,9 +230,41 @@ class CommissionPeriodViewSet(viewsets.ModelViewSet):
         return CommissionPeriodSerializer
 
     def get_queryset(self):
-        return CommissionPeriod.objects.filter(
+        qs = CommissionPeriod.objects.filter(
             tenant=self.request.user.tenant,
-        ).prefetch_related('seller_commissions__seller')
+        )
+
+        scope = self.request.query_params.get('scope')
+        if scope == 'active':
+            qs = qs.exclude(status__in=[
+                CommissionPeriod.Status.PAGA,
+                CommissionPeriod.Status.CANCELADA,
+            ])
+        elif scope == 'finished':
+            qs = qs.filter(status__in=[
+                CommissionPeriod.Status.PAGA,
+                CommissionPeriod.Status.CANCELADA,
+            ])
+
+        month = self.request.query_params.get('month')
+        if month:
+            qs = qs.filter(month=int(month))
+        year = self.request.query_params.get('year')
+        if year:
+            qs = qs.filter(year=int(year))
+
+        return qs.prefetch_related('seller_commissions__seller')
+
+    def retrieve(self, request, *args, **kwargs):
+        period = self.get_object()
+        if period.status in (
+            CommissionPeriod.Status.ABERTA,
+            CommissionPeriod.Status.PARCIALMENTE_FECHADA,
+            CommissionPeriod.Status.PARCIALMENTE_PAGA,
+        ):
+            from app.apps.commissions.services import sync_period_seller_commissions
+            sync_period_seller_commissions(period)
+        return super().retrieve(request, *args, **kwargs)
 
     def perform_create(self, serializer):
         tenant = self.request.user.tenant

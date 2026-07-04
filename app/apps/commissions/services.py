@@ -227,6 +227,23 @@ def close_seller_commissions(period, seller_commission_ids, user):
             })
         recalculate_period_status(period)
 
+    try:
+        tenant = period.tenant
+        if tenant.accountant_email and tenant.accountant_auto_send and not period.sent_to_accounting_at:
+            all_closed = not SellerCommission.objects.filter(period=period).exclude(
+                status__in=[
+                    SellerCommission.Status.FECHADA,
+                    SellerCommission.Status.AJUSTADA,
+                    SellerCommission.Status.PAGA,
+                    SellerCommission.Status.CANCELADA,
+                ],
+            ).exists()
+            if all_closed:
+                from app.apps.notifications.tasks import send_accounting_package_email
+                send_accounting_package_email.delay(str(tenant.uuid), period.month, period.year)
+    except Exception:
+        logger.error('Falha ao agendar envio contabil para period %s', period.id, exc_info=True)
+
     return calculations
 
 
@@ -308,23 +325,6 @@ def pay_seller_commissions(period, seller_commission_ids, user, payment_data):
                 'Failed to send payment notification for commission %s', sc.id,
                 exc_info=True,
             )
-
-    try:
-        tenant = period.tenant
-        if tenant.accountant_email and tenant.accountant_auto_send:
-            all_paid = not SellerCommission.objects.filter(period=period).exclude(
-                status__in=[SellerCommission.Status.PAGA, SellerCommission.Status.CANCELADA],
-            ).exists()
-            if all_paid:
-                from app.apps.notifications.tasks import send_accounting_package_email
-                send_accounting_package_email.delay(
-                    str(tenant.uuid), period.month, period.year,
-                )
-    except Exception:
-        logger.error(
-            'Failed to schedule auto accounting email for period %s', period.id,
-            exc_info=True,
-        )
 
     return list(commissions)
 
@@ -585,6 +585,29 @@ def get_missing_days_before_today(seller, month, year):
                 missing.append(current)
         current += timedelta(days=1)
     return missing
+
+
+def ensure_seller_commission(seller, sale_date):
+    period = CommissionPeriod.objects.filter(
+        tenant=seller.tenant, month=sale_date.month, year=sale_date.year,
+        status__in=[
+            CommissionPeriod.Status.ABERTA,
+            CommissionPeriod.Status.PARCIALMENTE_FECHADA,
+            CommissionPeriod.Status.PARCIALMENTE_PAGA,
+        ],
+    ).first()
+    if not period:
+        return None
+    sc, created = SellerCommission.objects.get_or_create(
+        period=period, seller=seller,
+        defaults={
+            'commission_rate': get_commission_rate(seller),
+            'expected_working_days': period.expected_working_days or 22,
+        },
+    )
+    if sc.is_editable:
+        sc.recalculate(commit=True)
+    return sc
 
 
 def validate_sale_can_be_changed(seller, sale_date, user):

@@ -465,6 +465,7 @@ class CommissionPeriodSerializer(serializers.ModelSerializer):
             'expected_working_days', 'notes',
             'closed_at', 'paid_at', 'adjusted_at',
             'adjustment_reason', 'cancelled_at', 'cancel_reason',
+            'sent_to_accounting_at',
             'created_at', 'seller_commissions', 'is_current_month',
         ]
         read_only_fields = [

@@ -367,6 +367,8 @@ def mobile_lancar_venda(request):
                 log_action(
                     request, 'sale.created', instance=sale,
                 )
+                from app.apps.commissions.services import ensure_seller_commission
+                ensure_seller_commission(seller, sale_date)
 
             success = True
             last_amount = amount_cents

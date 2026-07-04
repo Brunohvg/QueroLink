@@ -7,9 +7,18 @@
     <div class="flex items-center justify-between">
       <div>
         <h1 class="font-display text-[22px] font-bold text-gray-900 tracking-tight">Competencias</h1>
-        <p class="text-[13px] text-gray-500 mt-0.5">Feche, pague e acompanhe as comissoes por mes</p>
+        <p class="text-[13px] text-gray-500 mt-0.5">
+          <span x-show="!showFinished">Competencias em aberto e parcialmente fechadas/pagas</span>
+          <span x-show="showFinished">Todas as competencias, incluindo finalizadas</span>
+        </p>
       </div>
       <div class="flex items-center gap-2">
+        <button @click="toggleScope()"
+                :class="showFinished ? 'bg-gray-200 text-gray-800' : 'bg-white text-gray-500'"
+                class="inline-flex items-center gap-2 border border-gray-200 hover:border-gray-300 font-medium py-2.5 px-4 rounded-xl transition-all text-[13px] shadow-sm active:scale-[0.97]">
+          <template x-if="!showFinished"><span>Mostrar finalizadas</span></template>
+          <template x-if="showFinished"><span>Ocultar finalizadas</span></template>
+        </button>
         <button @click="load()"
                 class="inline-flex items-center gap-2 bg-white border border-gray-200 hover:border-gray-300 text-gray-700 font-medium py-2.5 px-4 rounded-xl transition-all text-[14px] shadow-sm hover:shadow active:scale-[0.97]">
           <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
@@ -79,6 +88,10 @@
             <span class="text-gray-500">Vendedores: <strong class="text-gray-800" x-text="(p.seller_commissions||[]).length"></strong></span>
             <span x-show="p.closed_at" class="text-gray-500">Fechamento: <strong class="text-gray-800" x-text="new Date(p.closed_at).toLocaleDateString('pt-BR')"></strong></span>
             <span x-show="p.paid_at" class="text-gray-500">Pagamento: <strong class="text-emerald-600" x-text="new Date(p.paid_at).toLocaleDateString('pt-BR')"></strong></span>
+            <span x-show="p.sent_to_accounting_at" class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-sky-50 text-sky-700">
+              <span class="w-1.5 h-1.5 rounded-full bg-sky-500"></span>
+              Enviada a contabilidade
+            </span>
           </div>
         </div>
       </div>
@@ -420,10 +433,17 @@ function fechamentoPage() {
         showPayModal: false, payPeriod: null, paySellers: [], payDate: '', payMethod: '', payNotes: '',
         showReopenModal: false, reopenPeriod: null, reopenSellers: [], reopenReason: '',
         selected: new Map(),
+        showFinished: false,
         async load() {
-            var r = await fetch('/api/commissions/periods/');
+            var url = '/api/commissions/periods/?scope=active';
+            if (this.showFinished) url = '/api/commissions/periods/?scope=all';
+            var r = await fetch(url);
             this.periods = await r.json();
             this.selected = new Map();
+        },
+        toggleScope() {
+            this.showFinished = !this.showFinished;
+            this.load();
         },
         showError(d) {
             showToast(d.error || d.detail || d.message || 'Erro inesperado', 'error');

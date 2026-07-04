@@ -30,6 +30,11 @@ class Seller(models.Model):
                 fields=['tenant', 'phone_hash'],
                 name='unique_tenant_phone',
             ),
+            models.UniqueConstraint(
+                fields=['tenant', 'cpf'],
+                condition=models.Q(cpf__isnull=False),
+                name='unique_cpf_per_tenant',
+            ),
         ]
         indexes = [
             models.Index(fields=['tenant', 'is_active']),
@@ -66,7 +71,16 @@ class Seller(models.Model):
                 d2 = 0
             if int(digits[9]) != d1 or int(digits[10]) != d2:
                 raise ValidationError({'cpf': 'CPF invalido.'})
-            self.cpf = f'{digits[:3]}.{digits[3:6]}.{digits[6:9]}-{digits[9:]}'
+            qs = Seller.objects.filter(tenant=self.tenant, cpf=digits).exclude(pk=self.pk)
+            if qs.exists():
+                raise ValidationError({'cpf': 'Ja existe um vendedor com este CPF.'})
+            self.cpf = digits
+
+    @property
+    def cpf_formatted(self):
+        if not self.cpf or len(self.cpf) != 11:
+            return self.cpf or ''
+        return f'{self.cpf[:3]}.{self.cpf[3:6]}.{self.cpf[6:9]}-{self.cpf[9:]}'
 
     def __str__(self):
         return self.name

@@ -553,11 +553,9 @@ def financeiro_historico(request):
 
 
 @login_required
-@login_required
 def gestor_webhooks(request):
-    result = _check_role(request, User.Role.ADMIN, User.Role.MANAGER)
-    if result:
-        return result
+    if not _check_role(request, User.Role.ADMIN, User.Role.MANAGER):
+        return redirect('dashboard:home')
     tenant = request.user.tenant
 
     from app.apps.webhooks.models import WebhookEvent
@@ -568,17 +566,17 @@ def gestor_webhooks(request):
     last_24h = now - timedelta(hours=24)
     last_7d = now - timedelta(days=7)
 
-    events = WebhookEvent.objects.filter(
-        gateway='pagarme', tenant=tenant,
-    ).order_by('-received_at')[:50]
+    base_qs = WebhookEvent.objects.filter(gateway='pagarme', tenant=tenant)
 
-    recent_24h = events.filter(received_at__gte=last_24h).count()
-    pending_10min = events.filter(
+    recent_24h = base_qs.filter(received_at__gte=last_24h).count()
+    pending_10min = base_qs.filter(
         processed=False, received_at__lte=now - timedelta(minutes=10),
     ).count()
-    ignored_7d = events.filter(
+    ignored_7d = base_qs.filter(
         processed=True, received_at__gte=last_7d,
     ).exclude(skip_reason__isnull=True).count()
+
+    events = base_qs.order_by('-received_at')[:50]
 
     webhook_url = (
         f"https://{settings.SERVICE_FQDN_WEB}"
@@ -923,9 +921,11 @@ def gestor_contabilidade(request):
                 status__in=[SellerCommission.Status.PAGA, SellerCommission.Status.CANCELADA],
             ).exists()
             status = period.get_status_display()
+            sent_at = period.sent_to_accounting_at
         else:
             all_paid = False
             status = 'Sem fechamento'
+            sent_at = None
 
         competencias.append({
             'month': month,
@@ -935,7 +935,13 @@ def gestor_contabilidade(request):
             'total_comm': total_comm,
             'status': status,
             'is_complete': all_paid,
+            'sent_to_accounting_at': sent_at,
         })
+
+    sellers_sem_cpf = list(Seller.objects.filter(
+        tenant=tenant, is_active=True, cpf__isnull=True,
+    ).values_list('name', flat=True))
+    has_pendencia_cpf = bool(sellers_sem_cpf)
 
     has_export = getattr(settings, 'PLAN_FEATURES', {}).get(tenant.plan, {}).get('export_contabil', False)
 
@@ -945,4 +951,6 @@ def gestor_contabilidade(request):
         'accountant_auto_send': tenant.accountant_auto_send,
         'has_export': has_export,
         'tenant': tenant,
+        'sellers_sem_cpf': sellers_sem_cpf,
+        'has_pendencia_cpf': has_pendencia_cpf,
     })

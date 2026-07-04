@@ -26,7 +26,7 @@ def build_accounting_zip(tenant, month_int, year_int):
 
         csv1_lines = ['Data;Vendedor;CPF Vendedor;Valor (R$);Origem;Status;Observacao']
         for s in sales:
-            cpf = getattr(s.seller, 'cpf', '') or 'Nao informado'
+            cpf = s.seller.cpf_formatted or 'Nao informado'
             valor = f'{s.amount/100:,.2f}'.replace(',', 'X').replace('.', ',').replace('X', '.')
             origin = 'Link' if s.origin == SModel.Origin.LINK else 'Manual'
             status = 'Estornada' if s.status == 'ESTORNADA' else 'Ativa'
@@ -56,7 +56,7 @@ def build_accounting_zip(tenant, month_int, year_int):
                 total_adj = 0
                 liquida = comissao
 
-            cpf = getattr(seller, 'cpf', '') or 'Nao informado'
+            cpf = seller.cpf_formatted or 'Nao informado'
             taxa = f'{float(get_commission_rate(seller))*100:.2f}'.replace('.', ',')
             csv2_lines.append(
                 f'{seller.name};{cpf};'
@@ -118,5 +118,17 @@ def build_accounting_zip(tenant, month_int, year_int):
             'prev_total': prev_total, 'variacao': variacao,
         })
         zf.writestr(f'resumo_{month_int:02d}_{year_int}.pdf', HTML(string=pdf_html).write_pdf())
+
+        sellers_missing_cpf = [
+            s for s in SellerM.objects.filter(tenant=tenant, is_active=True)
+            if not s.cpf and SellerCommission.objects.filter(
+                seller=s, period__month=month_int, period__year=year_int,
+            ).exists()
+        ]
+        if sellers_missing_cpf:
+            pend_lines = ['Vendedores sem CPF cadastrado — a folha pode exigir:']
+            for s in sellers_missing_cpf:
+                pend_lines.append(f'- {s.name}')
+            zf.writestr('pendencias.txt', '\n'.join(pend_lines).encode('utf-8'))
 
     return buf.getvalue()

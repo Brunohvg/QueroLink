@@ -59,6 +59,12 @@ class CommissionPeriod(models.Model):
     )
     cancel_reason = models.TextField(blank=True, null=True)
 
+    sent_to_accounting_at = models.DateTimeField(null=True, blank=True)
+    sent_to_accounting_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True,
+        on_delete=models.SET_NULL, related_name='+',
+    )
+
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

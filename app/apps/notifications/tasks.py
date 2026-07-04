@@ -535,6 +535,14 @@ def send_accounting_package_email(self, tenant_uuid, month, year, requested_by_u
     msg.attach(f'contabilidade_{year_int}_{month_int:02d}.zip', zip_bytes, 'application/zip')
     msg.send()
 
+    from app.apps.commissions.models import CommissionPeriod
+    period = CommissionPeriod.objects.filter(tenant=tenant, month=month_int, year=year_int).first()
+    if period and not period.sent_to_accounting_at:
+        period.sent_to_accounting_at = timezone.now()
+        if requested_by_user_id:
+            period.sent_to_accounting_by_id = requested_by_user_id
+        period.save(update_fields=['sent_to_accounting_at', 'sent_to_accounting_by', 'updated_at'])
+
     try:
         from app.apps.audit.models import AuditLog
         AuditLog.objects.create(
