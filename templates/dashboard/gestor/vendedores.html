@@ -258,7 +258,7 @@
         <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-400 to-emerald-500 flex items-center justify-center shadow-sm">
           <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5 5 5-5M12 15V3"></path></svg>
         </div>
-        <div><h2 class="text-[16px] font-semibold text-gray-900">Importar Vendedores</h2><p class="text-[12px] text-gray-400">CSV ou XLSX com colunas <strong>nome</strong>, <strong>telefone</strong></p></div>
+        <div><h2 class="text-[16px] font-semibold text-gray-900">Importar Vendedores</h2><p class="text-[12px] text-gray-400">CSV ou XLSX com colunas <strong>nome</strong>, <strong>telefone</strong>, <strong>cpf</strong> (opcional)</p></div>
       </div>
 
       <div x-show="!importResult">
@@ -268,7 +268,7 @@
              @click="$refs.fileInput.click()">
           <svg class="w-10 h-10 mx-auto mb-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path></svg>
           <p class="text-[14px] font-medium text-gray-700" x-text="selectedFile ? selectedFile.name : 'Clique ou arraste o arquivo aqui'"></p>
-          <p class="text-[12px] text-gray-400 mt-1">CSV ou XLSX — nome e telefone</p>
+          <p class="text-[12px] text-gray-400 mt-1">CSV ou XLSX — nome, telefone, cpf (opcional)</p>
           <input type="file" x-ref="fileInput" accept=".csv,.xlsx" @change="selectedFile = $refs.fileInput.files[0]" class="hidden">
         </div>
         <div class="mt-5 flex gap-3 justify-end">
@@ -339,7 +339,7 @@ function maskPhone(path) {
 }
 
 function maskCpf(path) {
-    var digits = this.getPropertyAtPath(path).replace(/\D/g, '').slice(0, 11);
+    var digits = (this.getPropertyAtPath(path) || '').replace(/\D/g, '').slice(0, 11);
     var formatted = '';
     if (digits.length > 0) formatted = digits.slice(0, 3);
     if (digits.length > 3) formatted += '.' + digits.slice(3, 6);

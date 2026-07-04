@@ -276,13 +276,25 @@ class SellerImportSerializer(serializers.Serializer):
                     role=User.Role.SELLER,
                     tenant=tenant,
                 )
-                seller = Seller.objects.create(
+                cpf_raw = (row.get('cpf') or row.get('CPF') or '').strip()
+                cpf_value = None
+                if cpf_raw:
+                    cpf_digits = ''.join(filter(str.isdigit, cpf_raw))
+                    if len(cpf_digits) == 11:
+                        cpf_value = cpf_digits
+                    else:
+                        errors.append({'linha': i, 'erro': f'CPF invalido: {cpf_raw}'})
+                        continue
+
+                seller = Seller(
                     tenant=tenant,
                     user=user,
                     name=name,
                     phone=cleaned_phone,
                     commission_rate=tenant.default_commission_rate,
+                    cpf=cpf_value,
                 )
+                seller.save()
 
                 try:
                     from app.apps.notifications.tasks import notify_seller_credentials
@@ -296,10 +308,11 @@ class SellerImportSerializer(serializers.Serializer):
                 used_usernames.add(username)
                 used_phones.add(compute_hash(cleaned_phone))
                 created.append({
-                    'linha': i,
-                    'nome': name,
-                    'telefone': cleaned_phone,
                     'username': username,
+                    'password': password,
+                    'name': name,
+                    'phone': phone,
+                    'uuid': str(seller.uuid),
                 })
 
             except Exception as e:

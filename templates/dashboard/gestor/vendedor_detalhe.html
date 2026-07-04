@@ -40,7 +40,7 @@
           <svg class="w-4 h-4 text-amber-500 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"/></svg>
           <div>
             <p class="text-[12px] font-semibold text-amber-800">CPF nao cadastrado</p>
-            <p class="text-[11px] text-amber-600">O CPF e necessario para a folha de pagamento e exportacao contabil. <a :href="'/dashboard/gestor/vendedores/'+(sellerData?.seller?.uuid||'')+'/editar/'" class="underline hover:text-amber-800">Cadastrar agora</a></p>
+            <p class="text-[11px] text-amber-600">O CPF e necessario para a folha de pagamento e exportacao contabil. <a href="{% url 'dashboard:gestor_vendedores' %}" class="underline hover:text-amber-800">Cadastrar na lista de vendedores</a></p>
           </div>
         </div>
       </div>
