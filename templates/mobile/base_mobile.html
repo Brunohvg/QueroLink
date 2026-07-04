@@ -88,6 +88,10 @@
             outline: none; transition: all 0.15s;
         }
         .input-field:focus { border-color: #66a3ff; box-shadow: 0 0 0 3px rgba(18,99,255,0.08); }
+        details summary::-webkit-details-marker { display: none; }
+        details summary { list-style: none; }
+        details .chevron { transition: transform 0.2s; }
+        details[open] .chevron { transform: rotate(90deg); }
     </style>
 </head>
 <body class="text-gray-800 antialiased">

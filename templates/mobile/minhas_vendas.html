@@ -112,7 +112,7 @@
   </div>
 
   {% if sales %}
-  <div x-show="false" class="space-y-3" id="sales-fallback">
+  <div class="space-y-3" id="sales-fallback">
     {% for s in sales|slice:":20" %}
     <div class="bg-white rounded-2xl p-4 card-shadow flex items-center justify-between">
       <div class="flex items-center gap-2.5 min-w-0">
@@ -168,8 +168,13 @@ function minhasVendas() {
         WEEKDAYS: WEEKDAYS,
 
         init() {
-            this.filterMonth = this.currentMonth;
-            this.filterSales();
+            var self = this;
+            var fb = document.getElementById('sales-fallback');
+            this.$nextTick(function() {
+                if (fb) fb.style.display = 'none';
+                self.filterMonth = self.currentMonth;
+                self.filterSales();
+            });
         },
 
         get filteredSales() {

@@ -608,7 +608,7 @@ def mobile_ranking(request):
 
     my_estimated_commission = 0
     try:
-        _, my_estimated_commission = calculate_estimated_commission(
+        my_estimated_commission, _ = calculate_estimated_commission(
             seller, today.month, today.year,
         )
     except Exception:
