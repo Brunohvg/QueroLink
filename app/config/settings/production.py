@@ -42,7 +42,6 @@ SECURE_HSTS_PRELOAD = True
 
 # Security headers explicitos
 SECURE_CONTENT_TYPE_NOSNIFF = True
-SECURE_BROWSER_XSS_FILTER = True
 SECURE_REFERRER_POLICY = 'same-origin'
 
 # Content Security Policy via middleware customizado

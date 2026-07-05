@@ -135,12 +135,6 @@ def evolution_webhook(request, instance_name, tenant_uuid, token):
 
 
 @csrf_exempt
-def evolution_webhook_legacy(request, instance_name, tenant_uuid):
-    logger.info("Legacy webhook (no token): instance=%s tenant=%s", instance_name, tenant_uuid)
-    return JsonResponse({"status": "ignored"}, status=200)
-
-
-@csrf_exempt
 def billing_webhook(request):
     if request.method != "POST":
         return JsonResponse({"error": "Method not allowed"}, status=405)

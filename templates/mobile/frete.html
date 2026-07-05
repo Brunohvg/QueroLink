@@ -117,8 +117,12 @@
   {% endif %}
 </div>
 
+{{ presets_json|json_script:"freight-presets" }}
+
 <script>
 function formatBRL(cents) {
+  return new Intl.NumberFormat('pt-BR', {style: 'currency', currency: 'BRL'}).format(cents / 100);
+}
   return new Intl.NumberFormat('pt-BR', {style: 'currency', currency: 'BRL'}).format(cents / 100);
 }
 
@@ -126,7 +130,7 @@ function freightCalc() {
   return {
     cep: '',
     cepError: '',
-    presets: {{ presets_json|safe }},
+    presets: JSON.parse(document.getElementById('freight-presets').textContent),
     selectedPreset: 0,
     customWeight: false,
     manualWeight: '',

@@ -18,8 +18,8 @@
     <title>{% block title %}Mérito{% endblock %}</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
     <script src="{% static 'js/alpine.min.js' %}" defer></script>
-    <link rel="stylesheet" href="/static/css/tailwind.css">
-    <script src="/static/js/format.js"></script>
+    <link rel="stylesheet" href="{% static 'css/tailwind.css' %}">
+    <script src="{% static 'js/format.js' %}"></script>
     <script>
         function getCSRFToken() {
             var meta = document.querySelector('meta[name="csrf-token"]');

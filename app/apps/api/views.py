@@ -94,8 +94,6 @@ class SellerViewSet(viewsets.ModelViewSet):
         return Response({
             'message': 'Senha redefinida com sucesso.',
             'whatsapp_sent': whatsapp_sent,
-            'temp_password': password if not whatsapp_sent else None,
-            'whatsapp_error': whatsapp_error,
         })
 
     @action(detail=False, methods=['post'])
@@ -977,7 +975,7 @@ class SellerDetailView(generics.GenericAPIView):
             'seller': {
                 'uuid': str(seller.uuid),
                 'name': seller.name,
-                'phone': seller.phone,
+                'phone': (seller.phone or '')[:4] + '****' + (seller.phone or '')[-4:] if len(seller.phone or '') >= 8 else '****',
                 'is_active': seller.is_active,
                 'commission_rate': float(seller.commission_rate),
                 'created_at': (
@@ -1650,6 +1648,7 @@ class SellerStatementView(generics.GenericAPIView):
         from weasyprint import HTML
 
         html = render_to_string('reports/extrato_vendedor.html', {
+            'logo_url': 'file://' + str(settings.BASE_DIR / 'static' / 'img' / 'vidalys-merito-logo.png'),
             'seller': seller,
             'tenant': seller.tenant,
             'competencia': f'{month_int:02d}/{year_int}',
@@ -1747,6 +1746,7 @@ class MonthlyReportView(generics.GenericAPIView):
         from weasyprint import HTML
 
         html = render_to_string('reports/relatorio_mensal.html', {
+            'logo_url': 'file://' + str(settings.BASE_DIR / 'static' / 'img' / 'vidalys-merito-logo.png'),
             'tenant': tenant,
             'competencia': f'{month_int:02d}/{year_int}',
             'data_geracao': hoje.strftime('%d/%m/%Y'),

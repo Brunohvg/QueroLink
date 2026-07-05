@@ -144,6 +144,13 @@ class SellerImportSerializer(serializers.Serializer):
             raise serializers.ValidationError(
                 'Arquivo muito grande. Tamanho maximo permitido: 5MB.'
             )
+        if name.endswith('.xlsx'):
+            header = value.read(512)
+            value.seek(0)
+            if not header.startswith(b'PK\x03\x04'):
+                raise serializers.ValidationError(
+                    'Arquivo .xlsx invalido ou corrompido.'
+                )
         return value
 
     def _parse_file(self, file):

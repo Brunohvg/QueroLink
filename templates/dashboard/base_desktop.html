@@ -6,10 +6,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}Mérito{% endblock %}</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
-    <link href="/static/css/tailwind.css" rel="stylesheet">
+    <link href="{% static 'css/tailwind.css' %}" rel="stylesheet">
     <script src="{% static 'js/alpine.min.js' %}" defer></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js" integrity="sha384-e6nUZLBkQ86NJ6TVVKAeSaK8jWa3NhkYWZFomE39AvDbQWeie9PlQqM3pmYW5d1g" crossorigin="anonymous"></script>
-    <script src="/static/js/format.js"></script>
+    <script src="{% static 'js/format.js' %}"></script>
     <style>
         body { font-family: 'Inter', system-ui, sans-serif; }
 

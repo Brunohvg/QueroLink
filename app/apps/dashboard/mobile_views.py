@@ -2,7 +2,6 @@ import json
 import logging
 
 from django.shortcuts import render, redirect
-from django.views.decorators.csrf import csrf_exempt
 from django.contrib.auth import (
     authenticate, login as auth_login, logout as auth_logout,
 )
@@ -133,7 +132,7 @@ def mobile_forgot_password(request):
                     pass
 
             if user and user.seller_profile:
-                pin = get_random_string(length=6, allowed_chars='0123456789')
+                pin = get_random_string(length=8, allowed_chars='0123456789')
                 reset = PRR(
                     user=user,
                     expires_at=tz.now() + td(minutes=10),

@@ -679,6 +679,7 @@ def gestor_webhooks(request):
     })
 
 
+@login_required
 def gestor_links(request):
     if not _check_role(request, User.Role.MANAGER, User.Role.ADMIN):
         return redirect('dashboard:home')
@@ -775,8 +776,9 @@ def gestor_link_detalhe(request, order_uuid):
             'expires_at': payment_link.expires_at if payment_link else None,
         })
     except Exception as e:
-        logger.error("gestor_link_detalhe error: %s", e, exc_info=True)
-        raise
+        logger.exception('Erro ao carregar detalhe do link %s', order_uuid)
+        messages.error(request, 'Erro ao carregar os dados do link. Tente novamente.')
+        return redirect('dashboard:gestor_links')
 
 
 @login_required
@@ -955,9 +957,34 @@ def gestor_contabilidade(request):
     tenant = request.user.tenant
     hoje = timezone.localdate()
 
-    from app.apps.commissions.services import calculate_estimated_commission
+    from decimal import Decimal, ROUND_HALF_UP
+    from datetime import date
     from app.apps.commissions.models import CommissionPeriod, SellerCommission
     from app.apps.sales.models import Sale as SModel
+
+    sellers_qs = list(Seller.objects.filter(tenant=tenant, is_active=True))
+    seller_map = {s.pk: s for s in sellers_qs}
+
+    sales_start = date(hoje.year - 1, hoje.month, 1) if hoje.month > 1 else date(hoje.year - 2, 12, 1)
+    sales_agg = SModel.objects.filter(
+        tenant=tenant,
+        seller__in=sellers_qs,
+        origin=SModel.Origin.MANUAL,
+        status='ATIVA',
+        sale_date__gte=sales_start,
+        sale_date__lte=hoje,
+    ).values('seller_id', 'sale_date__year', 'sale_date__month').annotate(t=Sum('amount'))
+
+    sales_by_key = {}
+    for row in sales_agg:
+        key = (row['seller_id'], row['sale_date__year'], row['sale_date__month'])
+        sales_by_key[key] = row['t']
+
+    periods_qs = CommissionPeriod.objects.filter(
+        tenant=tenant,
+        year__gte=hoje.year - 1,
+    ).prefetch_related('sellercommission_set')
+    period_map = {(p.year, p.month): p for p in periods_qs}
 
     competencias = []
     for i in range(12):
@@ -973,14 +1000,16 @@ def gestor_contabilidade(request):
         ).aggregate(t=Sum('amount'))['t'] or 0
 
         total_comm = 0
-        sellers_qs = Seller.objects.filter(tenant=tenant, is_active=True)
         for s in sellers_qs:
-            c, _ = calculate_estimated_commission(s, month, year)
-            total_comm += c
+            key = (s.pk, year, month)
+            seller_sales = sales_by_key.get(key, 0)
+            rate = Decimal(str(s.commission_rate or tenant.default_commission_rate or 0.01))
+            comm = int((Decimal(str(seller_sales)) * rate).quantize(Decimal('1'), rounding=ROUND_HALF_UP))
+            total_comm += comm
 
-        period = CommissionPeriod.objects.filter(tenant=tenant, month=month, year=year).first()
+        period = period_map.get((year, month))
         if period:
-            scs = SellerCommission.objects.filter(period=period)
+            scs = period.sellercommission_set.all()
             all_paid = scs.exists() and not scs.exclude(
                 status__in=[SellerCommission.Status.PAGA, SellerCommission.Status.CANCELADA],
             ).exists()

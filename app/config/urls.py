@@ -3,12 +3,21 @@ from django.conf.urls.static import static
 from django.contrib import admin
 from django.contrib.auth import views as auth_views
 from django.urls import path, include, reverse_lazy
+from django.utils.decorators import method_decorator
+from django.views.decorators.csrf import csrf_protect
 from django.http import JsonResponse
 from django.db import connections
 from django.db.utils import OperationalError
 from django.views.generic import RedirectView
+from django_ratelimit.decorators import ratelimit
 from app.apps.accounts import views as account_views
 from app.apps.dashboard import desktop_views
+
+
+@method_decorator(ratelimit(key='ip', rate='3/h', method='POST', block=True), name='post')
+@method_decorator(csrf_protect, name='post')
+class RateLimitedPasswordResetView(auth_views.PasswordResetView):
+    pass
 
 def health_check(request):
     db_ok = True
@@ -37,7 +46,7 @@ urlpatterns = [
     path('api/freight/', include('app.apps.freight.urls')),
     path('api/', include('app.apps.api.urls')),
 
-    path('dashboard/esqueci-senha/', auth_views.PasswordResetView.as_view(
+    path('dashboard/esqueci-senha/', RateLimitedPasswordResetView.as_view(
         template_name='registration/password_reset_form.html',
         email_template_name='registration/password_reset_email.html',
         success_url=reverse_lazy('password_reset_done'),

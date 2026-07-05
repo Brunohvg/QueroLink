@@ -2,609 +2,244 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Mérito — Pagamento</title>
-  <link rel="icon" type="image/png" sizes="32x32" href="{% static 'icons/favicon-32.png' %}">
-  <link rel="icon" type="image/png" sizes="16x16" href="{% static 'icons/favicon-16.png' %}">
-  <link rel="apple-touch-icon" href="{% static 'icons/apple-touch-icon.png' %}">
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
-  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-9ndCyUaIbzAi2FUVXJi0CjmCapSmO7SnpJef0486qhLnuZ2cdeRhO02iuK6FUUVM" crossorigin="anonymous">
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" integrity="sha384-iw3OoTErCYJJB9mCa8LNS2hbsQ7M3C0EpIsO/H5+EGAkPGc6rk+V8i04oW/K5xq0" crossorigin="anonymous">
-  <style>
-    :root {
-      --primary-color: #1463FF;
-      --primary-light: #e8f0fe;
-      --primary-dark: #0d52d9;
-      --secondary-color: #31c48d;
-      --secondary-dark: #1f9d6e;
-      --text-color: #1e293b;
-      --text-light: #64748b;
-      --bg-light: #f8fafc;
-      --border-color: #e2e8f0;
-      --border-radius: 12px;
-      --transition: all 0.2s ease;
-    }
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mérito — Pagamento</title>
+<link rel="icon" type="image/png" sizes="32x32" href="{% static 'icons/favicon-32.png' %}">
+<link rel="icon" type="image/png" sizes="16x16" href="{% static 'icons/favicon-16.png' %}">
+<link rel="apple-touch-icon" href="{% static 'icons/apple-touch-icon.png' %}">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="{% static 'css/tailwind.css' %}">
+<style>
+body { font-family: 'Inter', system-ui, sans-serif; color: #1e293b; }
 
-    body {
-      font-family: 'Inter', system-ui, sans-serif;
-      color: var(--text-color);
-      line-height: 1.6;
-      min-height: 100vh;
-      display: flex;
-      flex-direction: column;
-      background: var(--bg-light);
-      padding: 0;
-      margin: 0;
-    }
+.toast-enter { animation: toastIn 0.3s ease forwards; }
+.toast-leave { animation: toastOut 0.3s ease forwards; }
+@keyframes toastIn { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+@keyframes toastOut { from { transform: translateX(0); opacity: 1; } to { transform: translateX(100%); opacity: 0; } }
+@keyframes shrink { from { width: 100%; } to { width: 0%; } }
+@keyframes fadeInUp { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
 
-    .page-wrapper {
-      display: flex;
-      flex-direction: column;
-      min-height: 100vh;
-      padding: 30px 20px;
-    }
-
-    .main-content {
-      flex: 1;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      padding: 20px 0;
-    }
-
-    .app-container {
-      width: 100%;
-      max-width: 560px;
-      margin: 0 auto;
-    }
-
-    .brand-section {
-      text-align: center;
-      margin-bottom: 32px;
-    }
-
-    .app-title {
-      font-family: 'Inter', system-ui, sans-serif;
-      font-weight: 600;
-      font-size: 1.75rem;
-      color: var(--text-color);
-      margin: 0;
-      letter-spacing: -0.02em;
-    }
-
-    .app-subtitle {
-      font-size: 0.875rem;
-      color: var(--text-light);
-      margin-top: 4px;
-      font-weight: 400;
-    }
-
-    .card {
-      background-color: #fff;
-      border-radius: var(--border-radius);
-      border: 1px solid var(--border-color);
-      box-shadow: 0 1px 3px rgba(15, 23, 42, 0.04);
-      overflow: hidden;
-      margin-bottom: 20px;
-    }
-
-    .card-header {
-      padding: 18px 24px;
-      border-bottom: 1px solid var(--border-color);
-      display: flex;
-      align-items: center;
-    }
-
-    .card-header h5 {
-      margin: 0;
-      color: var(--text-color);
-      font-weight: 600;
-      font-size: 1rem;
-    }
-
-    .card-header-icon {
-      color: var(--primary-color);
-      margin-right: 12px;
-      font-size: 1rem;
-      display: flex;
-      align-items: center;
-    }
-
-    .card-body {
-      padding: 24px;
-    }
-
-    .form-group {
-      margin-bottom: 20px;
-      position: relative;
-    }
-
-    .form-label {
-      font-weight: 500;
-      font-size: 0.875rem;
-      margin-bottom: 6px;
-      display: block;
-      color: var(--text-color);
-    }
-
-    .form-control,
-    .form-select {
-      border: 1px solid var(--border-color);
-      border-radius: 10px;
-      padding: 12px 12px 12px 44px;
-      font-size: 15px;
-      transition: var(--transition);
-      background-color: #fff;
-      color: var(--text-color);
-      height: auto;
-    }
-
-    .form-control:focus,
-    .form-select:focus {
-      box-shadow: 0 0 0 3px rgba(67, 97, 238, 0.12);
-      border-color: var(--primary-color);
-    }
-
-    .form-select {
-      background-position: right 14px center;
-      cursor: pointer;
-    }
-
-    .input-icon-wrapper {
-      position: absolute;
-      left: 1px;
-      top: 27px;
-      width: 42px;
-      height: 42px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      color: var(--text-light);
-      font-size: 16px;
-    }
-
-    .installment-options {
-      display: flex;
-      gap: 8px;
-      margin-bottom: 20px;
-    }
-
-    .installment-option {
-      flex: 1;
-      position: relative;
-    }
-
-    .installment-option input[type="radio"] {
-      position: absolute;
-      opacity: 0;
-      width: 0;
-      height: 0;
-    }
-
-    .installment-option label {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      background-color: #fff;
-      border: 1px solid var(--border-color);
-      border-radius: 10px;
-      padding: 10px;
-      font-size: 13px;
-      font-weight: 500;
-      color: var(--text-color);
-      transition: var(--transition);
-      cursor: pointer;
-      text-align: center;
-      height: 100%;
-    }
-
-    .installment-option input[type="radio"]:checked + label {
-      border-color: var(--primary-color);
-      background-color: var(--primary-light);
-    }
-
-    .installment-option .installment-value {
-      font-size: 15px;
-      font-weight: 600;
-      margin-top: 4px;
-      color: var(--primary-color);
-    }
-
-    .btn {
-      padding: 14px 20px;
-      font-weight: 600;
-      transition: var(--transition);
-      border-radius: 10px;
-      font-size: 15px;
-      border: none;
-    }
-
-    .btn i {
-      margin-right: 6px;
-    }
-
-    .btn:disabled {
-      opacity: 0.6;
-      cursor: not-allowed;
-    }
-
-    .btn-primary {
-      background: var(--primary-color);
-      color: #fff;
-    }
-
-      .btn-primary:hover {
-        background: var(--primary-dark);
-      }
-      .toast-enter { animation: toastIn 0.3s ease forwards; }
-      .toast-leave { animation: toastOut 0.3s ease forwards; }
-      @keyframes toastIn { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
-      @keyframes toastOut { from { transform: translateX(0); opacity: 1; } to { transform: translateX(100%); opacity: 0; } }
-      @keyframes shrink { from { width: 100%; } to { width: 0%; } }
-
-    .btn-secondary {
-      background: var(--secondary-color);
-      color: #fff;
-    }
-
-    .btn-secondary:hover {
-      background: var(--secondary-dark);
-    }
-
-    .btn-outline {
-      background: transparent;
-      color: var(--text-color);
-      border: 1px solid var(--border-color);
-    }
-
-    .btn-outline:hover {
-      background: var(--bg-light);
-    }
-
-    .result-card {
-      opacity: 0;
-      transform: translateY(12px);
-      transition: var(--transition);
-      display: none;
-    }
-
-    .result-card.visible {
-      opacity: 1;
-      transform: translateY(0);
-      display: block;
-    }
-
-    .generated-link-container {
-      background-color: var(--bg-light);
-      border: 1px solid var(--border-color);
-      border-radius: 10px;
-      padding: 16px;
-      position: relative;
-    }
-
-    .link-label {
-      font-size: 13px;
-      color: var(--text-light);
-      margin-bottom: 8px;
-      display: block;
-      font-weight: 500;
-    }
-
-    .generated-link {
-      font-family: monospace;
-      font-size: 14px;
-      color: var(--primary-color);
-      word-break: break-all;
-      line-height: 1.5;
-      background-color: #fff;
-      padding: 12px;
-      border-radius: 8px;
-      border: 1px solid var(--border-color);
-    }
-
-    .copy-btn {
-      position: absolute;
-      top: 14px;
-      right: 16px;
-      background-color: #fff;
-      border: 1px solid var(--border-color);
-      border-radius: 8px;
-      width: 34px;
-      height: 34px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      color: var(--primary-color);
-      cursor: pointer;
-      transition: var(--transition);
-    }
-
-    .copy-btn:hover {
-      background-color: var(--primary-light);
-    }
-
-    .action-buttons {
-      display: flex;
-      gap: 12px;
-      margin-top: 16px;
-    }
-
-    .action-buttons .btn {
-      flex: 1;
-    }
-
-    .message {
-      padding: 12px 16px;
-      border-radius: 10px;
-      font-weight: 500;
-      font-size: 14px;
-      text-align: center;
-      opacity: 0;
-      transition: opacity 0.3s ease;
-      margin-top: 16px;
-    }
-
-    .success {
-      background-color: var(--secondary-color);
-      color: #fff;
-    }
-
-    .error {
-      background-color: #e53e3e;
-      color: #fff;
-    }
-
-    @keyframes fadeInUp {
-      from { opacity: 0; transform: translateY(12px); }
-      to { opacity: 1; transform: translateY(0); }
-    }
-
-    .fade-in-up {
-      animation: fadeInUp 0.3s ease-out forwards;
-    }
-
-    footer {
-      text-align: center;
-      padding: 20px 0 10px;
-      color: var(--text-light);
-      font-size: 0.8rem;
-    }
-
-    footer p {
-      margin-bottom: 4px;
-    }
-
-    @media (max-width: 767px) {
-      .page-wrapper { padding: 20px 15px; }
-      .app-title { font-size: 1.5rem; }
-      .card-body { padding: 18px; }
-      .btn { font-size: 14px; padding: 12px 16px; }
-      .installment-options { flex-direction: column; gap: 6px; }
-      .installment-option label { flex-direction: row; justify-content: space-between; padding: 10px 14px; }
-      .installment-option .installment-value { margin-top: 0; }
-      .action-buttons { flex-direction: column; }
-    }
-  </style>
+.installment-option input[type="radio"] { position: absolute; opacity: 0; width: 0; height: 0; }
+.installment-option input[type="radio"]:checked + label {
+  border-color: #1463FF; background-color: #EEF4FF;
+}
+.result-card { opacity: 0; transform: translateY(12px); transition: all 0.2s ease; }
+.result-card.visible { opacity: 1; transform: translateY(0); }
+</style>
 </head>
-<body>
-  <div class="page-wrapper">
-    <div class="main-content">
-      <div class="app-container">
-        <div class="brand-section">
-          <h1 class="app-title">Mérito</h1>
-          <p class="app-subtitle">Pagamento seguro</p>
-        </div>
+<body class="bg-[#f8fafc]">
+<div class="flex flex-col min-h-screen px-5 py-6">
+  <div class="flex-1 flex items-center justify-center py-5">
+    <div class="w-full max-w-[560px] mx-auto">
 
-        {% block page_content %}
-        <div class="card">
-          <div class="card-header">
-            <div class="card-header-icon">
-              <i class="fas fa-link"></i>
-            </div>
-            <h5>Link de Pagamento</h5>
-          </div>
-          <div class="card-body">
-            <form action="{% url 'orders:create_link' tenant_slug=tenant.slug %}" method="post" id="create-link-form">
-              {% csrf_token %}
-              <div class="form-group">
-                <label for="linkName" class="form-label">Nome do Cliente</label>
-                <input type="text" class="form-control" id="linkName" name="linkName" placeholder="Digite o nome do cliente" required />
-                <div class="input-icon-wrapper">
-                  <i class="fas fa-user"></i>
-                </div>
-              </div>
-
-              <div class="form-group">
-                <label for="linkValue" class="form-label">Valor do Pagamento</label>
-                <input type="text" class="form-control" id="linkValue" name="linkValue" placeholder="R$ 0,00" required />
-                <div class="input-icon-wrapper">
-                  <i class="fas fa-dollar-sign"></i>
-                </div>
-              </div>
-
-              <label class="form-label">Parcelamento</label>
-              <div class="installment-options">
-                <div class="installment-option">
-                  <input type="radio" id="installment-1" name="installments" value="1" checked />
-                  <label for="installment-1">
-                    <span>A Vista</span>
-                    <span class="installment-value">1x</span>
-                  </label>
-                </div>
-                <div class="installment-option">
-                  <input type="radio" id="installment-2" name="installments" value="2" />
-                  <label for="installment-2">
-                    <span>Parcelado</span>
-                    <span class="installment-value">2x</span>
-                  </label>
-                </div>
-                <div class="installment-option">
-                  <input type="radio" id="installment-3" name="installments" value="3" />
-                  <label for="installment-3">
-                    <span>Parcelado</span>
-                    <span class="installment-value">3x</span>
-                  </label>
-                </div>
-              </div>
-
-              <div class="form-group">
-                <label for="drop_vendedor" class="form-label">Vendedor</label>
-                <select class="form-select" id="drop_vendedor" name="drop_vendedor" required>
-                  <option value="" selected disabled>Escolha um vendedor</option>
-                  {% for seller in sellers %}
-                  <option value="{{ seller.uuid }}">{{ seller.name }}</option>
-                  {% empty %}
-                  <option value="" disabled>Nenhum vendedor cadastrado</option>
-                  {% endfor %}
-                </select>
-                <div class="input-icon-wrapper">
-                  <i class="fas fa-user-check"></i>
-                </div>
-              </div>
-
-              <button type="submit" class="btn btn-primary w-100" id="generate-link-btn">
-                <i class="fas fa-link"></i>Gerar Link de Pagamento
-              </button>
-            </form>
-          </div>
-        </div>
-
-        <div id="generatedLinkContainer" class="card result-card {% if request.session.generated_link %}visible{% endif %}" style="display: {% if request.session.generated_link %}block{% else %}none{% endif %};">
-          <div class="card-header">
-            <div class="card-header-icon">
-              <i class="fas fa-check-circle" style="color: var(--secondary-color);"></i>
-            </div>
-            <h5>Link Gerado</h5>
-          </div>
-          <div class="card-body">
-            <div class="generated-link-container">
-              <span class="link-label">Compartilhe este link com o cliente:</span>
-              <div class="generated-link" id="generatedLink">
-                {% if request.session.generated_link %}{{ request.session.generated_link }}{% endif %}
-              </div>
-              <button class="copy-btn" onclick="copyLink()" title="Copiar link">
-                <i class="fas fa-copy"></i>
-              </button>
-            </div>
-
-            <div class="action-buttons">
-              <button class="btn btn-secondary" onclick="copyLink()">
-                <i class="fas fa-copy"></i>Copiar Link
-              </button>
-              <a href="#" class="btn btn-primary" id="shareBtn">
-                <i class="fas fa-share-alt"></i>Compartilhar
-              </a>
-            </div>
-          </div>
-        </div>
-        {% endblock page_content %}
-
-        <div id="toast-container" class="fixed top-4 right-4 z-[9999] flex flex-col gap-2 pointer-events-none"></div>
+      <div class="text-center mb-8">
+        <h1 class="font-display text-[28px] font-semibold text-gray-900 tracking-tight">Mérito</h1>
+        <p class="text-[14px] text-gray-500 mt-1">Pagamento seguro</p>
       </div>
-    </div>
 
-    <footer>
-      <p>Mérito</p>
-    </footer>
+      {% block page_content %}
+      <div class="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden mb-5">
+        <div class="px-5 py-4 border-b border-gray-200 flex items-center">
+          <div class="text-brand-500 mr-3 flex items-center">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"/></svg>
+          </div>
+          <h5 class="text-[15px] font-semibold text-gray-900">Link de Pagamento</h5>
+        </div>
+        <div class="p-5">
+          <form action="{% url 'orders:create_link' tenant_slug=tenant.slug %}" method="post" id="create-link-form">
+            {% csrf_token %}
+            <div class="mb-5 relative">
+              <label for="linkName" class="text-[13px] font-medium text-gray-700 mb-1.5 block">Nome do Cliente</label>
+              <input type="text" class="w-full border border-gray-200 rounded-xl px-3 py-3 pl-11 text-[15px] transition bg-white text-gray-800 outline-none focus:border-brand-400 focus:ring-2 focus:ring-brand-100" id="linkName" name="linkName" placeholder="Digite o nome do cliente" required>
+              <div class="absolute left-1 top-[27px] w-[42px] h-[42px] flex items-center justify-center text-gray-500">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>
+              </div>
+            </div>
+
+            <div class="mb-5 relative">
+              <label for="linkValue" class="text-[13px] font-medium text-gray-700 mb-1.5 block">Valor do Pagamento</label>
+              <input type="text" class="w-full border border-gray-200 rounded-xl px-3 py-3 pl-11 text-[15px] transition bg-white text-gray-800 outline-none focus:border-brand-400 focus:ring-2 focus:ring-brand-100" id="linkValue" name="linkValue" placeholder="R$ 0,00" required>
+              <div class="absolute left-1 top-[27px] w-[42px] h-[42px] flex items-center justify-center text-gray-500">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+              </div>
+            </div>
+
+            <label class="text-[13px] font-medium text-gray-700 mb-2 block">Parcelamento</label>
+            <div class="flex gap-2 mb-5">
+              <div class="flex-1 installment-option">
+                <input type="radio" id="installment-1" name="installments" value="1" checked>
+                <label for="installment-1" class="flex flex-col items-center justify-center bg-white border border-gray-200 rounded-xl p-2.5 text-[13px] font-medium text-gray-800 transition cursor-pointer text-center hover:border-brand-300">
+                  <span>A Vista</span>
+                  <span class="text-[15px] font-semibold text-brand-500 mt-1">1x</span>
+                </label>
+              </div>
+              <div class="flex-1 installment-option">
+                <input type="radio" id="installment-2" name="installments" value="2">
+                <label for="installment-2" class="flex flex-col items-center justify-center bg-white border border-gray-200 rounded-xl p-2.5 text-[13px] font-medium text-gray-800 transition cursor-pointer text-center hover:border-brand-300">
+                  <span>Parcelado</span>
+                  <span class="text-[15px] font-semibold text-brand-500 mt-1 installment-value">2x</span>
+                </label>
+              </div>
+              <div class="flex-1 installment-option">
+                <input type="radio" id="installment-3" name="installments" value="3">
+                <label for="installment-3" class="flex flex-col items-center justify-center bg-white border border-gray-200 rounded-xl p-2.5 text-[13px] font-medium text-gray-800 transition cursor-pointer text-center hover:border-brand-300">
+                  <span>Parcelado</span>
+                  <span class="text-[15px] font-semibold text-brand-500 mt-1 installment-value">3x</span>
+                </label>
+              </div>
+            </div>
+
+            <div class="mb-5 relative">
+              <label for="drop_vendedor" class="text-[13px] font-medium text-gray-700 mb-1.5 block">Vendedor</label>
+              <select class="w-full border border-gray-200 rounded-xl px-3 py-3 pl-11 text-[15px] transition bg-white text-gray-800 outline-none focus:border-brand-400 focus:ring-2 focus:ring-brand-100 appearance-none cursor-pointer" id="drop_vendedor" name="drop_vendedor" required>
+                <option value="" selected disabled>Escolha um vendedor</option>
+                {% for seller in sellers %}
+                <option value="{{ seller.uuid }}">{{ seller.name }}</option>
+                {% empty %}
+                <option value="" disabled>Nenhum vendedor cadastrado</option>
+                {% endfor %}
+              </select>
+              <div class="absolute left-1 top-[27px] w-[42px] h-[42px] flex items-center justify-center text-gray-500">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+              </div>
+            </div>
+
+            <button type="submit" class="bg-brand-500 hover:bg-brand-600 text-white font-semibold py-3.5 px-4 rounded-xl text-[15px] transition w-full flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed" id="generate-link-btn">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"/></svg>
+              Gerar Link de Pagamento
+            </button>
+          </form>
+        </div>
+      </div>
+
+      <div id="generatedLinkContainer" class="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden mb-5 result-card {% if request.session.generated_link %}visible{% endif %}" style="display: {% if request.session.generated_link %}block{% else %}none{% endif %};">
+        <div class="px-5 py-4 border-b border-gray-200 flex items-center">
+          <div class="text-emerald-500 mr-3 flex items-center">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+          </div>
+          <h5 class="text-[15px] font-semibold text-gray-900">Link Gerado</h5>
+        </div>
+        <div class="p-5">
+          <div class="bg-gray-50 border border-gray-200 rounded-xl p-4 relative">
+            <span class="text-[13px] text-gray-500 mb-2 block font-medium">Compartilhe este link com o cliente:</span>
+            <div class="font-mono text-[14px] text-brand-500 break-all leading-relaxed bg-white p-3 rounded-lg border border-gray-200" id="generatedLink">
+              {% if request.session.generated_link %}{{ request.session.generated_link }}{% endif %}
+            </div>
+            <button class="absolute top-3.5 right-4 bg-white border border-gray-200 rounded-lg w-[34px] h-[34px] flex items-center justify-center text-brand-500 cursor-pointer transition hover:bg-brand-50" onclick="copyLink()" title="Copiar link">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>
+            </button>
+          </div>
+
+          <div class="flex gap-3 mt-4">
+            <button class="flex-1 bg-emerald-500 hover:bg-emerald-600 text-white font-semibold py-3 px-4 rounded-xl text-[14px] transition flex items-center justify-center gap-2" onclick="copyLink()">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>
+              Copiar Link
+            </button>
+            <a href="#" class="flex-1 bg-brand-500 hover:bg-brand-600 text-white font-semibold py-3 px-4 rounded-xl text-[14px] transition flex items-center justify-center gap-2" id="shareBtn">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z"/></svg>
+              Compartilhar
+            </a>
+          </div>
+        </div>
+      </div>
+      {% endblock page_content %}
+
+      <div id="toast-container" class="fixed top-4 right-4 z-[9999] flex flex-col gap-2 pointer-events-none"></div>
+    </div>
   </div>
 
-  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js" integrity="sha384-geWF76RCwLtnZ8qwWowPQNguL3RmwHVBC9FhGdlKrxdiJJigb/j/68SIy3Te4Bkz" crossorigin="anonymous"></script>
-  <script>
-    function showToast(message, type, duration) {
-        var c = {
-            success: { bg: 'bg-emerald-50', border: 'border-emerald-200', text: 'text-emerald-700', dot: 'bg-emerald-500', icon: '<svg class="w-5 h-5 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>' },
-            error:   { bg: 'bg-red-50', border: 'border-red-200', text: 'text-red-700', dot: 'bg-red-500', icon: '<svg class="w-5 h-5 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>' },
-            warning: { bg: 'bg-amber-50', border: 'border-amber-200', text: 'text-amber-700', dot: 'bg-amber-500', icon: '<svg class="w-5 h-5 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"></path></svg>' },
-            info:    { bg: 'bg-blue-50', border: 'border-blue-200', text: 'text-blue-700', dot: 'bg-blue-500', icon: '<svg class="w-5 h-5 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>' },
-        };
-        var s = c[type] || c.info;
-        duration = duration || (type === 'error' ? 6000 : 4000);
-        var el = document.createElement('div');
-        el.className = 'pointer-events-auto flex items-start gap-3 px-4 py-3 rounded-xl border shadow-lg toast-enter ' + s.bg + ' ' + s.border;
-        el.innerHTML = '<div class="flex-shrink-0 mt-0.5">' + s.icon + '</div>'
-            + '<div class="flex-1 min-w-0"><p class="text-sm font-medium ' + s.text + '"></p></div>'
-            + '<button onclick="this.parentElement.remove()" class="flex-shrink-0 text-gray-400 hover:text-gray-600 transition"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg></button>'
-            + '<div class="absolute bottom-0 left-0 h-0.5 rounded-full ' + s.dot + '" style="width:100%;animation:shrink ' + duration + 'ms linear forwards;"></div>';
-        el.querySelector('p').textContent = message;
-        document.getElementById('toast-container').appendChild(el);
-        setTimeout(function() { if (el.parentNode) el.parentNode.removeChild(el); }, duration + 300);
-    }
+  <footer class="text-center py-5 text-gray-400 text-[12px]">
+    <p>Mérito</p>
+  </footer>
+</div>
 
-    function showMessage(text, type) {
-      showToast(text, type);
-    }
+<script>
+function showToast(message, type, duration) {
+    var c = {
+        success: { bg: 'bg-emerald-50', border: 'border-emerald-200', text: 'text-emerald-700', dot: 'bg-emerald-500', icon: '<svg class="w-5 h-5 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>' },
+        error:   { bg: 'bg-red-50', border: 'border-red-200', text: 'text-red-700', dot: 'bg-red-500', icon: '<svg class="w-5 h-5 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>' },
+        warning: { bg: 'bg-amber-50', border: 'border-amber-200', text: 'text-amber-700', dot: 'bg-amber-500', icon: '<svg class="w-5 h-5 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"></path></svg>' },
+        info:    { bg: 'bg-blue-50', border: 'border-blue-200', text: 'text-blue-700', dot: 'bg-blue-500', icon: '<svg class="w-5 h-5 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>' },
+    };
+    var s = c[type] || c.info;
+    duration = duration || (type === 'error' ? 6000 : 4000);
+    var el = document.createElement('div');
+    el.className = 'pointer-events-auto flex items-start gap-3 px-4 py-3 rounded-xl border shadow-lg toast-enter ' + s.bg + ' ' + s.border;
+    el.innerHTML = '<div class="flex-shrink-0 mt-0.5">' + s.icon + '</div>'
+        + '<div class="flex-1 min-w-0"><p class="text-sm font-medium ' + s.text + '"></p></div>'
+        + '<button onclick="this.parentElement.remove()" class="flex-shrink-0 text-gray-400 hover:text-gray-600 transition"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg></button>'
+        + '<div class="absolute bottom-0 left-0 h-0.5 rounded-full ' + s.dot + '" style="width:100%;animation:shrink ' + duration + 'ms linear forwards;"></div>';
+    el.querySelector('p').textContent = message;
+    document.getElementById('toast-container').appendChild(el);
+    setTimeout(function() { if (el.parentNode) el.parentNode.removeChild(el); }, duration + 300);
+}
 
-    document.getElementById('linkValue').addEventListener('input', function(e) {
-      var value = e.target.value.replace(/\D/g, '');
-      if (value) {
-        value = (value / 100).toFixed(2).replace('.', ',');
-        e.target.value = 'R$ ' + value;
-      } else {
-        e.target.value = '';
-      }
-      updateInstallmentsLabels();
-    });
+function showMessage(text, type) {
+  showToast(text, type);
+}
 
-    document.getElementById('whatsapp')?.addEventListener('input', function(e) {
-      var value = e.target.value.replace(/\D/g, '');
-      if (value.length > 11) value = value.slice(0, 11);
-      if (value.length <= 10) {
-        value = value.replace(/(\d{2})(\d{4})(\d{0,4})/, '($1) $2-$3');
-      } else {
-        value = value.replace(/(\d{2})(\d{5})(\d{0,4})/, '($1) $2-$3');
-      }
-      e.target.value = value;
-    });
+document.getElementById('linkValue').addEventListener('input', function(e) {
+  var value = e.target.value.replace(/\D/g, '');
+  if (value) {
+    value = (value / 100).toFixed(2).replace('.', ',');
+    e.target.value = 'R$ ' + value;
+  } else {
+    e.target.value = '';
+  }
+  updateInstallmentsLabels();
+});
 
-    function copyLink() {
-      var linkText = document.getElementById('generatedLink').textContent;
-      navigator.clipboard.writeText(linkText)
-        .then(function() { showMessage('Link copiado!', 'success'); })
-        .catch(function() { showMessage('Erro ao copiar. Tente novamente.', 'error'); });
-    }
+function copyLink() {
+  var linkText = document.getElementById('generatedLink').textContent;
+  navigator.clipboard.writeText(linkText)
+    .then(function() { showMessage('Link copiado!', 'success'); })
+    .catch(function() { showMessage('Erro ao copiar. Tente novamente.', 'error'); });
+}
 
-    function updateInstallmentsLabels() {
-      var raw = document.getElementById('linkValue').value;
-      if (!raw) return;
-      var totalValue = parseFloat(raw.replace(/[R$ .]/g, '').replace(',', '.'));
-      if (!isNaN(totalValue) && totalValue > 0) {
-        var v2 = (totalValue / 2).toFixed(2).replace('.', ',');
-        var v3 = (totalValue / 3).toFixed(2).replace('.', ',');
-        document.querySelector('label[for="installment-2"] .installment-value').innerHTML = '2x <small>R$ ' + v2 + '</small>';
-        document.querySelector('label[for="installment-3"] .installment-value').innerHTML = '3x <small>R$ ' + v3 + '</small>';
-      }
-    }
+function updateInstallmentsLabels() {
+  var raw = document.getElementById('linkValue').value;
+  if (!raw) return;
+  var totalValue = parseFloat(raw.replace(/[R$ .]/g, '').replace(',', '.'));
+  if (!isNaN(totalValue) && totalValue > 0) {
+    var v2 = (totalValue / 2).toFixed(2).replace('.', ',');
+    var v3 = (totalValue / 3).toFixed(2).replace('.', ',');
+    var el2 = document.querySelector('label[for="installment-2"] .installment-value');
+    var el3 = document.querySelector('label[for="installment-3"] .installment-value');
+    if (el2) el2.innerHTML = '2x <small>R$ ' + v2 + '</small>';
+    if (el3) el3.innerHTML = '3x <small>R$ ' + v3 + '</small>';
+  }
+}
 
-    document.getElementById('shareBtn').addEventListener('click', function(e) {
-      e.preventDefault();
-      var linkText = document.getElementById('generatedLink').textContent;
-      if (navigator.share) {
-        navigator.share({
-          title: 'Link de Pagamento',
-          text: 'Clique para concluir seu pagamento.',
-          url: linkText
-        }).then(function() { showMessage('Link compartilhado!', 'success'); })
-          .catch(function() { copyLink(); });
-      } else {
-        copyLink();
-      }
-    });
+document.getElementById('shareBtn').addEventListener('click', function(e) {
+  e.preventDefault();
+  var linkText = document.getElementById('generatedLink').textContent;
+  if (navigator.share) {
+    navigator.share({
+      title: 'Link de Pagamento',
+      text: 'Clique para concluir seu pagamento.',
+      url: linkText
+    }).then(function() { showMessage('Link compartilhado!', 'success'); })
+      .catch(function() { copyLink(); });
+  } else {
+    copyLink();
+  }
+});
 
-    document.getElementById('create-link-form').addEventListener('submit', function() {
-      var btn = document.getElementById('generate-link-btn');
-      btn.disabled = true;
-      btn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Aguarde...';
-    });
+document.getElementById('create-link-form').addEventListener('submit', function() {
+  var btn = document.getElementById('generate-link-btn');
+  btn.disabled = true;
+  btn.innerHTML = '<svg class="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg> Aguarde...';
+});
 
-    document.addEventListener('DOMContentLoaded', function() {
-      if (document.getElementById('generatedLink').textContent.trim()) {
-        document.getElementById('generatedLinkContainer').classList.add('visible');
-        document.getElementById('generatedLinkContainer').style.display = 'block';
-      }
-      setTimeout(updateInstallmentsLabels, 500);
-    });
-  </script>
+document.addEventListener('DOMContentLoaded', function() {
+  if (document.getElementById('generatedLink').textContent.trim()) {
+    var c = document.getElementById('generatedLinkContainer');
+    c.classList.add('visible');
+    c.style.display = 'block';
+  }
+  setTimeout(updateInstallmentsLabels, 500);
+});
+</script>
 </body>
 </html>
