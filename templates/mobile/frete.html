@@ -32,7 +32,7 @@
           <button @click="selectedPreset = idx; customWeight = false"
                   class="px-4 py-2.5 rounded-xl text-[13px] font-medium transition border"
                   :class="selectedPreset === idx && !customWeight ? 'bg-brand-500 text-white border-brand-500 shadow-md' : 'bg-white text-gray-600 border-gray-200 hover:border-gray-300'">
-            <span x-text="preset.name + ' (' + preset.weight_grams + 'g)'"></span>
+            <span x-text="preset.name + ' (' + (preset.weight_grams / 1000).toFixed(1).replace('.', ',') + ' kg)'"></span>
           </button>
         </template>
         <button @click="customWeight = true; selectedPreset = -1"
@@ -42,10 +42,9 @@
         </button>
       </div>
       <div x-show="customWeight" class="mt-2 flex items-center gap-2">
-        <input type="number" x-model="manualWeight" min="50" max="30000"
-               class="w-32 px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-[14px] outline-none"
-               placeholder="gramas">
-        <span class="text-[13px] text-gray-400">gramas</span>
+        <input type="text" x-model="manualWeight" inputmode="decimal" placeholder="1,5"
+               class="w-32 px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-[14px] outline-none">
+        <span class="text-[13px] text-gray-400">kg</span>
       </div>
     </div>
 
@@ -144,7 +143,16 @@ function freightCalc() {
         this.cepError = 'Digite o CEP com 8 numeros.';
         return;
       }
-      var weight = this.customWeight ? parseInt(this.manualWeight) || 500 : (this.presets[this.selectedPreset]?.weight_grams || 500);
+      var weightGrams;
+      var weightLabel;
+      if (this.customWeight) {
+        var kg = parseFloat(this.manualWeight.replace(',', '.')) || 0.5;
+        weightGrams = Math.round(kg * 1000);
+        weightLabel = kg.toFixed(1).replace('.', ',') + ' kg';
+      } else {
+        weightGrams = this.presets[this.selectedPreset]?.weight_grams || 500;
+        weightLabel = (weightGrams / 1000).toFixed(1).replace('.', ',') + ' kg';
+      }
       this.loading = true;
       this.error = '';
       this.results = [];
@@ -152,13 +160,13 @@ function freightCalc() {
         var resp = await fetch('/api/freight/quote/', {
           method: 'POST',
           headers: {'Content-Type': 'application/json', 'X-CSRFToken': this.csrf},
-          body: JSON.stringify({cep_destino: this.cep, weight_grams: weight}),
+          body: JSON.stringify({cep_destino: this.cep, weight_grams: weightGrams}),
         });
         var data = await resp.json();
         if (data.success) {
           this.results = data.options;
           this.destination = data.destination.neighborhood + ' — ' + data.destination.city + '/' + data.destination.state;
-          var label = digits + ' — ' + this.destination + ' (' + weight + 'g)';
+          var label = digits + ' — ' + this.destination + ' (' + weightLabel + ')';
           this.history.unshift({label: label, options: data.options, destination: this.destination, official: data.official});
           if (this.history.length > 5) this.history.pop();
           localStorage.setItem('freight_history', JSON.stringify(this.history));
