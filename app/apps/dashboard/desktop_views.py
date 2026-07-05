@@ -200,7 +200,8 @@ def gestor_configuracoes(request):
         freight_adjustment = request.POST.get('freight_adjustment_percent', '').strip()
         if freight_adjustment:
             try:
-                tenant.freight_adjustment_percent = int(freight_adjustment)
+                val = int(freight_adjustment)
+                tenant.freight_adjustment_percent = max(-50, min(100, val))
             except ValueError:
                 pass
         presets_json = request.POST.get('freight_presets_json', '')
@@ -231,17 +232,16 @@ def gestor_configuracoes(request):
                 pass
 
         correios_usuario = request.POST.get('correios_usuario', '').strip()
-        if correios_usuario:
-            tenant.correios_usuario = correios_usuario
+        tenant.correios_usuario = correios_usuario or None
         correios_codigo = request.POST.get('correios_codigo_acesso', '').strip()
         if correios_codigo and correios_codigo != '••••••••':
             tenant.correios_codigo_acesso = correios_codigo
+        elif not correios_usuario:
+            tenant.correios_codigo_acesso = None
         correios_contrato = request.POST.get('correios_contrato', '').strip()
-        if correios_contrato:
-            tenant.correios_contrato = correios_contrato
+        tenant.correios_contrato = correios_contrato or None
         correios_cartao = request.POST.get('correios_cartao', '').strip()
-        if correios_cartao:
-            tenant.correios_cartao = correios_cartao
+        tenant.correios_cartao = correios_cartao or None
 
         tenant.save()
 
@@ -274,18 +274,16 @@ def gestor_configuracoes(request):
         return redirect('dashboard:gestor_configuracoes')
 
     import json as _json
-    freight_presets = getattr(tenant, 'freight_presets', None)
-    if not freight_presets or not isinstance(freight_presets, list) or len(freight_presets) == 0:
-        from app.apps.freight.services import DEFAULT_PRESETS
-        freight_presets = DEFAULT_PRESETS
+    from app.apps.freight.services import get_freight_presets
+    freight_presets = get_freight_presets(tenant)
     return render(request, 'dashboard/gestor/configuracoes.html', {
         'tenant': tenant,
         'link_events': template_events_with_body,
         'commission_rate_display': float(tenant.default_commission_rate) * 100,
         'event_vars_json': _json.dumps(EVENT_VARIABLES),
         'freight_presets_json': _json.dumps(freight_presets),
-        'motoboy_price_brl': (tenant.motoboy_price_per_km_cents or 200) / 100.0,
-        'motoboy_min_price_brl': (tenant.motoboy_min_price_cents or 800) / 100.0,
+        'motoboy_price_brl': (tenant.motoboy_price_per_km_cents if tenant.motoboy_price_per_km_cents > 0 else 200) / 100.0,
+        'motoboy_min_price_brl': (tenant.motoboy_min_price_cents if tenant.motoboy_min_price_cents > 0 else 800) / 100.0,
         'correios_cws_enabled': tenant.correios_cws_enabled,
     })
 

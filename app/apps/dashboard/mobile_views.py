@@ -716,10 +716,8 @@ def mobile_frete(request):
         return redirect('dashboard:mobile_home')
     tenant = request.user.tenant
     import json as _json
-    from app.apps.freight.services import DEFAULT_PRESETS
-    presets = getattr(tenant, 'freight_presets', None)
-    if not presets or not isinstance(presets, list) or len(presets) == 0:
-        presets = DEFAULT_PRESETS
+    from app.apps.freight.services import get_freight_presets
+    presets = get_freight_presets(tenant)
     return render(request, 'mobile/frete.html', {
         'seller': seller,
         'store_cep_configured': bool(tenant.store_cep),

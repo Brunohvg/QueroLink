@@ -92,6 +92,7 @@ CORREIOS_PRICE_TABLE = {
     (64000000, 64999999): (55.0, 36.0, 7, 15),
     (65000000, 65999999): (55.0, 36.0, 7, 15),
     (66000000, 68899999): (58.0, 38.0, 8, 18),
+    (68900000, 68999999): (60.0, 40.0, 10, 20),
     (69000000, 69299999): (60.0, 40.0, 10, 20),
     (69300000, 69399999): (65.0, 45.0, 12, 25),
     (69400000, 69899999): (60.0, 40.0, 10, 20),
@@ -101,6 +102,7 @@ CORREIOS_PRICE_TABLE = {
     (76800000, 76999999): (55.0, 36.0, 6, 14),
     (77000000, 77999999): (50.0, 32.0, 5, 12),
     (78000000, 78899999): (48.0, 30.0, 5, 12),
+    (78900000, 78999999): (48.0, 30.0, 5, 12),
     (79000000, 79999999): (45.0, 28.0, 4, 10),
     (80000000, 87999999): (40.0, 25.0, 3, 8),
     (88000000, 89999999): (42.0, 26.0, 3, 8),
@@ -228,8 +230,12 @@ def estimate_motoboy(tenant, cep_info: CepInfo) -> Optional[FreightOption]:
     if max_km and distance > max_km:
         return FreightOption('MOTOBOY', 'Motoboy', 0, 0,
                              error='Fora da area de entrega')
-    price_per_km = getattr(tenant, 'motoboy_price_per_km_cents', 0) or 200
-    min_price = getattr(tenant, 'motoboy_min_price_cents', 0) or 800
+    price_per_km = getattr(tenant, 'motoboy_price_per_km_cents', None)
+    if price_per_km is None:
+        price_per_km = 200
+    min_price = getattr(tenant, 'motoboy_min_price_cents', None)
+    if min_price is None:
+        min_price = 800
     price = max(round(distance * price_per_km), min_price)
     return FreightOption('MOTOBOY', 'Motoboy', int(price), 0)
 
@@ -243,8 +249,6 @@ DEFAULT_PRESETS = [
 
 def get_freight_presets(tenant):
     presets = getattr(tenant, 'freight_presets', None)
-    if presets:
+    if isinstance(presets, list) and len(presets) > 0:
         return presets
-    if not presets or not isinstance(presets, list) or len(presets) == 0:
-        return DEFAULT_PRESETS
-    return presets
+    return DEFAULT_PRESETS

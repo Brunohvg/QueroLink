@@ -111,6 +111,10 @@
 </div>
 
 <script>
+function formatBRL(cents) {
+  return new Intl.NumberFormat('pt-BR', {style: 'currency', currency: 'BRL'}).format(cents / 100);
+}
+
 function freightCalc() {
   return {
     cep: '',
@@ -200,15 +204,12 @@ function freightCalc() {
 
     reCopy: function(idx) {
       var h = this.history[idx];
+      if (!h) return;
       this.results = h.options;
       this.destination = h.destination;
       this.$nextTick(() => { this.copyToClipboard(); });
     },
   };
-}
-
-function formatBRL(cents) {
-  return new Intl.NumberFormat('pt-BR', {style: 'currency', currency: 'BRL'}).format(cents / 100);
 }
 </script>
 {% endblock %}

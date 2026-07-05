@@ -47,10 +47,6 @@ def freight_quote_view(request):
     if request.method != 'POST':
         return JsonResponse({'success': False, 'error': 'POST required.'}, status=405)
 
-    was_limited = getattr(request, 'limited', False)
-    if was_limited:
-        return JsonResponse({'success': False, 'error': 'Muitas requisicoes. Aguarde.'}, status=429)
-
     if not request.user.is_authenticated:
         return JsonResponse({'success': False, 'error': 'Autenticacao necessaria.'}, status=401)
 

@@ -17,9 +17,9 @@ DEADLINE_URL = 'https://api.correios.com.br/prazo/v1/nacional'
 DEFAULT_PRODUCTS = ['03298', '03220']
 PRODUCT_LABELS = {'03298': 'PAC', '03220': 'SEDEX'}
 DEFAULT_DIMENSIONS = {
-    'psAltura': '20',
-    'psLargura': '20',
-    'psComprimento': '20',
+    'psAltura': 20,
+    'psLargura': 20,
+    'psComprimento': 20,
 }
 
 

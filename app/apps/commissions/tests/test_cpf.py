@@ -59,6 +59,9 @@ class CpfTest(TestCase):
         from django.db import connection
         from django.apps import apps as django_apps
 
+        if connection.vendor != 'postgresql':
+            self.skipTest('raw SQL DROP CONSTRAINT requires PostgreSQL')
+
         mig = importlib.import_module('app.apps.sellers.migrations.0012_dedupe_cpf')
 
         s1 = Seller.objects.create(

@@ -457,7 +457,7 @@ showToast("{{ message|escapejs }}", "{% if message.tags == 'error' %}error{% eli
             <template x-for="v in currentVariables" :key="v">
               <button type="button" @click="insertVariable(v)"
                       class="px-2.5 py-1 rounded-lg text-[11px] font-medium bg-brand-50 text-brand-600 hover:bg-brand-100 hover:text-brand-700 transition border border-brand-100 cursor-pointer">
-                <span x-text="'{{' + v + '}}'"></span>
+                <span x-text="'{% templatetag openvariable %}' + v + '{% templatetag closevariable %}'"></span>
               </button>
             </template>
             <span x-show="!currentVariables.length" class="text-[12px] text-gray-400">Nenhuma variavel disponivel</span>
@@ -750,7 +750,7 @@ document.addEventListener('alpine:init', function() {
                 var ref = 'textarea_' + this.selectedEvent;
                 var ta = this.$refs[ref];
                 if (!ta) return;
-                var tag = '{{' + v + '}}';
+                var tag = '{% templatetag openvariable %}' + v + '{% templatetag closevariable %}';
                 var start = ta.selectionStart;
                 var end = ta.selectionEnd;
                 var before = ta.value.substring(0, start);
@@ -770,7 +770,7 @@ document.addEventListener('alpine:init', function() {
                 for (var i = 0; i < vars.length; i++) {
                     ctx[vars[i]] = sampleCtx[vars[i]] || ('[' + vars[i] + ']');
                 }
-                this.previewText = text.replace(/{{(\w+)}}/g, function(m, key) {
+                this.previewText = text.replace(/[{]{2}(\w+)[}]{2}/g, function(m, key) {
                     return ctx.hasOwnProperty(key) ? ctx[key] : '[' + key + ']';
                 });
             }
@@ -968,7 +968,7 @@ function configPage() {
 function freightConfig() {
     var initialPresets = {{ freight_presets_json|safe }};
     return {
-        adjustment: '{{ tenant.freight_adjustment_percent }}',
+        adjustment: {{ tenant.freight_adjustment_percent }},
         motoboyOn: {{ tenant.motoboy_enabled|lower }},
         presets: initialPresets,
         addPreset: function() {
