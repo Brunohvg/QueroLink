@@ -258,6 +258,14 @@ def gestor_configuracoes(request):
         correios_cartao = request.POST.get('correios_cartao', '').strip()
         tenant.correios_cartao = correios_cartao or None
 
+        weekday_values = request.POST.getlist('working_weekdays')
+        try:
+            working_weekdays_parsed = sorted(set(int(w) for w in weekday_values if 0 <= int(w) <= 6))
+            tenant.working_weekdays = working_weekdays_parsed if working_weekdays_parsed else [0, 1, 2, 3, 4, 5]
+        except (ValueError, TypeError):
+            pass
+        tenant.skip_national_holidays = request.POST.get('skip_national_holidays') == '1'
+
         tenant.save()
 
         if request.POST.get('test_cws') == '1' and tenant.correios_cws_enabled:
@@ -291,6 +299,7 @@ def gestor_configuracoes(request):
     import json as _json
     from app.apps.freight.services import get_freight_presets
     freight_presets = get_freight_presets(tenant)
+    working_weekdays_list = tenant.working_weekdays or [0, 1, 2, 3, 4, 5]
     return render(request, 'dashboard/gestor/configuracoes.html', {
         'tenant': tenant,
         'link_events': template_events_with_body,
@@ -300,6 +309,7 @@ def gestor_configuracoes(request):
         'motoboy_price_brl': (tenant.motoboy_price_per_km_cents if tenant.motoboy_price_per_km_cents > 0 else 200) / 100.0,
         'motoboy_min_price_brl': (tenant.motoboy_min_price_cents if tenant.motoboy_min_price_cents > 0 else 800) / 100.0,
         'correios_cws_enabled': tenant.correios_cws_enabled,
+        'working_weekdays_list': working_weekdays_list,
     })
 
 

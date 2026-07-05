@@ -727,6 +727,107 @@ showToast("{{ message|escapejs }}", "{% if message.tags == 'error' %}error{% eli
       </div>
     </form>
   </div>
+
+  <div x-show="tab==='funcionamento'" class="mt-6">
+    <form method="post" action="{% url 'dashboard:gestor_configuracoes' %}" class="bg-white rounded-2xl border border-gray-100 shadow-[0_1px_3px_-1px_rgba(0,0,0,0.04),0_4px_16px_-4px_rgba(67,97,238,0.06)] overflow-hidden">
+      {% csrf_token %}
+      <div class="px-6 py-5 border-b border-gray-100">
+        <div class="flex items-center gap-3">
+          <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-violet-400 to-purple-500 flex items-center justify-center shadow-sm">
+            <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
+          </div>
+          <div>
+            <h2 class="text-[15px] font-semibold text-gray-900">Funcionamento da loja</h2>
+            <p class="text-[12px] text-gray-400">Dias em que os vendedores devem lancar vendas</p>
+          </div>
+        </div>
+      </div>
+      <div class="px-6 py-5 space-y-5 max-w-md">
+        <div>
+          <label class="block text-[13px] font-medium text-gray-700 mb-3">Dias de funcionamento</label>
+          <div class="flex gap-2 flex-wrap">
+            <label class="flex items-center gap-1.5 px-3 py-2 rounded-lg border text-[13px] cursor-pointer transition
+              {% if 0 in working_weekdays_list %}bg-brand-50 border-brand-200 text-brand-700{% else %}bg-gray-50 border-gray-200 text-gray-600{% endif %}">
+              <input type="checkbox" name="working_weekdays" value="0"
+                     {% if 0 in working_weekdays_list %}checked{% endif %}
+                     class="accent-brand-500">
+              Seg
+            </label>
+            <label class="flex items-center gap-1.5 px-3 py-2 rounded-lg border text-[13px] cursor-pointer transition
+              {% if 1 in working_weekdays_list %}bg-brand-50 border-brand-200 text-brand-700{% else %}bg-gray-50 border-gray-200 text-gray-600{% endif %}">
+              <input type="checkbox" name="working_weekdays" value="1"
+                     {% if 1 in working_weekdays_list %}checked{% endif %}
+                     class="accent-brand-500">
+              Ter
+            </label>
+            <label class="flex items-center gap-1.5 px-3 py-2 rounded-lg border text-[13px] cursor-pointer transition
+              {% if 2 in working_weekdays_list %}bg-brand-50 border-brand-200 text-brand-700{% else %}bg-gray-50 border-gray-200 text-gray-600{% endif %}">
+              <input type="checkbox" name="working_weekdays" value="2"
+                     {% if 2 in working_weekdays_list %}checked{% endif %}
+                     class="accent-brand-500">
+              Qua
+            </label>
+            <label class="flex items-center gap-1.5 px-3 py-2 rounded-lg border text-[13px] cursor-pointer transition
+              {% if 3 in working_weekdays_list %}bg-brand-50 border-brand-200 text-brand-700{% else %}bg-gray-50 border-gray-200 text-gray-600{% endif %}">
+              <input type="checkbox" name="working_weekdays" value="3"
+                     {% if 3 in working_weekdays_list %}checked{% endif %}
+                     class="accent-brand-500">
+              Qui
+            </label>
+            <label class="flex items-center gap-1.5 px-3 py-2 rounded-lg border text-[13px] cursor-pointer transition
+              {% if 4 in working_weekdays_list %}bg-brand-50 border-brand-200 text-brand-700{% else %}bg-gray-50 border-gray-200 text-gray-600{% endif %}">
+              <input type="checkbox" name="working_weekdays" value="4"
+                     {% if 4 in working_weekdays_list %}checked{% endif %}
+                     class="accent-brand-500">
+              Sex
+            </label>
+            <label class="flex items-center gap-1.5 px-3 py-2 rounded-lg border text-[13px] cursor-pointer transition
+              {% if 5 in working_weekdays_list %}bg-brand-50 border-brand-200 text-brand-700{% else %}bg-gray-50 border-gray-200 text-gray-600{% endif %}">
+              <input type="checkbox" name="working_weekdays" value="5"
+                     {% if 5 in working_weekdays_list %}checked{% endif %}
+                     class="accent-brand-500">
+              Sab
+            </label>
+            <label class="flex items-center gap-1.5 px-3 py-2 rounded-lg border text-[13px] cursor-pointer transition
+              {% if 6 in working_weekdays_list %}bg-brand-50 border-brand-200 text-brand-700{% else %}bg-gray-50 border-gray-200 text-gray-600{% endif %}">
+              <input type="checkbox" name="working_weekdays" value="6"
+                     {% if 6 in working_weekdays_list %}checked{% endif %}
+                     class="accent-brand-500">
+              Dom
+            </label>
+          </div>
+          <p class="text-[12px] text-gray-400 mt-2 flex items-center gap-1.5">
+            <svg class="w-3.5 h-3.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+            Dias desmarcados nao cobram lancamento de venda do vendedor.
+          </p>
+        </div>
+
+        <div class="flex items-center justify-between py-2">
+          <div>
+            <p class="text-[13px] font-medium text-gray-700">Nao cobrar em feriados nacionais</p>
+            <p class="text-[12px] text-gray-400">Vendedores nao serao cobrados por nao lancar vendas em feriados</p>
+          </div>
+          <label class="relative inline-flex items-center cursor-pointer">
+            <input type="hidden" name="skip_national_holidays" value="0">
+            <input type="checkbox" name="skip_national_holidays" value="1"
+                   {% if tenant.skip_national_holidays %}checked{% endif %}
+                   class="sr-only peer">
+            <div class="w-10 h-5 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-brand-200 rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-brand-500"></div>
+          </label>
+        </div>
+      </div>
+
+      <div class="px-6 pb-6">
+        <div class="flex justify-end pt-4 border-t border-gray-100">
+          <button type="submit"
+                  class="inline-flex items-center gap-2 bg-gray-900 hover:bg-gray-800 text-white font-semibold py-2.5 px-6 rounded-xl transition-all text-[14px] shadow-sm hover:shadow-md active:scale-[0.97]">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+            Salvar Funcionamento
+          </button>
+        </div>
+      </div>
+    </form>
+  </div>
 </div>
 
 {{ event_vars_json|json_script:"event-vars" }}

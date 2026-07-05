@@ -23,3 +23,4 @@ psycopg2-binary==2.9.9
 dj-database-url==2.2.0
 pywebpush==2.0.0
 sentry-sdk[django,celery]==2.26.0
+holidays==0.63

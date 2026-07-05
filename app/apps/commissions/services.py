@@ -579,9 +579,10 @@ def get_missing_days_before_today(seller, month, year):
 
     missing = []
     current = start
+    from app.apps.accounts.models import is_working_day
     while current <= end:
         if current not in submitted_dates:
-            if current.weekday() != 6:
+            if is_working_day(seller.tenant, current):
                 missing.append(current)
         current += timedelta(days=1)
     return missing

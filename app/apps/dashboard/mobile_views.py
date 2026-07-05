@@ -268,6 +268,9 @@ def mobile_home(request):
             )
             has_missing_past_days = len(missing_past_days) > 0
 
+        from app.apps.accounts.models import is_working_day
+        is_working_day_today = is_working_day(seller.tenant, today)
+
         return render(request, 'mobile/home.html', {
             'seller': seller,
             'today_total': today_total,
@@ -287,6 +290,7 @@ def mobile_home(request):
             'combined_month_total': combined_month_total,
             'current_year': today.year,
             'current_month': today.month,
+            'is_working_day_today': is_working_day_today,
         })
     except Exception as e:
         logger.exception("Erro ao carregar mobile_home")

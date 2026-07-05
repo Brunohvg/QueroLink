@@ -71,6 +71,10 @@ class Tenant(models.Model):
     motoboy_min_price_cents = models.PositiveIntegerField(default=800)
     motoboy_max_km = models.PositiveIntegerField(default=15,
         help_text='Raio maximo de entrega (km)')
+    working_weekdays = models.JSONField(default=list, blank=True,
+        help_text='Dias de funcionamento (0=seg ... 6=dom). Vazio = seg a sab.')
+    skip_national_holidays = models.BooleanField(default=True,
+        help_text='Nao cobrar lancamentos em feriados nacionais')
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -168,6 +172,17 @@ def tenant_operational(tenant):
         return False
     except Subscription.DoesNotExist:
         return not tenant.is_trial_expired
+
+
+def is_working_day(tenant, d):
+    weekdays = tenant.working_weekdays or [0, 1, 2, 3, 4, 5]
+    if d.weekday() not in weekdays:
+        return False
+    if tenant.skip_national_holidays:
+        import holidays
+        if d in holidays.Brazil(years=d.year):
+            return False
+    return True
 
 
 def tenant_has_feature(tenant, feature_name):

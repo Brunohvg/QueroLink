@@ -252,10 +252,6 @@ def send_daily_entry_reminders():
     current_time = now.time()
     current_date = now.date()
 
-    if current_date.weekday() == 6:
-        logger.info("Daily reminder: domingo, pulando")
-        return
-
     window_start = (timezone.localtime(timezone.now()) - timedelta(minutes=15)).time()
 
     tenants = Tenant.objects.filter(
@@ -268,8 +264,10 @@ def send_daily_entry_reminders():
     sent_count = 0
     skipped_no_phone = 0
     for tenant in tenants:
-        from app.apps.accounts.models import tenant_operational
+        from app.apps.accounts.models import tenant_operational, is_working_day
         if not tenant_operational(tenant):
+            continue
+        if not is_working_day(tenant, current_date):
             continue
 
         sellers_with_sale_today = Sale.objects.filter(
