@@ -1,5 +1,6 @@
 from django.core.exceptions import ValidationError
 from django.test import TestCase
+from django.db.migrations.loader import MigrationLoader
 
 from app.apps.accounts.models import Tenant, User
 from app.apps.sellers.models import Seller
@@ -53,34 +54,51 @@ class CpfTest(TestCase):
         seller2 = _create_seller(self.tenant, self.user2, 'B', phone='11922222222')
         self.assertIsNone(seller2.cpf)
 
-    def test_dedupe_mantem_mais_antigo(self):
-        from app.apps.sellers.models import Seller as SellerModel
-        from django.db.models import Count, Min
+    def test_dedupe_funcao_real_mantem_mais_antigo(self):
+        import importlib
+        from django.db import connection
+        from django.apps import apps as django_apps
 
-        class FakeSeller:
-            def __init__(self, pk, tenant_id, cpf, created_at):
-                self.pk = pk
-                self.tenant_id = tenant_id
-                self.cpf = cpf
-                self.created_at = created_at
+        mig = importlib.import_module('app.apps.sellers.migrations.0012_dedupe_cpf')
 
-        s1 = FakeSeller(1, self.tenant.pk, '52998224725', '2026-01-01')
-        s2 = FakeSeller(2, self.tenant.pk, '52998224725', '2026-02-01')
-        sellers_list = [s1, s2]
+        s1 = Seller.objects.create(
+            tenant=self.tenant, user=self.user1, name='Seller A', phone='11911111111',
+        )
+        s2 = Seller.objects.create(
+            tenant=self.tenant, user=self.user2, name='Seller B', phone='11922222222',
+        )
 
-        pairs = {}
-        for s in sellers_list:
-            key = (s.tenant_id, s.cpf)
-            if s.cpf and key not in pairs:
-                pairs[key] = []
-            if s.cpf:
-                pairs[key].append(s)
+        cpf = '52998224725'
+        with connection.cursor() as cursor:
+            cursor.execute('ALTER TABLE sellers_seller DROP CONSTRAINT IF EXISTS unique_cpf_per_tenant')
+            cursor.execute('UPDATE sellers_seller SET cpf = %s WHERE id = %s', [cpf, s1.pk])
+            cursor.execute('UPDATE sellers_seller SET cpf = %s WHERE id = %s', [cpf, s2.pk])
 
-        for key, group in pairs.items():
-            group.sort(key=lambda s: (s.created_at, s.pk))
-            keep = group[0]
-            for dup in group[1:]:
-                dup.cpf = None
+        mig.dedupe_cpf(django_apps, None)
 
-        self.assertEqual(s1.cpf, '52998224725')
-        self.assertIsNone(s2.cpf)
+        s1.refresh_from_db()
+        s2.refresh_from_db()
+        older, newer = (s1, s2) if s1.created_at <= s2.created_at else (s2, s1)
+        self.assertEqual(older.cpf, cpf)
+        self.assertIsNone(newer.cpf)
+
+
+class CpfMigrationOrderTests(TestCase):
+    def test_dedupe_roda_antes_da_constraint(self):
+        from django.db import connection
+        loader = MigrationLoader(connection, load=True)
+        graph = loader.graph
+        dedupe = ('sellers', '0012_dedupe_cpf')
+        constraint = ('sellers', '0010_add_unique_cpf')
+        normalize = ('sellers', '0011_normalize_cpf_digits')
+
+        plan = [node for node in graph.forwards_plan(constraint)]
+        self.assertIn(dedupe, plan, 'dedupe (0012) nao esta no caminho ate a constraint (0010)')
+        self.assertLess(
+            plan.index(normalize), plan.index(dedupe),
+            'normalize (0011) deve rodar antes da dedupe (0012)',
+        )
+        self.assertLess(
+            plan.index(dedupe), plan.index(constraint),
+            'REGRESSAO: dedupe (0012) deve rodar ANTES da constraint (0010)',
+        )
