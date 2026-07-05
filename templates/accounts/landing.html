@@ -5,9 +5,22 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Mérito — Comissões de vendedores sem planilha</title>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="{% static 'css/tailwind.css' %}">
 <style>
+@font-face {
+  font-family: 'Inter';
+  src: url("{% static 'fonts/inter/inter-variable.woff2' %}") format('woff2');
+  font-weight: 400 700;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Space Grotesk';
+  src: url("{% static 'fonts/space-grotesk/space-grotesk-variable.woff2' %}") format('woff2');
+  font-weight: 500 700;
+  font-style: normal;
+  font-display: swap;
+}
 :root {
   --graphite: #0B1120;
   --graphite-2: #111A2E;

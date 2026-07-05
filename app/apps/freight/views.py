@@ -2,7 +2,6 @@ import json
 import logging
 
 from django.http import JsonResponse
-from django.views.decorators.csrf import csrf_exempt
 from django_ratelimit.decorators import ratelimit
 
 from app.apps.accounts.models import User
@@ -41,7 +40,6 @@ def _get_correios_options(tenant, cep_destino_digits, weight_grams):
 
 # ── POST /api/freight/quote/ ────────────────────────────
 
-@csrf_exempt
 @ratelimit(key='user', rate='30/m', method='POST', block=True)
 def freight_quote_view(request):
     if request.method != 'POST':
@@ -61,6 +59,12 @@ def freight_quote_view(request):
 
     cep_destino = body.get('cep_destino', '').strip()
     weight_grams = body.get('weight_grams', 0)
+
+    try:
+        weight_grams = int(weight_grams)
+    except (TypeError, ValueError):
+        return JsonResponse({'success': False, 'error': 'Peso invalido.'}, status=400)
+    weight_grams = max(50, min(30000, weight_grams))
 
     digits = ''.join(filter(str.isdigit, cep_destino))
     if len(digits) != 8:
@@ -118,7 +122,7 @@ def freight_quote_view(request):
 
 # ── POST /api/freight/test-cws/ ──────────────────────────
 
-@csrf_exempt
+@ratelimit(key='user', rate='10/m', method='POST', block=True)
 def freight_test_cws_view(request):
     if request.method != 'POST':
         return JsonResponse({'ok': False, 'error': 'POST required.'}, status=405)
@@ -126,7 +130,7 @@ def freight_test_cws_view(request):
     if not request.user.is_authenticated:
         return JsonResponse({'ok': False, 'error': 'Autenticacao necessaria.'}, status=401)
 
-    if request.user.role != User.Role.ADMIN:
+    if request.user.role not in (User.Role.ADMIN, User.Role.MANAGER):
         return JsonResponse({'ok': False, 'error': 'Apenas o gestor pode testar.'}, status=403)
 
     tenant = request.user.tenant

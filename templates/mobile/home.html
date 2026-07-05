@@ -33,6 +33,24 @@
   <script>showToast("{{ error|escapejs }}", "error");</script>
   {% else %}
 
+  {% if not seller.cpf %}
+  <div x-data="{ cpfHidden: false }" x-init="var d=localStorage.getItem('cpf_alert_dismissed');if(d && (Date.now()-parseInt(d))<7*864e5) cpfHidden=true" x-show="!cpfHidden" x-cloak
+       class="bg-violet-50 border border-violet-200 rounded-2xl px-4 py-3 flex items-center gap-3">
+    <div class="w-9 h-9 rounded-xl bg-violet-100 flex items-center justify-center flex-shrink-0">
+      <svg class="w-4.5 h-4.5 text-violet-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V8a2 2 0 00-2-2h-5m-4 0V5a2 2 0 114 0v1m-4 0a2 2 0 104 0m-5 8a2 2 0 100 4h10a2 2 0 100-4H9z"/></svg>
+    </div>
+    <div class="flex-1 min-w-0">
+      <p class="text-[13px] font-medium text-violet-800">Cadastre seu CPF para a folha de pagamento</p>
+    </div>
+    <a href="{% url 'dashboard:mobile_perfil' %}" class="flex-shrink-0 text-[12px] font-semibold text-violet-600 hover:text-violet-700 bg-violet-100 hover:bg-violet-200 px-3 py-1.5 rounded-lg transition">
+      Cadastrar
+    </a>
+    <button @click="cpfHidden=true;localStorage.setItem('cpf_alert_dismissed',Date.now())" class="flex-shrink-0 text-violet-300 hover:text-violet-500 transition p-0.5" aria-label="Fechar">
+      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+    </button>
+  </div>
+  {% endif %}
+
   <div class="relative overflow-hidden rounded-2xl p-6 text-white" style="background: linear-gradient(135deg, #1463FF, #0B3CA3);">
     <div class="absolute top-0 right-0 w-40 h-40 bg-white/5 rounded-full -mr-12 -mt-12"></div>
     <div class="absolute bottom-0 left-0 w-32 h-32 bg-white/5 rounded-full -ml-12 -mb-12"></div>

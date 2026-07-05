@@ -227,9 +227,6 @@ class User(AbstractUser):
         return self.username
 
     class Meta:
-        constraints = [
-            models.UniqueConstraint(fields=['email'], name='unique_user_email'),
-        ]
         indexes = [
             models.Index(fields=['tenant', 'role'], name='user_tenant_role_idx'),
             models.Index(fields=['role'], name='user_role_idx'),

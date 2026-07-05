@@ -54,13 +54,46 @@
         </div>
         <span class="text-[14px] font-bold text-brand-600">{{ seller.commission_rate|floatformat:2 }}%</span>
       </div>
-      <div class="flex items-center justify-between">
-        <div class="flex items-center gap-3">
-          <div class="w-9 h-9 rounded-xl bg-gray-100 flex items-center justify-center"><svg class="w-4.5 h-4.5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg></div>
-          <span class="text-[14px] text-gray-500">Vendedor desde</span>
-        </div>
-        <span class="text-[14px] font-semibold text-gray-800">{{ seller.created_at|date:"d/m/Y" }}</span>
-      </div>
+       <div class="flex items-center justify-between">
+         <div class="flex items-center gap-3">
+           <div class="w-9 h-9 rounded-xl bg-gray-100 flex items-center justify-center"><svg class="w-4.5 h-4.5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg></div>
+           <span class="text-[14px] text-gray-500">Vendedor desde</span>
+         </div>
+         <span class="text-[14px] font-semibold text-gray-800">{{ seller.created_at|date:"d/m/Y" }}</span>
+       </div>
+
+       <div class="border-t border-gray-100 pt-4">
+         <div class="flex items-center justify-between mb-3">
+           <div class="flex items-center gap-3">
+             <div class="w-9 h-9 rounded-xl bg-violet-50 flex items-center justify-center"><svg class="w-4.5 h-4.5 text-violet-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V8a2 2 0 00-2-2h-5m-4 0V5a2 2 0 114 0v1m-4 0a2 2 0 104 0"/></svg></div>
+             <span class="text-[14px] text-gray-500">CPF</span>
+           </div>
+         </div>
+
+         {% if seller.cpf %}
+         <div class="flex items-center justify-between bg-gray-50 rounded-xl px-4 py-3">
+           <span class="text-[15px] font-semibold text-gray-800 font-mono tracking-wider">{{ seller.cpf_formatted }}</span>
+           <span class="flex items-center gap-1 text-[11px] text-gray-400">
+             <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
+             Para alterar, fale com seu gestor
+           </span>
+         </div>
+         {% else %}
+         {% if cpf_error %}<p class="text-[12px] text-red-500 mb-2">{{ cpf_error }}</p>{% endif %}
+         {% if cpf_success %}<p class="text-[12px] text-emerald-600 mb-2">CPF salvo com sucesso.</p>{% endif %}
+         <form method="post" action="{% url 'dashboard:mobile_perfil' %}" class="flex items-center gap-2">
+           {% csrf_token %}
+           <input type="hidden" name="action" value="save_cpf">
+           <input type="text" name="cpf" inputmode="numeric" maxlength="14" placeholder="000.000.000-00"
+                  class="flex-1 px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-[14px] outline-none font-mono tracking-wider focus:border-violet-400 focus:ring-2 focus:ring-violet-100"
+                  oninput="var v=this.value.replace(/\D/g,'').slice(0,11);this.value=v.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/,'$1.$2.$3-$4');">
+           <button type="submit"
+                   class="bg-violet-500 hover:bg-violet-600 text-white font-semibold px-4 py-2.5 rounded-xl text-[13px] transition active:scale-[0.97] shadow-sm">
+             Salvar CPF
+           </button>
+         </form>
+         {% endif %}
+       </div>
     </div>
   </div>
 

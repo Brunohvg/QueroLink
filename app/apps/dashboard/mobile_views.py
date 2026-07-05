@@ -17,6 +17,7 @@ from app.apps.accounts.models import User
 from app.apps.sales.models import Sale
 from app.apps.commissions.models import CommissionPeriod, SellerCommission
 from app.apps.audit.utils import log_action
+from django.core.exceptions import ValidationError
 
 logger = logging.getLogger(__name__)
 
@@ -667,6 +668,40 @@ def mobile_perfil(request):
             'error': 'Perfil de vendedor nao encontrado.',
         })
 
+    if request.method == 'POST' and request.POST.get('action') == 'save_cpf':
+        if seller.cpf:
+            return render(request, 'mobile/perfil.html', {
+                'seller': seller,
+                'cpf_error': 'CPF ja cadastrado. Para alterar, fale com seu gestor.',
+                'cpf_success': False,
+            })
+
+        cpf_input = request.POST.get('cpf', '').strip()
+        if not cpf_input:
+            return render(request, 'mobile/perfil.html', {
+                'seller': seller,
+                'cpf_error': 'Informe um CPF valido.',
+                'cpf_success': False,
+            })
+
+        seller.cpf = cpf_input
+        try:
+            seller.full_clean()
+            seller.save()
+            log_action(request, 'seller_cpf_self_registered', instance=seller,
+                       changes={'cpf': seller.cpf})
+            return render(request, 'mobile/perfil.html', {
+                'seller': seller,
+                'cpf_success': True,
+            })
+        except ValidationError as e:
+            msgs = e.message_dict.get('cpf', ['CPF invalido.'])
+            return render(request, 'mobile/perfil.html', {
+                'seller': seller,
+                'cpf_error': msgs[0] if isinstance(msgs, list) else str(msgs),
+                'cpf_success': False,
+            })
+
     return render(request, 'mobile/perfil.html', {
         'seller': seller,
     })
@@ -714,11 +749,10 @@ def mobile_frete(request):
     if not seller:
         return redirect('dashboard:mobile_home')
     tenant = request.user.tenant
-    import json as _json
     from app.apps.freight.services import get_freight_presets
     presets = get_freight_presets(tenant)
     return render(request, 'mobile/frete.html', {
         'seller': seller,
         'store_cep_configured': bool(tenant.store_cep),
-        'presets_json': _json.dumps(presets),
+        'presets_json': presets,
     })

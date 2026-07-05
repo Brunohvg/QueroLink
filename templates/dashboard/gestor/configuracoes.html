@@ -971,7 +971,10 @@ function configPage() {
     }
 }
 function freightConfig() {
-    var initialPresets = JSON.parse(document.getElementById('freight-presets').textContent);
+    var _p = JSON.parse(document.getElementById('freight-presets').textContent || '[]');
+    if (typeof _p === 'string') _p = JSON.parse(_p);
+    if (!Array.isArray(_p)) _p = [];
+    var initialPresets = _p;
     return {
         adjustment: {{ tenant.freight_adjustment_percent }},
         motoboyOn: {{ tenant.motoboy_enabled|lower }},

@@ -196,7 +196,11 @@ def gestor_configuracoes(request):
 
         store_cep = request.POST.get('store_cep', '').strip()
         if store_cep:
-            tenant.store_cep = store_cep
+            digits = ''.join(filter(str.isdigit, store_cep))
+            if len(digits) == 8:
+                tenant.store_cep = f'{digits[:5]}-{digits[5:]}'
+            else:
+                messages.error(request, 'CEP da loja invalido. Use 8 digitos (ex: 00000-000).')
         freight_adjustment = request.POST.get('freight_adjustment_percent', '').strip()
         if freight_adjustment:
             try:
@@ -208,7 +212,18 @@ def gestor_configuracoes(request):
         if presets_json:
             try:
                 import json as _json
-                tenant.freight_presets = _json.loads(presets_json)
+                raw = _json.loads(presets_json)
+                valid = []
+                if isinstance(raw, list):
+                    for item in raw[:6]:
+                        name = str(item.get('name', '')).strip()[:20]
+                        try:
+                            weight = int(item.get('weight_grams', 0))
+                        except (TypeError, ValueError):
+                            continue
+                        if name and 50 <= weight <= 30000:
+                            valid.append({'name': name, 'weight_grams': weight})
+                tenant.freight_presets = valid
             except (ValueError, TypeError):
                 pass
         tenant.motoboy_enabled = request.POST.get('motoboy_enabled') == '1'
@@ -281,7 +296,7 @@ def gestor_configuracoes(request):
         'link_events': template_events_with_body,
         'commission_rate_display': float(tenant.default_commission_rate) * 100,
         'event_vars_json': _json.dumps(EVENT_VARIABLES),
-        'freight_presets_json': _json.dumps(freight_presets),
+        'freight_presets_json': freight_presets,
         'motoboy_price_brl': (tenant.motoboy_price_per_km_cents if tenant.motoboy_price_per_km_cents > 0 else 200) / 100.0,
         'motoboy_min_price_brl': (tenant.motoboy_min_price_cents if tenant.motoboy_min_price_cents > 0 else 800) / 100.0,
         'correios_cws_enabled': tenant.correios_cws_enabled,

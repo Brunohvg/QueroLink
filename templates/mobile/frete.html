@@ -130,7 +130,7 @@ function freightCalc() {
   return {
     cep: '',
     cepError: '',
-    presets: JSON.parse(document.getElementById('freight-presets').textContent),
+    presets: (function() { var _p = JSON.parse(document.getElementById('freight-presets').textContent || '[]'); if (typeof _p === 'string') _p = JSON.parse(_p); if (!Array.isArray(_p)) _p = []; return _p; })(),
     selectedPreset: 0,
     customWeight: false,
     manualWeight: '',
