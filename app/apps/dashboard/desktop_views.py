@@ -175,11 +175,10 @@ def gestor_configuracoes(request):
                 ) / 100
             except ValueError:
                 messages.error(request, 'Taxa de comissao invalida.')
-                import json as _json_err
                 return render(request, 'dashboard/gestor/configuracoes.html', {
                     'tenant': tenant, 'link_events': template_events_with_body,
                     'commission_rate_display': float(tenant.default_commission_rate or 0) * 100,
-                    'event_vars_json': _json_err.dumps(EVENT_VARIABLES),
+                    'event_vars_json': EVENT_VARIABLES,
                 })
 
         link_expires = request.POST.get('link_expires_in', '').strip()
@@ -296,7 +295,6 @@ def gestor_configuracoes(request):
         messages.success(request, 'Configuracoes salvas com sucesso.')
         return redirect('dashboard:gestor_configuracoes')
 
-    import json as _json
     from app.apps.freight.services import get_freight_presets
     freight_presets = get_freight_presets(tenant)
     working_weekdays_list = tenant.working_weekdays or [0, 1, 2, 3, 4, 5]
@@ -304,7 +302,7 @@ def gestor_configuracoes(request):
         'tenant': tenant,
         'link_events': template_events_with_body,
         'commission_rate_display': float(tenant.default_commission_rate) * 100,
-        'event_vars_json': _json.dumps(EVENT_VARIABLES),
+        'event_vars_json': EVENT_VARIABLES,
         'freight_presets_json': freight_presets,
         'motoboy_price_brl': (tenant.motoboy_price_per_km_cents if tenant.motoboy_price_per_km_cents > 0 else 200) / 100.0,
         'motoboy_min_price_brl': (tenant.motoboy_min_price_cents if tenant.motoboy_min_price_cents > 0 else 800) / 100.0,

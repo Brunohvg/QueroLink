@@ -102,6 +102,10 @@ showToast("{{ message|escapejs }}", "{% if message.tags == 'error' %}error{% eli
         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16V6a1 1 0 00-1-1H4a1 1 0 00-1 1v10a1 1 0 001 1h1m8-1a1 1 0 01-1 1H9m4-1V8a1 1 0 011-1h2.586a1 1 0 01.707.293l3.414 3.414a1 1 0 01.293.707V16a1 1 0 01-1 1h-1m-6-1a1 1 0 001 1h1M5 17a2 2 0 104 0m-4 0a2 2 0 114 0m6 0a2 2 0 104 0m-4 0a2 2 0 114 0"/></svg>
         Frete
       </button>
+      <button @click="tab='funcionamento'" :class="tab==='funcionamento' ? 'border-brand-500 text-brand-600 bg-brand-50/50' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'" class="flex items-center gap-2 px-5 py-3 text-[14px] font-medium border-b-2 transition-all whitespace-nowrap rounded-t-lg">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+        Funcionamento
+      </button>
     </nav>
   </div>
 
@@ -836,7 +840,8 @@ showToast("{{ message|escapejs }}", "{% if message.tags == 'error' %}error{% eli
 <script>
 document.addEventListener('alpine:init', function() {
     Alpine.data('messageEditor', function() {
-        var eventVars = JSON.parse(document.getElementById('event-vars').textContent);
+        var eventVars = JSON.parse(document.getElementById('event-vars').textContent || '{}');
+        if (typeof eventVars === 'string') eventVars = JSON.parse(eventVars);
         var sampleCtx = {
             vendedor: 'Fulano', usuario: 'fulano', senha: '********',
             periodo: '06/2026', valor: 'R$ 1.234,56',
