@@ -34,9 +34,16 @@ COPY requirements/production.txt ./requirements/production.txt
 RUN pip install --no-cache-dir -r requirements/production.txt \
     && rm -rf /root/.cache/pip /var/lib/apt/lists/*
 
-RUN curl -fsSL https://downloads.rclone.org/rclone-current-linux-arm64.deb -o /tmp/rclone.deb \
+RUN ARCH=$(dpkg --print-architecture) \
+    && case "$ARCH" in \
+        amd64) RCLONE_ARCH=amd64 ;; \
+        arm64) RCLONE_ARCH=arm64 ;; \
+        *) echo "ERROR: unsupported architecture: $ARCH" && exit 1 ;; \
+       esac \
+    && curl -fsSL "https://downloads.rclone.org/rclone-current-linux-${RCLONE_ARCH}.deb" -o /tmp/rclone.deb \
     && dpkg -i /tmp/rclone.deb \
-    && rm /tmp/rclone.deb
+    && rm /tmp/rclone.deb \
+    && rclone version
 
 COPY . .
 

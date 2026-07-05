@@ -79,6 +79,11 @@ services:
     environment:
       - DJANGO_SETTINGS_MODULE=app.config.settings.production
       - REDIS_URL=redis://:${REDIS_PASSWORD:-}@querolink-redis:6379/0
+      - DATABASE_URL=${DATABASE_URL:?}
+      - RCLONE_CONFIG_GDRIVE_TYPE=${RCLONE_CONFIG_GDRIVE_TYPE:?}
+      - RCLONE_CONFIG_GDRIVE_SCOPE=${RCLONE_CONFIG_GDRIVE_SCOPE:-drive}
+      - RCLONE_CONFIG_GDRIVE_TOKEN=${RCLONE_CONFIG_GDRIVE_TOKEN:?}
+      - GDRIVE_PATH=${GDRIVE_PATH:-querolink-backups}
     depends_on:
       querolink-redis:
         condition: service_healthy
@@ -90,6 +95,8 @@ services:
       timeout: 10s
       retries: 3
       start_period: 30s
+    volumes:
+      - backup_volume:/app/backups
     deploy:
       resources:
         limits:

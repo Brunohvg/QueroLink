@@ -12,14 +12,23 @@ def daily_backup():
         result = subprocess.run(
             ['/app/scripts/backup.sh'],
             capture_output=True, text=True, timeout=300,
+            check=True,
         )
-        if result.returncode == 0:
-            logger.info("Backup concluído: %s", result.stdout.strip().split('\n')[-1])
+        logger.info("Backup concluido: %s", result.stdout.strip().split('\n')[-1])
+    except subprocess.CalledProcessError as e:
+        if e.stdout:
+            for line in e.stdout.strip().split('\n')[-20:]:
+                logger.info("backup: %s", line)
+        if e.stderr:
+            logger.error("Backup stderr (ultimos 1000 chars): %s", e.stderr.strip()[-1000:])
+        raise
+    except subprocess.TimeoutExpired as e:
+        if e.stdout:
+            logger.error("Backup timeout — ultimos 500 chars: %s",
+                          e.stdout.decode('utf-8', errors='replace')[-500:])
         else:
-            logger.error("Backup falhou (código %d): %s", result.returncode, result.stderr[-500:])
-    except subprocess.TimeoutExpired:
-        logger.error("Backup timeout após 300s")
+            logger.error("Backup timeout apos 300s — sem stdout")
+        raise
     except FileNotFoundError:
-        logger.error("Script de backup não encontrado: /app/scripts/backup.sh")
-    except Exception as e:
-        logger.error("Backup exception: %s", e)
+        logger.exception("Script de backup nao encontrado: /app/scripts/backup.sh")
+        raise

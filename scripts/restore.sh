@@ -1,11 +1,14 @@
 #!/bin/bash
-set -e
+set -Eeuo pipefail
 
 # ============================================================
 # QueroLink — restore.sh
 # Baixa e restaura um backup do Google Drive
 # Uso: ./scripts/restore.sh <data>   (ex: 2026-06-29)
 #      ./scripts/restore.sh latest   (baixa o mais recente)
+#
+# Importante: restaurar apenas em banco PostgreSQL VAZIO.
+# Nunca executar sobre banco de producao em uso.
 # ============================================================
 
 GDRIVE_REMOTE="${GDRIVE_REMOTE:-gdrive}"
@@ -13,43 +16,65 @@ GDRIVE_PATH="${GDRIVE_PATH:-querolink-backups}"
 BACKUP_DIR="${BACKUP_DIR:-/app/backups}"
 
 log() { echo "[$(date +%H:%M:%S)] $*"; }
+die() { log "FATAL: $*"; exit 1; }
 
+RCLONE_BIN="${RCLONE_BIN:-rclone}"
 DATE_FILTER="${1:-latest}"
 
 if [ "$DATE_FILTER" = "latest" ]; then
     log "Procurando backup mais recente no Google Drive ..."
-    FILE=$(rclone ls "${GDRIVE_REMOTE}:${GDRIVE_PATH}" \
-        --include "querolink_*.dump.gz" \
+    FILE=$("$RCLONE_BIN" ls "${GDRIVE_REMOTE}:${GDRIVE_PATH}" \
+        --include "querolink_*.dump" \
         | sort -k2 | tail -1 | awk '{print $2}')
 else
     log "Procurando backup de ${DATE_FILTER} ..."
-    FILE=$(rclone ls "${GDRIVE_REMOTE}:${GDRIVE_PATH}" \
-        --include "querolink_${DATE_FILTER}*.dump.gz" \
+    FILE=$("$RCLONE_BIN" ls "${GDRIVE_REMOTE}:${GDRIVE_PATH}" \
+        --include "querolink_${DATE_FILTER}*.dump" \
         | sort -k2 | tail -1 | awk '{print $2}')
 fi
 
 if [ -z "$FILE" ]; then
-    log "FATAL: Nenhum backup encontrado para: ${DATE_FILTER}"
-    exit 1
+    die "Nenhum backup encontrado para: ${DATE_FILTER}"
 fi
 
 log "Baixando: ${FILE} ..."
-rclone copyto "${GDRIVE_REMOTE}:${GDRIVE_PATH}/${FILE}" "${BACKUP_DIR}/${FILE}"
+"$RCLONE_BIN" copyto "${GDRIVE_REMOTE}:${GDRIVE_PATH}/${FILE}" "${BACKUP_DIR}/${FILE}"
 
+# ── Parse DATABASE_URL ──────────────────────────────────────
 parse_db_url() {
     python3 -c "
-import os, urllib.parse
+import os, sys, urllib.parse
 url = os.environ.get('DATABASE_URL', '')
-parsed = urllib.parse.urlparse(url)
-print(parsed.hostname or 'localhost')
-print(parsed.port or 5432)
-print(parsed.username or 'postgres')
-print(parsed.password or '')
-print(parsed.path.lstrip('/') or 'postgres')
+if not url:
+    sys.exit(1)
+try:
+    parsed = urllib.parse.urlparse(url)
+    if not parsed.hostname:
+        sys.exit(1)
+    host = parsed.hostname
+    port = str(parsed.port) if parsed.port else '5432'
+    user = urllib.parse.unquote(parsed.username) if parsed.username else 'postgres'
+    pwd  = urllib.parse.unquote(parsed.password) if parsed.password else ''
+    db   = parsed.path.lstrip('/') or 'postgres'
+    sys.stdout.write(host + '\n' + port + '\n' + user + '\n' + pwd + '\n' + db + '\n')
+except Exception:
+    sys.exit(1)
 "
 }
 
-read -r DB_HOST DB_PORT DB_USER DB_PASS DB_NAME <<< "$(parse_db_url)"
+DB_INFO=$(parse_db_url) || die "nao foi possivel parsear DATABASE_URL"
+
+mapfile -t DB_PARTS <<< "$DB_INFO"
+DB_HOST="${DB_PARTS[0]:-}"
+DB_PORT="${DB_PARTS[1]:-}"
+DB_USER="${DB_PARTS[2]:-}"
+DB_PASS="${DB_PARTS[3]:-}"
+DB_NAME="${DB_PARTS[4]:-}"
+
+[ -n "$DB_HOST" ] || die "DB_HOST vazio apos parse de DATABASE_URL"
+[ -n "$DB_PORT" ] || die "DB_PORT vazio apos parse de DATABASE_URL"
+[ -n "$DB_USER" ] || die "DB_USER vazio apos parse de DATABASE_URL"
+[ -n "$DB_NAME" ] || die "DB_NAME vazio apos parse de DATABASE_URL"
 
 log "ATENCAO: Isso vai SOBRESCREVER o banco '${DB_NAME}@${DB_HOST}'."
 log "Arquivo: ${BACKUP_DIR}/${FILE}"
@@ -74,5 +99,7 @@ pg_restore \
     --no-acl \
     -j 2 \
     "${BACKUP_DIR}/${FILE}"
+
+unset PGPASSWORD
 
 log "===== RESTAURACAO CONCLUIDA ====="
