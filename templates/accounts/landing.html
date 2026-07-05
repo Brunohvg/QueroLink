@@ -2,208 +2,780 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Mérito — Gestao de comissao de vendedores</title>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="/static/css/tailwind.css">
-    <style>
-        body { font-family: 'Inter', system-ui, sans-serif; }
-    </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mérito — Comissões de vendedores sem planilha</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/static/css/tailwind.css">
+<style>
+:root {
+  --graphite: #0B1120;
+  --graphite-2: #111A2E;
+  --blue: #1263FF;
+  --cyan: #00D1E6;
+  --surface: #F5F7FA;
+  --ink: #0B1120;
+}
+html { scroll-behavior: smooth; }
+body { font-family: 'Inter', system-ui, sans-serif; }
+
+@keyframes float {
+  0%, 100% { transform: translateY(0px); }
+  50% { transform: translateY(-16px); }
+}
+@keyframes glow-pulse {
+  0%, 100% { opacity: 0.4; transform: scale(1); }
+  50% { opacity: 0.7; transform: scale(1.05); }
+}
+@keyframes fade-in-up {
+  from { opacity: 0; transform: translateY(24px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.animate-float { animation: float 6s ease-in-out infinite; }
+.animate-glow { animation: glow-pulse 4s ease-in-out infinite; }
+
+.reveal { opacity: 0; transform: translateY(24px); transition: opacity 0.7s ease, transform 0.7s ease; }
+.reveal.revealed { opacity: 1; transform: translateY(0); }
+.reveal-group > .reveal:nth-child(1) { transition-delay: 0ms; }
+.reveal-group > .reveal:nth-child(2) { transition-delay: 80ms; }
+.reveal-group > .reveal:nth-child(3) { transition-delay: 160ms; }
+.reveal-group > .reveal:nth-child(4) { transition-delay: 240ms; }
+.reveal-group > .reveal:nth-child(5) { transition-delay: 320ms; }
+.reveal-group > .reveal:nth-child(6) { transition-delay: 400ms; }
+.reveal-group > .reveal:nth-child(7) { transition-delay: 480ms; }
+.reveal-group > .reveal:nth-child(8) { transition-delay: 560ms; }
+
+[x-cloak] { display: none !important; }
+.nav-blur { backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); }
+.glass-card { background: rgba(255,255,255,0.06); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); border: 1px solid rgba(255,255,255,0.08); }
+.gradient-border { position: relative; }
+.gradient-border::before { content: ''; position: absolute; inset: 0; border-radius: inherit; padding: 1px; background: linear-gradient(135deg, var(--blue), var(--cyan)); -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0); -webkit-mask-composite: xor; mask-composite: exclude; pointer-events: none; }
+
+.text-gradient { background: linear-gradient(135deg, var(--blue), var(--cyan)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+.bg-grid { background-image: url("data:image/svg+xml,%3Csvg width='40' height='40' xmlns='http://www.w3.org/2000/svg'%3E%3Cdefs%3E%3Cpattern id='g' width='40' height='40' patternUnits='userSpaceOnUse'%3E%3Cpath d='M 40 0 L 0 0 0 40' fill='none' stroke='rgba(255,255,255,0.04)' stroke-width='0.5'/%3E%3C/pattern%3E%3C/defs%3E%3Crect width='100%25' height='100%25' fill='url(%23g)'/%3E%3C/svg%3E"); }
+.mockup-desktop { transform: perspective(1000px) rotateY(-4deg) rotateX(2deg); }
+.mockup-mobile { transform: perspective(1000px) rotateY(6deg) rotateX(-2deg); }
+
+.step-connector { position: relative; }
+.step-connector::after { content: ''; position: absolute; top: 36px; left: calc(50% + 40px); width: calc(100% - 80px); height: 2px; background: linear-gradient(90deg, var(--blue), var(--cyan)); }
+.step-connector:last-child::after { display: none; }
+
+@media (max-width: 768px) {
+  .step-connector::after { display: none; }
+}
+
+.faq-accordion-content { max-height: 0; overflow: hidden; transition: max-height 0.3s ease; }
+.faq-accordion-content.open { max-height: 300px; }
+
+.badge-gradient-border { border: 1px solid transparent; background-clip: padding-box; position: relative; }
+.badge-gradient-border::before { content: ''; position: absolute; inset: 0; border-radius: 999px; padding: 1px; background: linear-gradient(135deg, var(--blue), var(--cyan)); -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0); -webkit-mask-composite: xor; mask-composite: exclude; pointer-events: none; }
+
+.mockup-glow-bg { background: radial-gradient(ellipse at center, rgba(18,99,255,0.2) 0%, rgba(0,209,230,0.1) 40%, transparent 70%); }
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-float { animation: none; }
+  .animate-glow { animation: none; }
+  html { scroll-behavior: auto; }
+  .reveal { opacity: 1; transform: none; }
+}
+</style>
 </head>
-<body class="bg-white text-gray-900 antialiased">
+<body class="bg-white text-gray-900 antialiased" x-data="{ anual: false, mobileOpen: false, scrolled: false, faqOpen: null }" x-init="window.addEventListener('scroll', () => { scrolled = window.scrollY > 40; })">
+
+<!-- Navbar -->
+<nav class="fixed top-0 left-0 right-0 z-50 transition-all duration-300" :class="scrolled ? 'nav-blur bg-[rgba(11,17,32,0.85)] shadow-lg' : 'bg-transparent'">
+  <div class="max-w-6xl mx-auto px-4 sm:px-6">
+    <div class="flex items-center justify-between h-16 sm:h-20">
+      <a href="#" class="flex items-center gap-2" aria-label="Mérito home">
+        <svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+          <rect width="32" height="32" rx="8" fill="url(#logo-grad)"/>
+          <path d="M8 22V10l8 6 8-6v12" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+          <defs><linearGradient id="logo-grad" x1="0" y1="0" x2="32" y2="32"><stop stop-color="#1263FF"/><stop offset="1" stop-color="#00D1E6"/></linearGradient></defs>
+        </svg>
+        <span class="font-display text-xl font-semibold text-white tracking-tight">Mérito</span>
+      </a>
+
+      <!-- Desktop nav -->
+      <div class="hidden md:flex items-center gap-8">
+        <a href="#recursos" class="text-sm text-gray-300 hover:text-white transition">Recursos</a>
+        <a href="#como-funciona" class="text-sm text-gray-300 hover:text-white transition">Como funciona</a>
+        <a href="#precos" class="text-sm text-gray-300 hover:text-white transition">Planos</a>
+        <a href="#faq" class="text-sm text-gray-300 hover:text-white transition">FAQ</a>
+        <div class="flex items-center gap-3 ml-4">
+          <a href="{% url 'dashboard:login' %}" class="text-sm font-medium text-gray-300 hover:text-white transition px-4 py-2">Entrar</a>
+          <a href="{% url 'accounts:signup' %}" class="text-sm font-semibold text-white bg-brand-500 hover:bg-brand-600 px-5 py-2.5 rounded-xl transition shadow-[0_4px_20px_rgba(18,99,255,0.3)]">Começar grátis</a>
+        </div>
+      </div>
+
+      <!-- Mobile hamburger -->
+      <button @click="mobileOpen = !mobileOpen" class="md:hidden p-2 text-gray-300 hover:text-white transition" aria-label="Abrir menu" :aria-expanded="mobileOpen">
+        <svg x-show="!mobileOpen" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 12h18"/><path d="M3 6h18"/><path d="M3 18h18"/></svg>
+        <svg x-show="mobileOpen" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6L6 18"/><path d="M6 6l12 12"/></svg>
+      </button>
+    </div>
+
+    <!-- Mobile menu -->
+    <div x-show="mobileOpen" x-cloak @click.outside="mobileOpen = false" class="md:hidden pb-6 pt-2" x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0 -translate-y-4" x-transition:enter-end="opacity-1 translate-y-0">
+      <div class="flex flex-col gap-4 bg-[rgba(17,26,46,0.95)] nav-blur rounded-2xl p-6 border border-white/10">
+        <a href="#recursos" @click="mobileOpen = false" class="text-gray-300 hover:text-white transition py-1">Recursos</a>
+        <a href="#como-funciona" @click="mobileOpen = false" class="text-gray-300 hover:text-white transition py-1">Como funciona</a>
+        <a href="#precos" @click="mobileOpen = false" class="text-gray-300 hover:text-white transition py-1">Planos</a>
+        <a href="#faq" @click="mobileOpen = false" class="text-gray-300 hover:text-white transition py-1">FAQ</a>
+        <hr class="border-white/10">
+        <a href="{% url 'dashboard:login' %}" @click="mobileOpen = false" class="text-gray-300 hover:text-white transition py-1">Entrar</a>
+        <a href="{% url 'accounts:signup' %}" @click="mobileOpen = false" class="text-center bg-brand-500 hover:bg-brand-600 text-white font-semibold py-3 rounded-xl transition">Começar grátis</a>
+      </div>
+    </div>
+  </div>
+</nav>
 
 <!-- Hero -->
-<section class="py-20 px-4">
-    <div class="max-w-4xl mx-auto text-center">
-        <p class="text-[13px] font-semibold text-brand-500 uppercase tracking-wide mb-4">Para lojistas que tem vendedores comissionados</p>
-        <h1 class="font-display text-[40px] sm:text-[52px] font-semibold text-gray-900 leading-[1.15] tracking-tight mb-6">
-            Pare de calcular comissao<br>de vendedor na planilha
+<section class="relative min-h-[90vh] flex items-center overflow-hidden bg-[var(--graphite)]">
+  <div class="absolute inset-0 bg-grid"></div>
+  <div class="absolute inset-0" style="background: radial-gradient(ellipse 70% 60% at 50% 40%, rgba(18,99,255,0.12) 0%, rgba(0,209,230,0.06) 40%, transparent 70%);"></div>
+
+  <div class="relative z-10 max-w-6xl mx-auto px-4 sm:px-6 pt-24 pb-16 md:pt-32 md:pb-24">
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-16 items-center">
+      <div class="text-center lg:text-left">
+        <div class="badge-gradient-border inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-medium text-gray-300 bg-white/5 mb-6">
+          <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true"><circle cx="6" cy="6" r="5" stroke="url(#bdg)" stroke-width="1.5" fill="none"/><path d="M4.5 6l1 1 2-2" stroke="url(#bdg)" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round" fill="none"/><defs><linearGradient id="bdg" x1="0" y1="0" x2="12" y2="12"><stop stop-color="#1263FF"/><stop offset="1" stop-color="#00D1E6"/></linearGradient></defs></svg>
+          Feito para o varejo brasileiro
+        </div>
+        <h1 class="font-display text-[clamp(36px,5vw,64px)] font-semibold text-white leading-[1.1] tracking-tight mb-6">
+          Comissões dos seus vendedores,<br>sem planilha e sem briga<br><span class="text-gradient">no fim do mês.</span>
         </h1>
-        <p class="text-[17px] text-gray-500 max-w-xl mx-auto leading-relaxed mb-10">
-            Seus vendedores veem o proprio ganho no celular. Voce fecha o mes em minutos.
-            Comissao paga, WhatsApp disparado automaticamente.
+        <p class="text-[17px] sm:text-[18px] text-gray-300/80 max-w-lg mx-auto lg:mx-0 leading-relaxed mb-8">
+          O Mérito calcula, fecha e envia tudo pronto para o seu contador. Seus vendedores acompanham cada venda pelo celular — em tempo real.
         </p>
-        <div class="flex flex-col sm:flex-row gap-3 justify-center">
-            <a href="{% url 'accounts:signup' %}" class="inline-block bg-brand-500 hover:bg-brand-600 text-white font-semibold px-8 py-4 rounded-xl text-[16px] transition shadow-lg">
-                Comece gratis por 14 dias
-            </a>
-            <a href="#precos" class="inline-block bg-gray-100 hover:bg-gray-200 text-gray-700 font-semibold px-8 py-4 rounded-xl text-[16px] transition">
-                Ver planos
-            </a>
+        <div class="flex flex-col sm:flex-row gap-3 justify-center lg:justify-start">
+          <a href="{% url 'accounts:signup' %}" class="inline-block bg-brand-500 hover:bg-brand-600 text-white font-semibold px-8 py-4 rounded-xl text-[16px] transition shadow-[0_8px_30px_rgba(18,99,255,0.35)] hover:shadow-[0_8px_40px_rgba(18,99,255,0.5)] hover:-translate-y-0.5 active:translate-y-0">
+            Testar 14 dias grátis
+          </a>
+          <a href="#precos" class="inline-block border border-white/20 hover:border-white/40 text-gray-200 hover:text-white font-semibold px-8 py-4 rounded-xl text-[16px] transition hover:-translate-y-0.5 active:translate-y-0">
+            Ver planos
+          </a>
         </div>
+        <p class="text-[13px] text-gray-500 mt-4">Sem cartão de crédito · Cancele quando quiser</p>
+      </div>
+
+      <!-- Mockup -->
+      <div class="relative flex items-center justify-center lg:justify-end">
+        <div class="mockup-glow-bg absolute inset-0 animate-glow"></div>
+        <div class="relative animate-float flex flex-col items-center">
+          <!-- Desktop mockup card -->
+          <div class="mockup-desktop w-[300px] sm:w-[360px] lg:w-[420px] rounded-2xl overflow-hidden shadow-2xl border border-white/10 bg-[var(--graphite-2)]">
+            <div class="px-5 py-4 border-b border-white/5 flex items-center justify-between">
+              <div class="flex items-center gap-2">
+                <div class="w-2.5 h-2.5 rounded-full bg-red-400/60"></div>
+                <div class="w-2.5 h-2.5 rounded-full bg-yellow-400/60"></div>
+                <div class="w-2.5 h-2.5 rounded-full bg-green-400/60"></div>
+              </div>
+              <span class="text-xs text-gray-400 font-medium">Fechamento · Junho/2026</span>
+              <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5" class="text-gray-500" aria-hidden="true"><circle cx="6" cy="6" r="4.5"/><path d="M9.5 9.5L13 13"/></svg>
+            </div>
+            <div class="p-5">
+              <div class="grid grid-cols-4 gap-3 text-[11px] text-gray-500 font-semibold uppercase tracking-wide mb-3 pb-2 border-b border-white/5">
+                <span>Vendedor</span><span class="text-right">Vendas</span><span class="text-right">Comissão</span><span class="text-right">Status</span>
+              </div>
+              <div class="space-y-2.5 text-[13px]">
+                <div class="grid grid-cols-4 gap-3 items-center">
+                  <span class="text-gray-200">Ana Silva</span>
+                  <span class="text-right text-gray-300">R$ 12.450</span>
+                  <span class="text-right text-gray-200 font-medium">R$ 1.245</span>
+                  <span class="text-right"><span class="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400">FECHADA</span></span>
+                </div>
+                <div class="grid grid-cols-4 gap-3 items-center">
+                  <span class="text-gray-200">Carlos M.</span>
+                  <span class="text-right text-gray-300">R$ 8.320</span>
+                  <span class="text-right text-gray-200 font-medium">R$ 832</span>
+                  <span class="text-right"><span class="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400">FECHADA</span></span>
+                </div>
+                <div class="grid grid-cols-4 gap-3 items-center">
+                  <span class="text-gray-200">Julia T.</span>
+                  <span class="text-right text-gray-300">R$ 15.780</span>
+                  <span class="text-right text-gray-200 font-medium">R$ 1.578</span>
+                  <span class="text-right"><span class="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-blue-500/15 text-blue-400">PAGA</span></span>
+                </div>
+                <div class="grid grid-cols-4 gap-3 items-center">
+                  <span class="text-gray-200">Marcos D.</span>
+                  <span class="text-right text-gray-300">R$ 6.540</span>
+                  <span class="text-right text-gray-200 font-medium">R$ 654</span>
+                  <span class="text-right"><span class="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400">FECHADA</span></span>
+                </div>
+              </div>
+              <div class="mt-3 pt-3 border-t border-white/5 grid grid-cols-4 gap-3 text-[13px]">
+                <span class="text-gray-400 font-semibold">Total</span>
+                <span class="text-right text-gray-200 font-semibold">R$ 43.090</span>
+                <span class="text-right text-gray-200 font-semibold">R$ 4.309</span>
+                <span class="text-right"><span class="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-brand-500/20 text-brand-300">3 fechadas</span></span>
+              </div>
+              <div class="mt-4 pt-3 border-t border-white/5">
+                <div class="text-center py-2 bg-gradient-to-r from-brand-500/20 to-cyan-500/20 rounded-lg border border-brand-500/20">
+                  <span class="text-[12px] font-semibold text-brand-300">Fechar competência →</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Mobile mockup card -->
+          <div class="mockup-mobile -mt-10 sm:-mt-16 -mr-12 sm:-mr-24 lg:-mr-32 self-end w-[160px] sm:w-[200px] lg:w-[230px] rounded-2xl overflow-hidden shadow-xl border border-white/10 bg-[#0D1628]">
+            <div class="px-4 py-3 border-b border-white/5 flex items-center justify-between">
+              <span class="text-xs font-semibold text-gray-200">Minhas Vendas</span>
+              <div class="w-5 h-5 rounded-full bg-gradient-to-br from-brand-400 to-cyan-400 flex items-center justify-center text-[9px] font-bold text-white">A</div>
+            </div>
+            <div class="p-4 space-y-2.5">
+              <div class="flex items-center justify-between text-[11px]">
+                <span class="text-gray-400">Seg 23/06</span>
+                <span class="text-gray-200 font-medium">R$ 2.450</span>
+              </div>
+              <div class="flex items-center justify-between text-[11px]">
+                <span class="text-gray-400">Ter 24/06</span>
+                <span class="text-gray-200 font-medium">R$ 3.120</span>
+              </div>
+              <div class="flex items-center justify-between text-[11px]">
+                <span class="text-gray-400">Qua 25/06</span>
+                <span class="text-gray-200 font-medium">R$ 1.890</span>
+              </div>
+              <div class="flex items-center justify-between text-[11px]">
+                <span class="text-gray-400">Qui 26/06</span>
+                <span class="text-gray-200 font-medium">R$ 4.200</span>
+              </div>
+              <div class="flex items-center justify-between text-[11px]">
+                <span class="text-gray-400">Sex 27/06</span>
+                <span class="text-gray-200 font-medium">R$ 2.800</span>
+              </div>
+              <div class="mt-3 pt-3 border-t border-white/5">
+                <div class="text-center">
+                  <p class="text-[9px] text-gray-500 mb-1">Comissão do mês</p>
+                  <p class="font-display text-lg font-semibold text-gradient">R$ 1.234</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
+  </div>
 </section>
 
-<!-- O problema -->
-<section class="py-16 px-4 bg-gray-50">
-    <div class="max-w-3xl mx-auto">
-        <h2 class="font-display text-[28px] font-semibold text-gray-900 text-center mb-10">Se isso parece familiar...</h2>
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <div class="bg-white rounded-xl p-6 border border-gray-100">
-                <p class="text-[13px] font-semibold text-gray-500 uppercase tracking-wide mb-3">Planilhas</p>
-                <p class="text-[14px] text-gray-600 leading-relaxed">Tabela compartilhada no WhatsApp, versao desatualizada, formula que quebrou e ninguem viu.</p>
-            </div>
-            <div class="bg-white rounded-xl p-6 border border-gray-100">
-                <p class="text-[13px] font-semibold text-gray-500 uppercase tracking-wide mb-3">Invisibilidade</p>
-                <p class="text-[14px] text-gray-600 leading-relaxed">Seu vendedor nao sabe quanto ganhou. Pergunta toda semana. Voce perde tempo respondendo.</p>
-            </div>
-            <div class="bg-white rounded-xl p-6 border border-gray-100">
-                <p class="text-[13px] font-semibold text-gray-500 uppercase tracking-wide mb-3">Fechamento</p>
-                <p class="text-[14px] text-gray-600 leading-relaxed">Fim do mes e correria: puxar vendas, calcular taxa, conferir. Auditar? Nem pensar.</p>
-            </div>
-        </div>
+<!-- Trust bar -->
+<section class="bg-[var(--graphite)] border-t border-white/5 py-6">
+  <div class="max-w-5xl mx-auto px-4 sm:px-6">
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-8">
+      <div class="flex items-center gap-3 justify-center md:justify-start">
+        <svg width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden="true"><circle cx="10" cy="10" r="8" stroke="#00D1E6" stroke-width="1.5" fill="none"/><path d="M6 10l2.5 2.5L14 7" stroke="#00D1E6" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/></svg>
+        <span class="text-[13px] text-gray-300 font-medium">Fechamento em minutos</span>
+      </div>
+      <div class="flex items-center gap-3 justify-center md:justify-start">
+        <svg width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M4 15V3h12v12l-6 4-6-4z" stroke="#00D1E6" stroke-width="1.5" fill="none" stroke-linejoin="round"/><path d="M7 7h6M7 10h4" stroke="#00D1E6" stroke-width="1.5" stroke-linecap="round"/></svg>
+        <span class="text-[13px] text-gray-300 font-medium">Pacote contábil automático</span>
+      </div>
+      <div class="flex items-center gap-3 justify-center md:justify-start">
+        <svg width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M3 8a7 7 0 0114 0v4a7 7 0 01-14 0V8z" stroke="#00D1E6" stroke-width="1.5" fill="none"/><path d="M7 10h6M7 13h4" stroke="#00D1E6" stroke-width="1.5" stroke-linecap="round"/></svg>
+        <span class="text-[13px] text-gray-300 font-medium">WhatsApp integrado</span>
+      </div>
+      <div class="flex items-center gap-3 justify-center md:justify-start">
+        <svg width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden="true"><rect x="3" y="2" width="14" height="16" rx="2" stroke="#00D1E6" stroke-width="1.5" fill="none"/><path d="M7 9l2 2 4-4" stroke="#00D1E6" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        <span class="text-[13px] text-gray-300 font-medium">Dados criptografados</span>
+      </div>
     </div>
+  </div>
 </section>
 
-<!-- Como funciona -->
-<section class="py-16 px-4">
-    <div class="max-w-4xl mx-auto">
-        <h2 class="font-display text-[28px] font-semibold text-gray-900 text-center mb-4">Como funciona</h2>
-        <p class="text-[15px] text-gray-500 text-center mb-12">Quatro passos. Primeiro fechamento em menos de 15 minutos.</p>
-        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-            <div class="text-center">
-                <p class="font-display text-[40px] font-semibold text-gray-200 mb-3">1</p>
-                <p class="text-[15px] font-semibold text-gray-900 mb-2">Cadastre sua loja</p>
-                <p class="text-[13px] text-gray-500 leading-relaxed">2 minutos. So precisa do CNPJ e do nome da empresa.</p>
-            </div>
-            <div class="text-center">
-                <p class="font-display text-[40px] font-semibold text-gray-200 mb-3">2</p>
-                <p class="text-[15px] font-semibold text-gray-900 mb-2">Adicione vendedores</p>
-                <p class="text-[13px] text-gray-500 leading-relaxed">Cada vendedor ganha login proprio e recebe a senha por WhatsApp automaticamente.</p>
-            </div>
-            <div class="text-center">
-                <p class="font-display text-[40px] font-semibold text-gray-200 mb-3">3</p>
-                <p class="text-[15px] font-semibold text-gray-900 mb-2">Vendedores lancam vendas</p>
-                <p class="text-[13px] text-gray-500 leading-relaxed">Pelo celular, em 10 segundos. Ou geram link de pagamento pro cliente.</p>
-            </div>
-            <div class="text-center">
-                <p class="font-display text-[40px] font-semibold text-gray-200 mb-3">4</p>
-                <p class="text-[15px] font-semibold text-gray-900 mb-2">Fechamento automatico</p>
-                <p class="text-[13px] text-gray-500 leading-relaxed">Fecha o mes, o sistema consolida tudo. Envie pro financeiro com 1 clique.</p>
-            </div>
+<!-- Problem → Solution -->
+<section id="recursos" class="py-20 sm:py-28 px-4 bg-[var(--surface)]">
+  <div class="max-w-5xl mx-auto">
+    <h2 class="font-display text-[28px] sm:text-[36px] font-semibold text-[var(--ink)] text-center mb-4 reveal">O fim do mês não precisa ser assim</h2>
+    <p class="text-[15px] text-gray-500 text-center max-w-xl mx-auto mb-14 reveal">Enquanto uns ainda estão na planilha, outros já fecharam e foram para casa.</p>
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-8 reveal-group">
+      <!-- Antes card -->
+      <div class="bg-white rounded-2xl p-6 sm:p-8 border border-gray-200 reveal">
+        <div class="flex items-center gap-3 mb-6">
+          <div class="w-10 h-10 rounded-xl bg-red-50 flex items-center justify-center">
+            <svg width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M15 5L5 15M5 5l10 10" stroke="#e53e3e" stroke-width="2" stroke-linecap="round"/></svg>
+          </div>
+          <span class="font-display text-lg font-semibold text-gray-800">Antes</span>
         </div>
+        <ul class="space-y-4">
+          <li class="flex items-start gap-3 text-[14px] text-gray-600">
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" class="mt-0.5 shrink-0" aria-hidden="true"><circle cx="8" cy="8" r="7" fill="#fef2f2" stroke="#e53e3e" stroke-width="1"/><path d="M10 6L6 10M6 6l4 4" stroke="#e53e3e" stroke-width="1.2" stroke-linecap="round"/></svg>
+            Erros de fórmula que ninguém percebe
+          </li>
+          <li class="flex items-start gap-3 text-[14px] text-gray-600">
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" class="mt-0.5 shrink-0" aria-hidden="true"><circle cx="8" cy="8" r="7" fill="#fef2f2" stroke="#e53e3e" stroke-width="1"/><path d="M10 6L6 10M6 6l4 4" stroke="#e53e3e" stroke-width="1.2" stroke-linecap="round"/></svg>
+            Vendedor desconfiado do valor calculado
+          </li>
+          <li class="flex items-start gap-3 text-[14px] text-gray-600">
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" class="mt-0.5 shrink-0" aria-hidden="true"><circle cx="8" cy="8" r="7" fill="#fef2f2" stroke="#e53e3e" stroke-width="1"/><path d="M10 6L6 10M6 6l4 4" stroke="#e53e3e" stroke-width="1.2" stroke-linecap="round"/></svg>
+            Contador cobrando dados estruturados
+          </li>
+          <li class="flex items-start gap-3 text-[14px] text-gray-600">
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" class="mt-0.5 shrink-0" aria-hidden="true"><circle cx="8" cy="8" r="7" fill="#fef2f2" stroke="#e53e3e" stroke-width="1"/><path d="M10 6L6 10M6 6l4 4" stroke="#e53e3e" stroke-width="1.2" stroke-linecap="round"/></svg>
+            Horas perdidas todo fim de mês
+          </li>
+        </ul>
+      </div>
+
+      <!-- Com o Mérito card -->
+      <div class="gradient-border rounded-2xl bg-white p-6 sm:p-8 reveal shadow-lg shadow-blue-500/5">
+        <div class="flex items-center gap-3 mb-6">
+          <div class="w-10 h-10 rounded-xl flex items-center justify-center" style="background: linear-gradient(135deg, rgba(18,99,255,0.1), rgba(0,209,230,0.1));">
+            <svg width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden="true"><circle cx="10" cy="10" r="10" fill="url(#ck-grad)"/><path d="M6 10l2.5 2.5L14 7" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><defs><linearGradient id="ck-grad" x1="0" y1="0" x2="20" y2="20"><stop stop-color="#1263FF"/><stop offset="1" stop-color="#00D1E6"/></linearGradient></defs></svg>
+          </div>
+          <span class="font-display text-lg font-semibold text-gradient">Com o Mérito</span>
+        </div>
+        <ul class="space-y-4">
+          <li class="flex items-start gap-3 text-[14px] text-gray-600">
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" class="mt-0.5 shrink-0" aria-hidden="true"><circle cx="8" cy="8" r="7" fill="url(#ck2)"/><path d="M5 8l2 2 4-4" stroke="white" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/><defs><linearGradient id="ck2" x1="0" y1="0" x2="16" y2="16"><stop stop-color="#1263FF"/><stop offset="1" stop-color="#00D1E6"/></linearGradient></defs></svg>
+            Cálculo automático, sem erros
+          </li>
+          <li class="flex items-start gap-3 text-[14px] text-gray-600">
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" class="mt-0.5 shrink-0" aria-hidden="true"><circle cx="8" cy="8" r="7" fill="url(#ck3)"/><path d="M5 8l2 2 4-4" stroke="white" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/><defs><linearGradient id="ck3" x1="0" y1="0" x2="16" y2="16"><stop stop-color="#1263FF"/><stop offset="1" stop-color="#00D1E6"/></linearGradient></defs></svg>
+            Vendedor acompanha em tempo real
+          </li>
+          <li class="flex items-start gap-3 text-[14px] text-gray-600">
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" class="mt-0.5 shrink-0" aria-hidden="true"><circle cx="8" cy="8" r="7" fill="url(#ck4)"/><path d="M5 8l2 2 4-4" stroke="white" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/><defs><linearGradient id="ck4" x1="0" y1="0" x2="16" y2="16"><stop stop-color="#1263FF"/><stop offset="1" stop-color="#00D1E6"/></linearGradient></defs></svg>
+            Contador recebe tudo por e-mail
+          </li>
+          <li class="flex items-start gap-3 text-[14px] text-gray-600">
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" class="mt-0.5 shrink-0" aria-hidden="true"><circle cx="8" cy="8" r="7" fill="url(#ck5)"/><path d="M5 8l2 2 4-4" stroke="white" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/><defs><linearGradient id="ck5" x1="0" y1="0" x2="16" y2="16"><stop stop-color="#1263FF"/><stop offset="1" stop-color="#00D1E6"/></linearGradient></defs></svg>
+            Fechamento em minutos, não em dias
+          </li>
+        </ul>
+      </div>
     </div>
+  </div>
 </section>
 
-<!-- Beneficios -->
-<section class="py-16 px-4 bg-gray-50">
-    <div class="max-w-4xl mx-auto">
-        <h2 class="font-display text-[28px] font-semibold text-gray-900 text-center mb-10">Por que lojistas escolhem o Mérito</h2>
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div class="bg-white rounded-xl p-6 border border-gray-100">
-                <p class="text-[15px] font-semibold text-gray-900 mb-1">Vendedor ve o proprio ganho em tempo real</p>
-                <p class="text-[14px] text-gray-500">Seu time acessa o app, consulta total vendido, comissao acumulada, historico. Sem te incomodar.</p>
-            </div>
-            <div class="bg-white rounded-xl p-6 border border-gray-100">
-                <p class="text-[15px] font-semibold text-gray-900 mb-1">Voce nunca mais perde tempo com planilha</p>
-                <p class="text-[14px] text-gray-500">O sistema consolida venda por venda, calcula comissao, gera relatorio para contabilidade.</p>
-            </div>
-            <div class="bg-white rounded-xl p-6 border border-gray-100">
-                <p class="text-[15px] font-semibold text-gray-900 mb-1">Financeiro audita em segundos</p>
-                <p class="text-[14px] text-gray-500">Cada competencia tem trilha completa: vendas, taxa, comissao, status. Clicou, aprovou.</p>
-            </div>
-            <div class="bg-white rounded-xl p-6 border border-gray-100">
-                <p class="text-[15px] font-semibold text-gray-900 mb-1">Notificacao automatica via WhatsApp</p>
-                <p class="text-[14px] text-gray-500">Comissao paga? Vendedor recebe WhatsApp na hora. Nao precisa avisar manualmente.</p>
-            </div>
+<!-- Persona cards -->
+<section class="py-20 sm:py-28 px-4 bg-white">
+  <div class="max-w-5xl mx-auto">
+    <h2 class="font-display text-[28px] sm:text-[36px] font-semibold text-[var(--ink)] text-center mb-4 reveal">Cada pessoa vê o que importa</h2>
+    <p class="text-[15px] text-gray-500 text-center max-w-xl mx-auto mb-14 reveal">Uma plataforma, três visões. Cada um no seu papel.</p>
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-6 reveal-group">
+
+      <!-- Gestor -->
+      <div class="bg-[var(--surface)] rounded-2xl p-6 sm:p-8 border border-gray-200/80 hover:shadow-lg hover:-translate-y-1 transition-all duration-300 reveal">
+        <div class="w-12 h-12 rounded-xl flex items-center justify-center mb-5" style="background: linear-gradient(135deg, rgba(18,99,255,0.1), rgba(0,209,230,0.1));">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#1263FF" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
         </div>
+        <h3 class="font-display text-xl font-semibold text-[var(--ink)] mb-4">Para o gestor</h3>
+        <ul class="space-y-3 text-[14px] text-gray-600">
+          <li class="flex items-start gap-2.5">
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none" class="mt-0.5 shrink-0" aria-hidden="true"><circle cx="7" cy="7" r="7" fill="url(#dot1)"/><defs><linearGradient id="dot1" x1="0" y1="0" x2="14" y2="14"><stop stop-color="#1263FF"/><stop offset="1" stop-color="#00D1E6"/></linearGradient></defs></svg>
+            Dashboard com saúde da operação
+          </li>
+          <li class="flex items-start gap-2.5">
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none" class="mt-0.5 shrink-0" aria-hidden="true"><circle cx="7" cy="7" r="7" fill="url(#dot2)"/><defs><linearGradient id="dot2" x1="0" y1="0" x2="14" y2="14"><stop stop-color="#1263FF"/><stop offset="1" stop-color="#00D1E6"/></linearGradient></defs></svg>
+            Fechamento com um clique
+          </li>
+          <li class="flex items-start gap-2.5">
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none" class="mt-0.5 shrink-0" aria-hidden="true"><circle cx="7" cy="7" r="7" fill="url(#dot3)"/><defs><linearGradient id="dot3" x1="0" y1="0" x2="14" y2="14"><stop stop-color="#1263FF"/><stop offset="1" stop-color="#00D1E6"/></linearGradient></defs></svg>
+            Próxima ação sempre visível
+          </li>
+          <li class="flex items-start gap-2.5">
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none" class="mt-0.5 shrink-0" aria-hidden="true"><circle cx="7" cy="7" r="7" fill="url(#dot4)"/><defs><linearGradient id="dot4" x1="0" y1="0" x2="14" y2="14"><stop stop-color="#1263FF"/><stop offset="1" stop-color="#00D1E6"/></linearGradient></defs></svg>
+            Histórico completo de competências
+          </li>
+        </ul>
+        <!-- Mini bar chart -->
+        <div class="mt-6 flex items-end gap-1.5 h-16 px-2">
+          <div class="w-5 bg-brand-300/60 rounded-t" style="height: 30%"></div>
+          <div class="w-5 bg-brand-400/60 rounded-t" style="height: 55%"></div>
+          <div class="w-5 bg-brand-500/70 rounded-t" style="height: 75%"></div>
+          <div class="w-5 bg-cyan-400/70 rounded-t" style="height: 90%"></div>
+          <div class="w-5 bg-cyan-500/80 rounded-t" style="height: 60%"></div>
+          <div class="w-5 bg-brand-500/70 rounded-t" style="height: 80%"></div>
+        </div>
+      </div>
+
+      <!-- Vendedor -->
+      <div class="bg-[var(--surface)] rounded-2xl p-6 sm:p-8 border border-gray-200/80 hover:shadow-lg hover:-translate-y-1 transition-all duration-300 reveal" style="transition-delay: 80ms;">
+        <div class="w-12 h-12 rounded-xl flex items-center justify-center mb-5" style="background: linear-gradient(135deg, rgba(18,99,255,0.1), rgba(0,209,230,0.1));">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#1263FF" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="2" width="14" height="20" rx="2"/><path d="M12 18h.01"/></svg>
+        </div>
+        <h3 class="font-display text-xl font-semibold text-[var(--ink)] mb-4">Para o vendedor</h3>
+        <ul class="space-y-3 text-[14px] text-gray-600">
+          <li class="flex items-start gap-2.5">
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none" class="mt-0.5 shrink-0" aria-hidden="true"><circle cx="7" cy="7" r="7" fill="url(#dot5)"/><defs><linearGradient id="dot5" x1="0" y1="0" x2="14" y2="14"><stop stop-color="#1263FF"/><stop offset="1" stop-color="#00D1E6"/></linearGradient></defs></svg>
+            App no celular: lança venda em segundos
+          </li>
+          <li class="flex items-start gap-2.5">
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none" class="mt-0.5 shrink-0" aria-hidden="true"><circle cx="7" cy="7" r="7" fill="url(#dot6)"/><defs><linearGradient id="dot6" x1="0" y1="0" x2="14" y2="14"><stop stop-color="#1263FF"/><stop offset="1" stop-color="#00D1E6"/></linearGradient></defs></svg>
+            Comissão em tempo real, sem depender de ninguém
+          </li>
+          <li class="flex items-start gap-2.5">
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none" class="mt-0.5 shrink-0" aria-hidden="true"><circle cx="7" cy="7" r="7" fill="url(#dot7)"/><defs><linearGradient id="dot7" x1="0" y1="0" x2="14" y2="14"><stop stop-color="#1263FF"/><stop offset="1" stop-color="#00D1E6"/></linearGradient></defs></svg>
+            Ranking e metas na palma da mão
+          </li>
+          <li class="flex items-start gap-2.5">
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none" class="mt-0.5 shrink-0" aria-hidden="true"><circle cx="7" cy="7" r="7" fill="url(#dot8)"/><defs><linearGradient id="dot8" x1="0" y1="0" x2="14" y2="14"><stop stop-color="#1263FF"/><stop offset="1" stop-color="#00D1E6"/></linearGradient></defs></svg>
+            Lembretes no WhatsApp quando a comissão é paga
+          </li>
+        </ul>
+        <!-- Mini sales list -->
+        <div class="mt-6 space-y-2 px-1">
+          <div class="flex items-center justify-between text-[11px]"><span class="text-gray-400">Esta semana</span><span class="text-gray-700 font-medium">R$ 3.240</span></div>
+          <div class="flex items-center justify-between text-[11px]"><span class="text-gray-400">Comissão acumulada</span><span class="text-brand-600 font-semibold">R$ 486</span></div>
+          <div class="h-1.5 bg-gray-200 rounded-full overflow-hidden"><div class="h-full w-3/5 rounded-full" style="background: linear-gradient(90deg, #1263FF, #00D1E6);"></div></div>
+          <div class="text-[10px] text-gray-400 text-center">60% da meta</div>
+        </div>
+      </div>
+
+      <!-- Contador -->
+      <div class="bg-[var(--surface)] rounded-2xl p-6 sm:p-8 border border-gray-200/80 hover:shadow-lg hover:-translate-y-1 transition-all duration-300 reveal" style="transition-delay: 160ms;">
+        <div class="w-12 h-12 rounded-xl flex items-center justify-center mb-5" style="background: linear-gradient(135deg, rgba(18,99,255,0.1), rgba(0,209,230,0.1));">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#1263FF" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><path d="M9 15l2 2 4-4"/></svg>
+        </div>
+        <h3 class="font-display text-xl font-semibold text-[var(--ink)] mb-4">Para o contador</h3>
+        <ul class="space-y-3 text-[14px] text-gray-600">
+          <li class="flex items-start gap-2.5">
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none" class="mt-0.5 shrink-0" aria-hidden="true"><circle cx="7" cy="7" r="7" fill="url(#dot9)"/><defs><linearGradient id="dot9" x1="0" y1="0" x2="14" y2="14"><stop stop-color="#1263FF"/><stop offset="1" stop-color="#00D1E6"/></linearGradient></defs></svg>
+            Pacote mensal automático por e-mail
+          </li>
+          <li class="flex items-start gap-2.5">
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none" class="mt-0.5 shrink-0" aria-hidden="true"><circle cx="7" cy="7" r="7" fill="url(#dot10)"/><defs><linearGradient id="dot10" x1="0" y1="0" x2="14" y2="14"><stop stop-color="#1263FF"/><stop offset="1" stop-color="#00D1E6"/></linearGradient></defs></svg>
+            CSVs prontos para a folha de pagamento
+          </li>
+          <li class="flex items-start gap-2.5">
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none" class="mt-0.5 shrink-0" aria-hidden="true"><circle cx="7" cy="7" r="7" fill="url(#dot11)"/><defs><linearGradient id="dot11" x1="0" y1="0" x2="14" y2="14"><stop stop-color="#1263FF"/><stop offset="1" stop-color="#00D1E6"/></linearGradient></defs></svg>
+            Resumo em PDF por competência
+          </li>
+          <li class="flex items-start gap-2.5">
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none" class="mt-0.5 shrink-0" aria-hidden="true"><circle cx="7" cy="7" r="7" fill="url(#dot12)"/><defs><linearGradient id="dot12" x1="0" y1="0" x2="14" y2="14"><stop stop-color="#1263FF"/><stop offset="1" stop-color="#00D1E6"/></linearGradient></defs></svg>
+            CPF de cada vendedor discriminado
+          </li>
+        </ul>
+        <!-- Mini email icon -->
+        <div class="mt-6 px-2 py-3 bg-white rounded-xl border border-gray-200 flex items-center gap-3">
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="#1263FF" stroke-width="1.2" aria-hidden="true"><rect x="1" y="3" width="14" height="10" rx="1"/><path d="M1 4l7 5 7-5"/></svg>
+          <div class="flex-1 min-w-0"><p class="text-[11px] font-medium text-gray-700 truncate">pacote-contabil-junho2026.zip</p></div>
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="#31c48d" stroke-width="1.5" aria-hidden="true"><path d="M7 1v8M3 5l4 4 4-4"/></svg>
+        </div>
+      </div>
+
     </div>
+  </div>
 </section>
 
-<!-- Precos -->
-<section id="precos" class="py-16 px-4" x-data="{ anual: false }">
-    <div class="max-w-5xl mx-auto">
-        <h2 class="font-display text-[28px] font-semibold text-gray-900 text-center mb-2">Planos</h2>
-        <p class="text-[15px] text-gray-500 text-center mb-4">14 dias gratis em qualquer plano.</p>
-        <div class="flex items-center justify-center gap-3 mb-10">
-            <span class="text-[14px] font-medium" :class="!anual ? 'text-gray-900' : 'text-gray-400'">Mensal</span>
-            <button @click="anual = !anual" class="relative w-12 h-6 rounded-full transition" :class="anual ? 'bg-brand-500' : 'bg-gray-300'">
-                <span class="absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition" :class="anual ? 'translate-x-6' : ''"></span>
-            </button>
-            <span class="text-[14px] font-medium" :class="anual ? 'text-gray-900' : 'text-gray-400'">Anual <span class="text-success-700 text-[12px]">(-17%)</span></span>
+<!-- How it works -->
+<section id="como-funciona" class="py-20 sm:py-28 px-4 bg-[var(--graphite)] relative overflow-hidden">
+  <div class="absolute inset-0 bg-grid opacity-50"></div>
+  <div class="relative z-10 max-w-5xl mx-auto">
+    <h2 class="font-display text-[28px] sm:text-[36px] font-semibold text-white text-center mb-4 reveal">Como funciona</h2>
+    <p class="text-[15px] text-gray-400 text-center max-w-xl mx-auto mb-16 reveal">Quatro passos. Primeiro fechamento em menos de 15 minutos.</p>
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8 md:gap-6 reveal-group">
+      <div class="step-connector text-center reveal">
+        <div class="w-14 h-14 mx-auto rounded-2xl flex items-center justify-center mb-5" style="background: linear-gradient(135deg, rgba(18,99,255,0.15), rgba(0,209,230,0.1)); border: 1px solid rgba(255,255,255,0.06);">
+          <span class="font-display text-2xl font-bold" style="background: linear-gradient(135deg, #1263FF, #00D1E6); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">1</span>
         </div>
-
-        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 max-w-3xl mx-auto">
-            <!-- Starter -->
-            <div class="bg-white rounded-2xl border border-gray-200 p-6 flex flex-col">
-                <p class="text-[13px] font-semibold text-gray-500 uppercase tracking-wide mb-2">Starter</p>
-                <p class="text-[11px] text-gray-400 mb-3">Para começar a organizar as comissoes</p>
-                <p class="font-display text-[32px] font-semibold text-gray-900 mb-1">
-                    <span x-text="anual ? 'R$ 122' : 'R$ 147'"></span>
-                </p>
-                <p class="text-[13px] text-gray-500 mb-4" x-text="anual ? '/mes (R$ 1.470/ano)' : '/mes'"></p>
-                <ul class="space-y-2 mb-6 flex-1">
-                    <li class="text-[13px] text-gray-600 flex items-center gap-2"><span class="text-success-500 font-bold">✓</span> Ate 5 vendedores</li>
-                    <li class="text-[13px] text-gray-600 flex items-center gap-2"><span class="text-success-500 font-bold">✓</span> App do vendedor + dashboard do gestor</li>
-                    <li class="text-[13px] text-gray-600 flex items-center gap-2"><span class="text-success-500 font-bold">✓</span> Fechamento de comissoes</li>
-                    <li class="text-[13px] text-gray-600 flex items-center gap-2"><span class="text-success-500 font-bold">✓</span> Links de pagamento</li>
-                    <li class="text-[13px] text-gray-600 flex items-center gap-2"><span class="text-success-500 font-bold">✓</span> Lembretes automaticos por WhatsApp</li>
-                </ul>
-                <a :href="'{% url 'accounts:signup' %}?plano=starter&ciclo=' + (anual ? 'yearly' : 'monthly')" class="block text-center bg-brand-500 hover:bg-brand-600 text-white font-semibold py-3 rounded-xl text-[14px] transition">Comecar gratis</a>
-            </div>
-
-            <!-- Pro (Mais popular) -->
-            <div class="bg-white rounded-2xl border-2 border-brand-500 p-6 flex flex-col relative">
-                <span class="absolute -top-3 left-1/2 -translate-x-1/2 bg-brand-500 text-white text-[11px] font-semibold px-4 py-1 rounded-full">Mais popular</span>
-                <p class="text-[13px] font-semibold text-gray-500 uppercase tracking-wide mb-2">Pro</p>
-                <p class="text-[11px] text-gray-400 mb-3">Para quem quer folha e contabilidade sem planilha</p>
-                <p class="font-display text-[32px] font-semibold text-gray-900 mb-1">
-                    <span x-text="anual ? 'R$ 247' : 'R$ 297'"></span>
-                </p>
-                <p class="text-[13px] text-gray-500 mb-4" x-text="anual ? '/mes (R$ 2.970/ano)' : '/mes'"></p>
-                <ul class="space-y-2 mb-6 flex-1">
-                    <li class="text-[13px] text-gray-600 flex items-center gap-2"><span class="text-success-500 font-bold">✓</span> Ate 15 vendedores</li>
-                    <li class="text-[13px] text-gray-600 flex items-center gap-2"><span class="text-success-500 font-bold">✓</span> Tudo do Starter</li>
-                    <li class="text-[13px] text-gray-600 flex items-center gap-2"><span class="text-success-500 font-bold">✓</span> Pacote contabil automatico por e-mail</li>
-                    <li class="text-[13px] text-gray-600 flex items-center gap-2"><span class="text-success-500 font-bold">✓</span> Relatorios em PDF e previa de fechamento</li>
-                    <li class="text-[13px] text-gray-600 flex items-center gap-2"><span class="text-success-500 font-bold">✓</span> Importacao de vendas por CSV</li>
-                    <li class="text-[13px] text-gray-600 flex items-center gap-2"><span class="text-success-500 font-bold">✓</span> Notificacoes push no celular do vendedor</li>
-                </ul>
-                <a :href="'{% url 'accounts:signup' %}?plano=pro&ciclo=' + (anual ? 'yearly' : 'monthly')" class="block text-center bg-brand-500 hover:bg-brand-600 text-white font-semibold py-3 rounded-xl text-[14px] transition">Comecar gratis</a>
-            </div>
-
-            <!-- Business -->
-            <div class="bg-white rounded-2xl border border-gray-200 p-6 flex flex-col">
-                <p class="text-[13px] font-semibold text-gray-500 uppercase tracking-wide mb-2">Business</p>
-                <p class="text-[11px] text-gray-400 mb-3">Para operacoes maiores</p>
-                <p class="font-display text-[32px] font-semibold text-gray-900 mb-1">
-                    <span x-text="anual ? 'R$ 414' : 'R$ 497'"></span>
-                </p>
-                <p class="text-[13px] text-gray-500 mb-4" x-text="anual ? '/mes (R$ 4.970/ano)' : '/mes'"></p>
-                <ul class="space-y-2 mb-6 flex-1">
-                    <li class="text-[13px] text-gray-600 flex items-center gap-2"><span class="text-success-500 font-bold">✓</span> Ate 50 vendedores</li>
-                    <li class="text-[13px] text-gray-600 flex items-center gap-2"><span class="text-success-500 font-bold">✓</span> Tudo do Pro</li>
-                    <li class="text-[13px] text-gray-600 flex items-center gap-2"><span class="text-success-500 font-bold">✓</span> Suporte prioritario</li>
-                </ul>
-                <a :href="'{% url 'accounts:signup' %}?plano=business&ciclo=' + (anual ? 'yearly' : 'monthly')" class="block text-center bg-brand-500 hover:bg-brand-600 text-white font-semibold py-3 rounded-xl text-[14px] transition">Comecar gratis</a>
-            </div>
+        <h3 class="font-display text-[17px] font-semibold text-white mb-2">Cadastre seus vendedores</h3>
+        <p class="text-[13px] text-gray-400 leading-relaxed">Importe por CSV ou adicione um por um. Cada vendedor ganha login próprio.</p>
+      </div>
+      <div class="step-connector text-center reveal">
+        <div class="w-14 h-14 mx-auto rounded-2xl flex items-center justify-center mb-5" style="background: linear-gradient(135deg, rgba(18,99,255,0.15), rgba(0,209,230,0.1)); border: 1px solid rgba(255,255,255,0.06);">
+          <span class="font-display text-2xl font-bold" style="background: linear-gradient(135deg, #1263FF, #00D1E6); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">2</span>
         </div>
+        <h3 class="font-display text-[17px] font-semibold text-white mb-2">Vendas entram pelo app, link ou CSV</h3>
+        <p class="text-[13px] text-gray-400 leading-relaxed">Pelo app, link de pagamento ou importação de CSV. Tudo centralizado.</p>
+      </div>
+      <div class="step-connector text-center reveal">
+        <div class="w-14 h-14 mx-auto rounded-2xl flex items-center justify-center mb-5" style="background: linear-gradient(135deg, rgba(18,99,255,0.15), rgba(0,209,230,0.1)); border: 1px solid rgba(255,255,255,0.06);">
+          <span class="font-display text-2xl font-bold" style="background: linear-gradient(135deg, #1263FF, #00D1E6); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">3</span>
+        </div>
+        <h3 class="font-display text-[17px] font-semibold text-white mb-2">Feche a competência com um clique</h3>
+        <p class="text-[13px] text-gray-400 leading-relaxed">Revise, clique em fechar. O sistema consolida tudo em segundos.</p>
+      </div>
+      <div class="step-connector text-center reveal">
+        <div class="w-14 h-14 mx-auto rounded-2xl flex items-center justify-center mb-5" style="background: linear-gradient(135deg, rgba(18,99,255,0.15), rgba(0,209,230,0.1)); border: 1px solid rgba(255,255,255,0.06);">
+          <span class="font-display text-2xl font-bold" style="background: linear-gradient(135deg, #1263FF, #00D1E6); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">4</span>
+        </div>
+        <h3 class="font-display text-[17px] font-semibold text-white mb-2">Contador recebe tudo, você confirma</h3>
+        <p class="text-[13px] text-gray-400 leading-relaxed">E-mail automático com CSVs e PDF. Você só confirma o pagamento.</p>
+      </div>
     </div>
+  </div>
+</section>
+
+<!-- Plans -->
+<section id="precos" class="py-20 sm:py-28 px-4 bg-[var(--surface)]">
+  <div class="max-w-5xl mx-auto">
+    <h2 class="font-display text-[28px] sm:text-[36px] font-semibold text-[var(--ink)] text-center mb-2 reveal">Planos</h2>
+    <p class="text-[15px] text-gray-500 text-center mb-6 reveal">14 dias grátis em qualquer plano. Sem compromisso.</p>
+
+    <!-- Toggle -->
+    <div class="flex items-center justify-center gap-3 mb-12 reveal">
+      <span class="text-[14px] font-medium select-none" :class="!anual ? 'text-[var(--ink)]' : 'text-gray-400'">Mensal</span>
+      <button @click="anual = !anual" class="relative w-12 h-6 rounded-full transition-colors duration-200" :class="anual ? 'bg-brand-500' : 'bg-gray-300'" role="switch" :aria-checked="anual" aria-label="Alternar para plano anual">
+        <span class="absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform duration-200" :class="anual ? 'translate-x-6' : ''"></span>
+      </button>
+      <span class="text-[14px] font-medium select-none" :class="anual ? 'text-[var(--ink)]' : 'text-gray-400'">Anual <span class="text-emerald-600 text-[12px] font-semibold ml-1">2 meses grátis</span></span>
+    </div>
+
+    <!-- Price cards -->
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-4xl mx-auto reveal-group">
+
+      <!-- Starter -->
+      <div class="bg-white rounded-2xl border border-gray-200 p-6 sm:p-8 flex flex-col hover:shadow-lg hover:-translate-y-1 transition-all duration-300 reveal">
+        <p class="text-[13px] font-semibold text-gray-500 uppercase tracking-wide mb-1">Starter</p>
+        <p class="text-[12px] text-gray-400 mb-5">Para começar a organizar as comissões</p>
+        <p class="font-display text-[36px] font-semibold text-[var(--ink)] mb-1">
+          <span x-text="anual ? 'R$ 122' : 'R$ 147'"></span>
+          <span class="text-[14px] font-normal text-gray-400">/mês</span>
+        </p>
+        <p class="text-[13px] text-gray-400 mb-6" x-text="anual ? 'R$ 1.470/ano' : 'cancele quando quiser'"></p>
+        <ul class="space-y-3 mb-8 flex-1">
+          <li class="text-[13px] text-gray-600 flex items-start gap-2.5">
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none" class="mt-0.5 shrink-0" aria-hidden="true"><circle cx="7" cy="7" r="7" fill="url(#st1)"/><path d="M4.5 7l2 2 3-3" stroke="white" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/><defs><linearGradient id="st1" x1="0" y1="0" x2="14" y2="14"><stop stop-color="#1263FF"/><stop offset="1" stop-color="#00D1E6"/></linearGradient></defs></svg>
+            Até 5 vendedores
+          </li>
+          <li class="text-[13px] text-gray-600 flex items-start gap-2.5">
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none" class="mt-0.5 shrink-0" aria-hidden="true"><circle cx="7" cy="7" r="7" fill="url(#st2)"/><path d="M4.5 7l2 2 3-3" stroke="white" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/><defs><linearGradient id="st2" x1="0" y1="0" x2="14" y2="14"><stop stop-color="#1263FF"/><stop offset="1" stop-color="#00D1E6"/></linearGradient></defs></svg>
+            App do vendedor + dashboard do gestor
+          </li>
+          <li class="text-[13px] text-gray-600 flex items-start gap-2.5">
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none" class="mt-0.5 shrink-0" aria-hidden="true"><circle cx="7" cy="7" r="7" fill="url(#st3)"/><path d="M4.5 7l2 2 3-3" stroke="white" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/><defs><linearGradient id="st3" x1="0" y1="0" x2="14" y2="14"><stop stop-color="#1263FF"/><stop offset="1" stop-color="#00D1E6"/></linearGradient></defs></svg>
+            Fechamento de comissões
+          </li>
+          <li class="text-[13px] text-gray-600 flex items-start gap-2.5">
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none" class="mt-0.5 shrink-0" aria-hidden="true"><circle cx="7" cy="7" r="7" fill="url(#st4)"/><path d="M4.5 7l2 2 3-3" stroke="white" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/><defs><linearGradient id="st4" x1="0" y1="0" x2="14" y2="14"><stop stop-color="#1263FF"/><stop offset="1" stop-color="#00D1E6"/></linearGradient></defs></svg>
+            Links de pagamento
+          </li>
+          <li class="text-[13px] text-gray-600 flex items-start gap-2.5">
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none" class="mt-0.5 shrink-0" aria-hidden="true"><circle cx="7" cy="7" r="7" fill="url(#st5)"/><path d="M4.5 7l2 2 3-3" stroke="white" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/><defs><linearGradient id="st5" x1="0" y1="0" x2="14" y2="14"><stop stop-color="#1263FF"/><stop offset="1" stop-color="#00D1E6"/></linearGradient></defs></svg>
+            Lembretes automáticos por WhatsApp
+          </li>
+        </ul>
+        <a :href="'{% url 'accounts:signup' %}?plano=starter&ciclo=' + (anual ? 'yearly' : 'monthly')" class="block text-center bg-brand-500 hover:bg-brand-600 text-white font-semibold py-3.5 rounded-xl text-[14px] transition shadow-[0_4px_20px_rgba(18,99,255,0.25)] hover:shadow-[0_4px_30px_rgba(18,99,255,0.4)]">
+          Começar grátis
+        </a>
+      </div>
+
+      <!-- Pro (highlighted) -->
+      <div class="gradient-border rounded-2xl bg-white p-6 sm:p-8 flex flex-col relative shadow-xl shadow-blue-500/10 md:scale-105 origin-center reveal">
+        <span class="absolute -top-3 left-1/2 -translate-x-1/2 bg-brand-500 text-white text-[11px] font-semibold px-4 py-1 rounded-full whitespace-nowrap">Mais popular</span>
+        <p class="text-[13px] font-semibold text-gray-500 uppercase tracking-wide mb-1">Pro</p>
+        <p class="text-[12px] text-gray-400 mb-5">Para quem quer folha e contabilidade sem planilha</p>
+        <p class="font-display text-[36px] font-semibold text-[var(--ink)] mb-1">
+          <span x-text="anual ? 'R$ 247' : 'R$ 297'"></span>
+          <span class="text-[14px] font-normal text-gray-400">/mês</span>
+        </p>
+        <p class="text-[13px] text-gray-400 mb-6" x-text="anual ? 'R$ 2.970/ano' : 'cancele quando quiser'"></p>
+        <ul class="space-y-3 mb-8 flex-1">
+          <li class="text-[13px] text-gray-600 flex items-start gap-2.5">
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none" class="mt-0.5 shrink-0" aria-hidden="true"><circle cx="7" cy="7" r="7" fill="url(#pro1)"/><path d="M4.5 7l2 2 3-3" stroke="white" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/><defs><linearGradient id="pro1" x1="0" y1="0" x2="14" y2="14"><stop stop-color="#1263FF"/><stop offset="1" stop-color="#00D1E6"/></linearGradient></defs></svg>
+            Até 15 vendedores
+          </li>
+          <li class="text-[13px] text-gray-600 flex items-start gap-2.5">
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none" class="mt-0.5 shrink-0" aria-hidden="true"><circle cx="7" cy="7" r="7" fill="url(#pro2)"/><path d="M4.5 7l2 2 3-3" stroke="white" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/><defs><linearGradient id="pro2" x1="0" y1="0" x2="14" y2="14"><stop stop-color="#1263FF"/><stop offset="1" stop-color="#00D1E6"/></linearGradient></defs></svg>
+            Tudo do Starter
+          </li>
+          <li class="text-[13px] text-gray-600 flex items-start gap-2.5">
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none" class="mt-0.5 shrink-0" aria-hidden="true"><circle cx="7" cy="7" r="7" fill="url(#pro3)"/><path d="M4.5 7l2 2 3-3" stroke="white" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/><defs><linearGradient id="pro3" x1="0" y1="0" x2="14" y2="14"><stop stop-color="#1263FF"/><stop offset="1" stop-color="#00D1E6"/></linearGradient></defs></svg>
+            Pacote contábil automático por e-mail
+          </li>
+          <li class="text-[13px] text-gray-600 flex items-start gap-2.5">
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none" class="mt-0.5 shrink-0" aria-hidden="true"><circle cx="7" cy="7" r="7" fill="url(#pro4)"/><path d="M4.5 7l2 2 3-3" stroke="white" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/><defs><linearGradient id="pro4" x1="0" y1="0" x2="14" y2="14"><stop stop-color="#1263FF"/><stop offset="1" stop-color="#00D1E6"/></linearGradient></defs></svg>
+            Relatórios em PDF e prévia de fechamento
+          </li>
+          <li class="text-[13px] text-gray-600 flex items-start gap-2.5">
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none" class="mt-0.5 shrink-0" aria-hidden="true"><circle cx="7" cy="7" r="7" fill="url(#pro5)"/><path d="M4.5 7l2 2 3-3" stroke="white" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/><defs><linearGradient id="pro5" x1="0" y1="0" x2="14" y2="14"><stop stop-color="#1263FF"/><stop offset="1" stop-color="#00D1E6"/></linearGradient></defs></svg>
+            Importação de vendas por CSV
+          </li>
+          <li class="text-[13px] text-gray-600 flex items-start gap-2.5">
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none" class="mt-0.5 shrink-0" aria-hidden="true"><circle cx="7" cy="7" r="7" fill="url(#pro6)"/><path d="M4.5 7l2 2 3-3" stroke="white" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/><defs><linearGradient id="pro6" x1="0" y1="0" x2="14" y2="14"><stop stop-color="#1263FF"/><stop offset="1" stop-color="#00D1E6"/></linearGradient></defs></svg>
+            Notificações push no celular do vendedor
+          </li>
+        </ul>
+        <a :href="'{% url 'accounts:signup' %}?plano=pro&ciclo=' + (anual ? 'yearly' : 'monthly')" class="block text-center bg-brand-500 hover:bg-brand-600 text-white font-semibold py-3.5 rounded-xl text-[14px] transition shadow-[0_8px_30px_rgba(18,99,255,0.35)] hover:shadow-[0_8px_40px_rgba(18,99,255,0.5)]">
+          Começar grátis
+        </a>
+      </div>
+
+      <!-- Business -->
+      <div class="bg-white rounded-2xl border border-gray-200 p-6 sm:p-8 flex flex-col hover:shadow-lg hover:-translate-y-1 transition-all duration-300 reveal">
+        <p class="text-[13px] font-semibold text-gray-500 uppercase tracking-wide mb-1">Business</p>
+        <p class="text-[12px] text-gray-400 mb-5">Para operações maiores</p>
+        <p class="font-display text-[36px] font-semibold text-[var(--ink)] mb-1">
+          <span x-text="anual ? 'R$ 414' : 'R$ 497'"></span>
+          <span class="text-[14px] font-normal text-gray-400">/mês</span>
+        </p>
+        <p class="text-[13px] text-gray-400 mb-6" x-text="anual ? 'R$ 4.970/ano' : 'cancele quando quiser'"></p>
+        <ul class="space-y-3 mb-8 flex-1">
+          <li class="text-[13px] text-gray-600 flex items-start gap-2.5">
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none" class="mt-0.5 shrink-0" aria-hidden="true"><circle cx="7" cy="7" r="7" fill="url(#bus1)"/><path d="M4.5 7l2 2 3-3" stroke="white" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/><defs><linearGradient id="bus1" x1="0" y1="0" x2="14" y2="14"><stop stop-color="#1263FF"/><stop offset="1" stop-color="#00D1E6"/></linearGradient></defs></svg>
+            Até 50 vendedores
+          </li>
+          <li class="text-[13px] text-gray-600 flex items-start gap-2.5">
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none" class="mt-0.5 shrink-0" aria-hidden="true"><circle cx="7" cy="7" r="7" fill="url(#bus2)"/><path d="M4.5 7l2 2 3-3" stroke="white" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/><defs><linearGradient id="bus2" x1="0" y1="0" x2="14" y2="14"><stop stop-color="#1263FF"/><stop offset="1" stop-color="#00D1E6"/></linearGradient></defs></svg>
+            Tudo do Pro
+          </li>
+          <li class="text-[13px] text-gray-600 flex items-start gap-2.5">
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none" class="mt-0.5 shrink-0" aria-hidden="true"><circle cx="7" cy="7" r="7" fill="url(#bus3)"/><path d="M4.5 7l2 2 3-3" stroke="white" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/><defs><linearGradient id="bus3" x1="0" y1="0" x2="14" y2="14"><stop stop-color="#1263FF"/><stop offset="1" stop-color="#00D1E6"/></linearGradient></defs></svg>
+            Suporte prioritário
+          </li>
+        </ul>
+        <a :href="'{% url 'accounts:signup' %}?plano=business&ciclo=' + (anual ? 'yearly' : 'monthly')" class="block text-center bg-brand-500 hover:bg-brand-600 text-white font-semibold py-3.5 rounded-xl text-[14px] transition shadow-[0_4px_20px_rgba(18,99,255,0.25)] hover:shadow-[0_4px_30px_rgba(18,99,255,0.4)]">
+          Começar grátis
+        </a>
+      </div>
+
+    </div>
+
+    <p class="text-center text-[14px] text-gray-500 mt-10 reveal">
+      Precisa de mais de 50 vendedores?
+      <a href="mailto:contato@vidalys.com.br" class="text-brand-500 hover:text-brand-600 font-medium underline">Fale com a gente</a>
+    </p>
+  </div>
+</section>
+
+<!-- FAQ -->
+<section id="faq" class="py-20 sm:py-28 px-4 bg-white">
+  <div class="max-w-3xl mx-auto">
+    <h2 class="font-display text-[28px] sm:text-[36px] font-semibold text-[var(--ink)] text-center mb-4 reveal">Perguntas frequentes</h2>
+    <p class="text-[15px] text-gray-500 text-center max-w-xl mx-auto mb-14 reveal">Tire suas dúvidas sobre o Mérito.</p>
+    <div class="space-y-3 reveal-group">
+      <div class="border border-gray-200 rounded-xl overflow-hidden reveal">
+        <button @click="faqOpen = faqOpen === 0 ? null : 0" class="flex items-center justify-between w-full px-5 py-4 text-left text-[15px] font-medium text-[var(--ink)] hover:bg-gray-50 transition" :class="faqOpen === 0 ? 'bg-gray-50' : ''" :aria-expanded="faqOpen === 0" aria-controls="faq-0">
+          <span>O teste grátis realmente é sem cartão de crédito?</span>
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" class="transition-transform duration-200 shrink-0" :class="faqOpen === 0 ? 'rotate-180' : ''"><path d="M4 6l4 4 4-4"/></svg>
+        </button>
+        <div id="faq-0" class="faq-accordion-content" :class="faqOpen === 0 ? 'open' : ''">
+          <p class="px-5 pb-4 text-[14px] text-gray-500 leading-relaxed">Sim. São 14 dias grátis sem pedir cartão de crédito. Você só escolhe um plano depois de testar. Se não quiser continuar, é só não assinar — sem multa, sem taxa, sem compromisso.</p>
+        </div>
+      </div>
+      <div class="border border-gray-200 rounded-xl overflow-hidden reveal">
+        <button @click="faqOpen = faqOpen === 1 ? null : 1" class="flex items-center justify-between w-full px-5 py-4 text-left text-[15px] font-medium text-[var(--ink)] hover:bg-gray-50 transition" :class="faqOpen === 1 ? 'bg-gray-50' : ''" :aria-expanded="faqOpen === 1" aria-controls="faq-1">
+          <span>Como o vendedor acessa o sistema?</span>
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" class="transition-transform duration-200 shrink-0" :class="faqOpen === 1 ? 'rotate-180' : ''"><path d="M4 6l4 4 4-4"/></svg>
+        </button>
+        <div id="faq-1" class="faq-accordion-content" :class="faqOpen === 1 ? 'open' : ''">
+          <p class="px-5 pb-4 text-[14px] text-gray-500 leading-relaxed">Pelo próprio navegador do celular — não precisa instalar nada. Cada vendedor recebe um login e senha por WhatsApp automaticamente. Ele entra, vê as vendas, a comissão acumulada e o histórico.</p>
+        </div>
+      </div>
+      <div class="border border-gray-200 rounded-xl overflow-hidden reveal">
+        <button @click="faqOpen = faqOpen === 2 ? null : 2" class="flex items-center justify-between w-full px-5 py-4 text-left text-[15px] font-medium text-[var(--ink)] hover:bg-gray-50 transition" :class="faqOpen === 2 ? 'bg-gray-50' : ''" :aria-expanded="faqOpen === 2" aria-controls="faq-2">
+          <span>E se eu já tenho um histórico de vendas?</span>
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" class="transition-transform duration-200 shrink-0" :class="faqOpen === 2 ? 'rotate-180' : ''"><path d="M4 6l4 4 4-4"/></svg>
+        </button>
+        <div id="faq-2" class="faq-accordion-content" :class="faqOpen === 2 ? 'open' : ''">
+          <p class="px-5 pb-4 text-[14px] text-gray-500 leading-relaxed">No plano Pro você pode importar vendas por CSV. Suba o arquivo com as vendas dos meses anteriores e o sistema calcula as comissões automaticamente. Seu histórico não se perde.</p>
+        </div>
+      </div>
+      <div class="border border-gray-200 rounded-xl overflow-hidden reveal">
+        <button @click="faqOpen = faqOpen === 3 ? null : 3" class="flex items-center justify-between w-full px-5 py-4 text-left text-[15px] font-medium text-[var(--ink)] hover:bg-gray-50 transition" :class="faqOpen === 3 ? 'bg-gray-50' : ''" :aria-expanded="faqOpen === 3" aria-controls="faq-3">
+          <span>O contador precisa de login?</span>
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" class="transition-transform duration-200 shrink-0" :class="faqOpen === 3 ? 'rotate-180' : ''"><path d="M4 6l4 4 4-4"/></svg>
+        </button>
+        <div id="faq-3" class="faq-accordion-content" :class="faqOpen === 3 ? 'open' : ''">
+          <p class="px-5 pb-4 text-[14px] text-gray-500 leading-relaxed">Não. No plano Pro, o contador recebe tudo por e-mail automaticamente: CSVs prontos para a folha de pagamento, resumo em PDF e o CPF de cada vendedor. Sem precisar acessar o sistema.</p>
+        </div>
+      </div>
+      <div class="border border-gray-200 rounded-xl overflow-hidden reveal">
+        <button @click="faqOpen = faqOpen === 4 ? null : 4" class="flex items-center justify-between w-full px-5 py-4 text-left text-[15px] font-medium text-[var(--ink)] hover:bg-gray-50 transition" :class="faqOpen === 4 ? 'bg-gray-50' : ''" :aria-expanded="faqOpen === 4" aria-controls="faq-4">
+          <span>Posso cancelar quando quiser?</span>
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" class="transition-transform duration-200 shrink-0" :class="faqOpen === 4 ? 'rotate-180' : ''"><path d="M4 6l4 4 4-4"/></svg>
+        </button>
+        <div id="faq-4" class="faq-accordion-content" :class="faqOpen === 4 ? 'open' : ''">
+          <p class="px-5 pb-4 text-[14px] text-gray-500 leading-relaxed">Sim, pode cancelar quando quiser, sem multa. Se você assinou o plano anual, o cancelamento é feito e você continua usando até o fim do período já pago. Sem letras miúdas.</p>
+        </div>
+      </div>
+      <div class="border border-gray-200 rounded-xl overflow-hidden reveal">
+        <button @click="faqOpen = faqOpen === 5 ? null : 5" class="flex items-center justify-between w-full px-5 py-4 text-left text-[15px] font-medium text-[var(--ink)] hover:bg-gray-50 transition" :class="faqOpen === 5 ? 'bg-gray-50' : ''" :aria-expanded="faqOpen === 5" aria-controls="faq-5">
+          <span>Meus dados estão seguros?</span>
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" class="transition-transform duration-200 shrink-0" :class="faqOpen === 5 ? 'rotate-180' : ''"><path d="M4 6l4 4 4-4"/></svg>
+        </button>
+        <div id="faq-5" class="faq-accordion-content" :class="faqOpen === 5 ? 'open' : ''">
+          <p class="px-5 pb-4 text-[14px] text-gray-500 leading-relaxed">Sim. Todos os dados são criptografados em trânsito e em repouso. Fazemos backups diários e seguimos a LGPD. Seus dados e os dos seus vendedores estão protegidos.</p>
+        </div>
+      </div>
+    </div>
+  </div>
 </section>
 
 <!-- CTA final -->
-<section class="py-20 px-4 bg-brand-500">
-    <div class="max-w-2xl mx-auto text-center">
-        <h2 class="font-display text-[32px] font-semibold text-white mb-4">Comece seu trial gratuito de 14 dias</h2>
-        <p class="text-[16px] text-brand-100/80 leading-relaxed mb-8">Sem burocracia. Cadastre sua loja, convide seus vendedores e veja o primeiro fechamento acontecer.</p>
-        <a href="{% url 'accounts:signup' %}" class="inline-block bg-white hover:bg-gray-100 text-brand-600 font-semibold px-8 py-4 rounded-xl text-[16px] transition shadow-lg">
-            Criar minha conta gratis
-        </a>
+<section class="relative py-24 sm:py-32 px-4 bg-[var(--graphite)] overflow-hidden">
+  <div class="absolute inset-0 bg-grid"></div>
+  <div class="absolute inset-0" style="background: radial-gradient(ellipse 60% 50% at 50% 50%, rgba(18,99,255,0.1) 0%, rgba(0,209,230,0.05) 40%, transparent 70%);"></div>
+  <div class="relative z-10 max-w-2xl mx-auto text-center">
+    <h2 class="font-display text-[clamp(28px,4vw,44px)] font-semibold text-white leading-tight mb-6 reveal">
+      Feche o próximo mês em minutos,<br><span class="text-gradient">não em dias.</span>
+    </h2>
+    <p class="text-[16px] text-gray-300/70 max-w-lg mx-auto leading-relaxed mb-10 reveal">
+      Cadastre sua loja, convide seus vendedores e veja o primeiro fechamento acontecer. Sem cartão, sem risco.
+    </p>
+    <div class="reveal">
+      <a href="{% url 'accounts:signup' %}" class="inline-block bg-brand-500 hover:bg-brand-600 text-white font-semibold px-10 py-4 rounded-xl text-[17px] transition shadow-[0_8px_30px_rgba(18,99,255,0.35)] hover:shadow-[0_8px_40px_rgba(18,99,255,0.5)] hover:-translate-y-0.5 active:translate-y-0">
+        Criar minha conta grátis
+      </a>
+      <p class="text-[13px] text-gray-500 mt-4">14 dias grátis · Sem cartão de crédito · Cancele quando quiser</p>
     </div>
+  </div>
 </section>
 
 <!-- Footer -->
-<footer class="py-8 px-4 bg-gray-50 border-t border-gray-100">
-    <div class="max-w-4xl mx-auto flex items-center justify-between text-[13px] text-gray-400">
-        <div class="flex items-center gap-4">
-          <span>Mérito by Vidalys</span>
-          <a href="mailto:contato@vidalys.com.br" class="hover:text-gray-600 transition">contato@vidalys.com.br</a>
+<footer class="bg-[var(--graphite)] border-t border-white/5 py-12 px-4">
+  <div class="max-w-5xl mx-auto">
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-8 mb-10">
+      <div class="col-span-2 md:col-span-1">
+        <div class="flex items-center gap-2 mb-3">
+          <svg width="24" height="24" viewBox="0 0 32 32" fill="none" aria-hidden="true">
+            <rect width="32" height="32" rx="8" fill="url(#f-logo)"/>
+            <path d="M8 22V10l8 6 8-6v12" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+            <defs><linearGradient id="f-logo" x1="0" y1="0" x2="32" y2="32"><stop stop-color="#1263FF"/><stop offset="1" stop-color="#00D1E6"/></linearGradient></defs>
+          </svg>
+          <span class="font-display text-lg font-semibold text-white tracking-tight">Mérito</span>
         </div>
-        <a href="{% url 'dashboard:login' %}" class="hover:text-gray-600 transition">Acessar painel</a>
+        <p class="text-[13px] text-gray-400">Mérito by Vidalys</p>
+      </div>
+      <div>
+        <h4 class="text-[12px] font-semibold text-gray-300 uppercase tracking-wide mb-4">Produto</h4>
+        <ul class="space-y-2.5">
+          <li><a href="#recursos" class="text-[13px] text-gray-400 hover:text-white transition">Recursos</a></li>
+          <li><a href="#como-funciona" class="text-[13px] text-gray-400 hover:text-white transition">Como funciona</a></li>
+          <li><a href="#precos" class="text-[13px] text-gray-400 hover:text-white transition">Planos</a></li>
+          <li><a href="#faq" class="text-[13px] text-gray-400 hover:text-white transition">FAQ</a></li>
+        </ul>
+      </div>
+      <div>
+        <h4 class="text-[12px] font-semibold text-gray-300 uppercase tracking-wide mb-4">Conta</h4>
+        <ul class="space-y-2.5">
+          <li><a href="{% url 'dashboard:login' %}" class="text-[13px] text-gray-400 hover:text-white transition">Entrar</a></li>
+          <li><a href="{% url 'accounts:signup' %}" class="text-[13px] text-gray-400 hover:text-white transition">Criar conta</a></li>
+        </ul>
+      </div>
+      <div>
+        <h4 class="text-[12px] font-semibold text-gray-300 uppercase tracking-wide mb-4">Legal</h4>
+        <ul class="space-y-2.5">
+          <li><a href="#" class="text-[13px] text-gray-400 hover:text-white transition">Termos de uso</a></li>
+          <li><a href="#" class="text-[13px] text-gray-400 hover:text-white transition">Política de privacidade</a></li>
+        </ul>
+      </div>
     </div>
+    <div class="pt-8 border-t border-white/5 flex flex-col sm:flex-row items-center justify-between gap-4">
+      <p class="text-[12px] text-gray-500">© 2026 Vidalys · Mérito by Vidalys</p>
+      <a href="mailto:contato@vidalys.com.br" class="text-[12px] text-gray-400 hover:text-white transition">contato@vidalys.com.br</a>
+    </div>
+  </div>
 </footer>
 
 <script src="{% static 'js/alpine.min.js' %}" defer></script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  var revealObserver = new IntersectionObserver(function(entries) {
+    entries.forEach(function(entry) {
+      if (entry.isIntersecting) {
+        entry.target.classList.add('revealed');
+        revealObserver.unobserve(entry.target);
+      }
+    });
+  }, { threshold: 0.08 });
+
+  document.querySelectorAll('.reveal').forEach(function(el) {
+    revealObserver.observe(el);
+  });
+});
+</script>
 </body>
 </html>
