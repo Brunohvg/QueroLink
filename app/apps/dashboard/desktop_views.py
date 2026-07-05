@@ -998,7 +998,7 @@ def gestor_contabilidade(request):
     periods_qs = CommissionPeriod.objects.filter(
         tenant=tenant,
         year__gte=hoje.year - 1,
-    ).prefetch_related('sellercommission_set')
+    ).prefetch_related('seller_commissions')
     period_map = {(p.year, p.month): p for p in periods_qs}
 
     competencias = []
@@ -1024,7 +1024,7 @@ def gestor_contabilidade(request):
 
         period = period_map.get((year, month))
         if period:
-            scs = period.sellercommission_set.all()
+            scs = period.seller_commissions.all()
             all_paid = scs.exists() and not scs.exclude(
                 status__in=[SellerCommission.Status.PAGA, SellerCommission.Status.CANCELADA],
             ).exists()

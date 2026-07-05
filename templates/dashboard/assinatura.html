@@ -124,8 +124,20 @@
             </div>
             <div class="bg-white rounded-xl p-5 shadow-sm border border-gray-100 plan-card">
                 <p class="text-[11px] font-semibold text-gray-400 uppercase tracking-wider mb-1">Valor</p>
-                <p class="text-[20px] font-bold text-gray-900">{{ subscription.amount|brl|default:"—" }}</p>
-                <p class="text-[12px] text-gray-400 mt-1">{{ subscription.get_billing_cycle_display|default:"—" }}</p>
+                <p class="text-[20px] font-bold text-gray-900">
+                    {% if subscription and subscription.status == 'ACTIVE' or subscription and subscription.status == 'PAST_DUE' %}
+                        {{ subscription.amount|brl }}
+                    {% else %}
+                        {{ current_plan_amount|brl }}
+                    {% endif %}
+                </p>
+                <p class="text-[12px] text-gray-400 mt-1">
+                    {% if subscription and subscription.status == 'ACTIVE' or subscription and subscription.status == 'PAST_DUE' %}
+                        {{ subscription.get_billing_cycle_display|default:"—" }}
+                    {% else %}
+                        Preco do plano {{ tenant.get_plan_display }}
+                    {% endif %}
+                </p>
             </div>
             <div class="bg-white rounded-xl p-5 shadow-sm border border-gray-100 plan-card">
                 <p class="text-[11px] font-semibold text-gray-400 uppercase tracking-wider mb-1">Proximo vencimento</p>

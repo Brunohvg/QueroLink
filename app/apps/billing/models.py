@@ -14,11 +14,11 @@ def plan_amount(plan, billing_cycle):
 
 class Subscription(models.Model):
     class Status(models.TextChoices):
-        PENDING = 'PENDING', 'Pending'
-        TRIALING = 'TRIALING', 'Trialing'
-        ACTIVE = 'ACTIVE', 'Active'
-        PAST_DUE = 'PAST_DUE', 'Past Due'
-        CANCELED = 'CANCELED', 'Canceled'
+        PENDING = 'PENDING', 'Pendente'
+        TRIALING = 'TRIALING', 'Periodo de teste'
+        ACTIVE = 'ACTIVE', 'Ativa'
+        PAST_DUE = 'PAST_DUE', 'Pagamento pendente'
+        CANCELED = 'CANCELED', 'Cancelada'
 
     uuid = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     tenant = models.OneToOneField(

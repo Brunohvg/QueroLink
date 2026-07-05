@@ -173,6 +173,8 @@ def assinatura(request):
 
     limit_remaining = (plan_limit - active_sellers) if plan_limit is not None else None
 
+    current_plan_amount = plan_amount(tenant.plan, sub.billing_cycle if sub else 'MONTHLY')
+
     return render(request, 'dashboard/assinatura.html', {
         'tenant': tenant,
         'subscription': sub,
@@ -181,6 +183,7 @@ def assinatura(request):
         'billing_history': billing_history,
         'all_plans': all_plans,
         'limit_remaining': limit_remaining,
+        'current_plan_amount': current_plan_amount,
     })
 
 
