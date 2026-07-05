@@ -98,6 +98,10 @@ showToast("{{ message|escapejs }}", "{% if message.tags == 'error' %}error{% eli
         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
         Contabilidade
       </button>
+      <button @click="tab='frete'" :class="tab==='frete' ? 'border-brand-500 text-brand-600 bg-brand-50/50' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'" class="flex items-center gap-2 px-5 py-3 text-[14px] font-medium border-b-2 transition-all whitespace-nowrap rounded-t-lg">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16V6a1 1 0 00-1-1H4a1 1 0 00-1 1v10a1 1 0 001 1h1m8-1a1 1 0 01-1 1H9m4-1V8a1 1 0 011-1h2.586a1 1 0 01.707.293l3.414 3.414a1 1 0 01.293.707V16a1 1 0 01-1 1h-1m-6-1a1 1 0 001 1h1M5 17a2 2 0 104 0m-4 0a2 2 0 114 0m6 0a2 2 0 104 0m-4 0a2 2 0 114 0"/></svg>
+        Frete
+      </button>
     </nav>
   </div>
 
@@ -540,6 +544,187 @@ showToast("{{ message|escapejs }}", "{% if message.tags == 'error' %}error{% eli
       </div>
     </form>
   </div>
+
+  <div x-show="tab==='frete'" x-data="freightConfig()">
+    <form method="post" action="{% url 'dashboard:gestor_configuracoes' %}" class="bg-white rounded-2xl border border-gray-100 shadow-[0_1px_3px_-1px_rgba(0,0,0,0.04),0_4px_16px_-4px_rgba(67,97,238,0.06)] overflow-hidden">
+      {% csrf_token %}
+      <div class="px-6 py-5 border-b border-gray-100">
+        <div class="flex items-center gap-3">
+          <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-cyan-400 to-blue-500 flex items-center justify-center shadow-sm">
+            <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16V6a1 1 0 00-1-1H4a1 1 0 00-1 1v10a1 1 0 001 1h1m8-1a1 1 0 01-1 1H9m4-1V8a1 1 0 011-1h2.586a1 1 0 01.707.293l3.414 3.414a1 1 0 01.293.707V16a1 1 0 01-1 1h-1m-6-1a1 1 0 001 1h1M5 17a2 2 0 104 0m-4 0a2 2 0 114 0m6 0a2 2 0 104 0m-4 0a2 2 0 114 0"/></svg>
+          </div>
+          <div>
+            <h2 class="text-[15px] font-semibold text-gray-900">Calculadora de frete</h2>
+            <p class="text-[12px] text-gray-400">Configuracao do CEP da loja, embalagens e motoboy</p>
+          </div>
+        </div>
+      </div>
+      <div class="px-6 py-5 space-y-6 max-w-md">
+        <div>
+          <label for="store_cep" class="block text-[13px] font-medium text-gray-700 mb-1.5">CEP da loja (origem dos envios)</label>
+          <input type="text" id="store_cep" name="store_cep" maxlength="9"
+                 class="w-full px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-[14px] outline-none transition-all focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
+                 placeholder="00000-000"
+                  value="{% if tenant.store_cep %}{{ tenant.store_cep }}{% endif %}">
+        </div>
+
+        <div>
+          <label for="freight_adjustment_percent" class="block text-[13px] font-medium text-gray-700 mb-1.5">
+            Ajuste da estimativa (%)
+            <span class="text-[12px] text-gray-400 font-normal">(-50 a +100)</span>
+          </label>
+          <div class="flex items-center gap-3">
+            <input type="range" id="freight_adjustment_percent" name="freight_adjustment_percent"
+                   min="-50" max="100" value="{{ tenant.freight_adjustment_percent }}"
+                   class="flex-1 accent-brand-500"
+                   x-model="adjustment">
+            <span class="text-[14px] font-semibold text-gray-700 w-12 text-right" x-text="adjustment + '%'"></span>
+          </div>
+          <p class="text-[12px] text-gray-400 mt-2 flex items-center gap-1.5">
+            <svg class="w-3.5 h-3.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+            Estimativa ficou barata? Aumente. Cara? Diminua. Compare com valores reais e ajuste.
+          </p>
+        </div>
+
+        <div>
+          <label class="block text-[13px] font-medium text-gray-700 mb-3">Embalagens (presets para vendedores)</label>
+          <div class="space-y-2">
+            <template x-for="(preset, idx) in presets" :key="idx">
+              <div class="flex items-center gap-2 bg-gray-50 rounded-xl px-3 py-2">
+                <input type="text" :value="preset.name" @input="preset.name = $el.value.slice(0, 20)"
+                       class="flex-1 bg-transparent text-[13px] outline-none" placeholder="Nome da embalagem">
+                <input type="number" :value="preset.weight_grams" @input="preset.weight_grams = parseInt($el.value) || 0"
+                       class="w-20 bg-white border border-gray-200 rounded-lg px-2 py-1 text-[13px] outline-none" placeholder="g" min="50" max="30000">
+                <span class="text-[12px] text-gray-400">g</span>
+                <button @click="presets.splice(idx, 1)" x-show="presets.length > 1"
+                        class="text-gray-400 hover:text-red-500 transition" aria-label="Remover embalagem">
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                </button>
+              </div>
+            </template>
+          </div>
+          <button @click="addPreset()" x-show="presets.length < 6"
+                  class="mt-2 text-[13px] font-medium text-brand-500 hover:text-brand-600 transition inline-flex items-center gap-1">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+            Adicionar embalagem
+          </button>
+        </div>
+
+        <hr class="border-gray-100">
+
+        <div>
+          <label class="flex items-start gap-3 cursor-pointer">
+            <input type="checkbox" id="motoboy_enabled" name="motoboy_enabled" value="1"
+                   x-model="motoboyOn"
+                   class="w-5 h-5 rounded border-gray-300 text-brand-500 focus:ring-brand-500 mt-0.5">
+            <div>
+              <span class="text-[13px] font-medium text-gray-700">Motoboy (entrega local)</span>
+              <p class="text-[12px] text-gray-400 mt-0.5">Exibir estimativa de entrega por motoboy no calculo de frete.</p>
+            </div>
+          </label>
+        </div>
+
+        <div x-show="motoboyOn" class="space-y-4 pl-8">
+          <div class="grid grid-cols-2 gap-4">
+            <div>
+              <label class="block text-[12px] font-medium text-gray-600 mb-1">Preco por km (R$)</label>
+              <input type="text" id="motoboy_price_per_km_cents" name="motoboy_price_per_km_cents"
+                     class="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-[13px] outline-none"
+                     value="{{ motoboy_price_brl|stringformat:'.2f'|default:'2.00' }}">
+            </div>
+            <div>
+              <label class="block text-[12px] font-medium text-gray-600 mb-1">Preco minimo (R$)</label>
+              <input type="text" id="motoboy_min_price_cents" name="motoboy_min_price_cents"
+                     class="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-[13px] outline-none"
+                     value="{{ motoboy_min_price_brl|stringformat:'.2f'|default:'8.00' }}">
+            </div>
+          </div>
+          <div>
+            <label class="block text-[12px] font-medium text-gray-600 mb-1">Raio maximo (km)</label>
+            <input type="number" id="motoboy_max_km" name="motoboy_max_km"
+                   class="w-32 px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-[13px] outline-none"
+                   min="1" max="200" value="{{ tenant.motoboy_max_km|default:'15' }}">
+            <p class="text-[11px] text-gray-400 mt-1">Distancia maxima para entrega por motoboy.</p>
+          </div>
+        </div>
+
+        <hr class="border-gray-100">
+
+        <div>
+          <div class="flex items-center gap-3 mb-3">
+            <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg>
+            <h3 class="text-[14px] font-semibold text-gray-700">Contrato dos Correios <span class="text-[11px] font-normal text-gray-400">(opcional)</span></h3>
+          </div>
+          <p class="text-[12px] text-gray-400 mb-4">Tem contrato com os Correios? Informe as credenciais da API CWS e as cotaçoes usarao os valores reais do seu contrato. Sem credenciais, usamos estimativa por tabela.</p>
+
+          {% if correios_cws_enabled %}
+          <div class="bg-emerald-50 border border-emerald-200 rounded-xl p-4 mb-4 flex items-center gap-3">
+            <div class="w-8 h-8 rounded-full bg-emerald-100 flex items-center justify-center">
+              <svg class="w-4 h-4 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+            </div>
+            <div>
+              <p class="text-[13px] font-semibold text-emerald-800">Contrato ativo</p>
+              <p class="text-[11px] text-emerald-600">As cotaçoes usam os valores oficiais do seu contrato.</p>
+            </div>
+          </div>
+          {% else %}
+          <div class="bg-gray-50 border border-gray-200 rounded-xl p-3 mb-4 flex items-center gap-2">
+            <span class="text-[11px] text-gray-500">Usando estimativa por tabela regional</span>
+          </div>
+          {% endif %}
+
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label class="block text-[12px] font-medium text-gray-600 mb-1">Usuario (idCorreios)</label>
+              <input type="text" name="correios_usuario"
+                     class="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-[13px] outline-none"
+                     value="{{ tenant.correios_usuario|default:'' }}">
+            </div>
+            <div>
+              <label class="block text-[12px] font-medium text-gray-600 mb-1">Codigo de acesso</label>
+              <div class="flex gap-2">
+                <input type="password" name="correios_codigo_acesso"
+                       class="flex-1 px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-[13px] outline-none"
+                       placeholder="{% if tenant.correios_cws_enabled %}••••••••{% endif %}"
+                       value="{% if tenant.correios_cws_enabled %}••••••••{% else %}{% endif %}">
+              </div>
+            </div>
+            <div>
+              <label class="block text-[12px] font-medium text-gray-600 mb-1">Contrato</label>
+              <input type="text" name="correios_contrato"
+                     class="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-[13px] outline-none"
+                     value="{{ tenant.correios_contrato|default:'' }}">
+            </div>
+            <div>
+              <label class="block text-[12px] font-medium text-gray-600 mb-1">Cartao de postagem</label>
+              <input type="text" name="correios_cartao"
+                     class="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-[13px] outline-none"
+                     value="{{ tenant.correios_cartao|default:'' }}">
+            </div>
+          </div>
+
+          <div class="flex items-center gap-3 mt-3">
+            <p class="text-[11px] text-gray-400">Salve as credenciais para testar.</p>
+            <button type="submit" name="test_cws" value="1"
+                    class="inline-flex items-center gap-2 text-[12px] font-medium text-gray-500 hover:text-brand-500 transition border border-gray-200 hover:border-brand-300 rounded-lg px-3 py-1.5">
+              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+              Salvar e testar conexao
+            </button>
+          </div>
+        </div>
+
+        <input type="hidden" name="freight_presets_json" :value="JSON.stringify(presets)">
+
+        <div class="flex justify-end pt-4 border-t border-gray-100">
+          <button type="submit"
+                  class="inline-flex items-center gap-2 bg-gray-900 hover:bg-gray-800 text-white font-semibold py-2.5 px-6 rounded-xl transition-all text-[14px] shadow-sm hover:shadow-md active:scale-[0.97]">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+            Salvar Frete
+          </button>
+        </div>
+      </div>
+    </form>
+  </div>
 </div>
 
 <script>
@@ -779,6 +964,18 @@ function configPage() {
             setTimeout(poll, 3000);
         }
     }
+}
+function freightConfig() {
+    var initialPresets = {{ freight_presets_json|safe }};
+    return {
+        adjustment: '{{ tenant.freight_adjustment_percent }}',
+        motoboyOn: {{ tenant.motoboy_enabled|lower }},
+        presets: initialPresets,
+        addPreset: function() {
+            if (this.presets.length >= 6) return;
+            this.presets.push({name: '', weight_grams: 500});
+        },
+    };
 }
 </script>
 {% endblock %}

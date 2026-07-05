@@ -707,3 +707,21 @@ def mobile_links(request):
     return render(request, 'mobile/links.html', {
         'seller': seller, 'orders_json': orders_data,
     })
+
+
+@login_required
+def mobile_frete(request):
+    seller = _get_seller_profile(request)
+    if not seller:
+        return redirect('dashboard:mobile_home')
+    tenant = request.user.tenant
+    import json as _json
+    from app.apps.freight.services import DEFAULT_PRESETS
+    presets = getattr(tenant, 'freight_presets', None)
+    if not presets or not isinstance(presets, list) or len(presets) == 0:
+        presets = DEFAULT_PRESETS
+    return render(request, 'mobile/frete.html', {
+        'seller': seller,
+        'store_cep_configured': bool(tenant.store_cep),
+        'presets_json': _json.dumps(presets),
+    })

@@ -63,6 +63,7 @@ INSTALLED_APPS = [
     "app.apps.api",
     "app.apps.analytics",
     "app.apps.billing",
+    "app.apps.freight",
 
     'rest_framework',
     'rest_framework.authtoken',

@@ -1,5 +1,6 @@
 import uuid
 from django.db import models
+from django.core.exceptions import ValidationError
 from django.core.cache import cache
 from django.contrib.auth.models import AbstractUser
 from django.utils.text import slugify
@@ -24,6 +25,13 @@ class Tenant(models.Model):
     pagarme_webhook_password = EncryptedCharField(max_length=600, blank=True, null=True)
     whatsapp_instance_id = models.CharField(max_length=100, blank=True, null=True)
     whatsapp_token = EncryptedCharField(max_length=600, blank=True, null=True)
+    correios_usuario = models.CharField(max_length=100, blank=True, null=True,
+        help_text='Usuario Meu Correios (idCorreios)')
+    correios_codigo_acesso = EncryptedCharField(max_length=255, blank=True, null=True,
+        help_text='Codigo de acesso a API CWS')
+    correios_contrato = models.CharField(max_length=30, blank=True, null=True)
+    correios_cartao = models.CharField(max_length=30, blank=True, null=True,
+        help_text='Cartao de postagem (opcional)')
     default_commission_rate = models.DecimalField(max_digits=5, decimal_places=4, default=0.01)
     link_expires_in = models.PositiveIntegerField(
         default=1200,
@@ -52,6 +60,17 @@ class Tenant(models.Model):
         default=False,
         help_text='Enviar automaticamente o pacote contabil quando todas as comissoes da competencia forem pagas',
     )
+    store_cep = models.CharField(max_length=9, blank=True, null=True,
+        help_text='CEP de origem dos envios (loja)')
+    freight_adjustment_percent = models.IntegerField(default=0,
+        help_text='Calibracao da estimativa em % (-50 a +100)')
+    freight_presets = models.JSONField(default=list, blank=True,
+        help_text='Embalagens frequentes: [{"name": "Caixa P", "weight_grams": 500}]')
+    motoboy_enabled = models.BooleanField(default=False)
+    motoboy_price_per_km_cents = models.PositiveIntegerField(default=200)
+    motoboy_min_price_cents = models.PositiveIntegerField(default=800)
+    motoboy_max_km = models.PositiveIntegerField(default=15,
+        help_text='Raio maximo de entrega (km)')
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -93,6 +112,21 @@ class Tenant(models.Model):
         except Tenant.DoesNotExist:
             return True
 
+    def clean(self):
+        if self.freight_adjustment_percent < -50 or self.freight_adjustment_percent > 100:
+            raise ValidationError({'freight_adjustment_percent': 'Ajuste deve estar entre -50 e +100.'})
+        if self.freight_presets:
+            if not isinstance(self.freight_presets, list):
+                raise ValidationError({'freight_presets': 'Presets devem ser uma lista.'})
+            if len(self.freight_presets) > 6:
+                raise ValidationError({'freight_presets': 'Maximo de 6 embalagens.'})
+            for i, p in enumerate(self.freight_presets):
+                if not isinstance(p.get('name'), str) or len(p.get('name', '')) > 20:
+                    raise ValidationError({'freight_presets': f'Item {i+1}: nome invalido (max 20 chars).'})
+                w = p.get('weight_grams', 0)
+                if not isinstance(w, int) or w < 50 or w > 30000:
+                    raise ValidationError({'freight_presets': f'Item {i+1}: peso deve ser 50-30000g.'})
+
     def __str__(self):
         return self.company_name
 
@@ -107,6 +141,10 @@ class Tenant(models.Model):
     @property
     def whatsapp_configured(self):
         return bool(self.whatsapp_token and self.whatsapp_instance_id)
+
+    @property
+    def correios_cws_enabled(self):
+        return bool(self.correios_usuario and self.correios_codigo_acesso)
 
     @property
     def is_trial_expired(self):

@@ -44,4 +44,5 @@ urlpatterns += [
     path('mobile/links/', mobile_views.mobile_links, name='mobile_links'),
     path('mobile/ranking/', mobile_views.mobile_ranking, name='mobile_ranking'),
     path('mobile/perfil/', mobile_views.mobile_perfil, name='mobile_perfil'),
+    path('mobile/frete/', mobile_views.mobile_frete, name='mobile_frete'),
 ]

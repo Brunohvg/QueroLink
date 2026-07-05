@@ -194,7 +194,67 @@ def gestor_configuracoes(request):
         tenant.accountant_email = request.POST.get('accountant_email', '').strip() or None
         tenant.accountant_auto_send = request.POST.get('accountant_auto_send') == '1'
 
+        store_cep = request.POST.get('store_cep', '').strip()
+        if store_cep:
+            tenant.store_cep = store_cep
+        freight_adjustment = request.POST.get('freight_adjustment_percent', '').strip()
+        if freight_adjustment:
+            try:
+                tenant.freight_adjustment_percent = int(freight_adjustment)
+            except ValueError:
+                pass
+        presets_json = request.POST.get('freight_presets_json', '')
+        if presets_json:
+            try:
+                import json as _json
+                tenant.freight_presets = _json.loads(presets_json)
+            except (ValueError, TypeError):
+                pass
+        tenant.motoboy_enabled = request.POST.get('motoboy_enabled') == '1'
+        motoboy_price = request.POST.get('motoboy_price_per_km_cents', '').strip()
+        if motoboy_price:
+            try:
+                tenant.motoboy_price_per_km_cents = int(round(float(motoboy_price.replace(',', '.')) * 100))
+            except ValueError:
+                pass
+        motoboy_min = request.POST.get('motoboy_min_price_cents', '').strip()
+        if motoboy_min:
+            try:
+                tenant.motoboy_min_price_cents = int(round(float(motoboy_min.replace(',', '.')) * 100))
+            except ValueError:
+                pass
+        motoboy_max = request.POST.get('motoboy_max_km', '').strip()
+        if motoboy_max:
+            try:
+                tenant.motoboy_max_km = int(motoboy_max)
+            except ValueError:
+                pass
+
+        correios_usuario = request.POST.get('correios_usuario', '').strip()
+        if correios_usuario:
+            tenant.correios_usuario = correios_usuario
+        correios_codigo = request.POST.get('correios_codigo_acesso', '').strip()
+        if correios_codigo and correios_codigo != '••••••••':
+            tenant.correios_codigo_acesso = correios_codigo
+        correios_contrato = request.POST.get('correios_contrato', '').strip()
+        if correios_contrato:
+            tenant.correios_contrato = correios_contrato
+        correios_cartao = request.POST.get('correios_cartao', '').strip()
+        if correios_cartao:
+            tenant.correios_cartao = correios_cartao
+
         tenant.save()
+
+        if request.POST.get('test_cws') == '1' and tenant.correios_cws_enabled:
+            try:
+                from app.apps.freight.correios_cws import CorreiosAuthClient
+                token = CorreiosAuthClient().get_token(tenant)
+                if token:
+                    messages.success(request, 'Conexao com os Correios estabelecida com sucesso.')
+                else:
+                    messages.error(request, 'Falha na conexao: credenciais invalidas. Verifique usuario e codigo de acesso.')
+            except Exception:
+                messages.error(request, 'Erro ao conectar aos Correios. Tente novamente.')
 
         from app.apps.accounts.models import mark_onboarding_step
         if tenant.whatsapp_instance_id and tenant.whatsapp_token:
@@ -214,11 +274,19 @@ def gestor_configuracoes(request):
         return redirect('dashboard:gestor_configuracoes')
 
     import json as _json
+    freight_presets = getattr(tenant, 'freight_presets', None)
+    if not freight_presets or not isinstance(freight_presets, list) or len(freight_presets) == 0:
+        from app.apps.freight.services import DEFAULT_PRESETS
+        freight_presets = DEFAULT_PRESETS
     return render(request, 'dashboard/gestor/configuracoes.html', {
         'tenant': tenant,
         'link_events': template_events_with_body,
         'commission_rate_display': float(tenant.default_commission_rate) * 100,
         'event_vars_json': _json.dumps(EVENT_VARIABLES),
+        'freight_presets_json': _json.dumps(freight_presets),
+        'motoboy_price_brl': (tenant.motoboy_price_per_km_cents or 200) / 100.0,
+        'motoboy_min_price_brl': (tenant.motoboy_min_price_cents or 800) / 100.0,
+        'correios_cws_enabled': tenant.correios_cws_enabled,
     })
 
 
