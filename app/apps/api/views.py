@@ -112,6 +112,21 @@ class SellerViewSet(viewsets.ModelViewSet):
         })
         return Response(result, status=status.HTTP_200_OK)
 
+    def perform_destroy(self, instance):
+        from app.apps.sales.models import Sale
+        if Sale.objects.filter(seller=instance).exists():
+            from rest_framework import serializers as drf_ser
+            raise drf_ser.ValidationError({
+                'detail': 'Este vendedor possui vendas registradas e nao pode ser excluido. '
+                          'Desative-o para preservar o historico.',
+            })
+        log_action(self.request, 'seller.deleted', instance=instance,
+                   changes={'name': instance.name, 'username': instance.user.username if instance.user else None})
+        user = instance.user
+        instance.delete()
+        if user:
+            user.delete()
+
 
 class SaleViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated, IsSellerOwner | IsManagerOrAdmin]

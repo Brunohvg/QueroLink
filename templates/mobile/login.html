@@ -14,6 +14,12 @@
     <script>showToast("{{ error|escapejs }}", "error");</script>
     {% endif %}
 
+    {% if orphan_msg %}
+    <div class="bg-amber-50 border border-amber-200 text-amber-800 px-4 py-3 rounded-2xl text-[13px] text-center mb-4">
+      {{ orphan_msg }}
+    </div>
+    {% endif %}
+
     <form method="post" action="{% url 'dashboard:login' %}" class="space-y-5">
       {% csrf_token %}
       <div>

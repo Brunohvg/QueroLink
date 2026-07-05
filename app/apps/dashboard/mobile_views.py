@@ -28,7 +28,8 @@ def mobile_login(request):
         and request.user.role == User.Role.SELLER
     ):
         return redirect('dashboard:mobile_home')
-    return render(request, 'mobile/login.html')
+    orphan_msg = request.GET.get('msg', '')
+    return render(request, 'mobile/login.html', {'orphan_msg': orphan_msg})
 
 
 def mobile_logout(request):
@@ -181,6 +182,8 @@ def mobile_forgot_password(request):
 def mobile_home(request):
     try:
         seller = _get_seller_profile(request)
+        if hasattr(seller, 'status_code'):
+            return seller
         if not seller:
             return render(request, 'mobile/home.html', {
                 'error': 'Perfil de vendedor nao encontrado.',
@@ -302,6 +305,8 @@ def mobile_home(request):
 @login_required
 def mobile_lancar_venda(request):
     seller = _get_seller_profile(request)
+    if hasattr(seller, 'status_code'):
+        return seller
     if not seller:
         return render(request, 'mobile/lancar_venda.html', {
             'error': 'Perfil de vendedor nao encontrado.',
@@ -428,6 +433,8 @@ def mobile_lancar_venda(request):
 @login_required
 def mobile_minhas_vendas(request):
     seller = _get_seller_profile(request)
+    if hasattr(seller, 'status_code'):
+        return seller
     if not seller:
         return render(request, 'mobile/minhas_vendas.html', {
             'error': 'Perfil de vendedor nao encontrado.',
@@ -483,6 +490,8 @@ def mobile_minhas_vendas(request):
 @login_required
 def mobile_meu_desempenho(request):
     seller = _get_seller_profile(request)
+    if hasattr(seller, 'status_code'):
+        return seller
     if not seller:
         return render(request, 'mobile/meu_desempenho.html', {
             'error': 'Perfil de vendedor nao encontrado.',
@@ -566,12 +575,22 @@ def _get_seller_profile(request):
     try:
         return request.user.seller_profile
     except Exception:
+        if request.user.is_authenticated and request.user.role == User.Role.SELLER:
+            auth_logout(request)
+            from django.urls import reverse
+            from urllib.parse import urlencode
+            return redirect(
+                reverse('dashboard:mobile_login')
+                + '?' + urlencode({'msg': 'Este acesso foi desativado. Fale com seu gestor para receber novas credenciais.'})
+            )
         return None
 
 
 @login_required
 def mobile_ranking(request):
     seller = _get_seller_profile(request)
+    if hasattr(seller, 'status_code'):
+        return seller
     if not seller:
         return redirect('dashboard:mobile_home')
 
@@ -667,6 +686,8 @@ def mobile_ranking(request):
 @login_required
 def mobile_perfil(request):
     seller = _get_seller_profile(request)
+    if hasattr(seller, 'status_code'):
+        return seller
     if not seller:
         return render(request, 'mobile/perfil.html', {
             'error': 'Perfil de vendedor nao encontrado.',
@@ -714,6 +735,8 @@ def mobile_perfil(request):
 @login_required
 def mobile_links(request):
     seller = _get_seller_profile(request)
+    if hasattr(seller, 'status_code'):
+        return seller
     if not seller:
         return redirect('dashboard:mobile_home')
     from app.apps.orders.models import Order
@@ -750,6 +773,8 @@ def mobile_links(request):
 @login_required
 def mobile_frete(request):
     seller = _get_seller_profile(request)
+    if hasattr(seller, 'status_code'):
+        return seller
     if not seller:
         return redirect('dashboard:mobile_home')
     tenant = request.user.tenant

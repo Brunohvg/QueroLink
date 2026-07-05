@@ -14,7 +14,7 @@ class Sale(models.Model):
 
     uuid = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     tenant = models.ForeignKey(Tenant, on_delete=models.CASCADE, related_name='sales')
-    seller = models.ForeignKey(Seller, on_delete=models.CASCADE, related_name='sales')
+    seller = models.ForeignKey(Seller, on_delete=models.PROTECT, related_name='sales')
     order = models.OneToOneField(
         Order, on_delete=models.SET_NULL, null=True, blank=True, related_name='sale'
     )

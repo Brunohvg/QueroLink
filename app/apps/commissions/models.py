@@ -122,7 +122,7 @@ class SellerCommission(models.Model):
         related_name='seller_commissions',
     )
     seller = models.ForeignKey(
-        Seller, on_delete=models.CASCADE, related_name='commissions',
+        Seller, on_delete=models.PROTECT, related_name='commissions',
     )
 
     status = models.CharField(
