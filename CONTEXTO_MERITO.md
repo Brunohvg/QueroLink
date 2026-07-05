@@ -1,5 +1,5 @@
 # CONTEXTO_MERITO.md — DOSSIÊ COMPLETO DO SISTEMA PARA IA CONSELHEIRA/AUDITORA
-**Atualizado em: 05/07/2026 (v12 do código) · Mantenedor: Bruno Vidal · Atualizar a seção 9 a cada sessão**
+**Atualizado em: 05/07/2026 (documentação revisada após v12 do código; máquina de estados + matriz de migrations documentadas) · Mantenedor: Bruno Vidal · Atualizar a seção 9 a cada sessão**
 
 > **COMO USAR ESTE DOCUMENTO:** Cole no início de uma conversa com qualquer IA (Claude, GPT, Gemini) quando precisar de análise, auditoria, decisão de produto ou criação de prompts para o Mérito. Ele transfere o contexto, a metodologia e as lições aprendidas de meses de trabalho. Não é para a IA que escreve código (essa segue o `AGENTS.md` na raiz do projeto) — é para a IA que pensa junto.
 
@@ -25,13 +25,108 @@ Django 5.x · DRF · Celery + Redis · PostgreSQL · Alpine.js (build NORMAL —
 
 # 3. O DOMÍNIO DE COMISSÕES (entender antes de opinar sobre qualquer coisa)
 
-- `CommissionPeriod` (tenant+mês+ano): ABERTA / PARCIALMENTE_FECHADA / FECHADA / PARCIALMENTE_PAGA / PAGA / CANCELADA — o status do período é DERIVADO dos status por vendedor
+- `CommissionPeriod` (tenant+mês+ano): ABERTA / PARCIALMENTE_FECHADA / FECHADA / PARCIALMENTE_PAGA / PAGA / CANCELADA — o status do período é DERIVADO dos status por vendedor (exceto CANCELADA, que é atribuída diretamente por `cancel_period()`)
 - `SellerCommission` (por vendedor por período): ABERTA / REABERTA / FECHADA / AJUSTADA / PAGA / CANCELADA — granularidade POR VENDEDOR é sagrada (lojas pagam vendedores em datas diferentes); qualquer proposta de fluxo linear por período DESTRÓI capacidade — já foi proposta e rejeitada
 - Fechar congela a taxa (`freeze`), com `select_for_update`; reabrir/ajustar auditado (`CommissionAdjustment`, FK `seller_commission`); pagar registra data/usuário/observação
 - **"Enviada à contabilidade" é EVENTO (timestamp `sent_to_accounting_at/by`), não status** — decisão tomada após análise; o envio automático dispara quando TUDO FECHA (não quando paga — folha é processada ANTES do pagamento)
 - Auto-sync de vendedores: na LIST do ViewSet (a tela de fechamento só usa list!) + `ensure_seller_commission` ao lançar venda. Sync no retrieve existe mas o front não o chama
 - `related_name` críticos: `period.seller_commissions` / `seller.commissions` / `user.seller_profile` / `seller.sales` — usar `sellercommission_set` já causou 500 em produção
 - Exclusão de vendedor: proibida com vendas (desativar em vez de excluir); FKs de Sale/SellerCommission→Seller devem ser PROTECT (Prompt 27)
+
+## Máquina de estados
+
+### SellerCommission — estado financeiro individual (transições reais comprovadas no código)
+
+```
+                    fechar (freeze)
+       ┌─────────────────────────────────┐
+       │                                 ▼
+    ABERTA                            FECHADA ────── ajustar ────► AJUSTADA
+       │                                │  │                          │
+       │                     reabrir ───┘  ├── pagar ──► PAGA         │
+       │                       │           │              ▲           │
+       ▼                       ▼           │              │           │
+    REABERTA                REABERTA       │    pagar ────┘           │
+       │                                    │                         │
+       └──── fechar (freeze) ──► FECHADA    │        reabrir ◄────────┘
+                                            │
+                     ┌──────────────────────┘
+                     │
+                     ▼ todos os não-PAGA ──► CANCELADA (cancel_period em massa)
+```
+
+**Tabela de transições confirmadas:**
+
+| Origem | Operação | Destino | Função/Service | Código |
+|--------|----------|---------|----------------|--------|
+| ABERTA | fechar | FECHADA | `close_seller_commissions` → `SellerCommission.freeze()` | `services.py:198-247`, `models.py:273-289` |
+| REABERTA | fechar | FECHADA | `close_seller_commissions` → `SellerCommission.freeze()` | `services.py:198-247`, `models.py:273-289` |
+| FECHADA | reabrir | REABERTA | `reopen_seller_commissions` → `SellerCommission.reopen()` | `services.py:250-281`, `models.py:306-322` |
+| AJUSTADA | reabrir | REABERTA | `reopen_seller_commissions` → `SellerCommission.reopen()` | `services.py:250-281`, `models.py:306-322` |
+| FECHADA | ajustar | AJUSTADA | `create_commission_adjustment()` | `services.py:332-360` |
+| AJUSTADA | ajustar | AJUSTADA | `create_commission_adjustment()` (re-ajuste) | `services.py:332-360` |
+| FECHADA | pagar | PAGA | `pay_seller_commissions` → `SellerCommission.mark_paid()` | `services.py:284-329`, `models.py:291-304` |
+| AJUSTADA | pagar | PAGA | `pay_seller_commissions` → `SellerCommission.mark_paid()` | `services.py:284-329`, `models.py:291-304` |
+| ABERTA | cancelar | CANCELADA | `cancel_period()` (massa: `.exclude(PAGA).update(CANCELADA)`) | `services.py:787-811` |
+| REABERTA | cancelar | CANCELADA | `cancel_period()` | `services.py:787-811` |
+| FECHADA | cancelar | CANCELADA | `cancel_period()` | `services.py:787-811` |
+| AJUSTADA | cancelar | CANCELADA | `cancel_period()` | `services.py:787-811` |
+
+**Transições que NÃO existem no código atual:**
+- `PAGA → qualquer coisa` (bloqueado em `reopen_seller_commissions` line 273-277 + `cancel_period` exclui PAGA)
+- `ABERTA → PAGA` (`pay_seller_commissions` só aceita FECHADA/AJUSTADA, line 289-291)
+- `REABERTA → PAGA` (idem)
+- `ABERTA → AJUSTADA` (`create_commission_adjustment` não tem guard de status mas o serviço só é invocado sobre FECHADA; não há view chamando sobre ABERTA)
+- `CANCELADA → qualquer coisa` (não existe transição de saída de CANCELADA; `cancel_period` seta direto e não há `reopen` aceitando CANCELADA)
+- `PAGA → CANCELADA` (`cancel_period` exclui PAGA do `.update()`, line 805-809)
+
+**Regras operacionais:**
+- `ABERTA` e `REABERTA` são editáveis (`is_editable` property, `models.py:326-329`)
+- Fechar executa `recalculate` + `freeze`; valores congelados em `frozen_*`
+- `FECHADA` usa `frozen_commission_amount` como base (`amount_due`, `models.py:341-342`)
+- Ajuste cria `CommissionAdjustment` auditável (`previous_amount`, `new_amount`, `difference`)
+- Pagar é permitido somente para `FECHADA` ou `AJUSTADA`
+- Comissão `PAGA` não pode ser reaberta pelo fluxo atual (guarda em `reopen_seller_commissions` line 273)
+- Granularidade por vendedor é uma decisão estrutural do produto
+
+**Sobre CANCELADA:**
+`CANCELADA` existe no enum de `SellerCommission` e é setada exclusivamente por `cancel_period()` em massa (todas as comissões do período exceto PAGA). Fora desse caminho, não foi localizada transição operacional individual que coloque uma `SellerCommission` em CANCELADA. `cancel_period()` só é permitido se o período não tiver comissão PAGA. Comissões CANCELADA são ignoradas por `calculate_period_summary()` (não entram em nenhum contador) — o período cancelado mantém `status=CANCELADA` definido diretamente, não derivado de `recalculate_period_status()`.
+
+### CommissionPeriod — status DERIVADO (exceto CANCELADA)
+
+```
+CommissionPeriod — status DERIVADO do conjunto de SellerCommissions
+
+SellerCommissions
+       │
+       ▼
+recalculate_period_status()   [services.py:171-195]
+       │
+       ├── zero vendedores ─────────────────────────────► ABERTA
+       ├── todas pagas ─────────────────────────────────► PAGA
+       ├── todas fechadas/ajustadas (sem pagas) ────────► FECHADA
+       ├── todas fechadas/ajustadas (com algumas pagas) ─► PARCIALMENTE_PAGA
+       ├── mix abertas/reabertas + fechadas/ajustadas ──► PARCIALMENTE_FECHADA
+       ├── mix abertas/reabertas + pagas (sem fechadas) ─► PARCIALMENTE_PAGA
+       └── somente abertas/reabertas ───────────────────► ABERTA
+```
+
+**Exceção:** CANCELADA é atribuída diretamente por `cancel_period()` (`services.py:796`) e NÃO é derivada por `recalculate_period_status()`. Se `recalculate_period_status()` fosse chamada sobre um período cancelado com todas as comissões CANCELADA, calcularia ABERTA (comissões CANCELADA não entram em nenhum contador de `calculate_period_summary()`).
+
+**Regra mental para auditoria:** `SellerCommission` tem transições operacionais; `CommissionPeriod` resume o conjunto. Não redesenhar o período como workflow linear independente.
+
+### Contabilidade é evento, não status
+
+```
+FECHAMENTO TOTAL (todas as SellerCommissions fechadas/ajustadas/pagas/canceladas)
+       │
+       └── evento: sent_to_accounting_at / sent_to_accounting_by
+
+Isso NÃO cria um novo status financeiro.
+O envio contábil automático dispara em close_seller_commissions() quando
+todas as comissões estão em estado terminal E accountant_auto_send=True
+E sent_to_accounting_at ainda é NULL. [services.py:231-243]
+```
 
 # 4. LANDMINES — OS BUGS QUE SE REPETEM (decorar)
 
@@ -85,11 +180,53 @@ Numerados (PROMPT_N), abrindo com **"Siga o AGENTS.md"** (as regras permanentes 
 
 **Em 05/07/2026, v12:** ciclo completo validado em staging COM e-mail real chegando ao contador (criar → vender mobile → fechar → contabilidade → pagar → histórico, zero 500s). Prompts 1–26 executados e verificados.
 
-**Pendentes de execução:** PROMPT_27 (exclusão segura de vendedor: perform_destroy deletando User junto, PROTECT nos FKs, `fix_orphan_users`, bloqueio de exclusão com vendas) · PROMPT_28 (backup: parse DATABASE_URL quebrado — provado por simulação que só popula DB_HOST —, pipefail, rclone multi-arch, upload verificado com copyto+lsf, task com raise, extensão `.dump`).
+**Pendentes de execução:**
+- PROMPT_27 (exclusão segura de vendedor): Executado no código. PROTECT nos FKs, `perform_destroy` deletando User junto, `fix_orphan_users`, bloqueio de exclusão com vendas. Pendente de validação operacional (rodar `fix_orphan_users --apply` no staging).
+- PROMPT_28 (backup): Executado no código. Parse corrigido (`mapfile -t`, `urllib.parse.unquote`), `set -Eeuo pipefail`, rclone multi-arch, `copyto` + `lsf` para verificação, task com `raise`, extensão `.dump`. Testes novos passando (13 testes). Pendente de validação operacional (gerar token rclone, teste manual no worker, teste de restauração em banco vazio).
 
-**Pendentes operacionais:** aplicar 27+28 → verificar ZIP → gerar token rclone → teste manual do backup no worker → teste de RESTAURAÇÃO em banco vazio → go-live da Bibelô. Users órfãos no staging (limpar com `fix_orphan_users --apply`). Verificar se o console parou de acusar CSP/eval após o último deploy (se persistir: proxy do Coolify injetando header).
+**Pendentes operacionais:** verificar ZIP → gerar token rclone → teste manual do backup no worker → teste de RESTAURAÇÃO em banco vazio → go-live da Bibelô. Users órfãos no staging (limpar com `fix_orphan_users --apply`). Verificar se o console parou de acusar CSP/eval após o último deploy (se persistir: proxy do Coolify injetando header).
 
 **Roadmap pós-launch:** Git+CI (prioridade nº 1 — regressões só serão estruturalmente resolvidas com isso) · unificar e-mails no template do reset · resumo executivo mensal do gestor · metas por vendedor · declaração de conteúdo Correios em PDF · calibrar tabela de frete no balcão real · Nuvemshop (mês 3+) · revisar preço do Pro (R$397–497) com 3 clientes externos validados.
+
+## Matriz de migrations por ambiente
+
+| Ambiente | Estado verificado em | Última migration/leaf conhecido | Pendentes | Evidência |
+|---|---|---|---|---|
+| Local (dev) | 05/07/2026 ~19:30 BRT | leaf nodes do código (ver abaixo) | 8 migrations pendentes | `showmigrations --plan` + `migrate --plan` + `MigrationLoader.leaf_nodes()` contra SQLite local |
+| Staging | NÃO VERIFICADO | leaf nodes do código conhecidos; estado aplicado desconhecido | desconhecido | executar `showmigrations --plan` no container web de staging (`merito.vidalys.com.br`) |
+| Produção | NÃO VERIFICADO | estado aplicado desconhecido | desconhecido | verificar antes do primeiro go-live |
+
+**Leaf nodes do código atual (código fonte, não banco — o que o Django tentará aplicar):**
+
+| App | Leaf Migration |
+|---|---|
+| accounts | `0022_tenant_skip_national_holidays_and_more` |
+| admin | `0003_logentry_add_action_flag_choices` |
+| analytics | `0002_remove_linkclick_ip_address_linkclick_ip_hash` |
+| audit | `0002_auditlog_tenant_and_more` |
+| auth | `0012_alter_user_first_name_max_length` |
+| authtoken | `0004_alter_tokenproxy_options` |
+| billing | `0002_alter_subscription_plan_alter_subscription_status` |
+| commissions | `0004_alter_sellercommission_seller` |
+| contenttypes | `0002_remove_content_type_name` |
+| freight | `0001_initial` |
+| notifications | `0006_lifecycle_email` |
+| orders | `0003_alter_paymentlink_gateway_link_id` |
+| payments | `0002_add_payment_metadata` |
+| sales | `0005_alter_sale_seller` |
+| sellers | `0010_add_unique_cpf` |
+| sessions | `0001_initial` |
+| token_blacklist | `0012_alter_outstandingtoken_user` |
+| webhooks | `0004_webhookevent_skip_reason` |
+
+**Migrations pendentes no banco local (não aplicadas):**
+`accounts.0020_freight_fields`, `accounts.0021_correios_cws_fields`, `accounts.0022_tenant_skip_national_holidays_and_more`, `billing.0002_alter_subscription_plan_alter_subscription_status`, `sellers.0011_normalize_cpf_digits`, `sellers.0012_dedupe_cpf`, `sellers.0010_add_unique_cpf`, `commissions.0003_add_accounting_tracking`, `commissions.0004_alter_sellercommission_seller`, `freight.0001_initial`, `sales.0005_alter_sale_seller`
+
+**REGRA DE OURO DE DEPLOY:** a matriz registra observação, não controla o Django. Antes de qualquer go-live ou deploy com migrations novas, executar `showmigrations --plan` e `migrate --plan` no ambiente alvo, comparar com esta matriz e atualizar a matriz ANTES da aplicação. Depois de `migrate` bem-sucedido, executar `showmigrations --plan` novamente e atualizar a linha com o estado realmente aplicado.
+
+Se uma migration falhar, NÃO alterar a matriz para o estado pretendido. Registrar a última migration realmente aplicada e a migration que falhou. O ponto de retomada é evidência do banco, nunca memória da sessão anterior.
+
+Nunca usar a matriz como substituta da tabela `django_migrations`. A fonte de verdade operacional continua sendo o banco; a matriz é um índice humano/IA para detectar drift e orientar auditoria.
 
 # 10. CHECKLIST RÁPIDO A CADA ENTREGA (branch/commit no GitHub, ou ZIP)
 
