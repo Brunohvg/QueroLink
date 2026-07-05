@@ -59,6 +59,22 @@ class SellerSerializer(serializers.ModelSerializer):
             )
         return cleaned
 
+    def validate_cpf(self, value):
+        if not value:
+            return None
+        from app.apps.sellers.validators import normalize_and_validate_cpf
+        try:
+            digits = normalize_and_validate_cpf(value)
+        except ValueError as e:
+            raise serializers.ValidationError(str(e))
+        tenant = self.context['request'].user.tenant
+        qs = Seller.objects.filter(tenant=tenant, cpf=digits)
+        if self.instance:
+            qs = qs.exclude(pk=self.instance.pk)
+        if qs.exists():
+            raise serializers.ValidationError('Ja existe um vendedor com este CPF.')
+        return digits
+
 
 class SellerCreateSerializer(serializers.Serializer):
     name = serializers.CharField(max_length=100)
@@ -80,6 +96,22 @@ class SellerCreateSerializer(serializers.Serializer):
                     'Este telefone ja esta cadastrado para outro vendedor.'
                 )
         return cleaned
+
+    def validate_cpf(self, value):
+        if not value:
+            return None
+        from app.apps.sellers.validators import normalize_and_validate_cpf
+        try:
+            digits = normalize_and_validate_cpf(value)
+        except ValueError as e:
+            raise serializers.ValidationError(str(e))
+        request = self.context.get('request')
+        if request and request.user.tenant:
+            if Seller.objects.filter(
+                tenant=request.user.tenant, cpf=digits
+            ).exists():
+                raise serializers.ValidationError('Ja existe um vendedor com este CPF.')
+        return digits
 
     def create(self, validated_data):
         request = self.context['request']
@@ -245,6 +277,10 @@ class SellerImportSerializer(serializers.Serializer):
             Seller.objects.filter(tenant=tenant)
             .values_list('phone_hash', flat=True)
         )
+        used_cpfs = set(
+            Seller.objects.filter(tenant=tenant, cpf__isnull=False)
+            .values_list('cpf', flat=True)
+        )
 
         for i, row in enumerate(rows, start=2):
             name = (row.get('nome') or row.get('name') or '').strip()
@@ -286,12 +322,23 @@ class SellerImportSerializer(serializers.Serializer):
                 cpf_raw = (row.get('cpf') or row.get('CPF') or '').strip()
                 cpf_value = None
                 if cpf_raw:
-                    cpf_digits = ''.join(filter(str.isdigit, cpf_raw))
-                    if len(cpf_digits) == 11:
-                        cpf_value = cpf_digits
-                    else:
-                        errors.append({'linha': i, 'erro': f'CPF invalido: {cpf_raw}'})
-                        continue
+                    from app.apps.sellers.validators import normalize_and_validate_cpf
+                    try:
+                        cpf_value = normalize_and_validate_cpf(cpf_raw)
+                        if cpf_value in used_cpfs:
+                            errors.append({
+                                'linha': i,
+                                'erro': f'CPF ignorado: duplicado (ja cadastrado): {cpf_raw}',
+                            })
+                            cpf_value = None
+                        else:
+                            used_cpfs.add(cpf_value)
+                    except ValueError as e:
+                        errors.append({
+                            'linha': i,
+                            'erro': f'CPF ignorado: {str(e).lower()}: {cpf_raw}',
+                        })
+                        cpf_value = None
 
                 seller = Seller(
                     tenant=tenant,

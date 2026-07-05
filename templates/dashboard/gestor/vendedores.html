@@ -431,7 +431,7 @@ function vendedoresPage() {
         },
         async updateSeller() {
             var b = { name:this.form.name, phone:this.form.phone, commission_rate: String(parseFloat(this.form.commission_rate)/100) };
-            if (this.form.cpf) b.cpf = this.form.cpf;
+            b.cpf = this.form.cpf ? this.form.cpf : null;
             var r = await fetch(`/api/sellers/${this.form.uuid}/`, { method:'PATCH', headers:{'Content-Type':'application/json', 'X-CSRFToken': getCSRFToken()}, body: JSON.stringify(b) });
             if (r.ok) { this.showModal = false; this.loadSellers(); } else { var d = await r.json(); showToast(Object.values(d).flat().join('\n'), 'error'); }
         },

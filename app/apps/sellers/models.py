@@ -56,21 +56,11 @@ class Seller(models.Model):
 
     def clean(self):
         if self.cpf:
-            digits = ''.join(filter(str.isdigit, self.cpf))
-            if len(digits) != 11:
-                raise ValidationError({'cpf': 'CPF deve ter 11 digitos.'})
-            if digits == digits[0] * 11:
-                raise ValidationError({'cpf': 'CPF invalido.'})
-            s1 = sum(int(digits[i]) * (10 - i) for i in range(9))
-            d1 = (s1 * 10) % 11
-            if d1 == 10:
-                d1 = 0
-            s2 = sum(int(digits[i]) * (11 - i) for i in range(10))
-            d2 = (s2 * 10) % 11
-            if d2 == 10:
-                d2 = 0
-            if int(digits[9]) != d1 or int(digits[10]) != d2:
-                raise ValidationError({'cpf': 'CPF invalido.'})
+            from .validators import normalize_and_validate_cpf
+            try:
+                digits = normalize_and_validate_cpf(self.cpf)
+            except ValueError as e:
+                raise ValidationError({'cpf': str(e)})
             qs = Seller.objects.filter(tenant=self.tenant, cpf=digits).exclude(pk=self.pk)
             if qs.exists():
                 raise ValidationError({'cpf': 'Ja existe um vendedor com este CPF.'})

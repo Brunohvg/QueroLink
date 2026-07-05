@@ -23,6 +23,10 @@ from app.apps.commissions.models import (
     SellerCommission,
     CommissionAdjustment,
 )
+from app.apps.commissions.services import (
+    calculate_estimated_commission,
+    get_commission_rate,
+)
 from app.apps.accounts.models import User
 
 from .serializers import (
@@ -566,7 +570,7 @@ class CommissionPeriodViewSet(viewsets.ModelViewSet):
                 'name': seller.name,
                 'uuid': str(seller.uuid),
                 'total_sold': est_total,
-                'commission_rate': float(seller.commission_rate),
+                'commission_rate': float(get_commission_rate(seller)),
                 'commission_amount': est_commission,
                 'has_missing_days': len(missing_days) > 0,
                 'missing_days_count': len(missing_days),
@@ -977,7 +981,9 @@ class SellerDetailView(generics.GenericAPIView):
                 'name': seller.name,
                 'phone': (seller.phone or '')[:4] + '****' + (seller.phone or '')[-4:] if len(seller.phone or '') >= 8 else '****',
                 'is_active': seller.is_active,
-                'commission_rate': float(seller.commission_rate),
+                'commission_rate': float(get_commission_rate(seller)),
+                'cpf': seller.cpf,
+                'cpf_formatted': seller.cpf_formatted,
                 'created_at': (
                     seller.created_at.isoformat()
                     if seller.created_at else None
@@ -1623,7 +1629,7 @@ class SellerStatementView(generics.GenericAPIView):
         else:
             est, _ = calculate_estimated_commission(seller, month_int, year_int)
             comissao_valor = est
-            comissao_taxa = float(seller.commission_rate) * 100
+            comissao_taxa = float(get_commission_rate(seller)) * 100
             comissao_status = 'Estimativa'
 
         from app.apps.sellers.models import SellerGoal
@@ -1723,7 +1729,7 @@ class MonthlyReportView(generics.GenericAPIView):
                 'name': seller.name,
                 'total_sold': est_total,
                 'commission': commission_amount,
-                'commission_rate': float(seller.commission_rate) * 100,
+                'commission_rate': float(get_commission_rate(seller)) * 100,
                 'status': status,
             })
             total_sold += est_total
