@@ -148,54 +148,56 @@ def billing_webhook(request):
 
     from django.conf import settings
     webhook_secret = getattr(settings, 'MP_WEBHOOK_SECRET', '')
+    if not webhook_secret:
+        logger.critical('Billing webhook rejeitado: MP_WEBHOOK_SECRET ausente')
+        return JsonResponse({"error": "Billing webhook unavailable"}, status=503)
 
-    if webhook_secret:
-        x_sig = request.META.get('HTTP_X_SIGNATURE', '')
-        if not x_sig:
-            logger.warning("Billing webhook sem x-signature, rejeitado")
-            return JsonResponse({"error": "Forbidden"}, status=403)
+    x_sig = request.META.get('HTTP_X_SIGNATURE', '')
+    if not x_sig:
+        logger.warning("Billing webhook sem x-signature, rejeitado")
+        return JsonResponse({"error": "Forbidden"}, status=403)
 
-        import hashlib
-        import hmac
+    import hashlib
+    import hmac
 
-        x_request_id = request.META.get('HTTP_X_REQUEST_ID', '')
-        data_id = request.GET.get('data.id', '')
+    x_request_id = request.META.get('HTTP_X_REQUEST_ID', '')
+    data_id = request.GET.get('data.id', '')
 
-        if data_id:
-            data_id = data_id.lower()
+    if data_id:
+        data_id = data_id.lower()
 
-        parts = {}
-        for pair in x_sig.split(','):
-            if '=' in pair:
-                k, v = pair.split('=', 1)
-                parts[k.strip()] = v.strip()
+    parts = {}
+    for pair in x_sig.split(','):
+        if '=' in pair:
+            k, v = pair.split('=', 1)
+            parts[k.strip()] = v.strip()
 
-        ts = parts.get('ts', '')
-        v1 = parts.get('v1', '')
+    ts = parts.get('ts', '')
+    v1 = parts.get('v1', '')
 
-        if not ts or not v1:
-            logger.warning("Billing webhook x-signature mal formatada: %s", x_sig)
-            return JsonResponse({"error": "Forbidden"}, status=403)
+    if not ts or not v1:
+        logger.warning("Billing webhook x-signature mal formatada")
+        return JsonResponse({"error": "Forbidden"}, status=403)
 
-        manifest_parts = []
-        if data_id:
-            manifest_parts.append(f"id:{data_id};")
-        if x_request_id:
-            manifest_parts.append(f"request-id:{x_request_id};")
-        manifest_parts.append(f"ts:{ts};")
-        manifest = ''.join(manifest_parts)
+    manifest_parts = []
+    if data_id:
+        manifest_parts.append(f"id:{data_id};")
+    if x_request_id:
+        manifest_parts.append(f"request-id:{x_request_id};")
+    manifest_parts.append(f"ts:{ts};")
+    manifest = ''.join(manifest_parts)
 
-        expected = hmac.new(
-            webhook_secret.encode('utf-8'),
-            manifest.encode('utf-8'),
-            hashlib.sha256,
-        ).hexdigest()
+    expected = hmac.new(
+        webhook_secret.encode('utf-8'),
+        manifest.encode('utf-8'),
+        hashlib.sha256,
+    ).hexdigest()
 
-        if not hmac.compare_digest(expected, v1):
-            logger.warning("Billing webhook x-signature invalida (data_id=%s)", data_id)
-            return JsonResponse({"error": "Forbidden"}, status=403)
+    if not hmac.compare_digest(expected, v1):
+        logger.warning("Billing webhook x-signature invalida (data_id=%s)", data_id)
+        return JsonResponse({"error": "Forbidden"}, status=403)
 
-        logger.info("Billing webhook x-signature OK (data_id=%s, manifest=%s)", data_id, manifest)
+    logger.info("Billing webhook x-signature OK (data_id=%s)", data_id)
 
     event = WebhookEvent.objects.create(
         gateway='mercadopago',
