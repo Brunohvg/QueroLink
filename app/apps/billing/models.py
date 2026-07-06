@@ -31,6 +31,9 @@ class Subscription(models.Model):
     gateway_subscription_id = models.CharField(
         max_length=100, blank=True, null=True, db_index=True,
     )
+    pending_cancel_gateway_subscription_id = models.CharField(
+        max_length=100, blank=True, null=True, db_index=True,
+    )
     gateway_customer_id = models.CharField(
         max_length=100, blank=True, null=True,
     )
@@ -50,6 +53,7 @@ class Subscription(models.Model):
         indexes = [
             models.Index(fields=['status']),
             models.Index(fields=['gateway_subscription_id']),
+            models.Index(fields=['pending_cancel_gateway_subscription_id']),
         ]
 
     def __str__(self):
