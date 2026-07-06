@@ -34,6 +34,21 @@ jobs:
           REDIS_URL: redis://localhost:6379/0
         run: python manage.py check
 
+      - name: Django production deploy check
+        env:
+          DJANGO_SETTINGS_MODULE: app.config.settings.production
+          SECRET_KEY: ci-test-secret-key-not-for-production
+          DATABASE_URL: sqlite:///db.sqlite3
+          REDIS_URL: redis://localhost:6379/0
+          FERNET_KEY: ci-fernet-key-not-used
+          ALLOWED_HOSTS: localhost,127.0.0.1
+          MP_ACCESS_TOKEN: ''
+          MP_WEBHOOK_SECRET: ''
+          SECURE_SSL_REDIRECT: 'False'
+          SESSION_COOKIE_SECURE: 'False'
+          CSRF_COOKIE_SECURE: 'False'
+        run: python manage.py check --deploy
+
       - name: Check pending migrations
         env:
           DJANGO_SETTINGS_MODULE: app.config.settings.local
