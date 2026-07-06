@@ -38,7 +38,7 @@ class EstimateCorreiosTest(TestCase):
         self.assertEqual(result[1].price_cents, 3800)
 
     def test_unknown_cep_uses_default(self):
-        result = services.estimate_correios('99999999', weight_grams=300)
+        result = services.estimate_correios('00000000', weight_grams=300)
         self.assertEqual(result[0].price_cents, 3200)
         self.assertEqual(result[1].price_cents, 5000)
 
