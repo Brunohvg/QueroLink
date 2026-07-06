@@ -40,7 +40,7 @@ jobs:
           SECRET_KEY: ci-test-secret-key-not-for-production
           DATABASE_URL: sqlite:///db.sqlite3
           REDIS_URL: redis://localhost:6379/0
-          FERNET_KEY: ci-fernet-key-not-used
+          FERNET_KEY: Y2ktZmVybmV0LWtleS1ub3QtZm9yLXByb2R1Y3Rpb24h
           ALLOWED_HOSTS: localhost,127.0.0.1
           MP_ACCESS_TOKEN: ''
           MP_WEBHOOK_SECRET: ''
