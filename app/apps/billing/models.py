@@ -53,7 +53,6 @@ class Subscription(models.Model):
         indexes = [
             models.Index(fields=['status']),
             models.Index(fields=['gateway_subscription_id']),
-            models.Index(fields=['pending_cancel_gateway_subscription_id']),
         ]
 
     def __str__(self):
