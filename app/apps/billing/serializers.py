@@ -1,16 +1,13 @@
 from rest_framework import serializers
 from django.conf import settings
 from app.apps.accounts.models import Tenant
+from app.apps.accounts.plans import offered_plan_choices
 
 
 class UpgradeSerializer(serializers.Serializer):
-    plan = serializers.ChoiceField(choices=Tenant.Plan.choices)
+    plan = serializers.ChoiceField(choices=offered_plan_choices)
     billing_cycle = serializers.ChoiceField(
         choices=[('MONTHLY', 'Mensal'), ('YEARLY', 'Anual')],
-    )
-    payment_method = serializers.ChoiceField(
-        choices=[('credit_card', 'Cartao'), ('boleto', 'Boleto')],
-        default='boleto',
     )
 
     def validate_plan(self, value):
