@@ -61,7 +61,7 @@ jobs:
           DJANGO_SETTINGS_MODULE: app.config.settings.local
           SECRET_KEY: ci-test-secret-key-not-for-production
           REDIS_URL: redis://localhost:6379/0
-        run: python manage.py test -v2
+        run: python manage.py test -v2 --buffer
 
   frontend:
     runs-on: ubuntu-latest
