@@ -7,28 +7,17 @@ from django.utils import timezone
 
 from app.apps.sales.models import Sale
 from app.apps.sellers.models import Seller
+from app.apps.sellers.capacity import SellerCapacityExceeded, ensure_seller_capacity
 from app.apps.commissions.models import (
     CommissionPeriod,
     SellerCommission,
     CommissionAdjustment,
 )
-from app.apps.accounts.models import User
+from app.apps.accounts.models import Tenant, User
 from app.apps.accounts.validators import clean_phone, validate_phone_br
 from app.apps.accounts.fields import compute_hash
 
 logger = logging.getLogger(__name__)
-
-PLAN_LIMITS = {
-    'STARTER': None,
-    'PRO': None,
-    'ENTERPRISE': None,
-}
-
-
-def _check_seller_limit(tenant):
-    # Desabilitado — limite de vendedores nao e mais aplicado.
-    # Quando o billing for ativado, reativar esta funcao.
-    pass
 
 
 class SellerSerializer(serializers.ModelSerializer):
@@ -117,8 +106,6 @@ class SellerCreateSerializer(serializers.Serializer):
         request = self.context['request']
         tenant = request.user.tenant
 
-        _check_seller_limit(tenant)
-
         base = slugify(validated_data['name'])
         username = base
         n = 2
@@ -128,22 +115,27 @@ class SellerCreateSerializer(serializers.Serializer):
 
         password = get_random_string(12)
 
-        with transaction.atomic():
-            user = User.objects.create_user(
-                username=username,
-                password=password,
-                role=User.Role.SELLER,
-                tenant=tenant,
-            )
+        try:
+            with transaction.atomic():
+                locked_tenant = Tenant.objects.select_for_update().get(pk=tenant.pk)
+                ensure_seller_capacity(locked_tenant, requested=1)
+                user = User.objects.create_user(
+                    username=username,
+                    password=password,
+                    role=User.Role.SELLER,
+                    tenant=locked_tenant,
+                )
 
-            seller = Seller.objects.create(
-                tenant=tenant,
-                user=user,
-                name=validated_data['name'],
-                phone=validated_data['phone'],
-                cpf=validated_data.get('cpf', '') or None,
-                commission_rate=tenant.default_commission_rate,
-            )
+                seller = Seller.objects.create(
+                    tenant=locked_tenant,
+                    user=user,
+                    name=validated_data['name'],
+                    phone=validated_data['phone'],
+                    cpf=validated_data.get('cpf', '') or None,
+                    commission_rate=locked_tenant.default_commission_rate,
+                )
+        except SellerCapacityExceeded as e:
+            raise serializers.ValidationError({'detail': str(e)})
 
         try:
             from app.apps.notifications.tasks import notify_seller_credentials
@@ -241,38 +233,9 @@ class SellerImportSerializer(serializers.Serializer):
         reader = csv.DictReader(io.StringIO(decoded))
         return [row for row in reader]
 
-    def create(self, validated_data):
-        file = validated_data['file']
-        rows = self._parse_file(file)
-
-        request = self.context['request']
-        tenant = request.user.tenant
-
-        _check_seller_limit(tenant)
-
-        limit = PLAN_LIMITS.get(tenant.plan)
-        if limit is not None:
-            valid_count = 0
-            for row in rows:
-                name = (row.get('nome') or row.get('name') or '').strip()
-                phone = (row.get('telefone') or row.get('phone') or '').strip()
-                if not name or not phone:
-                    continue
-                cleaned_phone = clean_phone(phone)
-                if not validate_phone_br(cleaned_phone):
-                    continue
-                valid_count += 1
-            current = Seller.objects.filter(tenant=tenant, is_active=True).count()
-            if current + valid_count > limit:
-                raise serializers.ValidationError(
-                    f'Limite de vendedores do plano {tenant.plan} atingido ({limit}). '
-                    f'Voce tem {current} vendedores ativos e esta tentando importar '
-                    f'{valid_count}. Faca upgrade para adicionar mais vendedores.'
-                )
-
-        created = []
+    def _build_import_plan(self, rows, tenant):
         errors = []
-        used_usernames = set()
+        pending = []
         used_phones = set(
             Seller.objects.filter(tenant=tenant)
             .values_list('phone_hash', flat=True)
@@ -281,6 +244,8 @@ class SellerImportSerializer(serializers.Serializer):
             Seller.objects.filter(tenant=tenant, cpf__isnull=False)
             .values_list('cpf', flat=True)
         )
+        batch_phones = set()
+        batch_cpfs = set()
 
         for i, row in enumerate(rows, start=2):
             name = (row.get('nome') or row.get('name') or '').strip()
@@ -298,79 +263,103 @@ class SellerImportSerializer(serializers.Serializer):
                 errors.append({'linha': i, 'erro': f'Telefone invalido: {phone}'})
                 continue
 
-            if compute_hash(cleaned_phone) in used_phones:
+            phone_hash = compute_hash(cleaned_phone)
+            if phone_hash in used_phones or phone_hash in batch_phones:
                 errors.append({'linha': i, 'erro': f'Telefone ja cadastrado: {phone}'})
                 continue
 
-            base = slugify(name)
-            username = base
-            n = 2
-            while (username in used_usernames or
-                   User.objects.filter(username=username).exists()):
-                username = f'{base}-{n}'
-                n += 1
-
-            password = get_random_string(12)
-
-            try:
-                user = User.objects.create_user(
-                    username=username,
-                    password=password,
-                    role=User.Role.SELLER,
-                    tenant=tenant,
-                )
-                cpf_raw = (row.get('cpf') or row.get('CPF') or '').strip()
-                cpf_value = None
-                if cpf_raw:
-                    from app.apps.sellers.validators import normalize_and_validate_cpf
-                    try:
-                        cpf_value = normalize_and_validate_cpf(cpf_raw)
-                        if cpf_value in used_cpfs:
-                            errors.append({
-                                'linha': i,
-                                'erro': f'CPF ignorado: duplicado (ja cadastrado): {cpf_raw}',
-                            })
-                            cpf_value = None
-                        else:
-                            used_cpfs.add(cpf_value)
-                    except ValueError as e:
+            cpf_raw = (row.get('cpf') or row.get('CPF') or '').strip()
+            cpf_value = None
+            if cpf_raw:
+                from app.apps.sellers.validators import normalize_and_validate_cpf
+                try:
+                    candidate = normalize_and_validate_cpf(cpf_raw)
+                    if candidate in used_cpfs or candidate in batch_cpfs:
                         errors.append({
                             'linha': i,
-                            'erro': f'CPF ignorado: {str(e).lower()}: {cpf_raw}',
+                            'erro': f'CPF ignorado: duplicado (ja cadastrado): {cpf_raw}',
                         })
-                        cpf_value = None
+                    else:
+                        cpf_value = candidate
+                        batch_cpfs.add(candidate)
+                except ValueError as e:
+                    errors.append({
+                        'linha': i,
+                        'erro': f'CPF ignorado: {str(e).lower()}: {cpf_raw}',
+                    })
 
-                seller = Seller(
-                    tenant=tenant,
-                    user=user,
-                    name=name,
-                    phone=cleaned_phone,
-                    commission_rate=tenant.default_commission_rate,
-                    cpf=cpf_value,
-                )
-                seller.save()
+            batch_phones.add(phone_hash)
+            pending.append({
+                'line': i,
+                'name': name,
+                'phone': phone,
+                'cleaned_phone': cleaned_phone,
+                'cpf': cpf_value,
+            })
 
-                try:
-                    from app.apps.notifications.tasks import notify_seller_credentials
-                    notify_seller_credentials(seller, password)
-                except Exception:
-                    logger.error(
-                        'Failed to send credentials notification for seller %s',
-                        seller.uuid, exc_info=True
+        return pending, errors
+
+    def create(self, validated_data):
+        file = validated_data['file']
+        rows = self._parse_file(file)
+
+        request = self.context['request']
+        tenant = request.user.tenant
+
+        pending, errors = self._build_import_plan(rows, tenant)
+        created = []
+        credentials = []
+        used_usernames = set()
+
+        try:
+            with transaction.atomic():
+                locked_tenant = Tenant.objects.select_for_update().get(pk=tenant.pk)
+                ensure_seller_capacity(locked_tenant, requested=len(pending))
+
+                for item in pending:
+                    base = slugify(item['name'])
+                    username = base
+                    n = 2
+                    while (username in used_usernames or
+                           User.objects.filter(username=username).exists()):
+                        username = f'{base}-{n}'
+                        n += 1
+
+                    password = get_random_string(12)
+                    user = User.objects.create_user(
+                        username=username,
+                        password=password,
+                        role=User.Role.SELLER,
+                        tenant=locked_tenant,
                     )
+                    seller = Seller.objects.create(
+                        tenant=locked_tenant,
+                        user=user,
+                        name=item['name'],
+                        phone=item['cleaned_phone'],
+                        commission_rate=locked_tenant.default_commission_rate,
+                        cpf=item['cpf'],
+                    )
+                    used_usernames.add(username)
+                    credentials.append((seller, password))
+                    created.append({
+                        'username': username,
+                        'name': item['name'],
+                        'phone': item['phone'],
+                        'uuid': str(seller.uuid),
+                    })
+        except SellerCapacityExceeded as e:
+            raise serializers.ValidationError({'detail': str(e)})
 
-                used_usernames.add(username)
-                used_phones.add(compute_hash(cleaned_phone))
-                created.append({
-                    'username': username,
-                    'password': password,
-                    'name': name,
-                    'phone': phone,
-                    'uuid': str(seller.uuid),
-                })
-
-            except Exception as e:
-                errors.append({'linha': i, 'erro': str(e)})
+        for seller, password in credentials:
+            try:
+                from app.apps.notifications.tasks import notify_seller_credentials
+                notify_seller_credentials(seller, password)
+            except Exception:
+                logger.error(
+                    'Failed to send credentials notification for seller %s',
+                    seller.uuid, exc_info=True
+                )
 
         return {
             'total': len(rows),
