@@ -6,6 +6,7 @@ from django.utils import timezone
 from django_ratelimit.decorators import ratelimit
 from app.apps.accounts.forms import TenantRegistrationForm
 from app.apps.accounts.models import Tenant, User
+from app.apps.accounts.plans import is_offered_plan
 from app.apps.audit.utils import log_action
 
 
@@ -61,7 +62,7 @@ def signup_view(request):
     else:
         initial = {}
         requested_plan = request.GET.get('plano', '').upper()
-        if requested_plan in dict(Tenant.Plan.choices):
+        if is_offered_plan(requested_plan):
             initial['plan'] = requested_plan
         requested_cycle = request.GET.get('ciclo', '').upper()
         if requested_cycle in ('MONTHLY', 'YEARLY'):
