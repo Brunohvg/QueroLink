@@ -306,7 +306,6 @@ class SellerImportSerializer(serializers.Serializer):
         request = self.context['request']
         tenant = request.user.tenant
 
-        pending, errors = self._build_import_plan(rows, tenant)
         created = []
         credentials = []
         used_usernames = set()
@@ -314,6 +313,7 @@ class SellerImportSerializer(serializers.Serializer):
         try:
             with transaction.atomic():
                 locked_tenant = Tenant.objects.select_for_update().get(pk=tenant.pk)
+                pending, errors = self._build_import_plan(rows, locked_tenant)
                 ensure_seller_capacity(locked_tenant, requested=len(pending))
 
                 for item in pending:
