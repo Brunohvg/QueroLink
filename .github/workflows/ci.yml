@@ -68,8 +68,6 @@ jobs:
           if [ "$code" -ne 0 ]; then
             echo "Django test failure summary:"
             grep -E '^(ERROR|FAIL):|^Ran |^FAILED \(' test-output.log || true
-            echo "Last 80 log lines:"
-            tail -n 80 test-output.log
           fi
           exit "$code"
 
