@@ -5,7 +5,7 @@ from app.apps.accounts.plans import offered_plan_choices
 
 
 class UpgradeSerializer(serializers.Serializer):
-    plan = serializers.ChoiceField(choices=offered_plan_choices)
+    plan = serializers.ChoiceField(choices=offered_plan_choices())
     billing_cycle = serializers.ChoiceField(
         choices=[('MONTHLY', 'Mensal'), ('YEARLY', 'Anual')],
     )
