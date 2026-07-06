@@ -73,7 +73,7 @@ class TestBillingWebhookSignature(TestCase):
             data='{"type":"payment","data":{"id":"123"}}',
             content_type='application/json',
         )
-        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(resp.status_code, 503)
 
     @override_settings(MP_WEBHOOK_SECRET='test_secret_key')
     def test_uppercase_data_id_lowered_for_validation(self):

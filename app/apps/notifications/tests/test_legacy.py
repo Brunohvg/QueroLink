@@ -70,12 +70,9 @@ class TestDailyReminder(BaseDailyReminderTest):
             seller=self.seller,
             event_type=MessageTemplate.EventType.DAILY_REMINDER,
         )
-        seller2_notifications = Notification.objects.filter(
-            seller=self.seller2,
-            event_type=MessageTemplate.EventType.DAILY_REMINDER,
-        )
         self.assertEqual(seller_notifications.count(), 0)
-        self.assertEqual(seller2_notifications.count(), 1)
+        mock_create.assert_called_once()
+        self.assertEqual(mock_create.call_args.kwargs['seller'], self.seller2)
 
     @patch('app.apps.notifications.tasks.send_whatsapp_notification')
     @patch('app.apps.notifications.tasks.create_and_send_notification')
