@@ -61,7 +61,17 @@ jobs:
           DJANGO_SETTINGS_MODULE: app.config.settings.local
           SECRET_KEY: ci-test-secret-key-not-for-production
           REDIS_URL: redis://localhost:6379/0
-        run: python manage.py test -v2 --buffer
+        run: |
+          set +e
+          python manage.py test -v2 --buffer > test-output.log 2>&1
+          code=$?
+          if [ "$code" -ne 0 ]; then
+            echo "Django test failure summary:"
+            grep -E '^(ERROR|FAIL):|^Ran |^FAILED \(' test-output.log || true
+            echo "Last 80 log lines:"
+            tail -n 80 test-output.log
+          fi
+          exit "$code"
 
   frontend:
     runs-on: ubuntu-latest
