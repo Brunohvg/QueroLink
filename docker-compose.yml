@@ -87,8 +87,6 @@ services:
     depends_on:
       querolink-redis:
         condition: service_healthy
-      web:
-        condition: service_healthy
     healthcheck:
       test: ["CMD", "celery", "-A", "app.config", "inspect", "ping", "-d", "celery@$$HOSTNAME"]
       interval: 30s
@@ -123,8 +121,6 @@ services:
       - REDIS_URL=redis://:${REDIS_PASSWORD:-}@querolink-redis:6379/0
     depends_on:
       querolink-redis:
-        condition: service_healthy
-      web:
         condition: service_healthy
     deploy:
       replicas: 1
