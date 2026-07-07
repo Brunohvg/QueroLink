@@ -20,7 +20,7 @@ def _get_correios_options(tenant, cep_destino_digits, weight_grams):
                 options = CorreiosPricingClient(
                     token=token,
                     contrato=tenant.correios_contrato or '',
-                    cartao=tenant.correios_cartao or '',
+                    dr=token.get('_resolved_dr', '') if isinstance(token, dict) else '',
                 ).calculate_batch(
                     cep_origem=''.join(filter(str.isdigit, tenant.store_cep or '')),
                     cep_destino=cep_destino_digits,
@@ -141,10 +141,22 @@ def freight_test_cws_view(request):
         return JsonResponse({'ok': False, 'error': 'Credenciais dos Correios nao configuradas.'}, status=400)
 
     try:
-        from .correios_cws import CorreiosAuthClient
+        from .correios_cws import CorreiosAuthClient, CorreiosPricingClient
         token = CorreiosAuthClient().get_token(tenant)
         if token:
-            return JsonResponse({'ok': True})
+            cep_origem = ''.join(filter(str.isdigit, tenant.store_cep or '')) or '01001000'
+            client = CorreiosPricingClient(
+                token=token,
+                contrato=tenant.correios_contrato or '',
+                dr=token.get('_resolved_dr', '') if isinstance(token, dict) else '',
+            )
+            options = client.calculate_batch(cep_origem, cep_origem, 300)
+            valid = [o for o in options if not o.error and o.price_cents > 0]
+            if valid:
+                sedex = next((o for o in valid if o.service == '03220'), valid[0])
+                return JsonResponse({'ok': True, 'price_cents': sedex.price_cents, 'label': sedex.label})
+            msg = '; '.join(client.last_errors) or 'cotacao sem retorno'
+            return JsonResponse({'ok': False, 'error': f'Token OK, mas a cotacao falhou: {msg}.'})
         return JsonResponse({'ok': False, 'error': 'Credenciais invalidas.'})
     except Exception as e:
         logger.warning('test-cws falhou para tenant %s: %s', tenant.pk, e)

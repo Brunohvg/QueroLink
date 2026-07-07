@@ -11,15 +11,16 @@ logger = logging.getLogger(__name__)
 
 TOKEN_URL = 'https://api.correios.com.br/token/v1/autentica'
 TOKEN_URL_CARTAO = 'https://api.correios.com.br/token/v1/autentica/cartaopostagem'
+MEU_CONTRATO_URL = 'https://api.correios.com.br/meucontrato/v1'
 PRICE_URL = 'https://api.correios.com.br/preco/v1/nacional'
 DEADLINE_URL = 'https://api.correios.com.br/prazo/v1/nacional'
 
 DEFAULT_PRODUCTS = ['03298', '03220']
 PRODUCT_LABELS = {'03298': 'PAC', '03220': 'SEDEX'}
 DEFAULT_DIMENSIONS = {
-    'psAltura': 20,
-    'psLargura': 20,
-    'psComprimento': 20,
+    'comprimento': '20',
+    'largura': '20',
+    'altura': '20',
 }
 
 
@@ -43,6 +44,9 @@ class CorreiosAuthClient:
                     ttl = 300
             else:
                 ttl = 300
+            dr = self._resolve_dr(tenant, token)
+            if isinstance(token, dict):
+                token['_resolved_dr'] = dr
             cache.set(cache_key, token, timeout=ttl)
         return token
 
@@ -82,13 +86,75 @@ class CorreiosAuthClient:
             logger.warning('Correios CWS auth failed for tenant %s: %s', tenant.pk, e)
             return None
 
+    def _resolve_dr(self, tenant, token: dict) -> str:
+        dr = self._extract_dr_from_token(token)
+        if dr:
+            return dr
+
+        contrato = tenant.correios_contrato or ''
+        cnpj = ''.join(filter(str.isdigit, tenant.cnpj or ''))
+        bearer = token.get('token') if isinstance(token, dict) else ''
+        if contrato and cnpj and bearer:
+            dr = self._fetch_dr_from_contract(tenant, bearer, cnpj, contrato)
+            if dr:
+                return dr
+
+        if contrato:
+            logger.warning('Correios CWS: nuDR nao resolvido para tenant %s; enviando apenas nuContrato', tenant.pk)
+        return ''
+
+    def _extract_dr_from_token(self, token: dict) -> str:
+        if not isinstance(token, dict):
+            return ''
+
+        # A resposta do token por cartao pode trazer a DR no bloco cartaoPostagem.
+        # Mantemos aliases vistos na documentacao CWS/Meu Contrato para tolerar variacao do Swagger.
+        candidates = [
+            token.get('cartaoPostagem', {}).get('dr') if isinstance(token.get('cartaoPostagem'), dict) else None,
+            token.get('cartaoPostagem', {}).get('nuDR') if isinstance(token.get('cartaoPostagem'), dict) else None,
+            token.get('cartaoPostagem', {}).get('nuSe') if isinstance(token.get('cartaoPostagem'), dict) else None,
+            token.get('contrato', {}).get('dr') if isinstance(token.get('contrato'), dict) else None,
+            token.get('contrato', {}).get('nuDR') if isinstance(token.get('contrato'), dict) else None,
+            token.get('contrato', {}).get('nuSe') if isinstance(token.get('contrato'), dict) else None,
+            token.get('dr'),
+            token.get('nuDR'),
+            token.get('nuSe'),
+        ]
+        for value in candidates:
+            if value not in (None, ''):
+                return str(value)
+        return ''
+
+    def _fetch_dr_from_contract(self, tenant, bearer: str, cnpj: str, contrato: str) -> str:
+        try:
+            resp = requests.get(
+                f'{MEU_CONTRATO_URL}/empresas/{cnpj}/contratos/{contrato}',
+                headers={
+                    'Authorization': f'Bearer {bearer}',
+                    'Accept': 'application/json',
+                },
+                timeout=10,
+            )
+            resp.raise_for_status()
+            payload = resp.json()
+            if isinstance(payload, dict) and payload.get('nuSe') not in (None, ''):
+                return str(payload.get('nuSe'))
+        except Exception as e:
+            logger.warning('Correios CWS: falha ao resolver nuDR via Meu Contrato para tenant %s: %s', tenant.pk, e)
+        return ''
+
 
 class CorreiosPricingClient:
 
-    def __init__(self, token: dict, contrato: str = '', cartao: str = ''):
+    def __init__(self, token: dict, contrato: str = '', dr: str = ''):
         self._token = token
         self._contrato = contrato
-        self._cartao = cartao
+        self._dr = dr or (token.get('_resolved_dr', '') if isinstance(token, dict) else '')
+        self._last_errors = []
+
+    @property
+    def last_errors(self) -> list[str]:
+        return list(self._last_errors)
 
     @property
     def _bearer(self) -> str | None:
@@ -106,6 +172,7 @@ class CorreiosPricingClient:
 
     def calculate_batch(self, cep_origem: str, cep_destino: str,
                         peso_gramas: int) -> list[FreightOption]:
+        self._last_errors = []
         if not self._bearer:
             return []
 
@@ -122,9 +189,10 @@ class CorreiosPricingClient:
                     'cepOrigem': cep_origem,
                     'cepDestino': cep_destino,
                     'psObjeto': peso_str,
+                    'tpObjeto': '2',
                     **DEFAULT_DIMENSIONS,
                     **({'nuContrato': self._contrato} if self._contrato else {}),
-                    **({'nuDR': self._cartao} if self._cartao else {}),
+                    **({'nuDR': self._dr} if self._dr else {}),
                 }
                 for p in co_produtos
             ],
@@ -132,13 +200,13 @@ class CorreiosPricingClient:
 
         deadline_payload = {
             'idLote': id_lote,
-            'parametrosProduto': [
+            'parametrosPrazo': [
                 {
                     'coProduto': p,
                     'nuRequisicao': f'prazo-{p}',
                     'cepOrigem': cep_origem,
                     'cepDestino': cep_destino,
-                    'dtEvento': datetime.now(dt_timezone.utc).strftime('%d-%m-%Y'),
+                    'dataPostagem': datetime.now(dt_timezone.utc).strftime('%Y-%m-%d'),
                 }
                 for p in co_produtos
             ],
@@ -146,6 +214,7 @@ class CorreiosPricingClient:
 
         prices = self._fetch(PRICE_URL, price_payload)
         deadlines = self._fetch(DEADLINE_URL, deadline_payload)
+        self._last_errors.extend(self._extract_errors(prices))
 
         price_map = {}
         for item in prices:
@@ -193,7 +262,21 @@ class CorreiosPricingClient:
         try:
             resp = requests.post(url, json=payload, headers=self._headers, timeout=10)
             resp.raise_for_status()
-            return resp.json()
+            data = resp.json()
+            if isinstance(data, list):
+                return data
+            if isinstance(data, dict):
+                return [data]
+            return []
         except Exception as e:
             logger.warning('CWS fetch failed for %s: %s', url, e)
             return []
+
+    def _extract_errors(self, items):
+        errors = []
+        for item in items:
+            for key in ('msgErro', 'txErro'):
+                msg = item.get(key, '')
+                if msg:
+                    errors.append(str(msg))
+        return errors
