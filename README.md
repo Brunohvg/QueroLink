@@ -1,8 +1,26 @@
-# V-Com — Gestão de Comissões
+# Mérito by Vidalys
+
+Gestão de comissões para equipes de vendas no varejo físico.
 
 Sistema multi-tenant para gestão de links de pagamento (Pagar.me) e comissões de vendedores. Inclui PWA para vendedores e dashboard administrativo completo.
 
 **Em produção:** `querolink.lojabibelo.com.br` — Tenant: Loja Bibelô
+
+---
+
+## Funcionalidades principais
+
+- **Vendedores:** cadastro individual ou importação CSV/XLSX com convite via WhatsApp.
+- **Links de pagamento:** criação via Pagar.me v5 com link público por tenant.
+- **Vendas manuais:** lançamento pelo vendedor via PWA mobile.
+- **Comissões:** períodos mensais, fechamento, ajustes, pagamento e exportação contábil (CSV/XLSX/PDF).
+- **Billing:** planos STARTER, PRO e BUSINESS com assinatura via Mercado Pago.
+- **Notificações:** WhatsApp (Evolution API), push web, lembretes diários e e-mails de ciclo de vida.
+- **Frete:** cotação oficial Correios CWS (PAC/SEDEX) com fallback estimado.
+- **Backup automático:** diário às 02:00, pg_dump → Google Drive via rclone (R$ 0).
+- **Webhooks:** Pagar.me e Mercado Pago com idempotência, dedup e retry.
+- **Gestor:** dashboard com métricas, ranking, configurações e histórico de pagamentos.
+- **Financeiro:** fila de aprovação e exportação contábil.
 
 ---
 
@@ -24,7 +42,30 @@ Sistema multi-tenant para gestão de links de pagamento (Pagar.me) e comissões 
 
 ---
 
-## Início rápido
+## Arquitetura
+
+Aplicação multi-tenant por `Tenant`, com isolamento lógico em todos os models. Usuários possuem roles (ADMIN, MANAGER, FINANCEIRO, SELLER) vinculadas ao tenant.
+
+```
+┌────────────────────────────────────────────┐
+│  Templates Django + Alpine.js + Tailwind   │
+├────────────────────────────────────────────┤
+│  Django REST Framework (API autenticada)   │
+├──────────┬──────────┬──────────┬───────────┤
+│ accounts │ sellers  │  sales   │commissions│
+│  orders  │ payments │ webhooks │notifications│
+│  billing │ freight  │  audit   │ dashboard │
+├──────────┴──────────┴──────────┴───────────┤
+│  PostgreSQL  │  Redis  │  Celery Worker    │
+│  rclone/GDrive │ Celery Beat │ Gunicorn   │
+└────────────────────────────────────────────┘
+```
+
+Integrações externas: Pagar.me (links de pagamento), Mercado Pago (assinaturas), Evolution API (WhatsApp), Correios CWS (frete).
+
+---
+
+## Instalação local
 
 ```bash
 python3 -m venv .venv && source .venv/bin/activate
@@ -58,6 +99,43 @@ make down          # Parar containers
 make logs          # Logs Docker
 make clean         # Limpar pycache
 ```
+
+---
+
+## Execução de testes
+
+```bash
+make test
+```
+
+O comando executa a suíte completa via `python manage.py test app.apps.sellers app.apps.notifications app.apps.dashboard app.apps.api app.apps.commissions -v2`.
+
+---
+
+## Build CSS
+
+```bash
+make build-css
+```
+
+Compila o Tailwind CSS a partir de `static/css/tailwind.css` usando `npm run build:css`.
+
+---
+
+## Variáveis principais
+
+| Variável | Obrigatória | Descrição |
+|----------|:---:|-----------|
+| `SECRET_KEY` | Sim | Chave secreta Django |
+| `DATABASE_URL` | Sim | `postgres://user:pass@host:5432/db` |
+| `FERNET_KEY` | Sim | Chave de criptografia (gere com `python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"`) |
+| `REDIS_URL` | Sim | `redis://host:6379/0` |
+| `SERVICE_FQDN_WEB` | Sim | Domínio público (ex: `querolink.lojabibelo.com.br`) |
+| `API_KEY_PAGAR_ME` | Sim | Chave da API Pagar.me (raw `sk_*` ou base64) |
+| `WHATSAPP_API_KEY` | WhatsApp | Token Evolution API |
+| `WHATSAPP_INSTANCE` | WhatsApp | Nome da instância |
+| `SEED_ON_START` | Não | `true` para popular banco no boot |
+| `JWT_ACCESS_TOKEN_LIFETIME_MINUTES` | Não | Default 30 |
 
 ---
 
@@ -96,21 +174,6 @@ docker exec -it <container-web> ./scripts/setup-rclone.sh
 # Eventos: charge.paid, charge.payment_failed, charge.refunded, charge.chargedback
 # Para autenticação, configure usuário/senha no painel de configurações do tenant
 ```
-
-### Variáveis de ambiente críticas
-
-| Variável | Obrigatória | Descrição |
-|----------|:---:|-----------|
-| `SECRET_KEY` | ✅ | Chave secreta Django |
-| `DATABASE_URL` | ✅ | `postgres://user:pass@host:5432/db` |
-| `FERNET_KEY` | ✅ | Chave de criptografia (gere com `python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"`) |
-| `REDIS_URL` | ✅ | `redis://host:6379/0` |
-| `SERVICE_FQDN_WEB` | ✅ | Domínio público (ex: `querolink.lojabibelo.com.br`) |
-| `API_KEY_PAGAR_ME` | ✅ | Chave da API Pagar.me (raw `sk_*` ou base64) |
-| `API_KEY_INSTANCIA` | WhatsApp | Token Evolution API |
-| `INSTANCE` | WhatsApp | Nome da instância |
-| `SEED_ON_START` | Opcional | `true` para popular banco no boot |
-| `JWT_ACCESS_TOKEN_LIFETIME_MINUTES` | Opcional | Default 30 |
 
 ### Serviços Docker
 
@@ -335,6 +398,7 @@ python manage.py reset_seller_password <seller_uuid>
 | `PRD_QUEROLINK_COMISSOES.md` | PRD completo com especificação de todos os lotes |
 | `API.md` | Documentação detalhada da API REST |
 | `READINESS_REPORT.md` | Relatório de prontidão para produção |
+| `CONTEXTO_MERITO.md` | Contexto do projeto e estado atual |
 
 ---
 
@@ -348,4 +412,6 @@ python manage.py reset_seller_password <seller_uuid>
 
 ---
 
-Desenvolvido por Bruno Vidal para Loja Bibelô.
+## Propriedade intelectual
+
+Desenvolvido por Bruno Vidal para Loja Bibelô. Todos os direitos reservados.

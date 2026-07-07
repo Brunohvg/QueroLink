@@ -1,4 +1,4 @@
-# PRD — V-Com / QueroLink Sistema de Comissões
+# PRD — Mérito by Vidalys — Sistema de Comissões
 
 > **Status geral:** ✅ PRODUÇÃO — Lotes 1 a 7 implementados. Sistema estabilizado.
 > **Versão:** 2.1.0 | **Última atualização:** 2026-07-01
