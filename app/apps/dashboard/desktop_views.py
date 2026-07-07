@@ -269,10 +269,24 @@ def gestor_configuracoes(request):
 
         if request.POST.get('test_cws') == '1' and tenant.correios_cws_enabled:
             try:
-                from app.apps.freight.correios_cws import CorreiosAuthClient
+                from app.apps.freight.correios_cws import CorreiosAuthClient, CorreiosPricingClient
                 token = CorreiosAuthClient().get_token(tenant)
                 if token:
-                    messages.success(request, 'Conexao com os Correios estabelecida com sucesso.')
+                    cep_origem = ''.join(filter(str.isdigit, tenant.store_cep or '')) or '01001000'
+                    client = CorreiosPricingClient(
+                        token=token,
+                        contrato=tenant.correios_contrato or '',
+                        dr=token.get('_resolved_dr', '') if isinstance(token, dict) else '',
+                    )
+                    options = client.calculate_batch(cep_origem, cep_origem, 300)
+                    valid = [o for o in options if not o.error and o.price_cents > 0]
+                    if valid:
+                        sedex = next((o for o in valid if o.service == '03220'), valid[0])
+                        valor = f'{sedex.price_cents / 100:.2f}'.replace('.', ',')
+                        messages.success(request, f'Correios conectado — cotação oficial funcionando (SEDEX R$ {valor}).')
+                    else:
+                        msg = '; '.join(client.last_errors) or 'cotacao sem retorno'
+                        messages.warning(request, f'Token OK, mas a cotação falhou: {msg}. Verifique contrato/cartão.')
                 else:
                     messages.error(request, 'Falha na conexao: credenciais invalidas. Verifique usuario e codigo de acesso.')
             except Exception:
