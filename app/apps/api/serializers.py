@@ -2,7 +2,7 @@ from datetime import date
 import logging
 
 from rest_framework import serializers
-from django.db import transaction
+from django.db import IntegrityError, transaction
 from django.utils import timezone
 
 from app.apps.sales.models import Sale
@@ -18,6 +18,39 @@ from app.apps.accounts.validators import clean_phone, validate_phone_br
 from app.apps.accounts.fields import compute_hash
 
 logger = logging.getLogger(__name__)
+
+
+def _create_unique_seller_user(tenant, seller_name, used_usernames=None):
+    used_usernames = used_usernames if used_usernames is not None else set()
+    base = slugify(seller_name) or 'seller'
+    n = 1
+
+    for _attempt in range(10):
+        username = base if n == 1 else f'{base}-{n}'
+        while username in used_usernames or User.objects.filter(username=username).exists():
+            n += 1
+            username = f'{base}-{n}'
+
+        password = get_random_string(12)
+        try:
+            with transaction.atomic():
+                user = User.objects.create_user(
+                    username=username,
+                    password=password,
+                    role=User.Role.SELLER,
+                    tenant=tenant,
+                )
+        except IntegrityError:
+            used_usernames.add(username)
+            n += 1
+            continue
+
+        used_usernames.add(username)
+        return user, username, password
+
+    raise serializers.ValidationError({
+        'detail': 'Nao foi possivel gerar um username unico para o vendedor.',
+    })
 
 
 class SellerSerializer(serializers.ModelSerializer):
@@ -106,24 +139,13 @@ class SellerCreateSerializer(serializers.Serializer):
         request = self.context['request']
         tenant = request.user.tenant
 
-        base = slugify(validated_data['name'])
-        username = base
-        n = 2
-        while User.objects.filter(username=username).exists():
-            username = f"{base}-{n}"
-            n += 1
-
-        password = get_random_string(12)
-
         try:
             with transaction.atomic():
                 locked_tenant = Tenant.objects.select_for_update().get(pk=tenant.pk)
                 ensure_seller_capacity(locked_tenant, requested=1)
-                user = User.objects.create_user(
-                    username=username,
-                    password=password,
-                    role=User.Role.SELLER,
-                    tenant=locked_tenant,
+                user, username, password = _create_unique_seller_user(
+                    locked_tenant,
+                    validated_data['name'],
                 )
 
                 seller = Seller.objects.create(
@@ -317,20 +339,10 @@ class SellerImportSerializer(serializers.Serializer):
                 ensure_seller_capacity(locked_tenant, requested=len(pending))
 
                 for item in pending:
-                    base = slugify(item['name'])
-                    username = base
-                    n = 2
-                    while (username in used_usernames or
-                           User.objects.filter(username=username).exists()):
-                        username = f'{base}-{n}'
-                        n += 1
-
-                    password = get_random_string(12)
-                    user = User.objects.create_user(
-                        username=username,
-                        password=password,
-                        role=User.Role.SELLER,
-                        tenant=locked_tenant,
+                    user, username, password = _create_unique_seller_user(
+                        locked_tenant,
+                        item['name'],
+                        used_usernames,
                     )
                     seller = Seller.objects.create(
                         tenant=locked_tenant,

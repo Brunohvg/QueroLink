@@ -1,9 +1,10 @@
 import json
 from datetime import datetime
 from decimal import Decimal
+from concurrent.futures import ThreadPoolExecutor
 from unittest.mock import patch
 
-from django.test import TestCase, override_settings
+from django.test import Client, TestCase, TransactionTestCase, override_settings
 from django.utils import timezone
 
 from app.apps.accounts.models import Tenant, User
@@ -230,6 +231,79 @@ class TestWebhookAuth(TestCase):
         )
         self.assertEqual(resp.status_code, 200)
         self.assertTrue(WebhookEvent.objects.filter(tenant=self.tenant).exists())
+
+
+class TestWebhookIdempotency(TransactionTestCase):
+    def setUp(self):
+        self.tenant = Tenant.objects.create(
+            company_name='Idempotency Test',
+            slug='idempotency-test',
+            is_active=True,
+        )
+        self.url = f'/api/webhooks/pagarme/{self.tenant.slug}/'
+
+    def _post(self, payload):
+        return Client().post(
+            self.url,
+            data=json.dumps(payload),
+            content_type='application/json',
+        )
+
+    @override_settings(WEBHOOK_AUTH_REQUIRED=False)
+    @patch('app.apps.webhooks.tasks.process_pagarme_webhook.delay')
+    def test_duplicate_event_keeps_original_payload(self, mock_process):
+        first_payload = {'id': 'evt_duplicate', 'type': 'order.paid', 'data': {'id': 'or_1'}}
+        second_payload = {'id': 'evt_duplicate', 'type': 'order.paid', 'data': {'id': 'or_2'}}
+
+        first = self._post(first_payload)
+        second = self._post(second_payload)
+
+        self.assertEqual(first.status_code, 200)
+        self.assertEqual(first.json()['status'], 'received')
+        self.assertEqual(second.status_code, 200)
+        self.assertEqual(second.json()['status'], 'duplicate')
+        self.assertEqual(
+            WebhookEvent.objects.filter(gateway_event_id='evt_duplicate').count(),
+            1,
+        )
+        event = WebhookEvent.objects.get(gateway_event_id='evt_duplicate')
+        self.assertEqual(event.payload['data']['id'], 'or_1')
+        self.assertEqual(mock_process.call_count, 1)
+
+    @override_settings(WEBHOOK_AUTH_REQUIRED=False)
+    @patch('app.apps.webhooks.tasks.process_pagarme_webhook.delay')
+    def test_concurrent_duplicate_requests_create_one_event(self, mock_process):
+        payload = {'id': 'evt_concurrent', 'type': 'order.paid', 'data': {'id': 'or_1'}}
+
+        with ThreadPoolExecutor(max_workers=2) as executor:
+            responses = list(executor.map(lambda _i: self._post(payload), range(2)))
+
+        self.assertEqual(sorted(response.status_code for response in responses), [200, 200])
+        self.assertEqual(
+            WebhookEvent.objects.filter(gateway_event_id='evt_concurrent').count(),
+            1,
+        )
+        self.assertEqual(mock_process.call_count, 1)
+
+    @override_settings(WEBHOOK_AUTH_REQUIRED=False)
+    @patch('app.apps.webhooks.tasks.process_pagarme_webhook.delay')
+    def test_event_without_external_id_is_accepted_without_integrity_error(self, mock_process):
+        payload = {'type': 'connection.test', 'data': {'id': 'internal-only'}}
+
+        first = self._post(payload)
+        second = self._post(payload)
+
+        self.assertEqual(first.status_code, 200)
+        self.assertEqual(second.status_code, 200)
+        self.assertEqual(
+            WebhookEvent.objects.filter(
+                tenant=self.tenant,
+                gateway='pagarme',
+                gateway_event_id__isnull=True,
+            ).count(),
+            2,
+        )
+        self.assertEqual(mock_process.call_count, 2)
 
 
 class TestReconcilePendingOrders(BaseWebhookTest):

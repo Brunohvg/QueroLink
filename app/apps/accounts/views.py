@@ -44,6 +44,8 @@ def signup_view(request):
                     role=User.Role.ADMIN,
                     tenant=tenant,
                 )
+                from app.apps.notifications.services import ensure_default_message_templates
+                ensure_default_message_templates(tenant)
 
             user = authenticate(request, username=email, password=form.cleaned_data['password'])
             if user is not None:

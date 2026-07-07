@@ -2,7 +2,9 @@ import json
 import hmac
 import hashlib
 import logging
+import time
 
+from django.db import IntegrityError, OperationalError, transaction
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 
@@ -10,6 +12,34 @@ from app.apps.webhooks.models import WebhookEvent
 from app.apps.accounts.fields import scrub_payment_payload
 
 logger = logging.getLogger(__name__)
+
+
+def _get_or_create_webhook_event(gateway, payload, gateway_event_id=None, tenant=None):
+    if not gateway_event_id:
+        return WebhookEvent.objects.create(
+            gateway=gateway,
+            payload=payload,
+            gateway_event_id=None,
+            tenant=tenant,
+        ), True
+
+    for attempt in range(3):
+        try:
+            with transaction.atomic():
+                return WebhookEvent.objects.get_or_create(
+                    gateway_event_id=gateway_event_id,
+                    defaults={
+                        'gateway': gateway,
+                        'payload': payload,
+                        'tenant': tenant,
+                    },
+                )
+        except (IntegrityError, OperationalError):
+            if attempt == 2:
+                raise
+            time.sleep(0.05)
+
+    return WebhookEvent.objects.get(gateway_event_id=gateway_event_id), False
 
 
 def _verify_webhook_token(tenant_uuid, token):
@@ -74,17 +104,16 @@ def pagarme_webhook(request, tenant_slug):
 
     sanitized = scrub_payment_payload(payload)
     gateway_event_id = payload.get('id') or ''
-    if gateway_event_id and gateway_event_id.startswith('evt_'):
-        if WebhookEvent.objects.filter(gateway_event_id=gateway_event_id).exists():
-            logger.info("Webhook duplicado ignorado: gateway_event_id=%s", gateway_event_id)
-            return JsonResponse({"status": "duplicate"}, status=200)
-
-    event = WebhookEvent.objects.create(
+    event, created = _get_or_create_webhook_event(
         gateway='pagarme',
         payload=sanitized,
         gateway_event_id=gateway_event_id or None,
         tenant=tenant,
     )
+    if not created:
+        logger.info("Webhook duplicado ignorado: gateway_event_id=%s", gateway_event_id)
+        return JsonResponse({"status": "duplicate"}, status=200)
+
     from app.apps.webhooks.tasks import process_pagarme_webhook
     process_pagarme_webhook.delay(event.id)
     return JsonResponse({"status": "received"}, status=200)
@@ -115,7 +144,7 @@ def evolution_webhook(request, instance_name, tenant_uuid, token):
         elif event_type == 'QRCODE_UPDATE':
             pass
 
-        WebhookEvent.objects.create(
+        _get_or_create_webhook_event(
             gateway='evolution',
             payload={
                 'event': event_type,
@@ -199,11 +228,15 @@ def billing_webhook(request):
 
     logger.info("Billing webhook x-signature OK (data_id=%s)", data_id)
 
-    event = WebhookEvent.objects.create(
+    event, created = _get_or_create_webhook_event(
         gateway='mercadopago',
         payload=payload,
         gateway_event_id=str(payload.get('id', '')) or None,
     )
+    if not created:
+        logger.info("Billing webhook duplicado ignorado: gateway_event_id=%s", event.gateway_event_id)
+        return JsonResponse({"status": "duplicate"}, status=200)
+
     from app.apps.webhooks.tasks import process_billing_webhook
     process_billing_webhook.delay(event.id)
     return JsonResponse({"status": "received"}, status=200)

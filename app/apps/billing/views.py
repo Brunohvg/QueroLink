@@ -119,40 +119,28 @@ class UpgradeSubscriptionView(APIView):
             )
             old_gateway_id = sub.gateway_subscription_id
             pending_cancel_id = old_gateway_id if old_gateway_id and old_gateway_id != new_gateway_id else None
+            keep_current_access = sub.status == Subscription.Status.ACTIVE
             sub.plan = plan
             sub.billing_cycle = billing_cycle
             sub.amount = amount
             sub.gateway_subscription_id = new_gateway_id
             sub.pending_cancel_gateway_subscription_id = pending_cancel_id
-            sub.status = Subscription.Status.PENDING
+            if not keep_current_access:
+                sub.status = Subscription.Status.PENDING
             sub.save(update_fields=[
                 'plan', 'billing_cycle', 'amount', 'gateway_subscription_id',
                 'pending_cancel_gateway_subscription_id', 'status', 'updated_at',
             ])
 
-        cleanup_pending = False
-        if pending_cancel_id:
-            try:
-                gateway.cancel_preapproval(pending_cancel_id)
-                with transaction.atomic():
-                    locked = Subscription.objects.select_for_update().get(pk=sub.pk)
-                    if locked.pending_cancel_gateway_subscription_id == pending_cancel_id:
-                        locked.pending_cancel_gateway_subscription_id = None
-                        locked.save(update_fields=['pending_cancel_gateway_subscription_id', 'updated_at'])
-            except Exception:
-                cleanup_pending = True
-                logger.exception('Erro ao cancelar subscription anterior no Mercado Pago')
-
         cache.delete(f'tenant_operational:{tenant.uuid}')
 
         init_point = result.get('init_point', '')
-        response_status = 'cleanup_pending' if cleanup_pending else sub.status
         return Response({
             'subscription_id': sub.uuid,
             'gateway_id': new_gateway_id,
             'init_point': init_point,
-            'status': response_status,
-            'cleanup_pending': cleanup_pending,
+            'status': sub.status,
+            'cleanup_pending': bool(pending_cancel_id),
         })
 
 

@@ -4,11 +4,12 @@ from unittest.mock import patch
 
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.core.management import call_command
+from django.db import IntegrityError
 from django.test import TestCase, override_settings
 from django.utils import timezone
 
 from app.apps.accounts.forms import TenantRegistrationForm
-from app.apps.accounts.models import Tenant, User
+from app.apps.accounts.models import Tenant, User, tenant_operational
 from app.apps.api.serializers import SaleCreateSerializer
 from app.apps.billing.models import Subscription
 from app.apps.sellers.models import Seller
@@ -137,6 +138,36 @@ class TestPrompt30SellerLimits(TestCase, Prompt30Factories):
         self.assertNotIn('password', body['created'][0])
         self.assertNotIn('password', response.content.decode().lower())
 
+    @override_settings(PLAN_SELLER_LIMITS={'STARTER': 5})
+    @patch('app.apps.notifications.tasks.notify_seller_credentials')
+    def test_seller_create_retries_username_after_integrity_error(self, notify):
+        tenant = self.tenant('seller-username-race', plan=Tenant.Plan.STARTER)
+        self.user(tenant, 'seller-username-manager')
+        self.client.login(username='seller-username-manager', password='test12345')
+        original_create_user = User.objects.create_user
+        attempts = []
+
+        def create_user_with_one_collision(*args, **kwargs):
+            attempts.append(kwargs.get('username'))
+            if len(attempts) == 1:
+                raise IntegrityError('duplicate username')
+            return original_create_user(*args, **kwargs)
+
+        with patch(
+            'app.apps.api.serializers.User.objects.create_user',
+            side_effect=create_user_with_one_collision,
+        ):
+            response = self.client.post(
+                '/api/sellers/',
+                {'name': 'Ana Silva', 'phone': '11977770000'},
+                content_type='application/json',
+            )
+
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(attempts, ['ana-silva', 'ana-silva-2'])
+        self.assertTrue(User.objects.filter(username='ana-silva-2').exists())
+        notify.assert_called_once()
+
 
 class TestPrompt30BillingSafety(TestCase, Prompt30Factories):
     def setUp(self):
@@ -168,7 +199,7 @@ class TestPrompt30BillingSafety(TestCase, Prompt30Factories):
 
     @override_settings(PLAN_PRICES={'PRO': 29700}, MP_ACCESS_TOKEN='test-token')
     @patch('app.apps.billing.views.MercadoPagoGateway')
-    def test_upgrade_cancel_failure_preserves_pending_cleanup(self, gateway_cls):
+    def test_upgrade_pending_keeps_active_tenant_operational_and_defers_old_cancel(self, gateway_cls):
         gateway = gateway_cls.return_value
         gateway.create_preapproval.return_value = {'id': 'new-sub', 'init_point': 'https://mp'}
         gateway.cancel_preapproval.side_effect = MercadoPagoError('timeout', retryable=True)
@@ -187,7 +218,98 @@ class TestPrompt30BillingSafety(TestCase, Prompt30Factories):
         sub = Subscription.objects.get(tenant=self.tenant_obj)
         self.assertEqual(sub.gateway_subscription_id, 'new-sub')
         self.assertEqual(sub.pending_cancel_gateway_subscription_id, 'old-sub')
+        self.assertEqual(sub.status, Subscription.Status.ACTIVE)
+        self.assertTrue(tenant_operational(self.tenant_obj))
         self.assertTrue(response.json()['cleanup_pending'])
+        gateway.cancel_preapproval.assert_not_called()
+
+    @override_settings(PLAN_PRICES={'PRO': 29700}, MP_ACCESS_TOKEN='test-token')
+    @patch('app.apps.billing.views.MercadoPagoGateway')
+    def test_abandoned_upgrade_does_not_remove_active_access(self, gateway_cls):
+        gateway = gateway_cls.return_value
+        gateway.create_preapproval.return_value = {'id': 'new-sub', 'init_point': 'https://mp'}
+        Subscription.objects.create(
+            tenant=self.tenant_obj,
+            plan='STARTER',
+            status=Subscription.Status.ACTIVE,
+            gateway_subscription_id='old-sub',
+        )
+        response = self.client.post(
+            '/api/billing/subscription/upgrade/',
+            {'plan': 'PRO', 'billing_cycle': 'MONTHLY'},
+            content_type='application/json',
+        )
+        self.assertEqual(response.status_code, 200)
+        sub = Subscription.objects.get(tenant=self.tenant_obj)
+        self.assertEqual(sub.status, Subscription.Status.ACTIVE)
+        self.assertEqual(sub.pending_cancel_gateway_subscription_id, 'old-sub')
+        self.assertTrue(tenant_operational(self.tenant_obj))
+        gateway.cancel_preapproval.assert_not_called()
+
+    @patch('app.services.gateway.mercadopago.MercadoPagoGateway')
+    def test_confirmed_new_subscription_cancels_old_subscription(self, gateway_cls):
+        gateway = gateway_cls.return_value
+        gateway.get_preapproval.return_value = {
+            'external_reference': str(self.tenant_obj.uuid),
+            'status': 'authorized',
+        }
+        sub = Subscription.objects.create(
+            tenant=self.tenant_obj,
+            plan='PRO',
+            status=Subscription.Status.ACTIVE,
+            gateway_subscription_id='new-sub',
+            pending_cancel_gateway_subscription_id='old-sub',
+        )
+        event = WebhookEvent.objects.create(
+            gateway='mercadopago',
+            payload={
+                'type': 'subscription_preapproval',
+                'data': {'id': 'new-sub'},
+            },
+        )
+
+        from app.apps.webhooks.tasks import process_billing_webhook
+        with self.captureOnCommitCallbacks(execute=True):
+            process_billing_webhook(event.id)
+
+        sub.refresh_from_db()
+        self.tenant_obj.refresh_from_db()
+        event.refresh_from_db()
+        self.assertEqual(sub.status, Subscription.Status.ACTIVE)
+        self.assertIsNone(sub.pending_cancel_gateway_subscription_id)
+        self.assertEqual(self.tenant_obj.plan, Tenant.Plan.PRO)
+        self.assertTrue(event.processed)
+        gateway.cancel_preapproval.assert_called_once_with('old-sub')
+
+    @patch('app.services.gateway.mercadopago.MercadoPagoGateway')
+    def test_stale_old_subscription_cancel_webhook_does_not_cancel_current_subscription(self, gateway_cls):
+        gateway = gateway_cls.return_value
+        gateway.get_preapproval.return_value = {
+            'external_reference': str(self.tenant_obj.uuid),
+            'status': 'cancelled',
+        }
+        sub = Subscription.objects.create(
+            tenant=self.tenant_obj,
+            plan='PRO',
+            status=Subscription.Status.ACTIVE,
+            gateway_subscription_id='new-sub',
+        )
+        event = WebhookEvent.objects.create(
+            gateway='mercadopago',
+            payload={
+                'type': 'subscription_preapproval',
+                'data': {'id': 'old-sub'},
+            },
+        )
+
+        from app.apps.webhooks.tasks import process_billing_webhook
+        process_billing_webhook(event.id)
+
+        sub.refresh_from_db()
+        event.refresh_from_db()
+        self.assertEqual(sub.status, Subscription.Status.ACTIVE)
+        self.assertTrue(event.processed)
+        self.assertEqual(event.skip_reason, 'stale preapproval')
 
     @patch('app.apps.billing.views.MercadoPagoGateway')
     def test_cancel_remote_error_does_not_change_local_status(self, gateway_cls):

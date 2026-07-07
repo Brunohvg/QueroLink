@@ -1,9 +1,16 @@
+import io
+
+from django.core.management import call_command
 from django.test import TestCase
 from django.core.exceptions import ValidationError
 from app.apps.accounts.models import Tenant, User
 from app.apps.sellers.models import Seller
 from app.apps.commissions.models import CommissionPeriod
 from app.apps.notifications.models import Notification, MessageTemplate
+from app.apps.notifications.services import (
+    DEFAULT_MESSAGE_TEMPLATES,
+    ensure_default_message_templates,
+)
 
 
 class NotificationModelTest(TestCase):
@@ -153,3 +160,60 @@ class MessageTemplateValidationTest(TestCase):
         self.assertIsNotNone(notif)
         self.assertIn("Ola Maria", notif.message_body)
         self.assertIn("maria", notif.message_body)
+
+
+class DefaultMessageTemplateServiceTest(TestCase):
+    def setUp(self):
+        self.tenant = Tenant.objects.create(company_name="Templates", cnpj="55555555555555")
+
+    def test_dry_run_does_not_create_templates(self):
+        summary = ensure_default_message_templates(self.tenant, dry_run=True)
+
+        self.assertEqual(summary['missing'], len(DEFAULT_MESSAGE_TEMPLATES))
+        self.assertEqual(MessageTemplate.objects.filter(tenant=self.tenant).count(), 0)
+
+    def test_apply_creates_missing_templates_once(self):
+        first = ensure_default_message_templates(self.tenant)
+        second = ensure_default_message_templates(self.tenant)
+
+        self.assertEqual(first['created'], len(DEFAULT_MESSAGE_TEMPLATES))
+        self.assertEqual(second['created'], 0)
+        self.assertEqual(second['existing'], len(DEFAULT_MESSAGE_TEMPLATES))
+        self.assertEqual(
+            MessageTemplate.objects.filter(tenant=self.tenant).count(),
+            len(DEFAULT_MESSAGE_TEMPLATES),
+        )
+
+    def test_apply_never_overwrites_custom_template(self):
+        custom_body = "Mensagem customizada {{vendedor}}"
+        MessageTemplate.objects.create(
+            tenant=self.tenant,
+            event_type=MessageTemplate.EventType.SELLER_CREDENTIALS,
+            channel=MessageTemplate.Channel.WHATSAPP,
+            body=custom_body,
+        )
+
+        ensure_default_message_templates(self.tenant)
+
+        template = MessageTemplate.objects.get(
+            tenant=self.tenant,
+            event_type=MessageTemplate.EventType.SELLER_CREDENTIALS,
+            channel=MessageTemplate.Channel.WHATSAPP,
+        )
+        self.assertEqual(template.body, custom_body)
+
+    def test_backfill_command_dry_run_and_apply(self):
+        dry_run_output = io.StringIO()
+        call_command('backfill_message_templates', '--dry-run', stdout=dry_run_output)
+
+        self.assertIn('Dry run concluido', dry_run_output.getvalue())
+        self.assertEqual(MessageTemplate.objects.filter(tenant=self.tenant).count(), 0)
+
+        apply_output = io.StringIO()
+        call_command('backfill_message_templates', '--apply', stdout=apply_output)
+
+        self.assertIn('Backfill concluido', apply_output.getvalue())
+        self.assertEqual(
+            MessageTemplate.objects.filter(tenant=self.tenant).count(),
+            len(DEFAULT_MESSAGE_TEMPLATES),
+        )
