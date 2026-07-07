@@ -4,6 +4,7 @@ from decimal import Decimal
 from concurrent.futures import ThreadPoolExecutor
 from unittest.mock import patch
 
+from django.db import connections
 from django.test import Client, TestCase, TransactionTestCase, override_settings
 from django.utils import timezone
 
@@ -361,8 +362,14 @@ class TestWebhookIdempotency(TransactionTestCase):
     def test_concurrent_duplicate_requests_create_one_event(self, mock_process):
         payload = {'id': 'evt_concurrent', 'type': 'order.paid', 'data': {'id': 'or_1'}}
 
+        def post_and_close(_i):
+            try:
+                return self._post(payload)
+            finally:
+                connections.close_all()
+
         with ThreadPoolExecutor(max_workers=2) as executor:
-            responses = list(executor.map(lambda _i: self._post(payload), range(2)))
+            responses = list(executor.map(post_and_close, range(2)))
 
         self.assertEqual(sorted(response.status_code for response in responses), [200, 200])
         self.assertEqual(
