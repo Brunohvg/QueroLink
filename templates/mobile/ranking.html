@@ -1,0 +1,136 @@
+{% extends 'mobile/base_mobile.html' %}
+{% load currency_filters %}
+{% block title %}Ranking — Mérito{% endblock %}
+{% block content %}
+<div class="space-y-4 fade-up pb-20">
+
+  <div class="mb-2">
+    <h1 class="font-display text-[22px] font-bold text-gray-900">Ranking</h1>
+    <p class="text-[13px] text-gray-500 mt-0.5">{{ current_month }}</p>
+  </div>
+
+  {% if seller_pos %}
+  <div class="relative overflow-hidden rounded-2xl p-6 text-white" style="background: linear-gradient(135deg, #111827, #1E293B);">
+    <div class="absolute top-2 right-3 flex items-center gap-1">
+      <span class="w-2 h-2 rounded-sm bg-brand-500"></span>
+      <span class="w-2 h-2 rounded-sm bg-blue-400"></span>
+      <span class="w-1.5 h-1.5 rounded-sm bg-accent"></span>
+    </div>
+    <div class="relative">
+      <p class="text-[11px] font-semibold text-gray-400 uppercase tracking-[0.08em] mb-1">Sua posicao</p>
+      <p class="font-display text-[40px] font-bold leading-none tracking-tight">#{{ seller_pos }}</p>
+      <p class="text-[13px] text-gray-400 mt-2">
+        de {{ total_sellers }} vendedor{{ total_sellers|pluralize:"es" }} neste mes
+      </p>
+    </div>
+  </div>
+  {% else %}
+  <div class="bg-white rounded-2xl p-6 card-shadow text-center">
+    <div class="w-12 h-12 rounded-2xl bg-gray-100 flex items-center justify-center mx-auto mb-3">
+      <svg class="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"/></svg>
+    </div>
+    <p class="text-[14px] font-medium text-gray-700 mb-1">Voce ainda nao pontuou este mes.</p>
+    <p class="text-[12px] text-gray-400">Lance sua primeira venda!</p>
+  </div>
+  {% endif %}
+
+  {% if not visible_to_sellers and seller_pos %}
+  <div class="bg-white rounded-2xl p-5 card-shadow">
+    <p class="text-[11px] font-semibold text-gray-400 uppercase tracking-wider mb-2">Seu mes</p>
+    <div class="flex items-center justify-between">
+      <div>
+        <p class="text-[12px] text-gray-500">Total vendido</p>
+        <p class="font-display text-[20px] font-bold text-gray-900">{{ my_total|brl }}</p>
+      </div>
+      <div class="text-right">
+        <p class="text-[12px] text-gray-500">Comissao estimada</p>
+        <p class="font-display text-[20px] font-bold text-emerald-600">{{ my_estimated_commission|brl }}</p>
+      </div>
+    </div>
+    <a href="{% url 'dashboard:mobile_meu_desempenho' %}" class="inline-flex items-center gap-1 mt-3 text-[12px] font-medium text-brand-600 hover:text-brand-700">
+      Ver desempenho completo
+      <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"/></svg>
+    </a>
+  </div>
+
+  {% if goal and goal_progress is not None %}
+  <div class="bg-white rounded-2xl p-5 card-shadow">
+    <div class="flex items-center justify-between mb-2">
+      <p class="text-[11px] font-semibold text-gray-400 uppercase tracking-wider">META DO MES</p>
+      <p class="font-display text-[15px] font-bold {% if goal_progress >= 100 %}text-emerald-600{% else %}text-brand-500{% endif %}">{{ goal_progress }}%</p>
+    </div>
+    <div class="h-2.5 rounded-full bg-gray-100 mb-2 overflow-hidden">
+      <div class="h-full rounded-full transition-all duration-500" style="width: {% if goal_progress > 100 %}100{% else %}{{ goal_progress }}{% endif %}%; background: linear-gradient(90deg, #1463FF, #15CFEA);"></div>
+    </div>
+    <div class="flex items-center justify-between text-[12px]">
+      <span class="text-gray-600 font-medium">{{ combined_month_total|brl }} de {{ goal.target_amount|brl }}</span>
+      <span class="font-semibold {% if goal_progress >= 100 %}text-emerald-600{% else %}text-brand-600{% endif %}">
+        {% if goal_progress >= 100 %}Meta batida! 🎉{% else %}Faltam {{ goal_remaining|brl }}{% endif %}
+      </span>
+    </div>
+  </div>
+  {% endif %}
+
+  <div class="bg-white rounded-2xl p-5 card-shadow">
+    <div class="flex items-center gap-2 mb-3">
+      <svg class="w-5 h-5 text-amber-500" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/></svg>
+      <p class="text-[13px] font-semibold text-gray-800">Dicas para subir no ranking</p>
+    </div>
+    <ul class="space-y-2">
+      {% for tip in tips %}
+      <li class="flex items-start gap-2 text-[12px] text-gray-600">
+        <span class="w-1.5 h-1.5 rounded-full bg-brand-500 mt-1.5 flex-shrink-0"></span>
+        <span>{{ tip }}</span>
+      </li>
+      {% endfor %}
+    </ul>
+  </div>
+
+  <a href="{% url 'dashboard:mobile_lancar_venda' %}"
+     class="btn-primary flex items-center justify-center gap-3 shadow-lg shadow-brand-100">
+    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+    <span>Lancar venda de hoje</span>
+  </a>
+
+  <p class="text-[11px] text-gray-400 text-center pt-1">A lista completa do ranking e visivel apenas para o gestor.</p>
+
+  {% elif visible_to_sellers and ranking %}
+  <div class="space-y-2">
+    {% for r in ranking %}
+    <div class="bg-white rounded-2xl p-4 flex items-center gap-3 card-shadow {% if r.is_me %}ring-2 ring-brand-500 bg-brand-50/50{% endif %}">
+      <div class="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 font-display text-sm font-bold
+                  {% if forloop.counter == 1 %}bg-amber-400 text-white
+                  {% elif forloop.counter == 2 %}bg-gray-300 text-gray-600
+                  {% elif forloop.counter == 3 %}bg-amber-700 text-white
+                  {% else %}bg-gray-100 text-gray-500{% endif %}">
+        {{ forloop.counter }}
+      </div>
+      <div class="flex-1 min-w-0">
+        <p class="text-[14px] font-semibold text-gray-900 truncate">
+          {{ r.name }}
+          {% if r.is_me %}<span class="text-[12px] font-normal text-brand-600 ml-1">(voce)</span>{% endif %}
+        </p>
+      </div>
+      <p class="font-display text-[15px] font-bold text-gray-900 flex-shrink-0">
+        {% if r.total is not None %}{{ r.total|brl }}{% endif %}
+      </p>
+    </div>
+    {% endfor %}
+  </div>
+
+  <a href="{% url 'dashboard:mobile_lancar_venda' %}"
+     class="btn-primary flex items-center justify-center gap-3 shadow-lg shadow-brand-100">
+    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+    <span>Lancar venda de hoje</span>
+  </a>
+
+  {% endif %}
+
+  {% if not ranking and visible_to_sellers and not seller_pos %}
+  <div class="text-center py-10">
+    <p class="text-[14px] text-gray-400">Nenhuma venda registrada neste mes ainda.</p>
+  </div>
+  {% endif %}
+
+</div>
+{% endblock %}

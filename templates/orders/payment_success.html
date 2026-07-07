@@ -1,0 +1,42 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% if completed %}Pagamento Confirmado{% else %}Pagamento em Andamento{% endif %}</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{% static 'css/tailwind.css' %}">
+    <style>
+        body { font-family: 'Inter', system-ui, sans-serif; background: #F5F7FA; }
+    </style>
+</head>
+<body class="text-gray-800 antialiased min-h-screen flex items-center justify-center p-4">
+    <div class="w-full max-w-md">
+        <div class="bg-white rounded-2xl border border-gray-100 shadow-xl p-8 text-center">
+            {% if completed %}
+            <div class="w-20 h-20 rounded-full bg-emerald-50 flex items-center justify-center mx-auto mb-6">
+                <svg class="w-10 h-10 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+            </div>
+            <h1 class="font-display text-[24px] font-bold text-gray-900 mb-2">Pagamento Confirmado</h1>
+            <p class="text-[16px] text-gray-500">O pagamento de <strong class="text-gray-800">R$ {{ order.total_amount_decimal }}</strong> foi confirmado com sucesso.</p>
+            {% else %}
+            <div class="w-20 h-20 rounded-full bg-brand-50 flex items-center justify-center mx-auto mb-6">
+                <svg class="w-10 h-10 text-brand-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+            </div>
+            <h1 class="font-display text-[24px] font-bold text-gray-900 mb-2">Pagamento em Andamento</h1>
+            <p class="text-[16px] text-gray-500">Seu pagamento de <strong class="text-gray-800">R$ {{ order.total_amount_decimal }}</strong> esta sendo processado. Voce sera notificado quando for confirmado.</p>
+            {% endif %}
+            <a href="/" class="inline-flex items-center gap-2 mt-8 px-6 py-3 bg-gray-900 hover:bg-gray-800 text-white font-semibold rounded-xl transition-all text-[14px] shadow-lg shadow-gray-200 active:scale-[0.97]">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/></svg>
+                Voltar ao Inicio
+            </a>
+        </div>
+        <div class="text-center mt-6">
+            <a href="https://vidalys.com.br" target="_blank" rel="noopener" class="inline-block opacity-60 hover:opacity-80 transition-opacity">
+                <img src="{% static 'img/merito-logo.png' %}" alt="Mérito by Vidalys" class="h-5 w-auto opacity-60 mx-auto">
+            </a>
+        </div>
+    </div>
+</body>
+</html>

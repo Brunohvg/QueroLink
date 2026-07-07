@@ -1,0 +1,1 @@
+-h dbhost -p 5433 -U user -d mydb -Fc -Z9 -f /tmp/ql_test_debug/querolink_2026-07-05_193328.dump

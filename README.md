@@ -1,109 +1,351 @@
-# QueroLink / LinkPay
+# V-Com — Gestão de Comissões
 
-Um projeto **Django** para gerar links de pagamento integrados à **API v5 do Pagar.me**, com envio automático de links via WhatsApp. Desenvolvido para rodar em **Docker**, pré-configurado para deploy por trás de um **proxy reverso Traefik**.
+Sistema multi-tenant para gestão de links de pagamento (Pagar.me) e comissões de vendedores. Inclui PWA para vendedores e dashboard administrativo completo.
 
----
-
-## 🚀 Funcionalidades
-
-- **Geração de Link de Pagamento:** Cria links dinâmicos usando a API do Pagar.me, com valor, nome e número de parcelas.  
-- **API REST:** CRUD completo de pagamentos usando Django Rest Framework.  
-- **Integração WhatsApp:** Envia links de pagamento via API externa (`api.lojabibelo.com.br`).  
-- **Deploy com Docker:** Inclui `Dockerfile` e `docker-compose.yml` prontos para rodar em containers.  
-- **Serviço de Arquivos Estáticos:** Whitenoise para servir arquivos estáticos em produção de forma eficiente.
+**Em produção:** `querolink.lojabibelo.com.br` — Tenant: Loja Bibelô
 
 ---
 
-## 🛠 Tecnologias
+## Stack
 
-- **Backend:** Python 3.12, Django 5.1, Django Rest Framework  
-- **Servidor WSGI:** Gunicorn  
-- **Arquivos Estáticos:** Whitenoise  
-- **Configuração:** Python Decouple  
-- **Deploy:** Docker, Docker Compose  
-- **Banco de Dados:** SQLite (desenvolvimento)  
-- **APIs Externas:** Pagar.me v5, API WhatsApp (Lojabibelo)
+| Camada | Tecnologia |
+|--------|------------|
+| Backend | Python 3.13, Django 5.1, DRF |
+| Async | Celery 5.4 + Redis 7 |
+| Auth | JWT (simplejwt) + Token + Session |
+| Frontend | Alpine.js 3.14 + Tailwind CSS + Chart.js 4.4 |
+| PWA | Service Worker + Web Manifest (8 ícones) |
+| Banco | PostgreSQL |
+| Gateway | Pagar.me Core v5 |
+| WhatsApp | Evolution API |
+| Deploy | Docker multi-stage, Gunicorn, Whitenoise |
+| Backup | pg_dump + rclone → Google Drive (grátis) |
+| Docs | Swagger UI (drf-spectacular) |
 
 ---
 
-## ⚙️ Configuração
+## Início rápido
 
-O projeto utiliza **variáveis de ambiente** via `python-decouple`. Crie um arquivo `.env` na raiz do projeto ou configure as variáveis no ambiente de deploy.
+```bash
+python3 -m venv .venv && source .venv/bin/activate
+pip install -r requirements/base.txt
+cp .env.example .env
+make migrate
+make seed
+make dev
+```
 
-Variáveis principais:
+Acesse: `http://localhost:8000/dashboard/mobile/login/` (vendedor) ou `/dashboard/login/` (gestor/financeiro).
 
-```env
-SECRET_KEY=your_django_secret_key
-DEBUG=True
-ALLOWED_HOSTS=localhost,linkpay.lojabibelo.com.br
-API_KEY_PAGAR_ME=your_pagarme_api_key
-API_KEY_INSTANCIA=your_whatsapp_api_key
-INSTANCE=nome_da_instancia_whatsapp
-🐳 Executando com Docker
-Clone o repositório:
+Usuários de demo criados pelo `seed.py`:
+- **Gestor**: `admin@bibelo.com.br` / `admin123`
+- **Financeiro**: `financeiro` / `fin123`
+- **Vendedores**: `bibelo`, `celia`, `danubia`, ... (ver `seed.py`)
 
-bash
-Copiar código
-git clone <seu-repo-url>
-cd linkpay
-Crie o .env com as variáveis descritas acima.
+---
 
-Certifique-se de que as redes Docker traefik_public e app_network existam, ou remova external: true do docker-compose.yml.
+## Comandos rápidos (Makefile)
 
-bash
-Copiar código
-docker network create traefik_public
-docker network create app_network
-Build e start:
+```bash
+make help          # Todos os comandos
+make dev           # Servidor dev (porta 8000)
+make test          # Testes automatizados
+make seed          # Popular banco com dados demo
+make reset-db      # Recriar banco do zero
+make build         # Build Docker
+make up            # Iniciar containers
+make down          # Parar containers
+make logs          # Logs Docker
+make clean         # Limpar pycache
+```
 
-bash
-Copiar código
-docker-compose up -d --build
-O script entrypoint.sh aplicará migrações, coletará arquivos estáticos e iniciará o servidor Gunicorn.
+---
 
-Porta padrão: 8082
+## Deploy
 
-Se estiver usando Traefik, disponível via linkpay.lojabibelo.com.br.
+### Pré-requisitos
 
-📂 Estrutura do Projeto
-bash
-Copiar código
-core/                  # Configurações principais do Django
-link/                  # App principal
-  ├─ models.py         # Modelo PagarMePayment
-  ├─ urls.py           # Rotas web e API
-  ├─ views.py          # Views web
-  ├─ viewsets.py       # ViewSets da API
-  └─ api/
-      ├─ pagar_me.py   # Cliente Pagar.me
-      └─ whatsapp.py   # Cliente WhatsApp
-Dockerfile
-docker-compose.yml
-entrypoint.sh
-requisitos.txt
-📡 API REST
-Base: /api/v1/pagamentos/
-Autenticação: TokenAuthentication do Django Rest Framework
+- Docker + Docker Compose
+- `.env` configurado (copiar de `.env.example`, preencher valores reais)
+- PostgreSQL externo (URL no `DATABASE_URL`)
+- Rede Coolify (se usar Coolify): `docker network create coolify`
 
-Rotas
-Método	Endpoint	Descrição
-GET	/api/v1/pagamentos/	Lista todos os pagamentos
-POST	/api/v1/pagamentos/	Cria novo pagamento
-GET	/api/v1/pagamentos/<id>/	Detalha pagamento
-PUT	/api/v1/pagamentos/<id>/	Atualiza pagamento
-PATCH	/api/v1/pagamentos/<id>/	Atualiza parcialmente
-DELETE	/api/v1/pagamentos/<id>/	Remove pagamento
+### Comando único
 
-💡 Observações
-Pronto para produção usando Traefik e Docker.
+```bash
+scripts/deploy.sh production
+```
 
-Arquivos estáticos servidos com Whitenoise, sem necessidade de Nginx extra.
+### Etapas do deploy
 
-Integração completa com Pagar.me e WhatsApp, facilitando envios automáticos.
+1. Verifica `SECRET_KEY`, `DATABASE_URL`, `FERNET_KEY` no `.env`
+2. `docker compose build --no-cache` (Tailwind + Python + rclone)
+3. `docker compose up -d` (web + redis + celery worker + celery beat)
+4. Aguarda healthcheck (`/health/` responder 200)
+5. Aplica migrations automaticamente (`entrypoint.sh`)
+6. Exibe logs recentes
 
-📌 Desenvolvido por [Seu Nome / Lojabibelo]
+### Setup pós-deploy (1 vez)
 
-arduino
-Copiar código
+```bash
+# 1. Configurar rclone com Google Drive (para backup automático)
+docker exec -it <container-web> ./scripts/setup-rclone.sh
 
-Se quiser, posso fazer uma **versão ainda mais “profissional GitHub”**, com badges, demo, setup rápido e t
+# 2. Configurar webhook no painel do Pagar.me
+# URL: https://querolink.lojabibelo.com.br/api/webhooks/pagarme/<tenant_slug>/
+# Eventos: charge.paid, charge.payment_failed, charge.refunded, charge.chargedback
+# Para autenticação, configure usuário/senha no painel de configurações do tenant
+```
+
+### Variáveis de ambiente críticas
+
+| Variável | Obrigatória | Descrição |
+|----------|:---:|-----------|
+| `SECRET_KEY` | ✅ | Chave secreta Django |
+| `DATABASE_URL` | ✅ | `postgres://user:pass@host:5432/db` |
+| `FERNET_KEY` | ✅ | Chave de criptografia (gere com `python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"`) |
+| `REDIS_URL` | ✅ | `redis://host:6379/0` |
+| `SERVICE_FQDN_WEB` | ✅ | Domínio público (ex: `querolink.lojabibelo.com.br`) |
+| `API_KEY_PAGAR_ME` | ✅ | Chave da API Pagar.me (raw `sk_*` ou base64) |
+| `API_KEY_INSTANCIA` | WhatsApp | Token Evolution API |
+| `INSTANCE` | WhatsApp | Nome da instância |
+| `SEED_ON_START` | Opcional | `true` para popular banco no boot |
+| `JWT_ACCESS_TOKEN_LIFETIME_MINUTES` | Opcional | Default 30 |
+
+### Serviços Docker
+
+| Serviço | Porta | Função |
+|---------|:---:|--------|
+| `web` | 8000 | Django + Gunicorn |
+| `querolink-redis` | 6379 | Broker Celery |
+| `celery_worker` | — | Tarefas assíncronas (webhooks, WhatsApp, backup) |
+| `celery_beat` | — | Tarefas agendadas (backup 02:00, limpeza eventos >90d) |
+
+---
+
+## Backup automático (Google Drive gratuito)
+
+O sistema faz backup diário do PostgreSQL para o Google Drive via **rclone**.
+
+**Guia completo:** [`docs/GOOGLE_DRIVE_CREDENTIALS.md`](docs/GOOGLE_DRIVE_CREDENTIALS.md)
+
+| Característica | Detalhe |
+|----------------|---------|
+| Frequência | Diário às 02:00 (Celery beat) |
+| Formato | `pg_dump -Fc -Z9` (compactado, ~5 MB) |
+| Retenção Drive | 30 dias |
+| Retenção local | 2 dias |
+| Custo | R$ 0 (15 GB grátis Google Drive) |
+| Setup | 1 vez: `./scripts/setup-rclone.sh` (OAuth, 3 min) |
+
+**Restaurar:** `./scripts/restore.sh latest` ou `./scripts/restore.sh 2026-06-29`
+
+---
+
+## Webhooks Pagar.me
+
+Eventos tratados com idempotência (dedup via `gateway_event_id`), Celery retry (3x, 30s) e time limits:
+
+| Evento | Ação |
+|--------|------|
+| `charge.paid` | Payment → PAID, Order → COMPLETED, cria Sale, notifica WhatsApp |
+| `charge.payment_failed` | Payment → FAILED, notifica vendedor com motivo da recusa |
+| `charge.refunded` | Payment → REFUNDED, remove Sale, notifica vendedor |
+| `charge.chargedback` | Payment → CHARGEBACK, remove Sale, notifica vendedor |
+| `charge.antifraud_*` | Log do antifraude; se reprovado → Payment FAILED |
+| `order.paid` | Mesmo fluxo de charge.paid (via charges[0]) |
+| `payment-link.finished` | Mesmo fluxo de charge.paid (via gateway_link_id) |
+| `payment-link.expired` | Order → EXPIRED, notifica vendedor |
+| `payment-link.cancelled` | Order → CANCELED, notifica vendedor |
+
+URL: `POST /api/webhooks/pagarme/<tenant_slug>/` (com autenticação Basic Auth opcional por tenant)
+
+Dedup: eventos com mesmo `id` (ex: `evt_xxx`) são ignorados após o primeiro processamento.
+
+---
+
+## Estrutura do projeto
+
+```
+├── app/
+│   ├── apps/
+│   │   ├── accounts/     # Tenant, User (roles), middleware CSP, backup task
+│   │   ├── api/          # REST API (25+ endpoints, rate limiting)
+│   │   ├── audit/        # AuditLog
+│   │   ├── commissions/  # CommissionPeriod, SellerCommission, services
+│   │   ├── dashboard/    # Views desktop + mobile + gestor + financeiro
+│   │   ├── notifications/# MessageTemplate, Notification, WhatsApp tasks
+│   │   ├── orders/       # Order, PaymentLink, services (link creation)
+│   │   ├── payments/     # Payment (paid_at, card_brand, card_last4)
+│   │   ├── sales/        # Sale (LINK + MANUAL origins)
+│   │   ├── sellers/      # Seller
+│   │   └── webhooks/     # WebhookEvent, Pagar.me handler, cleanup task
+│   ├── config/           # settings, urls, celery, wsgi
+│   └── services/
+│       ├── gateway/      # PagarMeGateway (API v5)
+│       └── messaging/    # WhatsappClient (Evolution API)
+├── scripts/              # backup.sh, restore.sh, setup-rclone.sh, deploy.sh
+├── static/               # CSS (Tailwind), JS, icons, manifest.json, sw.js
+├── templates/
+│   ├── dashboard/        # Desktop (gestor, financeiro, link detalhe)
+│   ├── mobile/           # Mobile PWA (vendedor, 5 telas)
+│   ├── orders/           # Tela pública de link (Tailwind)
+│   └── components/       # Partials reutilizáveis
+├── requirements/         # base.txt, local.txt, production.txt
+├── Dockerfile            # Multi-stage (Node build → Python + rclone)
+├── docker-compose.yml    # 4 serviços + 4 volumes
+├── Makefile              # Comandos dev
+├── entrypoint.sh         # Boot (migrate, superuser, collectstatic)
+├── seed.py               # Dados demo
+├── manage.py
+├── README.md
+└── docs/
+    └── GOOGLE_DRIVE_CREDENTIALS.md
+```
+
+---
+
+## API REST
+
+Swagger UI: `/api/schema/swagger-ui/`
+
+### Autenticação
+
+| Método | URL | Permissão |
+|--------|-----|-----------|
+| POST | `/api/auth/login/` | Público (rate limit 5/min) |
+| POST | `/api/auth/refresh/` | Autenticado |
+| POST | `/api/auth/logout/` | Autenticado (blacklist do refresh token) |
+
+### Sellers
+
+| Método | URL | Permissão |
+|--------|-----|-----------|
+| GET/POST | `/api/sellers/` | MANAGER, ADMIN |
+| GET/PUT/PATCH/DELETE | `/api/sellers/{uuid}/` | MANAGER, ADMIN |
+| POST | `/api/sellers/{uuid}/reset_password/` | MANAGER, ADMIN |
+| POST | `/api/sellers/import_sellers/` | MANAGER, ADMIN (CSV/XLSX) |
+| GET | `/api/manager/seller/{uuid}/` | MANAGER, ADMIN |
+| GET | `/api/manager/seller/{uuid}/csv/` | MANAGER, ADMIN |
+| GET | `/api/manager/seller/{uuid}/xlsx/` | MANAGER, ADMIN |
+| GET | `/api/manager/seller/{uuid}/pdf/` | MANAGER, ADMIN |
+
+### Sales
+
+| Método | URL | Permissão |
+|--------|-----|-----------|
+| GET/POST | `/api/sales/` | SELLER / MANAGER, ADMIN |
+| GET/PUT/DELETE | `/api/sales/{uuid}/` | SELLER (própria) / MANAGER |
+| GET | `/api/seller/sales/` | SELLER |
+| GET | `/api/manager/sales/` | MANAGER, ADMIN |
+
+### Links de pagamento
+
+| Método | URL | Permissão |
+|--------|-----|-----------|
+| GET/POST | `/api/seller/links/` | SELLER (rate limit 10/min) |
+
+### Comissões
+
+| Método | URL | Permissão |
+|--------|-----|-----------|
+| GET/POST | `/api/commissions/periods/` | MANAGER, ADMIN |
+| GET/PATCH/DELETE | `/api/commissions/periods/{uuid}/` | MANAGER, ADMIN |
+| POST | `/api/commissions/periods/{uuid}/sync/` | MANAGER, ADMIN |
+| POST | `/api/commissions/periods/{uuid}/close_sellers/` | MANAGER, ADMIN |
+| POST | `/api/commissions/periods/{uuid}/reopen_sellers/` | MANAGER, ADMIN |
+| POST | `/api/commissions/periods/{uuid}/pay_sellers/` | ADMIN, FINANCEIRO |
+| POST | `/api/commissions/periods/{uuid}/cancel/` | MANAGER, ADMIN |
+| GET | `/api/manager/commissions/{status}/` | MANAGER, ADMIN |
+| GET | `/api/manager/ranking/` | MANAGER, ADMIN |
+| GET | `/api/manager/ranking/annual/` | MANAGER, ADMIN |
+| GET | `/api/manager/dashboard/summary/` | MANAGER, ADMIN |
+
+### Financeiro
+
+| Método | URL | Permissão |
+|--------|-----|-----------|
+| GET | `/api/financial/payment-queue/` | FINANCEIRO, ADMIN |
+| GET | `/api/financial/commissions/{uuid}/csv/` | FINANCEIRO, ADMIN |
+
+### Configuração
+
+| Método | URL | Permissão |
+|--------|-----|-----------|
+| GET | `/api/manager/webhook-status/` | MANAGER, ADMIN |
+| POST | `/api/seller/change-password/` | SELLER |
+
+---
+
+## Telas
+
+### Mobile PWA (vendedor)
+
+| Tela | URL |
+|------|-----|
+| Login | `/dashboard/mobile/login/` |
+| Home (resumo do mês) | `/dashboard/mobile/` |
+| Lançar venda | `/dashboard/mobile/lancar/` |
+| Minhas vendas | `/dashboard/mobile/vendas/` |
+| Links de pagamento | `/dashboard/mobile/links/` |
+| Fechamento | `/dashboard/mobile/fechamento/` |
+| Esqueci senha | `/dashboard/mobile/forgot-password/` |
+
+### Desktop (gestor)
+
+| Tela | URL |
+|------|-----|
+| Login | `/dashboard/login/` |
+| Home (dashboard) | `/dashboard/gestor/` |
+| Ranking | `/dashboard/gestor/ranking/` |
+| Vendedores | `/dashboard/gestor/vendedores/` |
+| Links | `/dashboard/gestor/links/` |
+| Detalhe do link | `/dashboard/gestor/links/{uuid}/` |
+| Fechamento | `/dashboard/gestor/fechamento/` |
+| Configurações | `/dashboard/gestor/configuracoes/` |
+
+### Desktop (financeiro)
+
+| Tela | URL |
+|------|-----|
+| Fila de aprovação | `/dashboard/financeiro/fila/` |
+| Histórico de pagamentos | `/dashboard/financeiro/historico/` |
+
+### Público
+
+| Tela | URL |
+|------|-----|
+| Link de pagamento | `/<tenant_slug>/` |
+| Pagamento concluído | `/pago/<order_uuid>/` |
+
+---
+
+## Management commands
+
+```bash
+python manage.py reset_seller_password <seller_uuid>
+```
+
+---
+
+## Documentação adicional
+
+| Arquivo | Conteúdo |
+|---------|----------|
+| `PRD_QUEROLINK_COMISSOES.md` | PRD completo com especificação de todos os lotes |
+| `API.md` | Documentação detalhada da API REST |
+| `READINESS_REPORT.md` | Relatório de prontidão para produção |
+
+---
+
+## Histórico de versões
+
+| Versão | Data | Descrição |
+|--------|------|-----------|
+| 2.1.0 | 2026-07-01 | Correções de concorrência, dedup de webhooks, CSP fix, time limits em tasks, cleanup batch |
+| 2.0.0 | 2026-06-29 | Estabilização: 16 correções críticas/altas, webhook completo, backup automático, redesign UI |
+| 1.0.0 | 2026-06-20 | MVP — 55 testes, 6 lotes implementados |
+
+---
+
+Desenvolvido por Bruno Vidal para Loja Bibelô.

@@ -1,0 +1,181 @@
+{% extends 'dashboard/base_desktop.html' %}
+{% block title %}Fila de Pagamento — Mérito{% endblock %}
+{% block content %}
+<div x-data="filaPage()" x-init="load()">
+    <h1 class="font-display text-[18px] font-semibold text-gray-900 mb-1">Fila de Pagamento</h1>
+    <p class="text-[13px] text-gray-500 mb-6">Comissoes individuais com status FECHADA aguardando pagamento.</p>
+
+    <template x-for="group in periodGroups" :key="group.period.uuid">
+        <div class="surface-card mb-4">
+            <div class="flex items-center justify-between mb-3">
+                <div>
+                    <h3 class="font-semibold text-[16px]" x-text="String(group.period.month).padStart(2,'0')+'/'+group.period.year"></h3>
+                    <p class="text-[12px] text-gray-500"><span x-text="group.commissions.length + ' vendedor(es)'"></span> — <span class="text-xs px-1.5 py-0.5 rounded-full" :class="{'bg-indigo-100 text-indigo-700': group.period.status==='PARCIALMENTE_PAGA', 'bg-warning-50 text-warning-700': group.period.status==='FECHADA', 'bg-amber-100 text-amber-700': group.period.status==='PARCIALMENTE_FECHADA'}" x-text="group.period.status"></span> — Total comissao: <strong class="text-brand-500" x-text="formatMoneyBRL(group.commissions.reduce((a,c)=>a+(c.commission_amount||0),0))"></strong></p>
+                </div>
+            </div>
+            <table class="w-full text-left text-[13px]">
+                <thead><tr><th class="px-3 py-2 font-semibold text-gray-500 border-b bg-gray-50 w-8"><input type="checkbox" @change="toggleAllGroup(group)" :checked="allSelected(group)"></th><th class="px-3 py-2 font-semibold text-gray-500 border-b bg-gray-50">Vendedor</th><th class="px-3 py-2 font-semibold text-gray-500 border-b bg-gray-50">Total Vendido</th><th class="px-3 py-2 font-semibold text-gray-500 border-b bg-gray-50">Comissao</th><th class="px-3 py-2 font-semibold text-gray-500 border-b bg-gray-50">Fechado em</th></tr></thead>
+                <tbody>
+                    <template x-for="sc in group.commissions" :key="sc.id">
+                        <tr class="hover:bg-gray-50">
+                            <td class="px-3 py-2 border-b"><input type="checkbox" :checked="isSelected(sc)" @change="toggle(group, sc)"></td>
+                            <td class="px-3 py-2 border-b font-medium" x-text="sc.seller_name"></td>
+                            <td class="px-3 py-2 border-b" x-text="formatMoneyBRL(sc.total_sold_amount)"></td>
+                            <td class="px-3 py-2 border-b font-semibold text-brand-500" x-text="formatMoneyBRL(sc.commission_amount)"></td>
+                            <td class="px-3 py-2 border-b text-gray-500" x-text="sc.closed_at ? new Date(sc.closed_at).toLocaleDateString('pt-BR') : '—'"></td>
+                        </tr>
+                    </template>
+                </tbody>
+            </table>
+        </div>
+    </template>
+    <div x-show="!periodGroups.length" class="text-center py-12 text-gray-500">Nenhuma comissao aguardando pagamento.</div>
+
+    <div x-show="selected.size > 0" class="fixed bottom-0 left-0 right-0 z-40 bg-white border-t border-gray-200 shadow-lg p-4">
+        <div class="max-w-5xl mx-auto flex items-center justify-between flex-wrap gap-3">
+            <p class="text-[14px] font-medium"><span x-text="selected.size"></span> selecionado(s) — Total: <strong class="text-brand-500" x-text="formatMoneyBRL(selectedTotal())"></strong></p>
+            <div class="flex gap-2">
+                <button @click="openPayModal()" class="bg-success-500 hover:bg-success-700 text-white font-medium py-2 px-4 rounded-xl transition text-[14px]">Pagar selecionados</button>
+                <button @click="openReopenModal()" class="bg-warning-500 hover:bg-warning-700 text-white font-medium py-2 px-4 rounded-xl transition text-[14px]">Reverter selecionados</button>
+                <button @click="selected.clear(); load()" class="bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium py-2 px-4 rounded-xl transition text-[14px]">Limpar</button>
+            </div>
+        </div>
+    </div>
+
+    <div x-show="showPay" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40" @click.self="showPay=false">
+        <div class="bg-white rounded-2xl shadow-xl p-6 w-full max-w-md mx-4">
+            <h3 class="text-[18px] font-semibold mb-3">Pagar Comissoes</h3>
+            <p class="text-[13px] text-gray-500 mb-2"><span x-text="selected.size"></span> vendedor(es) — Total: <strong x-text="formatMoneyBRL(selectedTotal())"></strong></p>
+            <p class="text-[12px] text-danger-500 mb-4">Confirme apenas se o pagamento ja foi realizado.</p>
+            <div class="mb-3"><label class="block text-[13px] text-gray-500 mb-1">Data</label><input type="date" x-model="payDate" class="w-full px-4 py-3 border rounded-xl focus:ring-2 focus:ring-brand-500 text-[14px]"></div>
+            <div class="mb-3"><label class="block text-[13px] text-gray-500 mb-1">Forma</label><select x-model="payMethod" class="w-full px-4 py-3 border rounded-xl focus:ring-2 focus:ring-brand-500 text-[14px]"><option value="">Selecione</option><option value="pix">PIX</option><option value="ted">TED</option><option value="dinheiro">Dinheiro</option><option value="outro">Outro</option></select></div>
+            <div class="mb-4"><label class="block text-[13px] text-gray-500 mb-1">Observacao</label><textarea x-model="payNotes" class="w-full px-4 py-3 border rounded-xl focus:ring-2 focus:ring-brand-500 text-[14px]" rows="2"></textarea></div>
+            <div class="flex gap-3 justify-end">
+                <button @click="showPay=false" class="bg-white border border-gray-300 text-gray-700 font-medium py-2 px-4 rounded-xl transition text-[14px]">Cancelar</button>
+                <button @click="doPay()" class="bg-success-500 hover:bg-success-700 text-white font-medium py-2 px-4 rounded-xl transition text-[14px]">Confirmar Pagamento</button>
+            </div>
+        </div>
+    </div>
+
+    <div x-show="showReopen" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40" @click.self="showReopen=false">
+        <div class="bg-white rounded-2xl shadow-xl p-6 w-full max-w-md mx-4">
+            <h3 class="text-[18px] font-semibold mb-3">Reverter Comissoes</h3>
+            <p class="text-[13px] text-gray-500 mb-2"><span x-text="selected.size"></span> vendedor(es).</p>
+            <p class="text-[12px] text-gray-500 mb-4">A reversao vai reabrir as comissoes. Esta acao sera registrada.</p>
+            <div class="mb-4"><label class="block text-[13px] text-gray-500 mb-1">Motivo *</label><textarea x-model="reopenReason" class="w-full px-4 py-3 border rounded-xl focus:ring-2 focus:ring-brand-500 text-[14px]" rows="3" placeholder="Motivo obrigatorio"></textarea></div>
+            <div class="flex gap-3 justify-end">
+                <button @click="showReopen=false" class="bg-white border border-gray-300 text-gray-700 font-medium py-2 px-4 rounded-xl transition text-[14px]">Cancelar</button>
+                <button @click="doReopen()" class="bg-warning-500 hover:bg-warning-700 text-white font-medium py-2 px-4 rounded-xl transition text-[14px]" :disabled="!reopenReason.trim()">Confirmar Reversao</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function getCSRFToken() {
+    var name = 'csrftoken';
+    var cookies = document.cookie.split(';');
+    for (var i = 0; i < cookies.length; i++) {
+        var c = cookies[i].trim();
+        if (c.indexOf(name + '=') === 0) return c.substring(name.length + 1);
+    }
+    return '';
+}
+
+function filaPage() {
+    return {
+        periodGroups: [], selected: new Map(), showPay: false, payDate: '', payMethod: '', payNotes: '',
+        showReopen: false, reopenReason: '',
+        async load() {
+            var r = await fetch('/api/financial/payment-queue/');
+            var data = await r.json();
+            this.periodGroups = data;
+            this.selected = new Map();
+        },
+        isSelected(sc) { return this.selected.has(sc.id); },
+        toggle(group, sc) {
+            if (this.selected.has(sc.id)) { this.selected.delete(sc.id); return; }
+            if (this.selected.size > 0) {
+                var firstId = this.selected.keys().next().value;
+                var firstPeriod = this.getPeriodForCommission(firstId);
+                if (firstPeriod && firstPeriod.uuid !== group.period.uuid) {
+                    showToast('Selecione vendedores de apenas uma competencia por vez.', 'warning'); return;
+                }
+            }
+            this.selected.set(sc.id, {seller: sc, period: group.period});
+        },
+        getPeriodForCommission(scId) {
+            for (var g of this.periodGroups) {
+                if (g.commissions.some(sc => sc.id === scId)) return g.period;
+            }
+            return null;
+        },
+        toggleAllGroup(group) {
+            if (group.commissions.every(sc => this.selected.has(sc.id))) {
+                group.commissions.forEach(sc => this.selected.delete(sc.id));
+            } else {
+                if (this.selected.size > 0) {
+                    var firstId = this.selected.keys().next().value;
+                    var firstPeriod = this.getPeriodForCommission(firstId);
+                    if (firstPeriod && firstPeriod.uuid !== group.period.uuid) {
+                    showToast('Selecione vendedores de apenas uma competencia por vez.', 'warning'); return;
+                    }
+                }
+                group.commissions.forEach(sc => this.selected.set(sc.id, {seller: sc, period: group.period}));
+            }
+        },
+        allSelected(group) { return group.commissions.length > 0 && group.commissions.every(sc => this.selected.has(sc.id)); },
+        selectedTotal() {
+            var total = 0;
+            this.selected.forEach(v => total += v.seller.commission_amount || 0);
+            return total;
+        },
+        getUniquePeriod() {
+            var periods = new Set();
+            this.selected.forEach(v => periods.add(v.period.uuid));
+            if (periods.size !== 1) { showToast('Selecione vendedores de apenas uma competencia.', 'warning'); return null; }
+            return this.selected.values().next().value.period;
+        },
+        getCurrentPeriodUuid() {
+            var p = this.getUniquePeriod();
+            return p ? p.uuid : null;
+        },
+        openPayModal() {
+            if (!this.getUniquePeriod()) return;
+            this.payDate = ''; this.payMethod = ''; this.payNotes = ''; this.showPay = true;
+        },
+        async doPay() {
+            var period = this.getUniquePeriod();
+            if (!period) return;
+            var ids = [];
+            this.selected.forEach(v => ids.push(v.seller.id));
+            var r = await fetch('/api/commissions/periods/' + period.uuid + '/pay_sellers/', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json', 'X-CSRFToken': getCSRFToken()},
+                body: JSON.stringify({seller_commission_ids: ids, payment_date: this.payDate, payment_method: this.payMethod, payment_notes: this.payNotes})
+            });
+            if (r.ok) { this.showPay = false; this.load(); }
+            else { var d = await r.json(); showToast(d.error || d.detail || 'Erro ao pagar', 'error'); }
+        },
+        openReopenModal() {
+            if (!this.getUniquePeriod()) return;
+            this.reopenReason = ''; this.showReopen = true;
+        },
+        async doReopen() {
+            if (!this.reopenReason.trim()) return;
+            var period = this.getUniquePeriod();
+            if (!period) return;
+            var ids = [];
+            this.selected.forEach(v => ids.push(v.seller.id));
+            var r = await fetch('/api/commissions/periods/' + period.uuid + '/reopen_sellers/', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json', 'X-CSRFToken': getCSRFToken()},
+                body: JSON.stringify({seller_commission_ids: ids, reason: this.reopenReason})
+            });
+            if (r.ok) { this.showReopen = false; this.load(); }
+            else { var d = await r.json(); showToast(d.error || d.detail || 'Erro ao reverter', 'error'); }
+        }
+    }
+}
+</script>
+{% endblock %}

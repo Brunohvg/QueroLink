@@ -1,0 +1,209 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta name="theme-color" content="#1463FF">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Mérito">
+    <meta name="application-name" content="Mérito">
+    <meta name="csrf-token" content="{{ csrf_token }}">
+    <link rel="icon" type="image/png" sizes="32x32" href="{% static 'icons/favicon-32.png' %}">
+    <link rel="icon" type="image/png" sizes="16x16" href="{% static 'icons/favicon-16.png' %}">
+    <link rel="apple-touch-icon" href="{% static 'icons/apple-touch-icon.png' %}">
+    <link rel="manifest" href="{% static 'manifest.json' %}">
+    <title>{% block title %}Mérito{% endblock %}</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
+    <script src="{% static 'js/alpine.min.js' %}" defer></script>
+    <link rel="stylesheet" href="{% static 'css/tailwind.css' %}">
+    <script src="{% static 'js/format.js' %}"></script>
+    <script>
+        function getCSRFToken() {
+            var meta = document.querySelector('meta[name="csrf-token"]');
+            if (meta) return meta.getAttribute('content');
+            var name = 'csrftoken';
+            var cookies = document.cookie.split(';');
+            for (var i = 0; i < cookies.length; i++) {
+                var c = cookies[i].trim();
+                if (c.indexOf(name + '=') === 0) return c.substring(name.length + 1);
+            }
+            return '';
+        }
+        function showToast(message, type, duration) {
+            var c = {
+                success: { bg: 'bg-emerald-50', border: 'border-emerald-200', text: 'text-emerald-700', icon: '<svg class="w-5 h-5 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>' },
+                error:   { bg: 'bg-red-50', border: 'border-red-200', text: 'text-red-700', icon: '<svg class="w-5 h-5 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>' },
+                warning: { bg: 'bg-amber-50', border: 'border-amber-200', text: 'text-amber-700', icon: '<svg class="w-5 h-5 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"/></svg>' },
+                info:    { bg: 'bg-blue-50', border: 'border-blue-200', text: 'text-blue-700', icon: '<svg class="w-5 h-5 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>' },
+            };
+            var s = c[type] || c.info;
+            duration = duration || (type === 'error' ? 6000 : 4000);
+            var el = document.createElement('div');
+            el.className = 'pointer-events-auto flex items-start gap-3 px-4 py-3 rounded-2xl border shadow-lg toast-enter ' + s.bg + ' ' + s.border;
+            el.innerHTML = '<div class="flex-shrink-0 mt-0.5">' + s.icon + '</div>'
+                + '<div class="flex-1 min-w-0"><p class="text-sm font-medium ' + s.text + '">' + message + '</p></div>'
+                + '<button onclick="this.closest(\'#toast-container\').querySelectorAll(\'>div\').forEach(function(t){removeToast(t)})" class="flex-shrink-0 ml-1"><svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg></button>'
+                + '<div class="absolute bottom-0 left-0 h-0.5 rounded-full ' + s.bg.replace('bg-','bg-').replace('-50','-500') + '" style="width:100%;animation:shrink ' + duration + 'ms linear forwards;"></div>';
+            var container = document.getElementById('toast-container');
+            container.appendChild(el);
+            var textEl = el.querySelector('p');
+            if (textEl) textEl.textContent = message;
+            setTimeout(function() { removeToast(el); }, duration);
+        }
+        function removeToast(el) {
+            if (!el || el.classList.contains('toast-leave')) return;
+            el.className = el.className.replace('toast-enter', 'toast-leave');
+            setTimeout(function() { if (el.parentNode) el.parentNode.removeChild(el); }, 300);
+        }
+    </script>
+    <style>
+        body { font-family: 'Inter', system-ui, sans-serif; background: #F5F7FA; }
+        .safe-bottom { padding-bottom: max(env(safe-area-inset-bottom), 16px); }
+        .safe-top { padding-top: max(env(safe-area-inset-top), 0px); }
+        .tap-target { min-height: 44px; min-width: 44px; cursor: pointer; }
+        input, select, button, textarea { font-size: 16px !important; }
+        .toast-enter { animation: toastIn 0.35s cubic-bezier(0.21, 1.02, 0.73, 1) forwards; }
+        .toast-leave { animation: toastOut 0.25s ease forwards; }
+        @keyframes toastIn { from { transform: translateX(120%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+        @keyframes toastOut { from { transform: translateX(0); opacity: 1; } to { transform: translateX(120%); opacity: 0; } }
+        @keyframes shrink { from { width: 100%; } to { width: 0%; } }
+        @keyframes fadeUp { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: translateY(0); } }
+        .fade-up { animation: fadeUp 0.45s ease forwards; }
+        .fade-up-d2 { animation: fadeUp 0.45s ease 0.08s forwards; opacity: 0; }
+        .fade-up-d3 { animation: fadeUp 0.45s ease 0.15s forwards; opacity: 0; }
+        .card-shadow { box-shadow: 0 1px 2px rgba(11,17,32,0.04), 0 4px 12px rgba(11,17,32,0.04); }
+        .btn-primary {
+            width: 100%; padding: 0.875rem; border-radius: 16px;
+            background: #1463FF; color: #fff; font-weight: 600; font-size: 15px;
+            transition: all 0.15s; box-shadow: 0 4px 14px -2px rgba(18,99,255,0.3);
+        }
+        .btn-primary:active { transform: scale(0.97); background: #0d52d9; }
+        .btn-primary:disabled { background: #d1d5db; box-shadow: none; cursor: not-allowed; }
+        .input-field {
+            width: 100%; padding: 0.75rem 1rem;
+            border: 1.5px solid #e5e7eb; border-radius: 14px; background: #fff;
+            outline: none; transition: all 0.15s;
+        }
+        .input-field:focus { border-color: #66a3ff; box-shadow: 0 0 0 3px rgba(18,99,255,0.08); }
+        details summary::-webkit-details-marker { display: none; }
+        details summary { list-style: none; }
+        details .chevron { transition: transform 0.2s; }
+        details[open] .chevron { transform: rotate(90deg); }
+    </style>
+</head>
+<body class="text-gray-800 antialiased">
+    <div id="toast-container" class="fixed top-12 right-3 z-[9999] flex flex-col gap-2 pointer-events-none max-w-sm w-full"></div>
+
+    {% if show_trial_banner %}
+    <div id="trial-banner" class="bg-graphite text-white text-center py-2.5 px-4 text-[13px] font-medium flex items-center justify-center gap-2 sticky top-0 z-40 safe-top">
+        <svg class="w-4 h-4 text-accent flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+        <span>Seu periodo de teste termina em {{ trial_days_left }} dia{{ trial_days_left|pluralize }}.</span>
+        <a href="{% url 'dashboard:assinatura' %}" class="text-accent font-semibold whitespace-nowrap">Assinar agora →</a>
+        <button onclick="document.getElementById('trial-banner').remove(); document.cookie='trial_banner_dismissed=1;path=/;max-age=604800';" class="text-white/50 hover:text-white p-1 ml-1 tap-target">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+        </button>
+    </div>
+    {% endif %}
+
+    <div class="min-h-screen flex flex-col max-w-lg mx-auto relative safe-top">
+        <main class="flex-1 px-5 pt-5 pb-32 safe-bottom">
+            {% block content %}{% endblock %}
+        </main>
+
+        {% if request.user.is_authenticated and request.user.role == 'SELLER' %}
+        {% include 'components/_bottom_nav.html' %}
+        {% endif %}
+    </div>
+
+    <script>
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register("{% static 'sw.js' %}")
+                .then(function(reg) { console.log('SW registrado'); })
+                .catch(function(err) { console.log('SW falhou:', err); });
+        }
+        let deferredPrompt;
+        window.addEventListener('beforeinstallprompt', function(e) {
+            e.preventDefault();
+            deferredPrompt = e;
+            if (window.matchMedia('(display-mode: standalone)').matches) return;
+            var lastShown = localStorage.getItem('merito_pwa_last_shown');
+            var now = Date.now();
+            if (lastShown && (now - parseInt(lastShown)) < 7 * 24 * 60 * 60 * 1000) return;
+            setTimeout(function() {
+                var banner = document.getElementById('install-banner');
+                if (banner) banner.classList.remove('hidden');
+            }, 3000);
+        });
+        function installPWA() {
+            if (deferredPrompt) {
+                deferredPrompt.prompt();
+                deferredPrompt.userChoice.then(function() {
+                    localStorage.setItem('merito_pwa_last_shown', Date.now());
+                    document.getElementById('install-banner').classList.add('hidden');
+                });
+            }
+        }
+        function dismissInstall() {
+            localStorage.setItem('merito_pwa_last_shown', Date.now());
+            document.getElementById('install-banner').classList.add('hidden');
+        }
+        window.addEventListener('appinstalled', function() {
+            localStorage.setItem('merito_pwa_last_shown', Date.now());
+        });
+
+        if ('Notification' in window && Notification.permission === 'default') {
+            var visits = parseInt(localStorage.getItem('merito_visits') || '0', 10) + 1;
+            localStorage.setItem('merito_visits', String(visits));
+            if (visits >= 3) {
+                Notification.requestPermission().then(function(perm) {
+                    if (perm === 'granted') { subscribeUserToPush(); }
+                });
+            }
+        }
+
+        function subscribeUserToPush() {
+            var vapidKey = '{{ VAPID_PUBLIC_KEY }}';
+            if (!vapidKey) return;
+            navigator.serviceWorker.ready.then(function(reg) {
+                return reg.pushManager.subscribe({
+                    userVisibleOnly: true,
+                    applicationServerKey: urlBase64ToUint8Array(vapidKey),
+                });
+            }).then(function(sub) {
+                var keys = sub.toJSON().keys;
+                fetch('/api/push/subscribe/', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCSRFToken() },
+                    body: JSON.stringify({ endpoint: sub.endpoint, keys: keys }),
+                });
+            }).catch(function(err) { console.log('Push subscription failed:', err); });
+        }
+
+        function urlBase64ToUint8Array(base64String) {
+            var padding = '='.repeat((4 - base64String.length % 4) % 4);
+            var base64 = (base64String + padding).replace(/\-/g, '+').replace(/_/g, '/');
+            var rawData = atob(base64);
+            var outputArray = new Uint8Array(rawData.length);
+            for (var i = 0; i < rawData.length; i++) {
+                outputArray[i] = rawData.charCodeAt(i);
+            }
+            return outputArray;
+        }
+    </script>
+
+    <div id="install-banner" class="hidden fixed bottom-28 left-4 right-4 bg-white rounded-2xl shadow-xl p-5 border border-gray-100 z-40 max-w-lg mx-auto safe-bottom card-shadow">
+        <div class="flex items-center gap-3">
+            <img src="{% static 'img/merito-monograma.png' %}" alt="Mérito" class="w-11 h-11 rounded-2xl flex-shrink-0">
+            <div class="flex-1">
+                <p class="text-sm font-semibold text-gray-800">Instale o Mérito na sua tela inicial</p>
+                <p class="text-xs text-gray-500">Acesso rapido ao app de comissoes</p>
+            </div>
+            <button onclick="installPWA()" class="bg-brand-500 hover:bg-brand-600 text-white px-5 py-2.5 rounded-xl text-sm font-semibold tap-target shadow-sm transition">Instalar</button>
+            <button onclick="dismissInstall()" class="text-gray-400 p-2 tap-target rounded-xl hover:bg-gray-100"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg></button>
+        </div>
+    </div>
+</body>
+</html>

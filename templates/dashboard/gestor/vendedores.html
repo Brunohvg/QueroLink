@@ -1,0 +1,466 @@
+{% extends 'dashboard/base_desktop.html' %}
+{% block title %}Vendedores — Mérito{% endblock %}
+{% block content %}
+<div x-data="vendedoresPage()" x-init="loadSellers()" class="max-w-7xl mx-auto">
+
+  <div class="sticky top-0 z-10 -mx-6 px-6 py-4 bg-gray-50/90 backdrop-blur-lg border-b border-gray-200/60 mb-6">
+    <div class="flex items-center justify-between">
+      <div>
+        <h1 class="font-display text-[22px] font-bold text-gray-900 tracking-tight">Vendedores</h1>
+        <p class="text-[13px] text-gray-500 mt-0.5 flex items-center gap-1.5">
+          <span x-text="stats.total + ' vendedor' + (stats.total !== 1 ? 'es' : '')"></span>
+          <span class="text-gray-300">•</span>
+          <span x-text="stats.ativos + ' ativos'"></span>
+        </p>
+      </div>
+      <div class="flex items-center gap-2">
+        <button @click="showImportModal = true"
+                class="inline-flex items-center gap-2 bg-white border border-gray-200 hover:border-gray-300 text-gray-700 font-medium py-2.5 px-4 rounded-xl transition-all text-[14px] shadow-sm hover:shadow active:scale-[0.97]">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5 5 5-5M12 15V3"></path></svg>
+          Importar
+        </button>
+        <button @click="openCreateModal()"
+                class="inline-flex items-center gap-2 bg-gray-900 hover:bg-gray-800 text-white font-semibold py-2.5 px-5 rounded-xl transition-all text-[14px] shadow-sm hover:shadow-md active:scale-[0.97]">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
+          Novo Vendedor
+        </button>
+      </div>
+    </div>
+  </div>
+
+    <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4 mb-8">
+      <div class="relative overflow-hidden bg-white rounded-2xl p-5 border border-gray-100 shadow-[0_1px_3px_-1px_rgba(0,0,0,0.04),0_4px_16px_-4px_rgba(67,97,238,0.06)]">
+        <div class="absolute top-0 right-0 w-32 h-32 bg-gradient-to-bl from-brand-50/50 to-transparent rounded-full -mr-8 -mt-8"></div>
+        <div class="relative"><p class="text-[11px] font-semibold text-gray-400 uppercase tracking-[0.08em] mb-2">Total</p><p class="text-[26px] font-bold text-gray-900" x-text="stats.total"></p></div>
+      </div>
+      <div class="relative overflow-hidden bg-white rounded-2xl p-5 border border-gray-100 shadow-[0_1px_3px_-1px_rgba(0,0,0,0.04),0_4px_16px_-4px_rgba(67,97,238,0.06)]">
+        <div class="absolute top-0 right-0 w-32 h-32 bg-gradient-to-bl from-emerald-50/60 to-transparent rounded-full -mr-8 -mt-8"></div>
+        <div class="relative"><p class="text-[11px] font-semibold text-gray-400 uppercase tracking-[0.08em] mb-2">Ativos</p><p class="text-[26px] font-bold text-emerald-600" x-text="stats.ativos"></p></div>
+      </div>
+      <div class="relative overflow-hidden bg-white rounded-2xl p-5 border border-gray-100 shadow-[0_1px_3px_-1px_rgba(0,0,0,0.04),0_4px_16px_-4px_rgba(67,97,238,0.06)]">
+        <div class="absolute top-0 right-0 w-32 h-32 bg-gradient-to-bl from-sky-50/60 to-transparent rounded-full -mr-8 -mt-8"></div>
+        <div class="relative"><p class="text-[11px] font-semibold text-gray-400 uppercase tracking-[0.08em] mb-2">Com venda</p><p class="text-[26px] font-bold text-sky-600" x-text="stats.comVendaNoMes"></p></div>
+      </div>
+      <div class="relative overflow-hidden bg-white rounded-2xl p-5 border border-gray-100 shadow-[0_1px_3px_-1px_rgba(0,0,0,0.04),0_4px_16px_-4px_rgba(67,97,238,0.06)]">
+        <div class="absolute top-0 right-0 w-32 h-32 bg-gradient-to-bl from-amber-50/60 to-transparent rounded-full -mr-8 -mt-8"></div>
+        <div class="relative"><p class="text-[11px] font-semibold text-gray-400 uppercase tracking-[0.08em] mb-2">Pendentes</p><p class="text-[26px] font-bold text-amber-600" x-text="stats.pendentes"></p></div>
+      </div>
+      <div class="relative overflow-hidden bg-white rounded-2xl p-5 border border-gray-100 shadow-[0_1px_3px_-1px_rgba(0,0,0,0.04),0_4px_16px_-4px_rgba(67,97,238,0.06)]">
+        <div class="absolute top-0 right-0 w-32 h-32 bg-gradient-to-bl from-rose-50/60 to-transparent rounded-full -mr-8 -mt-8"></div>
+        <div class="relative"><p class="text-[11px] font-semibold text-gray-400 uppercase tracking-[0.08em] mb-2">Sem lanc.</p><p class="text-[26px] font-bold text-rose-500" x-text="stats.semLancamento"></p></div>
+      </div>
+      <div class="relative overflow-hidden bg-white rounded-2xl p-5 border border-gray-100 shadow-[0_1px_3px_-1px_rgba(0,0,0,0.04),0_4px_16px_-4px_rgba(67,97,238,0.06)]">
+        <div class="absolute top-0 right-0 w-32 h-32 bg-gradient-to-bl from-red-50/60 to-transparent rounded-full -mr-8 -mt-8"></div>
+        <div class="relative"><p class="text-[11px] font-semibold text-gray-400 uppercase tracking-[0.08em] mb-2">Cancelados</p><p class="text-[26px] font-bold text-red-500" x-text="stats.cancelados"></p></div>
+      </div>
+    </div>
+
+  <div class="bg-white rounded-2xl border border-gray-100 shadow-[0_1px_3px_-1px_rgba(0,0,0,0.04),0_4px_16px_-4px_rgba(67,97,238,0.06)] overflow-hidden">
+    <div class="px-5 py-4 border-b border-gray-100 flex flex-col sm:flex-row sm:items-center gap-3">
+      <div class="relative flex-1 max-w-xs">
+        <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
+        <input type="text" x-model="search" placeholder="Buscar vendedor..."
+               class="w-full pl-9 pr-4 py-2 bg-gray-50 border border-gray-200 rounded-xl text-[13px] outline-none transition-all focus:border-brand-400 focus:ring-2 focus:ring-brand-100 focus:bg-white">
+      </div>
+      <div class="flex items-center gap-2 text-[12px]">
+        <button @click="filterStatus='todos'" class="px-3 py-1.5 rounded-lg font-medium transition" :class="filterStatus==='todos' ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'">Todos</button>
+        <button @click="filterStatus='PRONTO'" class="px-3 py-1.5 rounded-lg font-medium transition" :class="filterStatus==='PRONTO' ? 'bg-emerald-600 text-white' : 'bg-emerald-50 text-emerald-600 hover:bg-emerald-100'">Prontos</button>
+        <button @click="filterStatus='PENDENTE'" class="px-3 py-1.5 rounded-lg font-medium transition" :class="filterStatus==='PENDENTE' ? 'bg-amber-500 text-white' : 'bg-amber-50 text-amber-600 hover:bg-amber-100'">Pendentes</button>
+        <button @click="filterStatus='SEM_LANCAMENTO'" class="px-3 py-1.5 rounded-lg font-medium transition" :class="filterStatus==='SEM_LANCAMENTO' ? 'bg-gray-500 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'">Sem lanc.</button>
+      </div>
+    </div>
+
+    <div class="overflow-x-auto">
+      <table class="w-full text-left">
+        <thead>
+          <tr class="bg-gray-50/80">
+            <th class="px-4 py-3 text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Vendedor</th>
+            <th class="px-4 py-3 text-[11px] font-semibold text-gray-500 uppercase tracking-wider hidden md:table-cell">Dias</th>
+            <th class="px-4 py-3 text-[11px] font-semibold text-gray-500 uppercase tracking-wider hidden md:table-cell">Operac.</th>
+            <th class="px-4 py-3 text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Total mes</th>
+            <th class="px-4 py-3 text-[11px] font-semibold text-gray-500 uppercase tracking-wider hidden sm:table-cell">Comissao</th>
+            <th class="px-4 py-3 text-[11px] font-semibold text-gray-500 uppercase tracking-wider hidden lg:table-cell">Status</th>
+            <th class="px-4 py-3 text-[11px] font-semibold text-gray-500 uppercase tracking-wider hidden lg:table-cell">Ult. lanc.</th>
+            <th class="px-4 py-3 text-[11px] font-semibold text-gray-500 uppercase tracking-wider text-right">Acoes</th>
+          </tr>
+        </thead>
+        <tbody>
+          <template x-for="s in filteredSellers" :key="s.uuid">
+            <tr class="border-b border-gray-50 hover:bg-gray-50/50 transition-colors">
+              <td class="px-4 py-3.5">
+                <div class="flex items-center gap-3">
+                  <div class="w-9 h-9 rounded-full bg-gradient-to-br flex items-center justify-center text-white font-semibold text-[13px] shadow-sm flex-shrink-0"
+                       :class="s.is_active ? 'from-emerald-400 to-emerald-500' : 'from-gray-300 to-gray-400'">
+                    <span x-text="(s.name||'?')[0].toUpperCase()"></span>
+                  </div>
+                  <div>
+                    <a :href="'/dashboard/gestor/vendedores/' + s.uuid + '/'" class="text-[14px] font-semibold text-gray-900 hover:text-brand-600 transition-colors" x-text="s.name"></a>
+                    <p class="text-[11px] text-gray-400">
+                      <span x-text="s.phone || 'Sem telefone'"></span>
+                      <template x-if="s.cpf_formatted">
+                        <span> • <span class="text-gray-500" x-text="s.cpf_formatted"></span></span>
+                      </template>
+                      <template x-if="!s.cpf_formatted">
+                        <span class="text-amber-500 ml-1">⚠ sem CPF</span>
+                      </template>
+                    </p>
+                  </div>
+                </div>
+              </td>
+              <td class="px-4 py-3.5 text-[13px] text-gray-700 hidden md:table-cell" x-text="(s.submitted_days || 0) + '/' + (s.expected_days || 22)"></td>
+              <td class="px-4 py-3.5 hidden md:table-cell">
+                <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-medium"
+                      :class="{'bg-emerald-50 text-emerald-700': s.operational_status==='PRONTO', 'bg-amber-50 text-amber-700': s.operational_status==='PENDENTE', 'bg-gray-100 text-gray-600': s.operational_status==='SEM_LANCAMENTO'}">
+                  <span class="w-1.5 h-1.5 rounded-full"
+                        :class="{'bg-emerald-500': s.operational_status==='PRONTO', 'bg-amber-500': s.operational_status==='PENDENTE', 'bg-gray-400': s.operational_status==='SEM_LANCAMENTO'}"></span>
+                  <span x-text="s.operational_status==='PRONTO' ? 'Pronto' : s.operational_status==='PENDENTE' ? 'Pendente' : s.operational_status==='SEM_LANCAMENTO' ? 'Sem lanc.' : s.operational_status || '—'"></span>
+                </span>
+              </td>
+              <td class="px-4 py-3.5 font-semibold text-[14px] text-gray-900" x-text="formatMoneyBRL(s.month_total || 0)"></td>
+              <td class="px-4 py-3.5 font-semibold text-[14px] text-brand-600 hidden sm:table-cell" x-text="formatMoneyBRL(s.commission_amount || 0)"></td>
+              <td class="px-4 py-3.5 hidden lg:table-cell">
+                <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-medium"
+                      :class="{
+                        'bg-emerald-50 text-emerald-700': s.financial_status==='PAGA',
+                        'bg-amber-50 text-amber-700': s.financial_status==='FECHADA',
+                        'bg-orange-50 text-orange-700': s.financial_status==='PARCIALMENTE_FECHADA',
+                        'bg-teal-50 text-teal-700': s.financial_status==='PARCIALMENTE_PAGA',
+                        'bg-sky-50 text-sky-700': s.financial_status==='AJUSTADA',
+                        'bg-purple-50 text-purple-700': s.financial_status==='REABERTA',
+                        'bg-red-50 text-red-700': s.financial_status==='CANCELADA',
+                        'bg-gray-100 text-gray-600': s.financial_status==='ABERTA'
+                      }">
+                  <span class="w-1.5 h-1.5 rounded-full"
+                        :class="{
+                          'bg-emerald-500': s.financial_status==='PAGA',
+                          'bg-amber-500': s.financial_status==='FECHADA',
+                          'bg-orange-500': s.financial_status==='PARCIALMENTE_FECHADA',
+                          'bg-teal-500': s.financial_status==='PARCIALMENTE_PAGA',
+                          'bg-sky-500': s.financial_status==='AJUSTADA',
+                          'bg-purple-500': s.financial_status==='REABERTA',
+                          'bg-red-500': s.financial_status==='CANCELADA',
+                          'bg-gray-400': s.financial_status==='ABERTA'
+                        }"></span>
+                  <span x-text="
+                    s.financial_status==='PAGA' ? 'Paga' :
+                    s.financial_status==='FECHADA' ? 'Fechada' :
+                    s.financial_status==='PARCIALMENTE_FECHADA' ? 'Parcialmente fechada' :
+                    s.financial_status==='PARCIALMENTE_PAGA' ? 'Parcialmente paga' :
+                    s.financial_status==='AJUSTADA' ? 'Ajustada' :
+                    s.financial_status==='REABERTA' ? 'Reaberta' :
+                    s.financial_status==='CANCELADA' ? 'Cancelada' :
+                    s.financial_status || 'Aberta'"></span>
+                </span>
+              </td>
+              <td class="px-4 py-3.5 text-[13px] text-gray-500 hidden lg:table-cell">
+                <span x-text="s.last_sale_date || '—'"></span>
+                <span x-show="s.has_sale_today" class="ml-1.5 inline-flex items-center gap-1 px-1.5 py-0.5 bg-emerald-50 text-emerald-600 rounded-full text-[10px] font-medium">
+                  <span class="w-1 h-1 rounded-full bg-emerald-500"></span>
+                  Hoje
+                </span>
+              </td>
+              <td class="px-4 py-3.5 text-right">
+                <div class="flex justify-end gap-0.5">
+                  <a :href="'/dashboard/gestor/vendedores/' + s.uuid + '/'" class="p-2 text-gray-400 hover:text-brand-500 rounded-lg hover:bg-brand-50 transition-all" title="Ver detalhes">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
+                  </a>
+                  <button @click="openEditModal(s)" class="p-2 text-gray-400 hover:text-brand-500 rounded-lg hover:bg-brand-50 transition-all" title="Editar">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
+                  </button>
+                  <button @click="toggleActive(s)" class="p-2 text-gray-400 hover:text-amber-500 rounded-lg hover:bg-amber-50 transition-all" title="Ativar/Desativar">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
+                  </button>
+                  <button @click="resetPassword(s)" class="p-2 text-gray-400 hover:text-brand-500 rounded-lg hover:bg-brand-50 transition-all" title="Resetar senha">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"/></svg>
+                  </button>
+                  <button @click="confirmDelete(s)" class="p-2 text-gray-400 hover:text-red-500 rounded-lg hover:bg-red-50 transition-all" title="Excluir">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+                  </button>
+                </div>
+              </td>
+            </tr>
+          </template>
+          <tr x-show="!filteredSellers.length">
+            <td colspan="8" class="text-center py-12">
+              <div class="w-14 h-14 mx-auto mb-4 rounded-2xl bg-gray-50 flex items-center justify-center">
+                <svg class="w-7 h-7 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+              </div>
+              <p class="text-[14px] font-medium text-gray-500 mb-1" x-text="search ? 'Nenhum vendedor encontrado para "' + search + '"' : 'Nenhum vendedor cadastrado'"></p>
+              <p class="text-[12px] text-gray-400 mb-4" x-show="!search">Clique em "Novo Vendedor" para cadastrar.</p>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div x-show="showModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm" @click.self="showModal=false">
+    <div class="bg-white rounded-2xl shadow-xl p-6 w-full max-w-md mx-4" @click.stop>
+      <div class="flex items-center gap-3 mb-5">
+        <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-brand-400 to-brand-500 flex items-center justify-center shadow-sm">
+          <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z"/></svg>
+        </div>
+        <div><h2 class="text-[16px] font-semibold text-gray-900" x-text="editing?'Editar Vendedor':'Novo Vendedor'"></h2><p class="text-[12px] text-gray-400" x-text="editing?'Altere os dados do vendedor':'Cadastre um novo vendedor'"></p></div>
+      </div>
+      <form @submit.prevent="editing?updateSeller():createSeller()" class="space-y-4">
+        <div>
+          <label class="block text-[13px] font-medium text-gray-700 mb-1.5">Nome</label>
+          <input type="text" x-model="form.name" required
+                 class="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-[14px] outline-none transition-all focus:border-brand-400 focus:ring-2 focus:ring-brand-100 focus:bg-white"
+                 placeholder="Nome completo">
+        </div>
+          <div>
+           <label class="block text-[13px] font-medium text-gray-700 mb-1.5">Telefone</label>
+           <input type="text" x-model="form.phone" @input="maskPhone('form.phone')" required
+                  class="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-[14px] outline-none transition-all focus:border-brand-400 focus:ring-2 focus:ring-brand-100 focus:bg-white"
+                  placeholder="(31) 99999-9999">
+         </div>
+         <div>
+           <label class="block text-[13px] font-medium text-gray-700 mb-1.5">CPF <span class="text-gray-400 font-normal">(opcional)</span></label>
+           <input type="text" x-model="form.cpf" @input="maskCpf('form.cpf')"
+                  class="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-[14px] outline-none transition-all focus:border-brand-400 focus:ring-2 focus:ring-brand-100 focus:bg-white"
+                  placeholder="000.000.000-00">
+         </div>
+         <div x-show="editing">
+           <label class="block text-[13px] font-medium text-gray-700 mb-1.5">Taxa de Comissao (%)</label>
+           <div class="relative max-w-[160px]">
+             <input type="number" x-model="form.commission_rate" step="0.01" min="0" max="100"
+                    class="w-full px-4 py-2.5 pr-8 bg-gray-50 border border-gray-200 rounded-xl text-[14px] outline-none transition-all focus:border-brand-400 focus:ring-2 focus:ring-brand-100 focus:bg-white">
+             <span class="absolute right-3 top-1/2 -translate-y-1/2 text-[14px] text-gray-400 font-medium">%</span>
+           </div>
+         </div>
+        <div class="flex gap-3 justify-end pt-2">
+          <button type="button" @click="showModal=false" class="px-5 py-2.5 bg-white border border-gray-200 text-gray-700 font-medium rounded-xl transition-all text-[14px] hover:bg-gray-50 active:scale-[0.97]">Cancelar</button>
+          <button type="submit" class="px-5 py-2.5 bg-gray-900 hover:bg-gray-800 text-white font-semibold rounded-xl transition-all text-[14px] shadow-sm active:scale-[0.97]" x-text="editing?'Salvar':'Criar'"></button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div x-show="showPasswordModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm" @click.self="showPasswordModal=false">
+    <div class="bg-white rounded-2xl shadow-xl p-6 w-full max-w-sm mx-4 text-center">
+      <div class="w-14 h-14 mx-auto mb-4 rounded-2xl bg-gradient-to-br from-emerald-400 to-emerald-500 flex items-center justify-center shadow-sm">
+        <svg class="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+      </div>
+      <h3 class="text-[17px] font-bold text-gray-900 mb-1" x-text="passwordAction=='create'?'Vendedor criado!':'Senha redefinida!'"></h3>
+      <p class="text-[13px] text-gray-500 mb-4">As credenciais foram enviadas por WhatsApp.</p>
+      <div class="bg-gray-50 rounded-xl p-4 mb-5 text-left">
+        <p class="text-[12px] text-gray-500 mb-1">Usuario:</p>
+        <p class="text-[15px] font-semibold text-gray-900 break-all" x-text="passwordResult.username"></p>
+      </div>
+      <button @click="showPasswordModal=false" class="w-full bg-gray-900 hover:bg-gray-800 text-white font-semibold py-3 px-5 rounded-xl transition-all text-[14px] shadow-sm active:scale-[0.97]">Entendi</button>
+    </div>
+  </div>
+
+  <div x-show="showImportModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm" @click.self="showImportModal=false">
+    <div class="bg-white rounded-2xl shadow-xl p-6 w-full max-w-lg mx-4">
+      <div class="flex items-center gap-3 mb-5">
+        <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-400 to-emerald-500 flex items-center justify-center shadow-sm">
+          <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5 5 5-5M12 15V3"></path></svg>
+        </div>
+        <div><h2 class="text-[16px] font-semibold text-gray-900">Importar Vendedores</h2><p class="text-[12px] text-gray-400">CSV ou XLSX com colunas <strong>nome</strong>, <strong>telefone</strong>, <strong>cpf</strong> (opcional)</p></div>
+      </div>
+
+      <div x-show="!importResult">
+        <div @drop.prevent="handleFileDrop($event)" @dragover.prevent="dragOver=true" @dragleave.prevent="dragOver=false"
+             class="border-2 border-dashed rounded-xl p-8 text-center cursor-pointer hover:bg-gray-50 transition"
+             :class="{'border-brand-500 bg-brand-50': dragOver, 'border-gray-200': !dragOver}"
+             @click="$refs.fileInput.click()">
+          <svg class="w-10 h-10 mx-auto mb-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path></svg>
+          <p class="text-[14px] font-medium text-gray-700" x-text="selectedFile ? selectedFile.name : 'Clique ou arraste o arquivo aqui'"></p>
+          <p class="text-[12px] text-gray-400 mt-1">CSV ou XLSX — nome, telefone, cpf (opcional)</p>
+          <input type="file" x-ref="fileInput" accept=".csv,.xlsx" @change="selectedFile = $refs.fileInput.files[0]" class="hidden">
+        </div>
+        <div class="mt-5 flex gap-3 justify-end">
+          <button type="button" @click="showImportModal=false; selectedFile=null" class="px-5 py-2.5 bg-white border border-gray-200 text-gray-700 font-medium rounded-xl transition-all text-[14px] hover:bg-gray-50 active:scale-[0.97]">Cancelar</button>
+          <button type="button" @click="importSellers()" :disabled="!selectedFile || importing"
+                  class="px-5 py-2.5 bg-gray-900 hover:bg-gray-800 disabled:bg-gray-300 text-white font-semibold rounded-xl transition-all text-[14px] shadow-sm active:scale-[0.97]"
+                  x-text="importing ? 'Importando...' : 'Importar'"></button>
+        </div>
+      </div>
+
+      <div x-show="importResult" class="space-y-4">
+        <div class="flex items-center gap-3 p-4 rounded-xl" :class="importResult.erros > 0 ? 'bg-amber-50' : 'bg-emerald-50'">
+          <div class="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0" :class="importResult.erros > 0 ? 'bg-amber-100' : 'bg-emerald-100'">
+            <svg class="w-5 h-5" :class="importResult.erros > 0 ? 'text-amber-600' : 'text-emerald-600'" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+          </div>
+          <div>
+            <p class="text-[14px] font-semibold" :class="importResult.erros > 0 ? 'text-amber-800' : 'text-emerald-800'" x-text="importResult.criados + ' de ' + importResult.total + ' vendedores importados'"></p>
+            <p class="text-[12px]" :class="importResult.erros > 0 ? 'text-amber-600' : 'text-emerald-600'" x-text="importResult.erros + ' erro(s)'"></p>
+          </div>
+        </div>
+        <div x-show="importResult.errors.length" class="bg-red-50 rounded-xl p-4 max-h-40 overflow-y-auto">
+          <p class="text-[13px] font-semibold text-red-700 mb-2">Erros:</p>
+          <template x-for="e in importResult.errors" :key="e.linha">
+            <p class="text-[12px] text-red-600 leading-relaxed">Linha <span x-text="e.linha"></span>: <span x-text="e.erro"></span></p>
+          </template>
+        </div>
+        <div class="flex gap-3 justify-end">
+          <button type="button" @click="showImportModal=false; selectedFile=null; importResult=null; loadSellers()"
+                  class="px-5 py-2.5 bg-gray-900 hover:bg-gray-800 text-white font-semibold rounded-xl transition-all text-[14px] shadow-sm active:scale-[0.97]">Concluir</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div x-show="showDeleteModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm" @click.self="showDeleteModal=false">
+    <div class="bg-white rounded-2xl shadow-xl p-6 w-full max-w-sm mx-4 text-center">
+      <div class="w-14 h-14 mx-auto mb-4 rounded-2xl bg-red-50 flex items-center justify-center">
+        <svg class="w-7 h-7 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"/></svg>
+      </div>
+      <h3 class="text-[17px] font-bold text-gray-900 mb-2">Excluir Vendedor</h3>
+      <p class="text-[13px] text-gray-500 mb-5">Tem certeza que deseja excluir <strong x-text="deletingSeller?.name"></strong>? Esta acao nao pode ser desfeita.</p>
+      <div class="flex gap-3 justify-center">
+        <button type="button" @click="showDeleteModal=false" class="px-5 py-2.5 bg-white border border-gray-200 text-gray-700 font-medium rounded-xl transition-all text-[14px] hover:bg-gray-50 active:scale-[0.97]">Cancelar</button>
+        <button type="button" @click="executeDelete()" class="px-5 py-2.5 bg-red-600 hover:bg-red-700 text-white font-semibold rounded-xl transition-all text-[14px] shadow-sm active:scale-[0.97]">Excluir</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+function getCSRFToken() {
+    var name = 'csrftoken';
+    var cookies = document.cookie.split(';');
+    for (var i = 0; i < cookies.length; i++) {
+        var c = cookies[i].trim();
+        if (c.indexOf(name + '=') === 0) return c.substring(name.length + 1);
+    }
+    return '';
+}
+
+function maskPhone(path) {
+    var digits = this.getPropertyAtPath(path).replace(/\D/g, '');
+    var formatted = '';
+    if (digits.length > 0) formatted = '(' + digits.slice(0, 2);
+    if (digits.length > 2) formatted += ') ' + digits.slice(2, 7);
+    if (digits.length > 7) formatted += '-' + digits.slice(7, 11);
+    this.setPropertyAtPath(path, formatted.slice(0, 16));
+}
+
+function maskCpf(path) {
+    var digits = (this.getPropertyAtPath(path) || '').replace(/\D/g, '').slice(0, 11);
+    var formatted = '';
+    if (digits.length > 0) formatted = digits.slice(0, 3);
+    if (digits.length > 3) formatted += '.' + digits.slice(3, 6);
+    if (digits.length > 6) formatted += '.' + digits.slice(6, 9);
+    if (digits.length > 9) formatted += '-' + digits.slice(9);
+    this.setPropertyAtPath(path, formatted);
+}
+
+function vendedoresPage() {
+    return {
+        sellers: [], search: '', filterStatus: 'todos',
+        showModal: false, editing: false, showPasswordModal: false,
+        showImportModal: false, importing: false, selectedFile: null, importResult: null,
+        showDeleteModal: false, deletingSeller: null,
+        dragOver: false,
+        passwordResult: {}, passwordAction: '',
+        form: { name: '', phone: '', cpf: '', commission_rate: '1.00' },
+        stats: { total: 0, ativos: 0, comVendaNoMes: 0, semLancamento: 0, semLancamentoHoje: 0, prontos: 0, pendentes: 0, cancelados: 0, comissaoAberta: 0, comissaoPaga: 0, comissaoCancelada: 0, comissaoFechada: 0 },
+
+        get filteredSellers() {
+            var list = this.sellers;
+            if (this.filterStatus !== 'todos') list = list.filter(s => s.operational_status === this.filterStatus);
+            if (this.search) {
+                var q = this.search.toLowerCase();
+                list = list.filter(s => (s.name || '').toLowerCase().includes(q) || (s.phone || '').includes(q));
+            }
+            return list;
+        },
+
+        getPropertyAtPath(path) {
+            return path.split('.').reduce((obj, key) => obj && obj[key], this);
+        },
+        setPropertyAtPath(path, value) {
+            var keys = path.split('.');
+            var obj = this;
+            for (var i = 0; i < keys.length - 1; i++) obj = obj[keys[i]];
+            obj[keys[keys.length - 1]] = value;
+        },
+        async loadSellers() {
+            var r = await fetch('/api/sellers/');
+            var list = await r.json();
+            var hoje = new Date();
+            var mes = hoje.getMonth() + 1;
+            var ano = hoje.getFullYear();
+            var enriched = await Promise.all(list.map(async (s) => {
+                var detail = { month_total: 0, commission_amount: 0, submitted_days: 0, expected_days: 22, operational_status: 'SEM_LANCAMENTO', financial_status: 'ABERTA', last_sale_date: null, has_sale_today: false };
+                try {
+                    var d = await fetch('/api/manager/seller/' + s.uuid + '/?month=' + mes + '&year=' + ano).then(r => r.json());
+                    detail.month_total = d.manual_total || 0;
+                    if (d.commissions && d.commissions.length) {
+                        var c = d.commissions[0];
+                        detail.commission_amount = c.commission_amount || 0;
+                        detail.financial_status = c.status || c.period_status || 'ABERTA';
+                        detail.submitted_days = c.submitted_days_count || 0;
+                        detail.expected_days = c.expected_working_days || 22;
+                        detail.operational_status = c.operational_status || 'SEM_LANCAMENTO';
+                    }
+                    if (d.manual_sales && d.manual_sales.length) {
+                        var last = d.manual_sales[0];
+                        detail.last_sale_date = new Date(last.sale_date).toLocaleDateString('pt-BR');
+                        detail.has_sale_today = last.sale_date === new Date().toISOString().split('T')[0];
+                    }
+                } catch(e) {}
+                return Object.assign({}, s, detail);
+            }));
+            this.sellers = enriched;
+            this.stats.total = enriched.length;
+            this.stats.ativos = enriched.filter(s => s.is_active).length;
+            this.stats.comVendaNoMes = enriched.filter(s => s.month_total > 0).length;
+            this.stats.prontos = enriched.filter(s => s.operational_status === 'PRONTO').length;
+            this.stats.pendentes = enriched.filter(s => s.operational_status === 'PENDENTE').length;
+            this.stats.semLancamento = enriched.filter(s => s.operational_status === 'SEM_LANCAMENTO').length;
+            this.stats.cancelados = enriched.filter(s => s.financial_status === 'CANCELADA').length;
+            this.stats.semLancamentoHoje = enriched.filter(s => s.is_active && !s.has_sale_today).length;
+            this.stats.comissaoAberta = enriched.reduce((a, s) => s.financial_status === 'ABERTA' ? a + (s.commission_amount || 0) : a, 0);
+            this.stats.comissaoPaga = enriched.reduce((a, s) => s.financial_status === 'PAGA' ? a + (s.commission_amount || 0) : a, 0);
+            this.stats.comissaoFechada = enriched.reduce((a, s) => s.financial_status === 'FECHADA' || s.financial_status === 'PARCIALMENTE_FECHADA' ? a + (s.commission_amount || 0) : a, 0);
+            this.stats.comissaoCancelada = enriched.reduce((a, s) => s.financial_status === 'CANCELADA' ? a + (s.commission_amount || 0) : a, 0);
+        },
+        openCreateModal() { this.editing = false; this.form = { name: '', phone: '', cpf: '', commission_rate: '1.00' }; this.showModal = true; },
+        openEditModal(s) { this.editing = true; this.form = { uuid: s.uuid, name: s.name, phone: s.phone, cpf: s.cpf_formatted || s.cpf || '', commission_rate: String(parseFloat(s.commission_rate)*100) }; this.showModal = true; },
+        async createSeller() {
+            var body = { name:this.form.name, phone:this.form.phone };
+            if (this.form.cpf) body.cpf = this.form.cpf;
+            var r = await fetch('/api/sellers/', { method:'POST', headers:{'Content-Type':'application/json', 'X-CSRFToken': getCSRFToken()}, body: JSON.stringify(body) });
+            var d = await r.json();
+            if (r.ok) { this.showModal = false; this.passwordResult = d; this.passwordAction = 'create'; this.showPasswordModal = true; this.loadSellers(); }
+            else showToast(Object.values(d).flat().join('\n'), 'error');
+        },
+        async updateSeller() {
+            var b = { name:this.form.name, phone:this.form.phone, commission_rate: String(parseFloat(this.form.commission_rate)/100) };
+            b.cpf = this.form.cpf ? this.form.cpf : null;
+            var r = await fetch(`/api/sellers/${this.form.uuid}/`, { method:'PATCH', headers:{'Content-Type':'application/json', 'X-CSRFToken': getCSRFToken()}, body: JSON.stringify(b) });
+            if (r.ok) { this.showModal = false; this.loadSellers(); } else { var d = await r.json(); showToast(Object.values(d).flat().join('\n'), 'error'); }
+        },
+        async toggleActive(s) { await fetch(`/api/sellers/${s.uuid}/`, { method:'PATCH', headers:{'Content-Type':'application/json', 'X-CSRFToken': getCSRFToken()}, body:JSON.stringify({is_active:!s.is_active}) }); this.loadSellers(); },
+        async resetPassword(s) { var r = await fetch(`/api/sellers/${s.uuid}/reset_password/`, { method:'POST', headers:{'X-CSRFToken': getCSRFToken()} }); var d = await r.json(); if (r.ok) { this.passwordResult = d; this.passwordAction = 'reset'; this.showPasswordModal = true; } },
+        confirmDelete(s) { this.deletingSeller = s; this.showDeleteModal = true; },
+        async executeDelete() {
+            if (!this.deletingSeller) return;
+            var r = await fetch(`/api/sellers/${this.deletingSeller.uuid}/`, { method:'DELETE', headers:{'X-CSRFToken': getCSRFToken()} });
+            this.showDeleteModal = false; this.deletingSeller = null;
+            if (r.ok) this.loadSellers();
+            else { var d = await r.json(); showToast(Object.values(d).flat().join('\n'), 'error'); }
+        },
+        async handleFileDrop(event) {
+            this.dragOver = false;
+            var file = event.dataTransfer.files[0];
+            if (file && (file.name.endsWith('.csv') || file.name.endsWith('.xlsx'))) this.selectedFile = file;
+        },
+        async importSellers() {
+            if (!this.selectedFile) return;
+            this.importing = true;
+            var formData = new FormData();
+            formData.append('file', this.selectedFile);
+            var r = await fetch('/api/sellers/import_sellers/', { method:'POST', headers:{'X-CSRFToken': getCSRFToken()}, body: formData });
+            if (!r.ok) { this.importing = false; this.showImportModal = false; this.selectedFile = null; showToast('Erro ao importar.', 'error'); return; }
+            this.importResult = await r.json();
+            this.importing = false;
+        },
+    }
+}
+</script>
+{% endblock %}

@@ -1,0 +1,136 @@
+{% extends 'dashboard/base_desktop.html' %}
+{% block title %}Ranking — Mérito{% endblock %}
+{% block content %}
+<div x-data="rankingPage()" x-init="load()" class="max-w-7xl mx-auto">
+
+  <div class="sticky top-0 z-10 -mx-6 px-6 py-4 bg-gray-50/90 backdrop-blur-lg border-b border-gray-200/60 mb-6">
+    <div class="flex items-center justify-between">
+      <div>
+        <h1 class="font-display text-[22px] font-bold text-gray-900 tracking-tight">Ranking de Vendedores</h1>
+        <p class="text-[13px] text-gray-500 mt-0.5">Apenas vendas manuais entram no ranking</p>
+      </div>
+      <div class="flex items-center gap-2">
+        <select x-model="month" @change="load()" class="px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-[13px] outline-none transition-all focus:border-brand-400 focus:ring-2 focus:ring-brand-100">
+          <template x-for="m in 12" :key="m"><option :value="m" x-text="String(m).padStart(2,'0')"></option></template>
+        </select>
+        <select x-model="year" @change="load()" class="px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-[13px] outline-none transition-all focus:border-brand-400 focus:ring-2 focus:ring-brand-100">
+          <option value="2025">2025</option><option value="2026">2026</option><option value="2027">2027</option>
+        </select>
+      </div>
+    </div>
+  </div>
+
+  <div x-show="!ranking.length" class="text-center py-20">
+    <div class="w-16 h-16 mx-auto mb-4 rounded-2xl bg-gray-50 flex items-center justify-center">
+      <svg class="w-8 h-8 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
+    </div>
+    <p class="text-[15px] font-medium text-gray-500 mb-1">Nenhuma venda manual neste periodo</p>
+    <p class="text-[13px] text-gray-400">Selecione outro mes ou ano</p>
+  </div>
+
+  <div x-show="ranking.length">
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+      <div class="lg:col-span-2 bg-white rounded-2xl border border-gray-100 shadow-[0_1px_3px_-1px_rgba(0,0,0,0.04),0_4px_16px_-4px_rgba(67,97,238,0.06)] p-6">
+        <h3 class="text-[13px] font-semibold text-gray-400 uppercase tracking-wider mb-4">Vendas do mes</h3>
+        <div class="h-64"><canvas id="rankingChart"></canvas></div>
+      </div>
+      <div class="bg-white rounded-2xl border border-gray-100 shadow-[0_1px_3px_-1px_rgba(0,0,0,0.04),0_4px_16px_-4px_rgba(67,97,238,0.06)] p-6 text-center" x-show="topSeller">
+        <div class="w-14 h-14 mx-auto mb-4 rounded-2xl bg-gradient-to-br from-amber-400 to-amber-500 flex items-center justify-center shadow-sm">
+          <svg class="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z"/></svg>
+        </div>
+        <p class="text-[11px] font-semibold text-gray-400 uppercase tracking-[0.08em] mb-3">Vendedor do mes</p>
+        <p class="font-display text-[34px] font-bold text-gray-900 leading-tight" x-text="formatMoneyBRL(topSeller?.total_sold || 0)"></p>
+        <p class="text-[15px] font-medium text-gray-700 mt-2">
+          <a :href="'/dashboard/gestor/vendedores/' + (topSeller?.seller__uuid || '') + '/'" class="text-brand-600 hover:text-brand-700 font-semibold hover:underline" x-text="topSeller?.seller__name || '-'"></a>
+        </p>
+        <div class="mt-4 pt-4 border-t border-gray-100 grid grid-cols-2 gap-3">
+          <div>
+            <p class="text-[11px] text-gray-400 uppercase tracking-wider">Vendas</p>
+            <p class="text-[18px] font-bold text-gray-800" x-text="topSeller?.sale_count || 0"></p>
+          </div>
+          <div>
+            <p class="text-[11px] text-gray-400 uppercase tracking-wider">Comissao</p>
+            <p class="text-[18px] font-bold text-emerald-600" x-text="formatMoneyBRL(topSeller?.commission_estimada || 0)"></p>
+          </div>
+          <div class="col-span-2">
+            <p class="text-[11px] text-gray-400 uppercase tracking-wider">Taxa</p>
+            <p class="text-[18px] font-bold text-gray-800" x-text="topSeller?.commission_rate ? (topSeller.commission_rate*100).toFixed(2)+'%' : '-'"></p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="bg-white rounded-2xl border border-gray-100 shadow-[0_1px_3px_-1px_rgba(0,0,0,0.04),0_4px_16px_-4px_rgba(67,97,238,0.06)] overflow-hidden">
+      <div class="px-6 py-4 border-b border-gray-100">
+        <h3 class="text-[13px] font-semibold text-gray-400 uppercase tracking-wider">Classificacao</h3>
+      </div>
+      <div class="overflow-x-auto">
+        <table class="w-full text-left">
+          <thead>
+            <tr class="bg-gray-50/80">
+              <th class="px-4 py-3 text-[11px] font-semibold text-gray-500 uppercase tracking-wider w-12">#</th>
+              <th class="px-4 py-3 text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Vendedor</th>
+              <th class="px-4 py-3 text-[11px] font-semibold text-gray-500 uppercase tracking-wider text-right">Total</th>
+              <th class="px-4 py-3 text-[11px] font-semibold text-gray-500 uppercase tracking-wider text-right hidden sm:table-cell">Vendas</th>
+              <th class="px-4 py-3 text-[11px] font-semibold text-gray-500 uppercase tracking-wider text-right hidden md:table-cell">Ticket Medio</th>
+              <th class="px-4 py-3 text-[11px] font-semibold text-gray-500 uppercase tracking-wider text-right hidden sm:table-cell">Taxa</th>
+              <th class="px-4 py-3 text-[11px] font-semibold text-gray-500 uppercase tracking-wider text-right">Comissao</th>
+            </tr>
+          </thead>
+          <tbody>
+            <template x-for="(s, i) in ranking" :key="s.seller__uuid">
+              <tr class="border-b border-gray-50 hover:bg-gray-50/50 transition-colors">
+                <td class="px-4 py-4">
+                  <span class="inline-flex items-center justify-center w-7 h-7 rounded-full text-[12px] font-bold"
+                        :class="i === 0 ? 'bg-amber-100 text-amber-700' : i === 1 ? 'bg-gray-200 text-gray-600' : i === 2 ? 'bg-orange-100 text-orange-700' : 'bg-gray-100 text-gray-400'"
+                        x-text="i + 1"></span>
+                </td>
+                <td class="px-4 py-4">
+                  <a :href="'/dashboard/gestor/vendedores/' + s.seller__uuid + '/'" class="text-[14px] font-semibold text-gray-900 hover:text-brand-600 transition-colors" x-text="s.seller__name"></a>
+                </td>
+                <td class="px-4 py-4 font-semibold text-[14px] text-gray-900 text-right" x-text="formatMoneyBRL(s.total_sold)"></td>
+                <td class="px-4 py-4 text-[13px] text-gray-700 text-right hidden sm:table-cell" x-text="s.sale_count + (s.sale_count === 1 ? ' venda' : ' vendas')"></td>
+                <td class="px-4 py-4 text-[13px] text-gray-600 text-right hidden md:table-cell" x-text="formatMoneyBRL(s.ticket_medio || 0)"></td>
+                <td class="px-4 py-4 text-[13px] text-gray-600 text-right hidden sm:table-cell" x-text="(s.commission_rate*100).toFixed(2)+'%'"></td>
+                <td class="px-4 py-4 font-semibold text-[14px] text-emerald-600 text-right" x-text="formatMoneyBRL(s.commission_estimada)"></td>
+              </tr>
+            </template>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+function rankingPage() {
+    return {
+        month: new Date().getMonth()+1, year: new Date().getFullYear(), ranking: [], topSeller: null, chart: null,
+        async load() {
+            var r = await fetch(`/api/manager/ranking/?month=${this.month}&year=${this.year}`);
+            var d = await r.json();
+            this.ranking = d.ranking || []; this.topSeller = d.top_seller || null;
+            this.$nextTick(() => this.drawChart());
+        },
+        drawChart() {
+            if (this.chart) this.chart.destroy();
+            var ctx = document.getElementById('rankingChart');
+            if (!ctx || !this.ranking.length) return;
+            this.chart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: this.ranking.map(s => s.seller__name),
+                    datasets: [{
+                        label: 'Total Vendido (R$)',
+                        data: this.ranking.map(s => s.total_sold / 100),
+                        backgroundColor: this.ranking.map((_, i) => i === 0 ? '#0B3CA3' : '#66a3ff'),
+                        borderRadius: 8,
+                    }]
+                },
+                options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true } } }
+            });
+        },
+    }
+}
+</script>
+{% endblock %}

@@ -1,0 +1,66 @@
+{% extends 'dashboard/base_desktop.html' %}
+{% block title %}Historico de Pagamentos — Mérito{% endblock %}
+{% block content %}
+<div x-data="historicoPage()" x-init="load()">
+    <h1 class="font-display text-[18px] font-semibold text-gray-900 mb-1">Historico de Pagamentos</h1>
+    <p class="text-[13px] text-gray-500 mb-6">Comissoes pagas por vendedor.</p>
+
+    <template x-for="group in periodGroups" :key="group.period.uuid">
+        <div class="surface-card mb-4">
+            <div class="flex items-center justify-between mb-3">
+                <div>
+                    <h3 class="font-semibold text-[16px]" x-text="String(group.period.month).padStart(2,'0')+'/'+group.period.year"></h3>
+                    <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium mt-1"
+                          :class="{'bg-success-50 text-success-700': group.period.status==='PAGA', 'bg-amber-50 text-amber-700': group.period.status==='PARCIALMENTE_PAGA', 'bg-gray-100 text-gray-600': group.period.status==='AJUSTADA'}"
+                          x-text="group.period.status"></span>
+                </div>
+                <a :href="'/api/financial/commissions/'+group.period.uuid+'/csv/'" class="bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium py-2 px-4 rounded-xl transition text-[13px] flex items-center gap-1">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+                    CSV
+                </a>
+            </div>
+
+            <table class="w-full text-left text-[13px]">
+                <thead><tr><th class="px-3 py-2 font-semibold text-gray-500 border-b bg-gray-50">Vendedor</th><th class="px-3 py-2 font-semibold text-gray-500 border-b bg-gray-50">Total Vendido</th><th class="px-3 py-2 font-semibold text-gray-500 border-b bg-gray-50">Comissao</th><th class="px-3 py-2 font-semibold text-gray-500 border-b bg-gray-50">Pago em</th><th class="px-3 py-2 font-semibold text-gray-500 border-b bg-gray-50">Forma</th><th class="px-3 py-2 font-semibold text-gray-500 border-b bg-gray-50">Status</th></tr></thead>
+                <tbody>
+                    <template x-for="sc in group.commissions" :key="sc.id">
+                        <tr class="hover:bg-gray-50">
+                            <td class="px-3 py-2 border-b font-medium" x-text="sc.seller_name"></td>
+                            <td class="px-3 py-2 border-b" x-text="formatMoneyBRL(sc.total_sold_amount)"></td>
+                            <td class="px-3 py-2 border-b font-semibold text-brand-500" x-text="formatMoneyBRL(sc.commission_amount)"></td>
+                            <td class="px-3 py-2 border-b text-gray-500" x-text="sc.payment_date ? new Date(sc.payment_date).toLocaleDateString('pt-BR') : (sc.paid_at ? new Date(sc.paid_at).toLocaleDateString('pt-BR') : '—')"></td>
+                            <td class="px-3 py-2 border-b text-gray-500" x-text="sc.payment_method || '—'"></td>
+                            <td class="px-3 py-2 border-b">
+                                <span class="text-xs px-1.5 py-0.5 rounded-full" :class="{'bg-success-50 text-success-700': sc.status==='PAGA', 'bg-amber-50 text-amber-700': sc.status==='AJUSTADA'}" x-text="sc.status"></span>
+                            </td>
+                        </tr>
+                    </template>
+                </tbody>
+            </table>
+            <div x-show="!group.commissions.length" class="text-[13px] text-gray-500 py-3">Nenhum pagamento registrado.</div>
+        </div>
+    </template>
+    <div x-show="!periodGroups.length" class="text-center py-12 text-gray-500">Nenhum pagamento encontrado.</div>
+</div>
+
+<script>
+function historicoPage() {
+    return {
+        periodGroups: [],
+        async load() {
+            var statuses = ['PAGA', 'PARCIALMENTE_PAGA', 'AJUSTADA'];
+            var all = await Promise.all(statuses.map(s =>
+                fetch('/api/manager/commissions/' + s + '/').then(r => r.json())
+            ));
+            var merged = all.flat().sort((a,b) => b.year - a.year || b.month - a.month);
+            this.periodGroups = merged.map(p => ({
+                period: p,
+                commissions: (p.seller_commissions || []).filter(sc =>
+                    sc.status === 'PAGA' || sc.status === 'AJUSTADA'
+                )
+            })).filter(g => g.commissions.length > 0);
+        }
+    }
+}
+</script>
+{% endblock %}

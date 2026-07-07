@@ -1,0 +1,99 @@
+{% load currency_filters %}
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <title>Recibo de Comissao — {{ period.month|stringformat:"02d" }}/{{ period.year }}</title>
+    <style>
+        @page { size: A4; margin: 2cm; }
+        body { font-family: 'Inter', system-ui, sans-serif; color: #1e293b; font-size: 11pt; line-height: 1.6; }
+        .header { text-align: center; margin-bottom: 24pt; border-bottom: 2pt solid #1463FF; padding-bottom: 12pt; }
+        .header h1 { font-size: 16pt; font-weight: 700; color: #1463FF; margin: 0 0 4pt; }
+        .header p { font-size: 10pt; color: #64748b; margin: 2pt 0; }
+        .title { font-size: 14pt; font-weight: 700; margin: 20pt 0 12pt; color: #1e293b; }
+        .section { margin-bottom: 16pt; }
+        .section h3 { font-size: 11pt; font-weight: 600; color: #1463FF; margin: 0 0 8pt; border-bottom: 1pt solid #e2e8f0; padding-bottom: 4pt; }
+        table { width: 100%; border-collapse: collapse; margin-top: 8pt; }
+        th { background: #f1f5f9; font-weight: 600; padding: 6pt 8pt; text-align: left; font-size: 10pt; color: #475569; }
+        td { padding: 6pt 8pt; border-bottom: 1pt solid #e2e8f0; font-size: 10pt; }
+        .total-row td { font-weight: 700; border-top: 2pt solid #1e293b; background: #f8fafc; }
+        .value { text-align: right; font-variant-numeric: tabular-nums; }
+        .adjustment-neg { color: #dc2626; }
+        .adjustment-pos { color: #16a34a; }
+        .signature-area { margin-top: 40pt; display: flex; justify-content: space-between; }
+        .signature-box { width: 45%; }
+        .signature-line { border-top: 1pt solid #94a3b8; padding-top: 6pt; font-size: 10pt; color: #64748b; text-align: center; }
+        .footer { margin-top: 30pt; font-size: 9pt; color: #94a3b8; text-align: center; border-top: 1pt solid #e2e8f0; padding-top: 8pt; }
+        .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8pt; font-size: 10pt; }
+        .info-grid .label { color: #64748b; }
+        .info-grid .value { color: #1e293b; font-weight: 500; text-align: left; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>{{ tenant.company_name }}</h1>
+        <p>Recibo de Pagamento de Comissao</p>
+        <p>Competencia: {{ period.month|stringformat:"02d" }}/{{ period.year }}</p>
+    </div>
+
+    <div class="section">
+        <h3>Dados do Vendedor</h3>
+        <div class="info-grid">
+            <div><span class="label">Nome:</span> <span class="value">{{ sc.seller.name }}</span></div>
+            <div><span class="label">Telefone:</span> <span class="value">{{ sc.seller.phone|default:"—" }}</span></div>
+        </div>
+    </div>
+
+    <div class="section">
+        <h3>Comissao</h3>
+        <table>
+            <thead>
+                <tr><th>Descricao</th><th class="value">Valor</th></tr>
+            </thead>
+            <tbody>
+                <tr><td>Total vendido (lancamentos manuais)</td><td class="value">{{ sc.total_sold_amount|brl }}</td></tr>
+                <tr><td>Taxa de comissao</td><td class="value">{{ sc.commission_rate|floatformat:4 }}%</td></tr>
+                <tr><td>Comissao calculada</td><td class="value">{{ sc.commission_amount|brl }}</td></tr>
+                {% if adjustments %}
+                <tr><td colspan="2" style="padding: 4pt 0;"></td></tr>
+                <tr><th colspan="2">Ajustes</th></tr>
+                {% for adj in adjustments %}
+                <tr>
+                    <td>{{ adj.reason|truncatechars:60 }}</td>
+                    <td class="value {% if adj.difference >= 0 %}adjustment-pos{% else %}adjustment-neg{% endif %}">
+                        {% if adj.difference >= 0 %}+{% endif %}{{ adj.difference|brl }}
+                    </td>
+                </tr>
+                {% endfor %}
+                {% endif %}
+                <tr class="total-row"><td>Valor pago</td><td class="value">{{ sc.paid_amount|default:sc.commission_amount|brl }}</td></tr>
+            </tbody>
+        </table>
+    </div>
+
+    <div class="section">
+        <h3>Dados do Pagamento</h3>
+        <div class="info-grid">
+            <div><span class="label">Data do pagamento:</span> <span class="value">{{ sc.payment_date|date:"d/m/Y"|default:"—" }}</span></div>
+            <div><span class="label">Metodo:</span> <span class="value">{{ sc.get_payment_method_display|default:sc.payment_method|default:"—" }}</span></div>
+            {% if sc.payment_notes %}
+            <div style="grid-column: 1 / -1;"><span class="label">Observacoes:</span> <span class="value">{{ sc.payment_notes }}</span></div>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="signature-area">
+        <div class="signature-box">
+            <div class="signature-line">Assinatura do Vendedor</div>
+        </div>
+        <div class="signature-box">
+            <div class="signature-line">Assinatura do Gestor</div>
+        </div>
+    </div>
+
+    <div class="footer">
+        Mérito by Vidalys &middot; vidalys.com.br<br>
+        Recibo gerado em {{ hoje|date:"d/m/Y" }}
+    </div>
+</body>
+</html>

@@ -1,0 +1,36 @@
+{% extends 'dashboard/base_desktop.html' %}
+{% load static %}
+{% block title %}Acesso pausado — Mérito{% endblock %}
+{% block content %}
+<div class="min-h-[80vh] flex items-center justify-center">
+    <div class="w-full max-w-md text-center">
+        <img src="{% static 'img/merito-logo.png' %}" alt="Mérito by Vidalys" class="h-12 w-auto mx-auto mb-10 opacity-80">
+
+        <div class="w-16 h-16 rounded-2xl bg-graphite flex items-center justify-center mx-auto mb-6">
+            <svg class="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
+        </div>
+
+        <h1 class="font-display text-[24px] font-bold text-gray-900 mb-2">Seu acesso esta pausado</h1>
+        <p class="text-[14px] text-gray-500 mb-8 leading-relaxed">
+            {% if not tenant.is_active %}
+                Sua conta esta suspensa. Entre em contato com o suporte para reativa-la.
+            {% else %}
+                Seu periodo de teste expirou ou sua assinatura esta inativa. Atualize seu plano para continuar usando o Mérito.
+            {% endif %}
+        </p>
+
+        <div class="space-y-3">
+            <a href="{% url 'dashboard:assinatura' %}"
+               class="block w-full py-3 px-6 bg-brand-500 hover:bg-brand-600 text-white font-semibold rounded-2xl transition-all text-[15px] shadow-lg shadow-brand-100 active:scale-[0.97]">
+                Ver planos e assinar
+            </a>
+            <a href="#"
+               class="block w-full py-3 px-6 bg-white border border-gray-200 text-gray-700 font-semibold rounded-2xl transition-all text-[15px] hover:bg-gray-50 active:scale-[0.97]">
+                Falar com suporte
+            </a>
+        </div>
+
+        <p class="text-[11px] text-gray-400 mt-10">&copy; 2026 Vidalys. Todos os direitos reservados.</p>
+    </div>
+</div>
+{% endblock %}

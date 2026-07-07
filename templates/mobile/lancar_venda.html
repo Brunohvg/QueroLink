@@ -1,0 +1,123 @@
+{% extends 'mobile/base_mobile.html' %}
+{% load currency_filters %}
+{% block title %}Lancar Venda — Mérito{% endblock %}
+{% block content %}
+<div class="space-y-5 fade-up" x-data="lancarVenda()">
+
+  <div class="flex items-center gap-3">
+    <a href="{% url 'dashboard:mobile_home' %}"
+       class="w-10 h-10 bg-white rounded-xl card-shadow flex items-center justify-center tap-target text-gray-400 hover:text-brand-500 transition-all active:scale-[0.95]">
+      <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
+    </a>
+    <h1 class="font-display text-[20px] font-bold text-gray-900">Lancar Venda</h1>
+    {% if not is_editable %}
+    <span class="ml-auto inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-medium bg-amber-50 text-amber-600">
+      <span class="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
+      Bloqueado
+    </span>
+    {% endif %}
+  </div>
+
+  {% if success %}
+  <script>showToast("{% if was_update %}Lancamento atualizado!{% else %}Venda registrada!{% endif %}", "success");</script>
+  <div class="relative overflow-hidden rounded-2xl text-center text-white" style="background: linear-gradient(135deg, #059669, #047857);">
+    <div class="absolute top-0 right-0 w-48 h-48 bg-white/5 rounded-full -mr-16 -mt-16"></div>
+    <div class="absolute bottom-0 left-0 w-36 h-36 bg-white/5 rounded-full -ml-12 -mb-12"></div>
+    <div class="relative px-6 py-10">
+      <div class="w-16 h-16 mx-auto mb-5 rounded-full bg-white/20 flex items-center justify-center backdrop-blur-sm">
+        <svg class="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+      </div>
+      <p class="font-display text-[22px] font-bold">{% if was_update %}Atualizado!{% else %}Venda registrada!{% endif %}</p>
+      <p class="font-display text-[40px] font-bold mt-3 tracking-tight">{{ last_amount|brl }}</p>
+      <a href="{% url 'dashboard:mobile_lancar_venda' %}"
+         class="inline-block mt-7 bg-white/20 hover:bg-white/30 text-white font-semibold px-10 py-3.5 rounded-2xl tap-target text-[15px] backdrop-blur-sm transition-all active:scale-[0.97]">
+        Nova Venda
+      </a>
+    </div>
+  </div>
+  {% else %}
+
+  {% if error %}
+  <script>showToast("{{ error|escapejs }}", "error");</script>
+  {% endif %}
+
+  {% if not is_editable %}
+  <div class="bg-amber-50/80 border border-amber-100 text-amber-700 px-4 py-3 rounded-2xl text-[13px] flex items-start gap-2.5">
+    <svg class="w-4 h-4 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"/></svg>
+    <span>{% if seller_commission_status == 'PAGA' %}Sua comissao foi paga.{% elif seller_commission_status == 'FECHADA' %}Sua comissao foi fechada.{% else %}Lancamentos bloqueados.{% endif %} Fale com o gestor.</span>
+  </div>
+  {% endif %}
+
+  {% if is_editable %}
+  <div class="bg-brand-50/60 border border-brand-100 text-brand-800 px-4 py-3 rounded-2xl text-[12px] flex items-start gap-2.5">
+    <svg class="w-4 h-4 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+    <div>
+      <p class="font-medium text-[13px] mb-0.5">Informe o total vendido no dia selecionado.</p>
+      <p class="text-[11px] leading-relaxed">Caso tenha esquecido um dia anterior, selecione a data correta e registre o valor daquele dia. Nao acumule varios dias em um unico lancamento.</p>
+    </div>
+  </div>
+  {% endif %}
+
+  <form method="post" action="{% url 'dashboard:mobile_lancar_venda' %}" class="space-y-4">
+    {% csrf_token %}
+
+    <div class="bg-white rounded-2xl card-shadow overflow-hidden">
+      <div class="px-5 pt-5 pb-4">
+        <label class="block text-[11px] font-semibold text-gray-400 uppercase tracking-wider mb-3">Valor da Venda</label>
+        <div class="relative">
+          <span class="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300 text-lg font-bold">R$</span>
+          <input type="text" id="valor_display" x-ref="valorDisplay" x-on:input="formatInput()"
+                 class="w-full pl-12 pr-4 py-4 bg-gray-50 border-2 border-gray-100 rounded-2xl focus:border-brand-400 focus:outline-none transition-all font-display text-[24px] font-bold text-gray-800 text-center"
+                 placeholder="0,00" style="font-size:24px!important"
+                 {% if existing_sale %}value="{{ existing_sale.amount|default:0 }}"{% endif %}>
+        </div>
+        <input type="hidden" name="amount_cents" x-ref="amountCents" value="{{ existing_sale.amount|default:0 }}">
+      </div>
+
+      <div class="border-t border-gray-100 px-5 py-4">
+        <div>
+          <label for="sale_date" class="block text-[11px] font-semibold text-gray-400 uppercase tracking-wider mb-2">Data do Lancamento</label>
+          <input type="date" id="sale_date" name="sale_date" x-ref="saleDate"
+                 class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-[14px] outline-none transition-all focus:border-brand-400 focus:ring-2 focus:ring-brand-100 appearance-none"
+                 value="{% if existing_sale %}{{ existing_sale.sale_date|date:'Y-m-d' }}{% else %}{% now 'Y-m-d' %}{% endif %}"
+                 max="{% now 'Y-m-d' %}">
+        </div>
+      </div>
+    </div>
+
+    {% if is_editable %}
+    <button type="submit" x-bind:disabled="amountCents <= 0"
+            x-bind:class="amountCents > 0 ? 'btn-primary' : 'w-full py-3.5 rounded-2xl bg-gray-100 text-gray-400 font-semibold cursor-not-allowed text-[15px]'"
+            class="w-full py-3.5 rounded-2xl bg-gray-100 text-gray-400 font-semibold cursor-not-allowed text-[15px]">
+      <span x-show="amountCents > 0">Registrar Venda</span>
+      <span x-show="amountCents <= 0">Digite o valor</span>
+    </button>
+    {% endif %}
+  </form>
+  {% endif %}
+</div>
+
+<script>
+function lancarVenda() {
+    return {
+        amountCents: {{ existing_sale.amount|default:0 }},
+        lastAmount: {{ request.session.last_venda_amount|default:0 }},
+        init() {
+            if (this.amountCents > 0) {
+                this.$refs.valorDisplay.value = Math.floor(this.amountCents/100) + ',' + String(this.amountCents%100).padStart(2,'0');
+            }
+            if (!{{ existing_sale|yesno:"true,false" }}) {
+                this.$refs.saleDate.value = new Date().toISOString().split('T')[0];
+            }
+        },
+        formatInput() {
+            var raw = this.$refs.valorDisplay.value.replace(/\D/g, '');
+            if (!raw) { this.$refs.valorDisplay.value = ''; this.amountCents = 0; this.$refs.amountCents.value = '0'; return; }
+            this.amountCents = parseInt(raw, 10);
+            this.$refs.amountCents.value = this.amountCents;
+            this.$refs.valorDisplay.value = Math.floor(raw/100) + ',' + String(raw%100).padStart(2,'0');
+        },
+    }
+}
+</script>
+{% endblock %}

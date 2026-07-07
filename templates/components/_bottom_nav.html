@@ -1,0 +1,59 @@
+<nav class="fixed bottom-0 left-0 right-0 z-50 bg-white border-t border-gray-100 safe-bottom">
+  <div class="max-w-lg mx-auto grid grid-cols-5 items-center h-[72px] px-1">
+    <a href="{% url 'dashboard:mobile_home' %}"
+       class="flex flex-col items-center justify-center gap-0.5 h-full tap-target
+              {% if request.resolver_match.url_name == 'mobile_home' %}text-brand-500{% else %}text-gray-400{% endif %}">
+      <div class="w-9 h-9 rounded-xl flex items-center justify-center
+                  {% if request.resolver_match.url_name == 'mobile_home' %}bg-brand-50{% endif %}">
+        <svg class="w-6 h-6" fill="{% if request.resolver_match.url_name == 'mobile_home' %}currentColor{% else %}none{% endif %}" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/>
+        </svg>
+      </div>
+      <span class="text-[10px] font-semibold">Inicio</span>
+    </a>
+
+    <a href="{% url 'dashboard:mobile_minhas_vendas' %}"
+       class="flex flex-col items-center justify-center gap-0.5 h-full tap-target
+              {% if request.resolver_match.url_name == 'mobile_minhas_vendas' %}text-brand-500{% else %}text-gray-400{% endif %}">
+      <div class="w-9 h-9 rounded-xl flex items-center justify-center
+                  {% if request.resolver_match.url_name == 'mobile_minhas_vendas' %}bg-brand-50{% endif %}">
+        <svg class="w-6 h-6" fill="{% if request.resolver_match.url_name == 'mobile_minhas_vendas' %}currentColor{% else %}none{% endif %}" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
+        </svg>
+      </div>
+      <span class="text-[10px] font-semibold">Vendas</span>
+    </a>
+
+    <div class="flex items-center justify-center">
+      <a href="{% url 'dashboard:mobile_lancar_venda' %}"
+         class="w-[52px] h-[52px] rounded-full bg-brand-500 hover:bg-brand-600 flex items-center justify-center shadow-lg -mt-5 transition-all active:scale-95
+                {% if request.resolver_match.url_name == 'mobile_lancar_venda' %}ring-2 ring-brand-200{% endif %}">
+        <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+      </a>
+    </div>
+
+    <a href="{% url 'dashboard:mobile_ranking' %}"
+       class="flex flex-col items-center justify-center gap-0.5 h-full tap-target
+              {% if request.resolver_match.url_name == 'mobile_ranking' %}text-brand-500{% else %}text-gray-400{% endif %}">
+      <div class="w-9 h-9 rounded-xl flex items-center justify-center
+                  {% if request.resolver_match.url_name == 'mobile_ranking' %}bg-brand-50{% endif %}">
+        <svg class="w-6 h-6" fill="{% if request.resolver_match.url_name == 'mobile_ranking' %}currentColor{% else %}none{% endif %}" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z"/>
+        </svg>
+      </div>
+      <span class="text-[10px] font-semibold">Ranking</span>
+    </a>
+
+    <a href="{% url 'dashboard:mobile_meu_desempenho' %}"
+       class="flex flex-col items-center justify-center gap-0.5 h-full tap-target
+              {% if request.resolver_match.url_name == 'mobile_meu_desempenho' %}text-brand-500{% else %}text-gray-400{% endif %}">
+      <div class="w-9 h-9 rounded-xl flex items-center justify-center
+                  {% if request.resolver_match.url_name == 'mobile_meu_desempenho' %}bg-brand-50{% endif %}">
+        <svg class="w-6 h-6" fill="{% if request.resolver_match.url_name == 'mobile_meu_desempenho' %}currentColor{% else %}none{% endif %}" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
+        </svg>
+      </div>
+      <span class="text-[10px] font-semibold">Desempenho</span>
+    </a>
+  </div>
+</nav>

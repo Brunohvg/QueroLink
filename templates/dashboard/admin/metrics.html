@@ -1,0 +1,41 @@
+{% extends 'dashboard/base_desktop.html' %}
+{% load currency_filters %}
+{% block title %}Metricas SaaS — Mérito{% endblock %}
+{% block content %}
+<div x-data>
+<div class="bg-purple-900 -mx-6 -mt-0 px-6 py-6 mb-6">
+  <h1 class="text-white font-display text-[22px] font-bold">Metricas SaaS</h1>
+  <p class="text-purple-300 text-[13px] mt-1">Saude do negocio Vidalys</p>
+</div>
+
+<div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 mb-6">
+  <div class="surface-card text-center"><p class="text-[10px] text-gray-400 uppercase tracking-wider">Tenants</p><p class="font-display text-[24px] font-bold">{{ total_tenants }}</p></div>
+  <div class="surface-card text-center"><p class="text-[10px] text-gray-400 uppercase tracking-wider">Trial ativos</p><p class="font-display text-[24px] font-bold text-amber-600">{{ trial_ativos }}</p></div>
+  <div class="surface-card text-center"><p class="text-[10px] text-gray-400 uppercase tracking-wider">Pagantes</p><p class="font-display text-[24px] font-bold text-emerald-600">{{ pagantes }}</p></div>
+  <div class="surface-card text-center"><p class="text-[10px] text-gray-400 uppercase tracking-wider">MRR</p><p class="font-display text-[18px] font-bold">{{ mrr|brl }}</p></div>
+  <div class="surface-card text-center"><p class="text-[10px] text-gray-400 uppercase tracking-wider">Churn 30d</p><p class="font-display text-[24px] font-bold text-red-600">{{ churn_30d }}</p></div>
+  <div class="surface-card text-center"><p class="text-[10px] text-gray-400 uppercase tracking-wider">Ativacao</p><p class="font-display text-[24px] font-bold text-brand-600">{{ taxa_ativacao }}%</p></div>
+</div>
+
+<div class="grid grid-cols-2 gap-3 mb-6">
+  <div class="surface-card text-center"><p class="text-[10px] text-gray-400 uppercase">Vendas (30d)</p><p class="font-bold text-[20px]">{{ vendas_30d }}</p></div>
+  <div class="surface-card text-center"><p class="text-[10px] text-gray-400 uppercase">Notificacoes (30d)</p><p class="font-bold text-[20px]">{{ notificacoes_30d }}</p></div>
+</div>
+
+<h2 class="text-[14px] font-bold text-gray-900 mb-3">Top 5 Tenants (mes atual)</h2>
+<div class="surface-card mb-6 overflow-x-auto">
+  <table class="w-full text-[12px]">
+    <thead><tr class="border-b"><th class="py-2 px-3 text-left text-gray-400">Tenant</th><th class="py-2 px-3 text-right text-gray-400">Vendas</th><th class="py-2 px-3 text-right text-gray-400">Valor</th></tr></thead>
+    <tbody>{% for t in top_tenants %}<tr class="border-b border-gray-50"><td class="py-2 px-3">{{ t.tenant__company_name }}</td><td class="py-2 px-3 text-right">{{ t.count }}</td><td class="py-2 px-3 text-right font-mono">{{ t.total|brl }}</td></tr>{% empty %}<tr><td colspan="3" class="py-4 text-center text-gray-400">Sem dados</td></tr>{% endfor %}</tbody>
+  </table>
+</div>
+
+<h2 class="text-[14px] font-bold text-gray-900 mb-3">Tenants recentes</h2>
+<div class="surface-card overflow-x-auto">
+  <table class="w-full text-[12px]">
+    <thead><tr class="border-b"><th class="py-2 px-3 text-left text-gray-400">Empresa</th><th class="py-2 px-3 text-left text-gray-400">Plano</th><th class="py-2 px-3 text-left text-gray-400">Criacao</th><th class="py-2 px-3 text-left text-gray-400">Status</th><th class="py-2 px-3 text-right text-gray-400">Vendedores</th><th class="py-2 px-3 text-center text-gray-400">Onboarding</th></tr></thead>
+    <tbody>{% for r in recentes_data %}<tr class="border-b border-gray-50"><td class="py-2 px-3">{{ r.name }}</td><td class="py-2 px-3">{{ r.plan }}</td><td class="py-2 px-3 text-gray-500">{{ r.created }}</td><td class="py-2 px-3">{{ r.status }}</td><td class="py-2 px-3 text-right">{{ r.sellers }}</td><td class="py-2 px-3 text-center">{{ r.onboarding }}</td></tr>{% endfor %}</tbody>
+  </table>
+</div>
+</div>
+{% endblock %}

@@ -1,0 +1,146 @@
+{% extends 'dashboard/base_desktop.html' %}
+{% block title %}Importar Vendas — Mérito{% endblock %}
+{% block content %}
+<div x-data="importPage()">
+  <h1 class="font-display text-[22px] font-bold text-gray-900 mb-6">Importar Vendas</h1>
+
+  <div class="surface-card mb-6">
+    <p class="text-[13px] text-gray-600 mb-4">Importe vendas do seu historico via arquivo CSV. O arquivo deve ter as colunas: data, vendedor, valor, observacao (opcional).</p>
+    <p class="text-[12px] text-gray-400 mb-4">Formatos aceitos para data: DD/MM/YYYY ou YYYY-MM-DD. Valor: com virgula (1.234,56) ou ponto (1234.56).</p>
+
+    <div class="border-2 border-dashed border-gray-200 rounded-2xl p-8 text-center hover:border-brand-300 transition-colors"
+         x-on:dragover.prevent x-on:drop.prevent="handleDrop($event)">
+      <input type="file" id="csv-file" accept=".csv" @change="handleFile($event)" class="hidden">
+      <label for="csv-file" class="cursor-pointer">
+        <div class="w-14 h-14 rounded-2xl bg-brand-50 flex items-center justify-center mx-auto mb-3">
+          <svg class="w-7 h-7 text-brand-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/></svg>
+        </div>
+        <p class="text-[14px] font-medium text-gray-700">Clique para selecionar ou arraste o arquivo CSV</p>
+        <p class="text-[12px] text-gray-400 mt-1" x-show="!filename">CSV com ate 500 linhas</p>
+        <p class="text-[13px] font-medium text-brand-600 mt-1" x-show="filename" x-text="filename"></p>
+      </label>
+    </div>
+  </div>
+
+  <div x-show="preview.length > 0" class="surface-card">
+    <div class="flex items-center justify-between mb-4">
+      <h2 class="text-[14px] font-semibold text-gray-900">Preview</h2>
+      <span class="text-[12px] text-gray-500" x-text="validCount + ' de ' + preview.length + ' linhas validas'"></span>
+    </div>
+
+    <div class="overflow-x-auto max-h-96">
+      <table class="w-full text-[12px]">
+        <thead>
+          <tr class="border-b border-gray-100">
+            <th class="text-left py-2 px-2 text-[10px] font-semibold text-gray-400 uppercase">#</th>
+            <th class="text-left py-2 px-2 text-[10px] font-semibold text-gray-400 uppercase">Data</th>
+            <th class="text-left py-2 px-2 text-[10px] font-semibold text-gray-400 uppercase">Vendedor</th>
+            <th class="text-right py-2 px-2 text-[10px] font-semibold text-gray-400 uppercase">Valor</th>
+            <th class="text-left py-2 px-2 text-[10px] font-semibold text-gray-400 uppercase">Observacao</th>
+            <th class="text-left py-2 px-2 text-[10px] font-semibold text-gray-400 uppercase">Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          <template x-for="(r, i) in preview.slice(0, 20)" :key="i">
+            <tr :class="r.error ? 'bg-red-50' : ''">
+              <td class="py-1.5 px-2" x-text="i + 1"></td>
+              <td class="py-1.5 px-2" x-text="r.date"></td>
+              <td class="py-1.5 px-2" x-text="r.vendedor"></td>
+              <td class="py-1.5 px-2 text-right font-mono" x-text="r.valor"></td>
+              <td class="py-1.5 px-2 text-gray-500" x-text="r.observacao"></td>
+              <td class="py-1.5 px-2">
+                <span x-show="!r.error" class="text-emerald-600 text-[11px]">OK</span>
+                <span x-show="r.error" class="text-red-600 text-[11px] cursor-help" :title="r.error">Erro</span>
+              </td>
+            </tr>
+          </template>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="flex justify-end mt-6 pt-4 border-t border-gray-100">
+      <button @click="importSales()" :disabled="validCount === 0"
+              class="inline-flex items-center gap-2 bg-gray-900 hover:bg-gray-800 disabled:bg-gray-300 text-white font-semibold py-2.5 px-5 rounded-xl transition-all text-[14px] shadow-sm hover:shadow-md active:scale-[0.97]">
+        <span x-show="!importing">Importar <span x-text="validCount"></span> vendas</span>
+        <span x-show="importing">Importando...</span>
+      </button>
+    </div>
+  </div>
+
+  <div x-show="result" class="surface-card mt-4" x-transition>
+    <h3 class="text-[14px] font-semibold text-gray-900 mb-2">Resultado</h3>
+    <p class="text-[13px]"><span class="font-bold text-emerald-600" x-text="result?.imported || 0"></span> importadas, <span class="font-bold text-amber-600" x-text="result?.skipped || 0"></span> duplicatas puladas, <span class="font-bold text-red-600" x-text="(result?.errors || []).length"></span> erros</p>
+  </div>
+</div>
+
+<script>
+function importPage() {
+    return {
+        preview: [],
+        filename: '',
+        result: null,
+        importing: false,
+        get validCount() { return this.preview.filter(function(r) { return !r.error; }).length; },
+
+        handleFile(e) {
+            var file = e.target.files[0];
+            if (!file) return;
+            this.parseCSV(file);
+        },
+        handleDrop(e) {
+            var file = e.dataTransfer.files[0];
+            if (!file) return;
+            this.parseCSV(file);
+        },
+        parseCSV(file) {
+            var self = this;
+            self.filename = file.name;
+            self.result = null;
+            var reader = new FileReader();
+            reader.onload = function(ev) {
+                var text = ev.target.result;
+                var lines = text.split(/\r?\n/).filter(function(l) { return l.trim(); });
+                if (lines.length < 2) { self.preview = []; return; }
+
+                var headers = lines[0].toLowerCase().split(/[,;]/).map(function(h) { return h.trim().replace(/"/g, ''); });
+                var dateIdx = headers.indexOf('data');
+                var sellerIdx = headers.indexOf('vendedor');
+                var valueIdx = headers.indexOf('valor');
+                var obsIdx = headers.indexOf('observacao');
+
+                self.preview = [];
+                for (var i = 1; i < Math.min(lines.length, 26); i++) {
+                    var cols = lines[i].split(/[,;]/).map(function(c) { return c.trim().replace(/"/g, ''); });
+                    var row = { date: cols[dateIdx] || '', vendedor: cols[sellerIdx] || '', valor: cols[valueIdx] || '', observacao: obsIdx >= 0 ? (cols[obsIdx] || '') : '', error: null };
+
+                    if (!row.date) row.error = 'Data obrigatoria';
+                    if (!row.vendedor) row.error = 'Vendedor obrigatorio';
+                    if (!row.valor) row.error = 'Valor obrigatorio';
+
+                    self.preview.push(row);
+                }
+            };
+            reader.readAsText(file);
+        },
+        importSales() {
+            var self = this;
+            self.importing = true;
+            fetch('/api/sales/import/', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCSRFToken() },
+                body: JSON.stringify({
+                    sales: self.preview.filter(function(r) { return !r.error; }).map(function(r) {
+                        var amount = parseFloat(r.valor.replace(/\./g, '').replace(',', '.')) || 0;
+                        return { date: r.date, seller_name: r.vendedor, amount_cents: Math.round(amount * 100), notes: r.observacao };
+                    })
+                }),
+            }).then(function(r) { return r.json(); }).then(function(data) {
+                self.result = data;
+            }).catch(function(e) {
+                showToast('Erro ao importar: ' + e.message, 'error');
+            }).finally(function() { self.importing = false; });
+        }
+    }
+}
+</script>
+{% endblock %}
