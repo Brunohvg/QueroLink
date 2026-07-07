@@ -1,5 +1,5 @@
 from django.core.exceptions import ValidationError
-from django.test import TestCase
+from django.test import TestCase, TransactionTestCase
 from django.db.migrations.loader import MigrationLoader
 
 from app.apps.accounts.models import Tenant, User
@@ -17,7 +17,7 @@ def _create_seller(tenant, user, name, cpf=None, phone='11999999999'):
     return seller
 
 
-class CpfTest(TestCase):
+class CpfTest(TransactionTestCase):
     def setUp(self):
         self.tenant = Tenant.objects.create(company_name='CPF Test', slug='cpf-test', is_active=True)
         self.tenant2 = Tenant.objects.create(company_name='CPF Test 2', slug='cpf-test2', is_active=True)
