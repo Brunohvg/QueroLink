@@ -82,6 +82,7 @@ def process_pagarme_webhook(event_id):
 
         if event.gateway_event_id:
             already_processed = WebhookEvent.objects.filter(
+                gateway=event.gateway,
                 gateway_event_id=event.gateway_event_id,
                 processed=True,
             ).exclude(id=event.id).exists()
@@ -790,9 +791,9 @@ def reconcile_pending_orders():
                     'id': event_id_str,
                 }
                 event, created = WebhookEvent.objects.get_or_create(
+                    gateway='pagarme',
                     gateway_event_id=event_id_str,
                     defaults={
-                        'gateway': 'pagarme',
                         'payload': synthetic_payload,
                         'tenant': tenant,
                     },
@@ -815,9 +816,9 @@ def reconcile_pending_orders():
                     'id': event_id_str,
                 }
                 event, created = WebhookEvent.objects.get_or_create(
+                    gateway='pagarme',
                     gateway_event_id=event_id_str,
                     defaults={
-                        'gateway': 'pagarme',
                         'payload': synthetic_payload,
                         'tenant': tenant,
                     },

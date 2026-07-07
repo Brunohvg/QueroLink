@@ -27,9 +27,9 @@ def _get_or_create_webhook_event(gateway, payload, gateway_event_id=None, tenant
         try:
             with transaction.atomic():
                 return WebhookEvent.objects.get_or_create(
+                    gateway=gateway,
                     gateway_event_id=gateway_event_id,
                     defaults={
-                        'gateway': gateway,
                         'payload': payload,
                         'tenant': tenant,
                     },
@@ -39,7 +39,10 @@ def _get_or_create_webhook_event(gateway, payload, gateway_event_id=None, tenant
                 raise
             time.sleep(0.05)
 
-    return WebhookEvent.objects.get(gateway_event_id=gateway_event_id), False
+    return WebhookEvent.objects.get(
+        gateway=gateway,
+        gateway_event_id=gateway_event_id,
+    ), False
 
 
 def _verify_webhook_token(tenant_uuid, token):

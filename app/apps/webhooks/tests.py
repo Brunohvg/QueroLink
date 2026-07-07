@@ -249,6 +249,27 @@ class TestWebhookIdempotency(TransactionTestCase):
             content_type='application/json',
         )
 
+    def _post_billing(self, payload):
+        import hashlib
+        import hmac
+
+        data_id = payload.get('data', {}).get('id', '')
+        request_id = f'req-{payload.get("id", "event")}'
+        ts = '1704067200'
+        manifest = f'id:{data_id};request-id:{request_id};ts:{ts};'
+        v1 = hmac.new(
+            b'test_secret_key',
+            manifest.encode(),
+            hashlib.sha256,
+        ).hexdigest()
+        return Client().post(
+            f'/api/webhooks/billing/?data.id={data_id}&type=payment',
+            data=json.dumps(payload).encode(),
+            content_type='application/json',
+            HTTP_X_SIGNATURE=f'ts={ts},v1={v1}',
+            HTTP_X_REQUEST_ID=request_id,
+        )
+
     @override_settings(WEBHOOK_AUTH_REQUIRED=False)
     @patch('app.apps.webhooks.tasks.process_pagarme_webhook.delay')
     def test_duplicate_event_keeps_original_payload(self, mock_process):
@@ -263,11 +284,76 @@ class TestWebhookIdempotency(TransactionTestCase):
         self.assertEqual(second.status_code, 200)
         self.assertEqual(second.json()['status'], 'duplicate')
         self.assertEqual(
-            WebhookEvent.objects.filter(gateway_event_id='evt_duplicate').count(),
+            WebhookEvent.objects.filter(
+                gateway='pagarme',
+                gateway_event_id='evt_duplicate',
+            ).count(),
             1,
         )
-        event = WebhookEvent.objects.get(gateway_event_id='evt_duplicate')
+        event = WebhookEvent.objects.get(
+            gateway='pagarme',
+            gateway_event_id='evt_duplicate',
+        )
         self.assertEqual(event.payload['data']['id'], 'or_1')
+        self.assertEqual(mock_process.call_count, 1)
+
+    @override_settings(WEBHOOK_AUTH_REQUIRED=False, MP_WEBHOOK_SECRET='test_secret_key')
+    @patch('app.apps.webhooks.tasks.process_billing_webhook.delay')
+    @patch('app.apps.webhooks.tasks.process_pagarme_webhook.delay')
+    def test_same_event_id_can_exist_in_different_gateways(self, mock_pagarme, mock_billing):
+        pagarme_response = self._post({
+            'id': 'evt_same',
+            'type': 'order.paid',
+            'data': {'id': 'or_same'},
+        })
+        billing_response = self._post_billing({
+            'id': 'evt_same',
+            'type': 'payment',
+            'data': {'id': 'evt_same'},
+        })
+
+        self.assertEqual(pagarme_response.status_code, 200)
+        self.assertEqual(billing_response.status_code, 200)
+        self.assertEqual(
+            WebhookEvent.objects.filter(gateway_event_id='evt_same').count(),
+            2,
+        )
+        self.assertTrue(WebhookEvent.objects.filter(
+            gateway='pagarme',
+            gateway_event_id='evt_same',
+        ).exists())
+        self.assertTrue(WebhookEvent.objects.filter(
+            gateway='mercadopago',
+            gateway_event_id='evt_same',
+        ).exists())
+        self.assertEqual(mock_pagarme.call_count, 1)
+        self.assertEqual(mock_billing.call_count, 1)
+
+    @override_settings(MP_WEBHOOK_SECRET='test_secret_key')
+    @patch('app.apps.webhooks.tasks.process_billing_webhook.delay')
+    def test_mercadopago_duplicate_event_dedupes_and_keeps_original_payload(self, mock_process):
+        first_payload = {'id': 'evt_mp_duplicate', 'type': 'payment', 'data': {'id': 'pay_1'}}
+        second_payload = {'id': 'evt_mp_duplicate', 'type': 'payment', 'data': {'id': 'pay_2'}}
+
+        first = self._post_billing(first_payload)
+        second = self._post_billing(second_payload)
+
+        self.assertEqual(first.status_code, 200)
+        self.assertEqual(first.json()['status'], 'received')
+        self.assertEqual(second.status_code, 200)
+        self.assertEqual(second.json()['status'], 'duplicate')
+        self.assertEqual(
+            WebhookEvent.objects.filter(
+                gateway='mercadopago',
+                gateway_event_id='evt_mp_duplicate',
+            ).count(),
+            1,
+        )
+        event = WebhookEvent.objects.get(
+            gateway='mercadopago',
+            gateway_event_id='evt_mp_duplicate',
+        )
+        self.assertEqual(event.payload['data']['id'], 'pay_1')
         self.assertEqual(mock_process.call_count, 1)
 
     @override_settings(WEBHOOK_AUTH_REQUIRED=False)
@@ -280,7 +366,10 @@ class TestWebhookIdempotency(TransactionTestCase):
 
         self.assertEqual(sorted(response.status_code for response in responses), [200, 200])
         self.assertEqual(
-            WebhookEvent.objects.filter(gateway_event_id='evt_concurrent').count(),
+            WebhookEvent.objects.filter(
+                gateway='pagarme',
+                gateway_event_id='evt_concurrent',
+            ).count(),
             1,
         )
         self.assertEqual(mock_process.call_count, 1)
