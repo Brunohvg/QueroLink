@@ -26,8 +26,6 @@ def link_sellers_to_users(apps, schema_editor):
         return
 
     print(f"Encontrados {sellers_without_user.count()} Sellers sem User vinculado.")
-    print("CREDENCIAIS GERADAS (username / senha temporaria):")
-    print("-" * 55)
 
     for seller in sellers_without_user:
         username = generate_unique_username(seller.name, existing_usernames)
@@ -43,10 +41,7 @@ def link_sellers_to_users(apps, schema_editor):
         seller.user = user
         seller.save(update_fields=["user"])
 
-        print(f"  {username:30s}  {password}")
-
-    print("-" * 55)
-    print("Guarde as senhas acima. Elas NAO serao exibidas novamente.")
+    print("Sellers vinculados a Users com senhas temporarias geradas.")
 
 
 def unlink_sellers_from_users(apps, schema_editor):

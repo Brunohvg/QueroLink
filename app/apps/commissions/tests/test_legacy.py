@@ -1062,7 +1062,7 @@ class TestMobileHomeMissingDaysContext(BaseTest):
         response = mobile_home(request)
         self.assertTrue(hasattr(response, 'content'))
         content = response.content.decode()
-        self.assertIn('Lancamentos bloqueados', content)
+        self.assertIn('Sua comissao deste mes foi fechada', content)
 
 
 class TestReceiptPDF(BaseTest):

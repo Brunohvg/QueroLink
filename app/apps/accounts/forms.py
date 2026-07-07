@@ -3,6 +3,7 @@ from django.contrib.auth.password_validation import validate_password
 from app.apps.accounts.validators import clean_cnpj, validate_cnpj
 from app.apps.accounts.models import Tenant, User
 from app.apps.accounts.fields import compute_hash
+from app.apps.accounts.plans import offered_plan_choices
 
 
 class TenantRegistrationForm(forms.Form):
@@ -54,7 +55,7 @@ class TenantRegistrationForm(forms.Form):
     )
     plan = forms.ChoiceField(
         label='Plano',
-        choices=Tenant.Plan.choices,
+        choices=offered_plan_choices,
         initial=Tenant.Plan.STARTER,
         widget=forms.Select(attrs={
             'class': 'form-control',

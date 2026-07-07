@@ -31,6 +31,9 @@ class Subscription(models.Model):
     gateway_subscription_id = models.CharField(
         max_length=100, blank=True, null=True, db_index=True,
     )
+    pending_cancel_gateway_subscription_id = models.CharField(
+        max_length=100, blank=True, null=True, db_index=True,
+    )
     gateway_customer_id = models.CharField(
         max_length=100, blank=True, null=True,
     )

@@ -61,36 +61,6 @@ if [ -z "$1" ] || [ "$1" = 'gunicorn' ]; then
     python manage.py migrate --noinput
     log "Migrations concluídas."
 
-    # ── Bootstrap superuser (sempre roda, idempotente) ─────
-    log "===== BOOTSTRAP SUPERUSER ====="
-    python -c "
-import os; os.environ.setdefault('DJANGO_SETTINGS_MODULE','app.config.settings.production')
-import django; django.setup()
-from django.utils.crypto import get_random_string
-from app.apps.accounts.models import User
-
-if User.objects.filter(is_superuser=True).exists():
-    print('Superuser ja existe. Nada a fazer.')
-else:
-    email = os.environ.get('DJANGO_SUPERUSER_EMAIL', '').strip()
-    password = os.environ.get('DJANGO_SUPERUSER_PASSWORD', '').strip()
-    if email and password and len(password) >= 12:
-        User.objects.create_superuser(username=email, email=email, password=password)
-        print(f'Superuser criado com email fornecido: {email}')
-    else:
-        password = get_random_string(20)
-        email = 'admin@querolink.local'
-        User.objects.create_superuser(username=email, email=email, password=password)
-        print('========================================')
-        print('ATENCAO: Superuser criado com senha aleatoria.')
-        print(f'  Email : {email}')
-        print(f'  Senha : {password}')
-        print('GUARDE ESSA SENHA. Ela nao sera exibida novamente.')
-        print('Configure DJANGO_SUPERUSER_EMAIL e DJANGO_SUPERUSER_PASSWORD no Coolify.')
-        print('========================================')
-"
-    log "Bootstrap superuser concluido."
-
     # ── Seed (opcional, só se SEED_ON_START=true) ──────────
     if [ "${SEED_ON_START:-false}" = "true" ]; then
         log "===== SEED ====="
@@ -100,31 +70,6 @@ import django; django.setup()
 exec(open('seed.py').read())
 "
         log "Seed concluído."
-    fi
-
-    # ── Templates padrão (força criação) ───────────────────
-    log "===== TEMPLATES ====="
-    if ! python manage.py shell -c "
-from app.apps.accounts.models import Tenant
-from app.apps.notifications.models import MessageTemplate
-DEFAULT = [
-    ('seller_credentials','whatsapp','Ola {{vendedor}}! Seu acesso ao sistema de comissoes foi criado.\nUsuario: {{usuario}}\nSenha temporaria: {{senha}}\nAcesse e troque sua senha no primeiro login.'),
-    ('commission_paid','whatsapp','Ola {{vendedor}}! Sua comissao de {{periodo}} no valor de {{valor}} foi paga. Confira os detalhes no app.'),
-    ('commission_adjusted','whatsapp','Sua comissao do periodo {{periodo}} recebeu um ajuste de {{valor}}. Acesse o sistema para conferir os detalhes.'),
-    ('link_created','whatsapp','Ola {{vendedor}}! Seu link de {{valor}} para {{cliente}} foi gerado com sucesso.'),
-    ('payment_paid','whatsapp','Ola {{vendedor}}! O link de {{valor}} do(a) {{cliente}} foi pago!'),
-    ('link_canceled','whatsapp','Ola {{vendedor}}! O link de {{valor}} do(a) {{cliente}} foi cancelado.'),
-    ('payment_expired','whatsapp','Ola {{vendedor}}! O link de {{valor}} do(a) {{cliente}} expirou.'),
-    ('payment_failed','whatsapp','Ola {{vendedor}}! O pagamento de {{valor}} do(a) {{cliente}} falhou. Motivo: {{motivo}}'),
-    ('payment_refunded','whatsapp','Ola {{vendedor}}! O pagamento de {{valor}} do(a) {{cliente}} foi estornado.'),
-    ('daily_reminder','whatsapp','Ola {{vendedor}}! Voce ainda nao lancou suas vendas de hoje. Lance agora pelo app para manter sua comissao em dia.'),
-]
-for t in Tenant.objects.all():
-    for et, ch, body in DEFAULT:
-        MessageTemplate.objects.get_or_create(tenant=t, event_type=et, channel=ch, defaults={'body':body})
-print('Templates verificados.')
-"; then
-        log "AVISO: falha ao criar templates padrão — verificar manualmente. Continuando o boot."
     fi
 
     # ── Static files ───────────────────────────────────────

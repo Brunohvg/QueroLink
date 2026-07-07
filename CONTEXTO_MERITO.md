@@ -1,5 +1,5 @@
 # CONTEXTO_MERITO.md — DOSSIÊ COMPLETO DO SISTEMA PARA IA CONSELHEIRA/AUDITORA
-**Atualizado em: 05/07/2026 (documentação revisada após v12 do código; máquina de estados + matriz de migrations documentadas) · Mantenedor: Bruno Vidal · Atualizar a seção 9 a cada sessão**
+**Atualizado em: 06/07/2026 (Prompt 30 concluido no PR #4; CI remoto verde; hardening pre-merge em andamento) · Mantenedor: Bruno Vidal · Atualizar a seção 9 a cada sessão**
 
 > **COMO USAR ESTE DOCUMENTO:** Cole no início de uma conversa com qualquer IA (Claude, GPT, Gemini) quando precisar de análise, auditoria, decisão de produto ou criação de prompts para o Mérito. Ele transfere o contexto, a metodologia e as lições aprendidas de meses de trabalho. Não é para a IA que escreve código (essa segue o `AGENTS.md` na raiz do projeto) — é para a IA que pensa junto.
 
@@ -180,21 +180,26 @@ Numerados (PROMPT_N), abrindo com **"Siga o AGENTS.md"** (as regras permanentes 
 
 **Em 05/07/2026, v12:** ciclo completo validado em staging COM e-mail real chegando ao contador (criar → vender mobile → fechar → contabilidade → pagar → histórico, zero 500s). Prompts 1–26 executados e verificados.
 
-**Pendentes de execução:**
+**Em 06/07/2026, Prompt 30:** PR #4 (`fix/prompt-30-production-hardening`) auditado no HEAD `06b5ade515a5e2734b636e9f2c9d006368fcf735`, com GitHub Actions `CI` run 130 concluido com sucesso. Hardening implementado: planos ofertaveis limitados a STARTER/PRO/BUSINESS; capacidade de sellers via `PLAN_SELLER_LIMITS`; criacao/importacao de sellers sob lock; importacao sem senha no JSON; upgrade de assinatura cria nova preapproval antes de cancelar a antiga; `pending_cancel_gateway_subscription_id`; webhook de billing falha fechado sem `MP_WEBHOOK_SECRET`; retryable de Mercado Pago nao marca evento como processado; bootstrap automatico de superuser removido; Celery worker/beat sem dependencia de health HTTP do web; CI cobrindo check, deploy check, migrations, tests e build CSS.
+
+**Hardening pre-merge apos Prompt 30:** em andamento para reduzir riscos finais antes do merge em `querolink-v2`: idempotencia atomica de webhooks, templates padrao fora do boot e backfill explicito, limpeza segura de legados e auditoria de producao.
+
+**Pendentes de execução/validação:**
 - PROMPT_27 (exclusão segura de vendedor): Executado no código. PROTECT nos FKs, `perform_destroy` deletando User junto, `fix_orphan_users`, bloqueio de exclusão com vendas. Pendente de validação operacional (rodar `fix_orphan_users --apply` no staging).
 - PROMPT_28 (backup): Executado no código. Parse corrigido (`mapfile -t`, `urllib.parse.unquote`), `set -Eeuo pipefail`, rclone multi-arch, `copyto` + `lsf` para verificação, task com `raise`, extensão `.dump`. Testes novos passando (13 testes). Pendente de validação operacional (gerar token rclone, teste manual no worker, teste de restauração em banco vazio).
+- Prompt 30/hardening pre-merge: CI remoto validado no PR #4; staging ainda pendente para esta base; producao ainda nao iniciada.
 
-**Pendentes operacionais:** verificar ZIP → gerar token rclone → teste manual do backup no worker → teste de RESTAURAÇÃO em banco vazio → go-live da Bibelô. Users órfãos no staging (limpar com `fix_orphan_users --apply`). Verificar se o console parou de acusar CSP/eval após o último deploy (se persistir: proxy do Coolify injetando header).
+**Pendentes operacionais:** validar esta base em staging antes do merge/go-live → gerar token rclone → teste manual do backup no worker → teste de RESTAURAÇÃO em banco vazio → limpar users órfãos no staging com `fix_orphan_users --apply` → verificar CSP/eval no console após deploy → go-live da Bibelô. Produção ainda não iniciada.
 
-**Roadmap pós-launch:** Git+CI (prioridade nº 1 — regressões só serão estruturalmente resolvidas com isso) · unificar e-mails no template do reset · resumo executivo mensal do gestor · metas por vendedor · declaração de conteúdo Correios em PDF · calibrar tabela de frete no balcão real · Nuvemshop (mês 3+) · revisar preço do Pro (R$397–497) com 3 clientes externos validados.
+**Roadmap pós-launch:** manter GitHub Actions como gate obrigatório · unificar e-mails no template do reset · resumo executivo mensal do gestor · metas por vendedor · declaração de conteúdo Correios em PDF · calibrar tabela de frete no balcão real · Nuvemshop (mês 3+) · revisar preço do Pro (R$397–497) com 3 clientes externos validados.
 
 ## Matriz de migrations por ambiente
 
 | Ambiente | Estado verificado em | Última migration/leaf conhecido | Pendentes | Evidência |
 |---|---|---|---|---|
-| Local (dev) | 05/07/2026 ~19:30 BRT | leaf nodes do código (ver abaixo) | 8 migrations pendentes | `showmigrations --plan` + `migrate --plan` + `MigrationLoader.leaf_nodes()` contra SQLite local |
-| Staging | NÃO VERIFICADO | leaf nodes do código conhecidos; estado aplicado desconhecido | desconhecido | executar `showmigrations --plan` no container web de staging (`merito.vidalys.com.br`) |
-| Produção | NÃO VERIFICADO | estado aplicado desconhecido | desconhecido | verificar antes do primeiro go-live |
+| Local (dev) | 06/07/2026 | leaf nodes do código (ver abaixo) | migrations pendentes no SQLite local; ver lista abaixo | `migrate --plan` contra SQLite local |
+| Staging | NÃO VERIFICADO para Prompt 30 | leaf nodes do código conhecidos; estado aplicado desconhecido para esta base | desconhecido | executar `showmigrations --plan` no container web de staging (`merito.vidalys.com.br`) |
+| Produção | NÃO INICIADA | estado aplicado desconhecido | desconhecido | verificar antes do primeiro go-live |
 
 **Leaf nodes do código atual (código fonte, não banco — o que o Django tentará aplicar):**
 
@@ -206,7 +211,7 @@ Numerados (PROMPT_N), abrindo com **"Siga o AGENTS.md"** (as regras permanentes 
 | audit | `0002_auditlog_tenant_and_more` |
 | auth | `0012_alter_user_first_name_max_length` |
 | authtoken | `0004_alter_tokenproxy_options` |
-| billing | `0002_alter_subscription_plan_alter_subscription_status` |
+| billing | `0003_subscription_pending_cancel_gateway_subscription_id` |
 | commissions | `0004_alter_sellercommission_seller` |
 | contenttypes | `0002_remove_content_type_name` |
 | freight | `0001_initial` |
@@ -220,7 +225,7 @@ Numerados (PROMPT_N), abrindo com **"Siga o AGENTS.md"** (as regras permanentes 
 | webhooks | `0004_webhookevent_skip_reason` |
 
 **Migrations pendentes no banco local (não aplicadas):**
-`accounts.0020_freight_fields`, `accounts.0021_correios_cws_fields`, `accounts.0022_tenant_skip_national_holidays_and_more`, `billing.0002_alter_subscription_plan_alter_subscription_status`, `sellers.0011_normalize_cpf_digits`, `sellers.0012_dedupe_cpf`, `sellers.0010_add_unique_cpf`, `commissions.0003_add_accounting_tracking`, `commissions.0004_alter_sellercommission_seller`, `freight.0001_initial`, `sales.0005_alter_sale_seller`
+`accounts.0020_freight_fields`, `accounts.0021_correios_cws_fields`, `accounts.0022_tenant_skip_national_holidays_and_more`, `billing.0002_alter_subscription_plan_alter_subscription_status`, `billing.0003_subscription_pending_cancel_gateway_subscription_id`, `sellers.0011_normalize_cpf_digits`, `sellers.0012_dedupe_cpf`, `sellers.0010_add_unique_cpf`, `commissions.0003_add_accounting_tracking`, `commissions.0004_alter_sellercommission_seller`, `freight.0001_initial`, `sales.0005_alter_sale_seller`
 
 **REGRA DE OURO DE DEPLOY:** a matriz registra observação, não controla o Django. Antes de qualquer go-live ou deploy com migrations novas, executar `showmigrations --plan` e `migrate --plan` no ambiente alvo, comparar com esta matriz e atualizar a matriz ANTES da aplicação. Depois de `migrate` bem-sucedido, executar `showmigrations --plan` novamente e atualizar a linha com o estado realmente aplicado.
 

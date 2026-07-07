@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 
 
 def _skip_foreign_event(event, reason):
-    """Marca evento como processado sem erro — evita retry de webhooks de outras plataformas."""
+    """Marca evento como processado sem erro - evita retry de webhooks de outras plataformas."""
     logger.warning("Webhook %s ignorado: %s", event.id, reason)
     event.processed = True
     event.skip_reason = reason
@@ -82,6 +82,7 @@ def process_pagarme_webhook(event_id):
 
         if event.gateway_event_id:
             already_processed = WebhookEvent.objects.filter(
+                gateway=event.gateway,
                 gateway_event_id=event.gateway_event_id,
                 processed=True,
             ).exclude(id=event.id).exists()
@@ -455,6 +456,34 @@ def process_pagarme_webhook(event_id):
         event.save(update_fields=['processed'])
 
 
+def _safe_gateway_skip_reason(error):
+    operation = getattr(error, 'operation', '') or 'mercadopago'
+    status_code = getattr(error, 'status_code', None)
+    if status_code is not None:
+        return f'{operation} returned definitive status {status_code}'
+    return f'{operation} definitive error'
+
+
+def _handle_gateway_lookup_error(event, error):
+    if getattr(error, 'retryable', False):
+        logger.warning(
+            'Billing webhook %s retryable Mercado Pago error in %s status=%s',
+            event.id,
+            getattr(error, 'operation', 'mercadopago'),
+            getattr(error, 'status_code', None),
+        )
+        raise error
+
+    if hasattr(error, 'retryable') and not error.retryable:
+        event.processed = True
+        event.skip_reason = _safe_gateway_skip_reason(error)
+        event.save(update_fields=['processed', 'skip_reason'])
+        return
+
+    logger.exception('Billing webhook %s unexpected Mercado Pago lookup error', event.id)
+    raise error
+
+
 @shared_task(
     autoretry_for=(Exception,),
     max_retries=3,
@@ -467,10 +496,25 @@ def process_billing_webhook(event_id):
     from app.apps.accounts.models import Tenant
     from app.services.gateway.mercadopago import MercadoPagoGateway, MercadoPagoError
 
-    # ---------------------------------------------------------------
-    # FASE 1 (sem transacao): buscar event, fazer chamadas HTTP,
-    # resolver tenant/sub/novo status em memoria.
-    # ---------------------------------------------------------------
+    def cancel_pending_subscription_after_confirmation(subscription_pk, pending_id):
+        try:
+            gateway = MercadoPagoGateway()
+            gateway.cancel_preapproval(pending_id)
+        except Exception:
+            logger.exception(
+                'Billing: erro ao cancelar subscription anterior %s',
+                pending_id,
+            )
+            return
+
+        with db_transaction.atomic():
+            locked = Subscription.objects.select_for_update().get(pk=subscription_pk)
+            if locked.pending_cancel_gateway_subscription_id == pending_id:
+                locked.pending_cancel_gateway_subscription_id = None
+                locked.save(update_fields=[
+                    'pending_cancel_gateway_subscription_id', 'updated_at',
+                ])
+
     try:
         event = WebhookEvent.objects.get(id=event_id)
     except WebhookEvent.DoesNotExist:
@@ -481,7 +525,6 @@ def process_billing_webhook(event_id):
 
     payload = event.payload
     mp_type = payload.get('type', '')
-    action = payload.get('action', '')
     data = payload.get('data', {})
 
     tenant = None
@@ -489,18 +532,21 @@ def process_billing_webhook(event_id):
     new_sub_status = None
     new_period_end = None
     sync_plan = False
+    external_ref = ''
+    preapproval_id = ''
 
     if mp_type == 'payment' and data.get('id'):
         payment_id = data['id']
         try:
             gateway = MercadoPagoGateway()
             payment = gateway.get_payment(payment_id)
-        except (MercadoPagoError, Exception) as e:
-            logger.warning("Erro ao buscar payment %s: %s", payment_id, e)
-            event.processed = True
-            event.skip_reason = str(e)[:500]
-            event.save(update_fields=['processed', 'skip_reason'])
-            return
+        except MercadoPagoError as e:
+            result = _handle_gateway_lookup_error(event, e)
+            if result is None:
+                return
+        except Exception:
+            logger.exception('Erro inesperado ao buscar payment %s', payment_id)
+            raise
 
         external_ref = payment.get('external_reference', '')
         if external_ref:
@@ -523,8 +569,8 @@ def process_billing_webhook(event_id):
 
         if not tenant:
             logger.warning(
-                "Billing webhook: payment %s sem tenant via external_reference "
-                "ou preapproval_id", payment_id,
+                "Billing webhook: payment %s sem tenant via external_reference ou preapproval_id",
+                payment_id,
             )
             event.processed = True
             event.skip_reason = 'tenant not found'
@@ -558,12 +604,13 @@ def process_billing_webhook(event_id):
         try:
             gateway = MercadoPagoGateway()
             preapproval = gateway.get_preapproval(preapproval_id)
-        except (MercadoPagoError, Exception) as e:
-            logger.warning("Erro ao buscar preapproval %s: %s", preapproval_id, e)
-            event.processed = True
-            event.skip_reason = str(e)[:500]
-            event.save(update_fields=['processed', 'skip_reason'])
-            return
+        except MercadoPagoError as e:
+            result = _handle_gateway_lookup_error(event, e)
+            if result is None:
+                return
+        except Exception:
+            logger.exception('Erro inesperado ao buscar preapproval %s', preapproval_id)
+            raise
 
         external_ref = preapproval.get('external_reference', '')
         if not external_ref:
@@ -589,6 +636,12 @@ def process_billing_webhook(event_id):
             event.save(update_fields=['processed', 'skip_reason'])
             return
 
+        if sub.gateway_subscription_id and preapproval_id != sub.gateway_subscription_id:
+            event.processed = True
+            event.skip_reason = 'stale preapproval'
+            event.save(update_fields=['processed', 'skip_reason'])
+            return
+
         mp_status = preapproval.get('status', '')
         if mp_status == 'authorized':
             new_sub_status = Subscription.Status.ACTIVE
@@ -598,9 +651,6 @@ def process_billing_webhook(event_id):
         elif mp_status == 'past_due':
             new_sub_status = Subscription.Status.PAST_DUE
 
-    # ---------------------------------------------------------------
-    # FASE 2 (transacao curta): lock nas linhas, aplicar mudancas.
-    # ---------------------------------------------------------------
     if new_sub_status is None and not sync_plan:
         with db_transaction.atomic():
             try:
@@ -613,51 +663,57 @@ def process_billing_webhook(event_id):
             event.save(update_fields=['processed'])
         return
 
-    def _apply_changes():
-        with db_transaction.atomic():
-            try:
-                locked_event = WebhookEvent.objects.select_for_update().get(
-                    id=event_id, processed=False,
-                )
-            except WebhookEvent.DoesNotExist:
-                return
+    with db_transaction.atomic():
+        try:
+            locked_event = WebhookEvent.objects.select_for_update().get(
+                id=event_id, processed=False,
+            )
+        except WebhookEvent.DoesNotExist:
+            return
 
-            locked_sub = Subscription.objects.select_for_update().get(pk=sub.pk)
-            locked_tenant = Tenant.objects.select_for_update().get(pk=tenant.pk)
+        locked_sub = Subscription.objects.select_for_update().get(pk=sub.pk)
+        locked_tenant = Tenant.objects.select_for_update().get(pk=tenant.pk)
 
-            if locked_event.tenant is None and tenant:
-                locked_event.tenant = tenant
+        if locked_event.tenant is None and tenant:
+            locked_event.tenant = tenant
 
-            if new_sub_status is not None:
-                locked_sub.status = new_sub_status
-            if new_period_end is not None:
-                locked_sub.current_period_end = new_period_end
+        pending_cancel_id = None
+        if new_sub_status == Subscription.Status.ACTIVE:
+            pending_cancel_id = locked_sub.pending_cancel_gateway_subscription_id
 
-            update_fields = ['status', 'updated_at']
-            if new_period_end is not None:
-                update_fields.append('current_period_end')
+        if new_sub_status is not None:
+            locked_sub.status = new_sub_status
+        if new_period_end is not None:
+            locked_sub.current_period_end = new_period_end
 
-            locked_sub.save(update_fields=update_fields)
+        update_fields = ['status', 'updated_at']
+        if new_period_end is not None:
+            update_fields.append('current_period_end')
 
-            if sync_plan:
-                locked_tenant.plan = locked_sub.plan
-                locked_tenant.save(update_fields=['plan', 'updated_at'])
+        locked_sub.save(update_fields=update_fields)
 
-            locked_event.processed = True
-            locked_event.save(update_fields=['processed', 'tenant'])
+        if sync_plan:
+            locked_tenant.plan = locked_sub.plan
+            locked_tenant.save(update_fields=['plan', 'updated_at'])
 
+        locked_event.processed = True
+        locked_event.save(update_fields=['processed', 'tenant'])
+
+        db_transaction.on_commit(
+            lambda: cache.delete(f'tenant_operational:{tenant.uuid}')
+        )
+        if pending_cancel_id:
             db_transaction.on_commit(
-                lambda: cache.delete(f'tenant_operational:{tenant.uuid}')
+                lambda sub_pk=locked_sub.pk, pending_id=pending_cancel_id:
+                    cancel_pending_subscription_after_confirmation(sub_pk, pending_id)
             )
 
-            if new_sub_status == Subscription.Status.ACTIVE:
-                logger.info("Billing: tenant %s ACTIVE", external_ref)
-            elif new_sub_status == Subscription.Status.PAST_DUE:
-                logger.warning("Billing: tenant %s PAST_DUE", external_ref)
-            elif new_sub_status == Subscription.Status.CANCELED:
-                logger.info("Billing: subscription %s cancelada", preapproval_id)
-
-    _apply_changes()
+        if new_sub_status == Subscription.Status.ACTIVE:
+            logger.info("Billing: tenant %s ACTIVE", external_ref)
+        elif new_sub_status == Subscription.Status.PAST_DUE:
+            logger.warning("Billing: tenant %s PAST_DUE", external_ref)
+        elif new_sub_status == Subscription.Status.CANCELED:
+            logger.info("Billing: subscription %s cancelada", preapproval_id)
 
 
 @shared_task(soft_time_limit=300, time_limit=360)
@@ -727,15 +783,6 @@ def reconcile_pending_orders():
             remote_status = remote_order.get('status', '')
 
             event_id_str = f'reconcile_{order.uuid}'
-            existing = WebhookEvent.objects.filter(gateway_event_id=event_id_str).first()
-            if existing:
-                if existing.processed and order.status == Order.Status.PENDING:
-                    logger.warning(
-                        "Reconcile: evento %s ja processado mas order %s segue PENDING "
-                        "(skip_reason=%s) — investigar correlacao",
-                        event_id_str, order.uuid, existing.skip_reason,
-                    )
-                continue
 
             if remote_status == 'paid':
                 synthetic_payload = {
@@ -743,12 +790,22 @@ def reconcile_pending_orders():
                     'data': remote_order,
                     'id': event_id_str,
                 }
-                event = WebhookEvent.objects.create(
+                event, created = WebhookEvent.objects.get_or_create(
                     gateway='pagarme',
-                    payload=synthetic_payload,
                     gateway_event_id=event_id_str,
-                    tenant=tenant,
+                    defaults={
+                        'payload': synthetic_payload,
+                        'tenant': tenant,
+                    },
                 )
+                if not created:
+                    if event.processed and order.status == Order.Status.PENDING:
+                        logger.warning(
+                            "Reconcile: evento %s ja processado mas order %s segue PENDING "
+                            "(skip_reason=%s) - investigar correlacao",
+                            event_id_str, order.uuid, event.skip_reason,
+                        )
+                    continue
                 process_pagarme_webhook.delay(event.id)
                 paid_count += 1
 
@@ -758,12 +815,22 @@ def reconcile_pending_orders():
                     'data': remote_order,
                     'id': event_id_str,
                 }
-                event = WebhookEvent.objects.create(
+                event, created = WebhookEvent.objects.get_or_create(
                     gateway='pagarme',
-                    payload=synthetic_payload,
                     gateway_event_id=event_id_str,
-                    tenant=tenant,
+                    defaults={
+                        'payload': synthetic_payload,
+                        'tenant': tenant,
+                    },
                 )
+                if not created:
+                    if event.processed and order.status == Order.Status.PENDING:
+                        logger.warning(
+                            "Reconcile: evento %s ja processado mas order %s segue PENDING "
+                            "(skip_reason=%s) - investigar correlacao",
+                            event_id_str, order.uuid, event.skip_reason,
+                        )
+                    continue
                 process_pagarme_webhook.delay(event.id)
                 failed_count += 1
 
