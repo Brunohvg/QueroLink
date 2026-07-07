@@ -69,7 +69,7 @@
           <div class="flex items-center justify-between">
             <div>
               <div class="flex items-center gap-2">
-                <span class="font-display text-[15px] font-semibold text-gray-800" x-text="opt.service === 'MOTOBOY' ? 'Motoboy' : opt.service === 'SEDEX' ? 'SEDEX' : 'PAC'"></span>
+                <span class="font-display text-[15px] font-semibold text-gray-800" x-text="freightServiceLabel(opt)"></span>
                 <span x-show="opt.service !== 'MOTOBOY' && !opt.official" class="text-[10px] font-medium text-gray-400 bg-gray-100 rounded-full px-2 py-0.5">estimativa</span>
                 <span x-show="opt.service !== 'MOTOBOY' && opt.official" class="text-[10px] font-medium text-blue-600 bg-blue-50 rounded-full px-2 py-0.5">contrato</span>
               </div>
@@ -193,11 +193,12 @@ function freightCalc() {
       var lines = [];
       lines.push('Frete para ' + this.destination + ' (' + this.cep + '):');
       var hasOfficial = false;
+      var self = this;
       this.results.forEach(function(opt) {
         if (opt.error) return;
         if (opt.official) hasOfficial = true;
-        var name = opt.service === 'MOTOBOY' ? 'Motoboy' : opt.service === 'SEDEX' ? 'SEDEX' : 'PAC';
-        var emoji = opt.service === 'MOTOBOY' ? '🏍' : opt.service === 'SEDEX' ? '🚀' : '📦';
+        var name = self.freightServiceLabel(opt);
+        var emoji = self.freightServiceEmoji(opt);
         var price = formatBRL(opt.price_cents);
         var days = opt.service === 'MOTOBOY' ? 'hoje' : 'ate ' + opt.delivery_days + ' dias uteis';
         lines.push(emoji + ' ' + name + ': ' + price + ' (' + days + ')');
@@ -248,6 +249,22 @@ function freightCalc() {
 
     cheapest: function(options) {
       return options && options.length ? formatBRL(options[0].price_cents) : '';
+    },
+
+    freightServiceLabel: function(opt) {
+      if (!opt) return 'Frete';
+      if (opt.label) return opt.label;
+      if (opt.service === 'MOTOBOY') return 'Motoboy';
+      if (opt.service === '03220' || opt.service === 'SEDEX') return 'SEDEX';
+      if (opt.service === '03298' || opt.service === 'PAC') return 'PAC';
+      return opt.service || 'Frete';
+    },
+
+    freightServiceEmoji: function(opt) {
+      if (!opt) return '📦';
+      if (opt.service === 'MOTOBOY') return '🏍';
+      if (opt.service === '03220' || opt.service === 'SEDEX') return '🚀';
+      return '📦';
     },
   };
 }
