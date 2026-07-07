@@ -74,6 +74,7 @@ class CpfTest(TransactionTestCase):
         cpf = '52998224725'
         with connection.cursor() as cursor:
             cursor.execute('ALTER TABLE sellers_seller DROP CONSTRAINT IF EXISTS unique_cpf_per_tenant')
+            cursor.execute('DROP INDEX IF EXISTS unique_cpf_per_tenant')
             cursor.execute('UPDATE sellers_seller SET cpf = %s WHERE uuid = %s', [cpf, s1.pk])
             cursor.execute('UPDATE sellers_seller SET cpf = %s WHERE uuid = %s', [cpf, s2.pk])
 
