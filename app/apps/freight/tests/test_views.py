@@ -113,6 +113,52 @@ class FreightQuoteViewTest(TestCase):
         self.assertContains(resp, "opt.service === '03220' || opt.service === 'SEDEX'")
         self.assertNotContains(resp, "opt.service === 'SEDEX' ? 'SEDEX' : 'PAC'")
 
+    @patch.object(CorreiosAuthClient, 'get_token')
+    @patch('app.apps.freight.correios_cws.requests.post')
+    @patch('app.apps.freight.views.services.ViaCepClient.get_cep_info')
+    @patch('app.apps.freight.views.services.estimate_motoboy')
+    def test_quote_keeps_pac_visible_when_sedex_is_cheaper(
+        self, mock_motoboy, mock_cep, mock_requests, mock_get_token,
+    ):
+        self.tenant.correios_usuario = 'usr'
+        self.tenant.correios_codigo_acesso = 'pass'
+        self.tenant.save()
+        mock_get_token.return_value = {'token': 'jwt-fake'}
+        mock_cep.return_value = MagicMock(
+            city='Sao Paulo', state='SP', neighborhood='Centro',
+        )
+        mock_motoboy.return_value = None
+
+        mock_price = MagicMock(status_code=200)
+        mock_price.json.return_value = [
+            {'coProduto': '03298', 'pcFinal': '40,00'},
+            {'coProduto': '03220', 'pcFinal': '35,00'},
+        ]
+        mock_prazo = MagicMock(status_code=200)
+        mock_prazo.json.return_value = [
+            {'coProduto': '03298', 'prazoEntrega': '6'},
+            {'coProduto': '03220', 'prazoEntrega': '2'},
+        ]
+        mock_requests.side_effect = [mock_price, mock_prazo]
+
+        resp = self._post({'cep_destino': '01001000', 'weight_grams': 500})
+
+        self.assertEqual(resp.status_code, 200)
+        data = resp.json()
+        by_service = {item['service']: item for item in data['options']}
+        self.assertIn('03298', by_service)
+        self.assertIn('03220', by_service)
+        self.assertGreater(by_service['03298']['price_cents'], by_service['03220']['price_cents'])
+
+    def test_mobile_template_highlights_sedex_when_it_is_best_option(self):
+        resp = self.client.get(reverse('dashboard:mobile_frete'))
+
+        self.assertEqual(resp.status_code, 200)
+        self.assertContains(resp, 'Nesta região, o SEDEX está mais vantajoso que o PAC.')
+        self.assertContains(resp, 'Melhor opção')
+        self.assertContains(resp, 'sedexBetterThanPac')
+        self.assertContains(resp, 'isBestShippingOption(opt)')
+
     def test_invalid_cep_returns_400(self):
         resp = self._post({'cep_destino': 'abc', 'weight_grams': 500})
         self.assertEqual(resp.status_code, 400)

@@ -63,13 +63,18 @@
       <span x-text="destination"></span>
     </div>
 
+    <div x-show="sedexBetterThanPac()" class="mb-3 rounded-2xl border border-emerald-100 bg-emerald-50 px-4 py-3 text-[13px] text-emerald-700">
+      Nesta região, o SEDEX está mais vantajoso que o PAC.
+    </div>
+
     <div class="space-y-2 overflow-y-auto" style="max-height: 50vh;">
-      <template x-for="opt in results" :key="opt.service">
-        <div class="bg-white rounded-2xl p-4 border border-gray-100 shadow-sm" :class="{'border-red-200 bg-red-50/30': opt.error}">
+      <template x-for="opt in displayResults()" :key="opt.service">
+        <div class="bg-white rounded-2xl p-4 border border-gray-100 shadow-sm" :class="{'border-red-200 bg-red-50/30': opt.error, 'border-emerald-300 ring-2 ring-emerald-100': isBestShippingOption(opt)}">
           <div class="flex items-center justify-between">
             <div>
               <div class="flex items-center gap-2">
                 <span class="font-display text-[15px] font-semibold text-gray-800" x-text="freightServiceLabel(opt)"></span>
+                <span x-show="isBestShippingOption(opt)" class="text-[10px] font-semibold text-emerald-700 bg-emerald-100 rounded-full px-2 py-0.5">Melhor opção</span>
                 <span x-show="opt.service !== 'MOTOBOY' && !opt.official" class="text-[10px] font-medium text-gray-400 bg-gray-100 rounded-full px-2 py-0.5">estimativa</span>
                 <span x-show="opt.service !== 'MOTOBOY' && opt.official" class="text-[10px] font-medium text-blue-600 bg-blue-50 rounded-full px-2 py-0.5">contrato</span>
               </div>
@@ -248,7 +253,20 @@ function freightCalc() {
     },
 
     cheapest: function(options) {
-      return options && options.length ? formatBRL(options[0].price_cents) : '';
+      var display = this.sortedFreightOptions(options || []);
+      return display.length ? formatBRL(display[0].price_cents) : '';
+    },
+
+    displayResults: function() {
+      return this.sortedFreightOptions(this.results);
+    },
+
+    sortedFreightOptions: function(options) {
+      return (options || []).slice().sort(function(a, b) {
+        if (a.error && !b.error) return 1;
+        if (!a.error && b.error) return -1;
+        return (a.price_cents || 0) - (b.price_cents || 0);
+      });
     },
 
     freightServiceLabel: function(opt) {
@@ -265,6 +283,24 @@ function freightCalc() {
       if (opt.service === 'MOTOBOY') return '🏍';
       if (opt.service === '03220' || opt.service === 'SEDEX') return '🚀';
       return '📦';
+    },
+
+    isSedex: function(opt) {
+      return opt && (opt.service === '03220' || opt.service === 'SEDEX' || opt.label === 'SEDEX');
+    },
+
+    isPac: function(opt) {
+      return opt && (opt.service === '03298' || opt.service === 'PAC' || opt.label === 'PAC');
+    },
+
+    sedexBetterThanPac: function() {
+      var sedex = (this.results || []).find((opt) => this.isSedex(opt) && !opt.error);
+      var pac = (this.results || []).find((opt) => this.isPac(opt) && !opt.error);
+      return !!(sedex && pac && sedex.price_cents > 0 && pac.price_cents > sedex.price_cents);
+    },
+
+    isBestShippingOption: function(opt) {
+      return this.sedexBetterThanPac() && this.isSedex(opt);
     },
   };
 }

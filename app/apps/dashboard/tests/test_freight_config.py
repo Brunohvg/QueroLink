@@ -72,3 +72,18 @@ class FreightConfigTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, 'freight-presets')
         self.assertContains(response, 'Calcular frete')
+
+    def test_gestor_configuracoes_renders_main_setting_groups(self):
+        self.client.login(username='admin', password='pass')
+        response = self.client.get(reverse('dashboard:gestor_configuracoes'))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'Billing')
+        self.assertContains(response, 'WhatsApp')
+        self.assertContains(response, 'Dados da loja')
+        self.assertContains(response, 'Correios/Frete')
+        self.assertContains(response, 'Billing e segurança')
+        self.assertContains(response, 'name="store_cep"')
+        self.assertContains(response, 'name="correios_usuario"')
+        self.assertContains(response, 'name="pagarme_api_key"')
+        self.assertContains(response, 'name="whatsapp_instance_id"')
