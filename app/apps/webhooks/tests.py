@@ -4,7 +4,7 @@ from decimal import Decimal
 from concurrent.futures import ThreadPoolExecutor
 from unittest.mock import patch
 
-from django.db import connections
+from django.db import connection, connections
 from django.test import Client, TestCase, TransactionTestCase, override_settings
 from django.utils import timezone
 
@@ -366,7 +366,8 @@ class TestWebhookIdempotency(TransactionTestCase):
             try:
                 return self._post(payload)
             finally:
-                connections.close_all()
+                if connection.vendor != 'sqlite':
+                    connections.close_all()
 
         with ThreadPoolExecutor(max_workers=2) as executor:
             responses = list(executor.map(post_and_close, range(2)))
