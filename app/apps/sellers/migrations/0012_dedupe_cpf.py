@@ -1,7 +1,7 @@
 import logging
 
 from django.db import migrations
-from django.db.models import Count, Min
+from django.db.models import Count
 
 logger = logging.getLogger(__name__)
 
@@ -13,7 +13,7 @@ def dedupe_cpf(apps, schema_editor):
         .exclude(cpf__isnull=True)
         .exclude(cpf='')
         .values('tenant', 'cpf')
-        .annotate(cnt=Count('cpf'), first_pk=Min('pk'))
+        .annotate(cnt=Count('cpf'))
         .filter(cnt__gt=1)
     )
     dupe_count = dupes.count()
