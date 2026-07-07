@@ -595,14 +595,14 @@ showToast("{{ message|escapejs }}", "{% if message.tags == 'error' %}error{% eli
           <div class="space-y-2">
             <template x-for="(preset, idx) in presets" :key="idx">
               <div class="flex items-center gap-2 bg-gray-50 rounded-xl px-3 py-2">
-                <input type="text" :value="preset.name" @input="preset.name = $el.value.slice(0, 20)"
+                <input type="text" :value="preset.name" @input="preset.name = $event.target.value.slice(0, 20)"
                        class="flex-1 bg-transparent text-[13px] outline-none" placeholder="Nome da embalagem">
                 <input type="text" inputmode="decimal"
                        :value="(preset.weight_grams / 1000).toFixed(1).replace('.', ',')"
-                       @input="preset.weight_grams = Math.round(parseFloat($el.value.replace(',', '.')) * 1000) || 500"
+                       @input="preset.weight_grams = Math.round(parseFloat($event.target.value.replace(',', '.')) * 1000) || 500"
                        class="w-20 bg-white border border-gray-200 rounded-lg px-2 py-1 text-[13px] outline-none" placeholder="0,5">
                 <span class="text-[12px] text-gray-400">kg</span>
-                <button @click="presets.splice(idx, 1)" x-show="presets.length > 1"
+                <button type="button" @click="presets.splice(idx, 1)" x-show="presets.length > 1"
                         class="text-gray-400 hover:text-red-500 transition" aria-label="Remover embalagem">
                   <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
                 </button>
