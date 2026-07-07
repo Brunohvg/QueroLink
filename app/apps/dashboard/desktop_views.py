@@ -245,17 +245,22 @@ def gestor_configuracoes(request):
             except ValueError:
                 pass
 
-        correios_usuario = request.POST.get('correios_usuario', '').strip()
-        tenant.correios_usuario = correios_usuario or None
-        correios_codigo = request.POST.get('correios_codigo_acesso', '').strip()
-        if correios_codigo and correios_codigo != '••••••••':
-            tenant.correios_codigo_acesso = correios_codigo
-        elif not correios_usuario:
-            tenant.correios_codigo_acesso = None
-        correios_contrato = request.POST.get('correios_contrato', '').strip()
-        tenant.correios_contrato = correios_contrato or None
-        correios_cartao = request.POST.get('correios_cartao', '').strip()
-        tenant.correios_cartao = correios_cartao or None
+        correios_usuario = None
+        if 'correios_usuario' in request.POST:
+            correios_usuario = request.POST.get('correios_usuario', '').strip()
+            tenant.correios_usuario = correios_usuario or None
+        if 'correios_codigo_acesso' in request.POST:
+            correios_codigo = request.POST.get('correios_codigo_acesso', '').strip()
+            if correios_codigo and correios_codigo != '••••••••':
+                tenant.correios_codigo_acesso = correios_codigo
+            elif correios_usuario == '':
+                tenant.correios_codigo_acesso = None
+        if 'correios_contrato' in request.POST:
+            correios_contrato = request.POST.get('correios_contrato', '').strip()
+            tenant.correios_contrato = correios_contrato or None
+        if 'correios_cartao' in request.POST:
+            correios_cartao = request.POST.get('correios_cartao', '').strip()
+            tenant.correios_cartao = correios_cartao or None
 
         weekday_values = request.POST.getlist('working_weekdays')
         try:
