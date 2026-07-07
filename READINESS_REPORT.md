@@ -1,80 +1,237 @@
-# Readiness Report — V-Com / QueroLink
+# Estado atual
 
-> **Data:** 2026-07-01
-> **Versão:** 2.1.0
-> **Branch:** `querolink-v2`
-> **Recomendação:** ✅ PRONTO PARA PRODUÇÃO
+O QueroLink/Merito esta em validacao de staging na branch `querolink-v2`, apos estabilizacao de billing, webhooks idempotentes, Correios CWS, calculo de frete e embalagens.
 
----
+Arquitetura:
 
-## Correções aplicadas (v2.1.0)
+- Aplicacao Django 5 com Django REST Framework.
+- Multi-tenant por `Tenant`, com usuarios ADMIN, MANAGER, SELLER e FINANCIAL.
+- Workers Celery e Celery Beat para tarefas assincronas e agendadas.
+- Redis como broker Celery e cache em producao.
+- PostgreSQL em producao; SQLite apenas para desenvolvimento e job CI legado.
+- Frontend server-rendered com templates Django, Alpine.js local e Tailwind compilado.
+- Deploy por Docker Compose no Coolify.
 
-### Lote 7 — Concorrência e operação
+Stack:
 
-| # | Severidade | O que foi corrigido |
-|---|:----------:|---------------------|
-| C1 | 🔴 | Deadlock em `close_seller_commissions` / `reopen_seller_commissions` / `pay_seller_commissions`: `select_for_update` sem `ORDER BY` podia travar duas transações concorrentes. Adicionado `.order_by('id')`. |
-| C2 | 🔴 | Race condition em `create_commission_adjustment`: leitura e escrita do valor sem lock. Envolvido em `transaction.atomic()` com `select_for_update`. |
-| C3 | 🟠 | `PaymentLink.gateway_link_id` sem `db_index`: full table scan em todo webhook. Adicionado índice + migration 0003. |
-| C4 | 🟠 | Nenhuma task Celery tinha `time_limit`: uma task travada segurava o worker. Adicionados `soft_time_limit`/`time_limit` nas 4 tasks. |
-| C5 | 🟠 | `cleanup_old_webhook_events` fazia DELETE massivo: podia travar tabela e encher WAL. Alterado para lotes de 1000 registros. |
-| C6 | 🟠 | CSP bloqueava scripts inline: Alpine.js e modais quebravam. Adicionado `unsafe-inline` + `unsafe-eval` no script-src. |
-| C7 | 🟢 | Webhook dedup via `gateway_event_id` (view + task + banco). |
-| C8 | 🟢 | Limpeza de links órfãos no Pagar.me em caso de falha na criação. |
+- Python 3.12.
+- Django 5.1.
+- DRF.
+- Celery 5.4.
+- Redis 7.
+- PostgreSQL.
+- Tailwind CSS.
+- Pagar.me para links de pagamento.
+- Mercado Pago para billing.
+- Evolution API para WhatsApp.
+- Sentry opcional com PII desabilitado.
 
----
+Modulos:
 
-## Checklist de produção
+- `accounts`: tenants, usuarios, onboarding, seguranca e backup.
+- `sellers`: vendedores, CPF, metas e vinculo com usuario.
+- `sales`: vendas manuais e vendas informativas de link.
+- `commissions`: periodos, calculos, ajustes e exportacao contabil.
+- `billing`: assinatura, planos, Mercado Pago e limites.
+- `orders`/`payments`: pedidos, links Pagar.me e pagamentos.
+- `webhooks`: recebimento, idempotencia, reconcile e limpeza.
+- `notifications`: WhatsApp, push, lembretes, e-mails de ciclo de vida e pacote contabil.
+- `freight`: cotacao Correios CWS oficial com fallback estimado.
+- `dashboard`: telas desktop do gestor e mobile do vendedor.
+- `api`: endpoints autenticados internos.
 
-| Item | Status |
-|------|--------|
-| DEBUG=False | ✅ |
-| SECRET_KEY forte em produção | ✅ |
-| HTTPS forçado | ✅ |
-| HSTS 1 ano + subdomains + preload | ✅ |
-| Session/CSRF cookies secure | ✅ |
-| CSP ativo | ✅ |
-| .env no .gitignore | ✅ |
-| CORS configurado | ✅ (mesmo domínio) |
-| Rate limiting ativo | ✅ |
-| Migrations aplicadas | ✅ |
-| Tasks Celery com time limits | ✅ |
-| Tasks Celery com retry | ✅ |
-| Backups automáticos (Google Drive) | ✅ |
-| Monitoramento /health/ | ✅ |
+# Funcionalidades prontas
 
----
+Autenticacao:
 
-## O que não está implementado
+- Login por sessao no dashboard.
+- JWT/token para APIs autenticadas.
+- Reset de senha com rate limit.
+- Roles ADMIN, MANAGER, SELLER e FINANCIAL.
 
-| Funcionalidade | Impacto |
-|----------------|---------|
-| Testes automatizados em CI (GitHub Actions) | Não bloqueante — Makefile `make test` manual |
-| Alertas de falha de task Celery | Tasks falham silenciosamente (log apenas) |
-| Painel de admin Django | Não necessário — tudo via dashboard customizado |
-| Analytics de cliques (LinkClick) | Model existe, view não implementada |
-| Tela de perfil do vendedor (troca de senha) | API `change-password` existe, UI não |
+Multi-tenant:
 
----
+- Dados vinculados a tenant.
+- Usuarios e vendedores isolados por tenant.
+- CSP e middleware de bloqueio operacional por tenant.
 
-## Plano de deploy
+Billing:
 
-```bash
-git push origin querolink-v2
-# Deploy automático via Coolify ou manual:
-ssh <server>
-cd /opt/querolink
-git pull
-scripts/deploy.sh production
-```
+- Planos ofertaveis STARTER, PRO e BUSINESS.
+- Trial, assinatura, upgrade e status operacional.
+- Webhook Mercado Pago com HMAC e idempotencia.
+- Falha fechada quando segredo obrigatorio nao esta configurado.
 
----
+Vendedores:
 
-## DR (Desaster Recovery)
+- Cadastro individual.
+- Importacao CSV/XLSX com limite por plano.
+- CPF normalizado e unico por tenant.
+- Convite por WhatsApp sem expor senha em JSON de resposta.
 
-| Cenário | Procedimento | RTO |
-|---------|-------------|:---:|
-| Falha de app | `docker compose restart web` | 5s |
-| Falha de worker | `docker compose restart celery_worker` | 5s |
-| Corrupção de dados | `scripts/restore.sh latest` (restaura backup do Google Drive) | 10 min |
-| Perda total | `git pull` + `scripts/deploy.sh production` + restore | 30 min |
+Comissao:
+
+- Vendas manuais entram em comissao.
+- Vendas de link sao informativas.
+- Periodos, ajustes, pagamento, previa e exportacao contabil.
+
+Dashboard:
+
+- Gestor com metricas, vendas, vendedores, comissoes, assinatura, configuracoes e contabilidade.
+- Mobile do vendedor com lancamento, ranking, metas, notificacoes e frete.
+
+Correios:
+
+- Cotacao oficial Correios CWS.
+- Servicos PAC e SEDEX mapeados por codigo.
+- Embalagens configuraveis.
+- Fallback estimado identificado como estimativa.
+
+Notificacoes:
+
+- WhatsApp por tenant ou instancia compartilhada opcional.
+- Retry controlado.
+- Requeue de notificacoes travadas.
+- Push web.
+- Lembretes diarios e e-mails de ciclo de vida.
+
+Backup:
+
+- Backup diario via Celery Beat.
+- `pg_dump -Fc`.
+- Upload para Google Drive via rclone.
+- Script de restore documentado.
+
+# Segurança
+
+Hardenings implementados:
+
+- Segredos sensiveis em `EncryptedCharField`.
+- Hash para dados sensiveis pesquisaveis quando necessario.
+- Webhook Mercado Pago com assinatura HMAC.
+- Webhook Pagar.me com Basic Auth opcional por tenant.
+- Idempotencia de webhooks por `gateway_event_id`.
+- Eventos externos ignorados de forma controlada e processados sem retry infinito.
+- `SECRET_KEY`, `DATABASE_URL`, `FERNET_KEY` e credenciais via ambiente.
+- CSP customizada preservando `unsafe-eval` para Alpine local.
+- Sem CDN novo nas telas.
+- `SECURE_SSL_REDIRECT`, HSTS, cookies seguros e `SECURE_PROXY_SSL_HEADER` em producao.
+- `SECURE_CONTENT_TYPE_NOSNIFF` e `SECURE_REFERRER_POLICY`.
+- Sentry com `send_default_pii=False`.
+- Rate limit em reset de senha.
+- Validacoes de limite por plano em cadastro/importacao de vendedores.
+- Celery com time limits nas tasks criticas.
+- Cleanup de webhooks antigos em lotes.
+- Backup sem logar credenciais.
+- Observabilidade Celery estruturada para inicio, sucesso, duracao e falha das tasks criticas, sem argumentos ou kwargs.
+
+# Testes
+
+Quantidade atual:
+
+- 394 testes automatizados executados com `python manage.py test -v2`.
+- O CI executa a suite em SQLite e PostgreSQL.
+
+Cobertura conhecida:
+
+- Billing, webhooks, limites de plano e trial.
+- Sellers, CPF, importacao e exclusao.
+- Comissoes, periodos, exportacao e telas relacionadas.
+- Notificacoes, retries e push.
+- Backup e parse de `DATABASE_URL`.
+- Frete, Correios CWS, fallback e renderizacao mobile.
+- Configuracoes do gestor.
+- Healthchecks operacionais.
+- Observabilidade Celery.
+- Estrutura obrigatoria deste relatorio.
+
+Limitacoes:
+
+- Testes nao validam o envio real de WhatsApp, e-mail, Pagar.me, Mercado Pago, Correios ou Google Drive.
+- Testes nao substituem validacao manual de staging com credenciais reais.
+- Restore precisa ser validado operacionalmente em banco vazio antes de go-live.
+
+# Infraestrutura
+
+Docker:
+
+- `web`: Django/Gunicorn.
+- `querolink-redis`: Redis com healthcheck.
+- `celery_worker`: worker Celery com healthcheck por `celery inspect ping`.
+- `celery_beat`: agendador Celery.
+- Volumes para media, Redis, backups e schedule do beat.
+
+Coolify:
+
+- Deploy por Docker Compose.
+- Rede externa `coolify`.
+- Variaveis sensiveis via ambiente.
+- `/health/` liberado de redirect SSL.
+
+Redis:
+
+- Broker Celery.
+- Result backend Celery.
+- Cache em producao.
+- Validado pelo healthcheck da aplicacao quando backend Redis esta ativo.
+
+Celery:
+
+- Worker separado do web.
+- Beat separado.
+- Time limits por task.
+- Observabilidade por sinais Celery em tasks criticas.
+- Healthcheck do container do worker via `inspect ping`.
+- Healthcheck HTTP valida conectividade com broker.
+
+GitHub Actions:
+
+- `backend-sqlite`: check, deploy check, migrations e suite em SQLite.
+- `backend-postgres`: check, migrations e suite em PostgreSQL.
+- `frontend`: install e build CSS.
+- Jobs independentes.
+
+Backup:
+
+- Agendado diariamente as 02:00.
+- Gera dump PostgreSQL em formato custom.
+- Envia para Google Drive com rclone.
+- Mantem retencao local/remota configuravel.
+
+Restore:
+
+- Restore por `scripts/restore.sh`.
+- Dumps `.dump` sao restaurados com `pg_restore`.
+- Validacao em banco vazio continua obrigatoria antes de producao.
+
+# Pendências
+
+- Validar staging ponta a ponta apos merge do Prompt 32.
+- Validar backup real no worker com rclone configurado.
+- Validar restore em banco PostgreSQL vazio.
+- Confirmar GitHub Actions verdes no Pull Request do Prompt 32.
+- Confirmar `/health/` em staging retornando banco, Redis e Celery como operacionais.
+
+# Checklist Produção
+
+- [ ] Branch do Prompt 32 com PR aprovado.
+- [ ] `backend-sqlite` verde.
+- [ ] `backend-postgres` verde.
+- [ ] `frontend` verde.
+- [ ] `python manage.py check` limpo.
+- [ ] `DJANGO_SETTINGS_MODULE=app.config.settings.production python manage.py check --deploy` revisado.
+- [ ] `python manage.py makemigrations --check --dry-run` sem migrations pendentes.
+- [ ] `docker compose config` valido.
+- [ ] Variaveis obrigatorias configuradas no Coolify.
+- [ ] `FERNET_KEY` configurada e preservada.
+- [ ] `MP_WEBHOOK_SECRET` configurado.
+- [ ] Credenciais Pagar.me por tenant validadas.
+- [ ] Credenciais Correios CWS validadas.
+- [ ] Evolution API/WhatsApp validado.
+- [ ] Backup real gerado.
+- [ ] Restore real testado em banco vazio.
+- [ ] `/health/` retorna `status=ok` em staging.
+- [ ] Worker Celery saudavel.
+- [ ] Beat Celery ativo.
+- [ ] Sentry configurado ou decisao registrada de operar sem DSN.
+- [ ] Go-live autorizado.

@@ -6,12 +6,11 @@ from django.urls import path, include, reverse_lazy
 from django.utils.decorators import method_decorator
 from django.views.decorators.csrf import csrf_protect
 from django.http import JsonResponse
-from django.db import connections
-from django.db.utils import OperationalError
 from django.views.generic import RedirectView
 from django_ratelimit.decorators import ratelimit
 from app.apps.accounts import views as account_views
 from app.apps.dashboard import desktop_views
+from app.config.health import get_health_status
 
 
 @method_decorator(ratelimit(key='ip', rate='3/h', method='POST', block=True), name='post')
@@ -20,18 +19,8 @@ class RateLimitedPasswordResetView(auth_views.PasswordResetView):
     pass
 
 def health_check(request):
-    db_ok = True
-    try:
-        connections['default'].cursor()
-    except OperationalError:
-        db_ok = False
-
-    payload = {
-        'status': 'ok' if db_ok else 'degraded',
-        'database': 'ok' if db_ok else 'error',
-    }
-    status_code = 200 if db_ok else 503
-    return JsonResponse(payload, status=status_code)
+    health = get_health_status()
+    return JsonResponse(health['payload'], status=health['status_code'])
 
 urlpatterns = [
     path('', account_views.landing_page, name='root'),
