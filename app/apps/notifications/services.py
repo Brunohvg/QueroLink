@@ -10,7 +10,7 @@ DEFAULT_MESSAGE_TEMPLATES = (
         MessageTemplate.Channel.WHATSAPP,
         'Ola {{vendedor}}! Seu acesso ao sistema de comissoes foi criado.\n'
         'Usuario: {{usuario}}\n'
-        'Senha temporaria: {{senha}}\n'
+        'Sua senha chega na proxima mensagem. Toque nela, segure e escolha Copiar.\n'
         'Acesse e troque sua senha no primeiro login.',
     ),
     (

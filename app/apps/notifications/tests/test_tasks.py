@@ -1,4 +1,4 @@
-from unittest.mock import patch, MagicMock
+from unittest.mock import call, patch, MagicMock
 from django.test import TestCase, override_settings
 from django.conf import settings
 from app.apps.accounts.models import Tenant, User
@@ -52,6 +52,27 @@ class SendWhatsappNotificationTaskTest(TestCase):
         mock_delay.assert_called_once()
 
     @patch("app.apps.notifications.tasks.send_whatsapp_notification.delay")
+    def test_create_and_send_notification_persists_secondary_body(self, mock_delay):
+        from app.apps.notifications.tasks import create_and_send_notification
+
+        notif = create_and_send_notification(
+            tenant=self.tenant,
+            event_type=MessageTemplate.EventType.SELLER_CREDENTIALS,
+            channel=MessageTemplate.Channel.WHATSAPP,
+            recipient="31999999999",
+            seller=self.seller,
+            context={
+                "vendedor": self.seller.name,
+                "usuario": self.seller.user.username,
+                "senha": "abc123",
+            },
+            secondary_body="abc123",
+        )
+
+        self.assertEqual(notif.secondary_body, "abc123")
+        mock_delay.assert_called_once()
+
+    @patch("app.apps.notifications.tasks.send_whatsapp_notification.delay")
     def test_notify_seller_credentials(self, mock_delay):
         from app.apps.notifications.tasks import notify_seller_credentials
 
@@ -65,6 +86,11 @@ class SendWhatsappNotificationTaskTest(TestCase):
         self.assertIn("Vendedor Teste", notif.message_body)
         self.assertIn("vendedor_teste", notif.message_body)
         self.assertIn("senha123", notif.message_body)
+        self.assertEqual(notif.secondary_body, "senha123")
+        self.assertNotIn("*", notif.secondary_body)
+        self.assertNotIn("`", notif.secondary_body)
+        self.assertNotIn("\n", notif.secondary_body)
+        self.assertFalse(notif.secondary_body.startswith("Senha"))
         mock_delay.assert_called_once()
 
     @patch("app.apps.notifications.tasks.send_whatsapp_notification.delay")
@@ -137,6 +163,101 @@ class SendWhatsappNotificationTaskTest(TestCase):
 
         notif.refresh_from_db()
         self.assertEqual(notif.status, Notification.Status.SENT)
+
+    @patch("app.apps.notifications.tasks.time.sleep")
+    @patch("app.apps.notifications.tasks.WhatsappClient")
+    def test_send_whatsapp_notification_with_secondary_body_sends_two_messages(
+        self, mock_client_class, mock_sleep
+    ):
+        self.tenant.whatsapp_instance_id = 'test-instance'
+        self.tenant.save()
+
+        mock_client = MagicMock()
+        mock_client_class.return_value = mock_client
+
+        notif = Notification.objects.create(
+            tenant=self.tenant,
+            seller=self.seller,
+            event_type=MessageTemplate.EventType.SELLER_CREDENTIALS,
+            channel=MessageTemplate.Channel.WHATSAPP,
+            recipient="31999999999",
+            message_body="corpo",
+            secondary_body="Abc#234567",
+        )
+
+        from app.apps.notifications.tasks import send_whatsapp_notification
+        send_whatsapp_notification(notif.uuid)
+
+        notif.refresh_from_db()
+        self.assertEqual(notif.status, Notification.Status.SENT)
+        mock_sleep.assert_called_once_with(1)
+        self.assertEqual(mock_client.send_message.call_count, 2)
+        self.assertEqual(
+            mock_client.send_message.call_args_list,
+            [
+                call("31999999999", "corpo"),
+                call("31999999999", "Abc#234567"),
+            ],
+        )
+
+    @patch("app.apps.notifications.tasks.time.sleep")
+    @patch("app.apps.notifications.tasks.WhatsappClient")
+    def test_second_message_failure_keeps_pending_and_retries(
+        self, mock_client_class, mock_sleep
+    ):
+        self.tenant.whatsapp_instance_id = 'test-instance'
+        self.tenant.save()
+
+        mock_client = MagicMock()
+        mock_client.send_message.side_effect = [None, Exception("Second failed")]
+        mock_client_class.return_value = mock_client
+
+        notif = Notification.objects.create(
+            tenant=self.tenant,
+            seller=self.seller,
+            event_type=MessageTemplate.EventType.SELLER_CREDENTIALS,
+            channel=MessageTemplate.Channel.WHATSAPP,
+            recipient="31999999999",
+            message_body="corpo",
+            secondary_body="Abc#234567",
+        )
+
+        from app.apps.notifications.tasks import send_whatsapp_notification
+        try:
+            send_whatsapp_notification(notif.uuid)
+        except Exception:
+            pass
+
+        notif.refresh_from_db()
+        self.assertEqual(notif.status, Notification.Status.PENDING)
+        self.assertEqual(notif.retry_count, 1)
+        self.assertIn("Second failed", notif.error_log)
+        mock_sleep.assert_called_once_with(1)
+
+    @patch("app.apps.notifications.tasks.WhatsappClient")
+    def test_other_event_without_secondary_body_sends_one_message(self, mock_client_class):
+        self.tenant.whatsapp_instance_id = 'test-instance'
+        self.tenant.save()
+
+        mock_client = MagicMock()
+        mock_client_class.return_value = mock_client
+
+        notif = Notification.objects.create(
+            tenant=self.tenant,
+            seller=self.seller,
+            event_type=MessageTemplate.EventType.COMMISSION_PAID,
+            channel=MessageTemplate.Channel.WHATSAPP,
+            recipient="31999999999",
+            message_body="comissao paga",
+        )
+
+        from app.apps.notifications.tasks import send_whatsapp_notification
+        send_whatsapp_notification(notif.uuid)
+
+        notif.refresh_from_db()
+        self.assertEqual(notif.status, Notification.Status.SENT)
+        self.assertFalse(notif.secondary_body)
+        mock_client.send_message.assert_called_once_with("31999999999", "comissao paga")
 
     @patch("app.apps.notifications.tasks.WhatsappClient")
     def test_send_whatsapp_notification_max_retries_exceeded(self, mock_client_class):

@@ -1,3 +1,5 @@
+from unittest.mock import patch
+
 from django.test import TestCase, override_settings
 from django.urls import reverse
 from django.core.cache import cache
@@ -49,6 +51,23 @@ class SellerCreateAPITest(SellerAPITestBase):
         }, format='json')
         self.assertEqual(response.status_code, 201)
         self.assertEqual(response.data['name'], 'Maria Silva')
+
+    @patch('app.apps.notifications.tasks.notify_seller_credentials')
+    @patch('app.apps.api.serializers.generate_temp_password')
+    def test_manager_create_seller_uses_readable_temp_password(
+        self, mock_generate_temp_password, mock_notify_seller_credentials
+    ):
+        mock_generate_temp_password.return_value = 'Abc#234567'
+
+        client = self._auth_manager()
+        response = client.post(reverse('api-seller-list'), {
+            'name': 'Senha Legivel',
+            'phone': '(31) 93333-4444',
+        }, format='json')
+
+        self.assertEqual(response.status_code, 201)
+        seller = Seller.objects.get(name='Senha Legivel')
+        mock_notify_seller_credentials.assert_called_once_with(seller, 'Abc#234567')
 
     def test_seller_cannot_create_another_seller(self):
         client = self._auth_seller()
