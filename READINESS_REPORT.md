@@ -1,6 +1,6 @@
 # Estado atual
 
-O QueroLink/Merito esta em validacao de staging na branch `querolink-v2`, apos estabilizacao de billing, webhooks idempotentes, Correios CWS, calculo de frete e embalagens.
+O Merito by Vidalys esta em validacao de staging na branch `querolink-v2`, apos estabilizacao de billing, webhooks idempotentes, Correios CWS, calculo de frete e embalagens.
 
 Arquitetura:
 

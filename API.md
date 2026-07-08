@@ -1,4 +1,4 @@
-# API REST — V-Com
+# API REST — Mérito by Vidalys
 
 > **Base URL:** `https://querolink.lojabibelo.com.br/api/`
 > **Schema OpenAPI:** `/api/schema/`

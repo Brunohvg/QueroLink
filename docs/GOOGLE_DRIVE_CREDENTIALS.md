@@ -10,7 +10,7 @@
 ## Pré-requisitos
 
 - **Conta Google** (gmail.com ou Google Workspace)
-- **Acesso ao servidor** onde o QueroLink está rodando
+- **Acesso ao servidor** onde o Mérito by Vidalys está rodando
 - **Docker** já rodando com o container `web`
 - **Navegador** no seu PC/celular (para autenticar no Google)
 

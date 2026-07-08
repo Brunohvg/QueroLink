@@ -4,7 +4,7 @@ Atualizado em 2026-07-07 para o Prompt 32.
 
 # Estado atual do projeto
 
-O Merito by Vidalys, tambem chamado QueroLink no repositorio, esta na branch base `querolink-v2` em validacao de staging. O Prompt 30 foi estabilizado, billing esta operacional, webhooks estao idempotentes, Correios CWS esta funcionando, embalagens estao configuraveis e o frete foi estabilizado.
+O Merito by Vidalys esta na branch base `querolink-v2` em validacao de staging. O Prompt 30 foi estabilizado, billing esta operacional, webhooks estao idempotentes, Correios CWS esta funcionando, embalagens estao configuraveis e o frete foi estabilizado.
 
 O Prompt 32 adiciona somente readiness operacional, observabilidade, documentacao e cobertura CI em PostgreSQL. Nao altera regras de negocio, models, migrations, payloads, APIs publicas, frete, billing, sellers, comissoes, webhooks ou backup.
 
