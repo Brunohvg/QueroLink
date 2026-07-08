@@ -14,6 +14,7 @@ from app.apps.commissions.models import (
     CommissionAdjustment,
 )
 from app.apps.accounts.models import Tenant, User
+from app.apps.accounts.utils import generate_temp_password
 from app.apps.accounts.validators import clean_phone, validate_phone_br
 from app.apps.accounts.fields import compute_hash
 
@@ -31,7 +32,7 @@ def _create_unique_seller_user(tenant, seller_name, used_usernames=None):
             n += 1
             username = f'{base}-{n}'
 
-        password = get_random_string(12)
+        password = generate_temp_password()
         try:
             with transaction.atomic():
                 user = User.objects.create_user(
@@ -615,8 +616,3 @@ class ChangePasswordSerializer(serializers.Serializer):
 def slugify(value):
     from django.utils.text import slugify as _slugify
     return _slugify(value)
-
-
-def get_random_string(length):
-    from django.utils.crypto import get_random_string as _get_random_string
-    return _get_random_string(length)

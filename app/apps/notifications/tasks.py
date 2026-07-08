@@ -1,4 +1,5 @@
 import logging
+import time
 
 from celery import shared_task
 from django.conf import settings
@@ -62,9 +63,17 @@ def send_whatsapp_notification(self, notification_id):
             api_key=api_key,
         )
         client.send_message(notification.recipient, notification.message_body)
+        if notification.secondary_body:
+            # Se a segunda mensagem falhar, o retry reenvia as duas mensagens.
+            time.sleep(1)
+            client.send_message(notification.recipient, notification.secondary_body)
 
         notification.status = Notification.Status.SENT
         notification.save(update_fields=["status", "updated_at"])
+        logger.info(
+            "WhatsApp notification %s sent (%d mensagens)",
+            notification_id, 2 if notification.secondary_body else 1,
+        )
 
     except InvalidNumberError as e:
         notification.status = Notification.Status.FAILED
@@ -99,7 +108,7 @@ def send_whatsapp_notification(self, notification_id):
             raise self.retry(exc=e, countdown=60 * (2 ** self.request.retries))
 
 
-def create_and_send_notification(*, tenant, event_type, channel, recipient, context, seller=None, order=None, commission_period=None):
+def create_and_send_notification(*, tenant, event_type, channel, recipient, context, seller=None, order=None, commission_period=None, secondary_body=None):
     if channel == MessageTemplate.Channel.WHATSAPP and not recipient:
         logger.warning(
             "WhatsApp notification skipped: %s no phone for tenant=%s seller=%s",
@@ -138,6 +147,7 @@ def create_and_send_notification(*, tenant, event_type, channel, recipient, cont
         channel=channel,
         recipient=recipient,
         message_body=message_body,
+        secondary_body=secondary_body,
     )
 
     if channel == MessageTemplate.Channel.WHATSAPP:
@@ -171,6 +181,7 @@ def notify_seller_credentials(seller, password):
             "usuario": seller.user.username,
             "senha": password,
         },
+        secondary_body=password,
     )
 
 
@@ -566,6 +577,3 @@ def send_accounting_package_email(self, tenant_uuid, month, year, requested_by_u
         "send_accounting_package_email: sent to %s for %s/%s",
         tenant.accountant_email, month_int, year_int,
     )
-
-
-

@@ -78,8 +78,8 @@ class SellerViewSet(viewsets.ModelViewSet):
             return Response(
                 {'error': 'Vendedor sem usuario vinculado.'}, status=400,
             )
-        from django.utils.crypto import get_random_string
-        password = get_random_string(12)
+        from app.apps.accounts.utils import generate_temp_password
+        password = generate_temp_password()
         seller.user.set_password(password)
         seller.user.save()
         try:
