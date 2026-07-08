@@ -663,6 +663,13 @@ class WebPushTest(TestCase):
         self.assertTrue(sub.is_active)
         self.assertEqual(sub.user, self.user)
 
+    # NOTA: usamos override_settings(VAPID_PRIVATE_KEY=...) e nao
+    # patch.object(settings, ..., create=True). Se o cache do LazySettings
+    # estiver limpo (ex.: apos outro teste com override_settings), o mock
+    # registra local=False e no teardown chama delattr(settings, ...),
+    # apagando VAPID_PRIVATE_KEY do Settings pelo resto do processo. Isso
+    # fazia testes posteriores (fechamento -> send_push) estourarem
+    # AttributeError. override_settings restaura sem apagar o atributo.
     def test_push_with_410_endpoint_marked_inactive(self):
         sub = PushSubscription.objects.create(
             user=self.user,
@@ -680,7 +687,7 @@ class WebPushTest(TestCase):
             mock_webpush.side_effect = WebPushException(
                 'Gone', response=MagicMock(status_code=410),
             )
-            with patch.object(settings, 'VAPID_PRIVATE_KEY', 'test-key', create=True):
+            with override_settings(VAPID_PRIVATE_KEY='test-key'):
                 send_push_notification(
                     user=self.user,
                     title='Test',
@@ -709,7 +716,7 @@ class WebPushTest(TestCase):
         )
 
         with patch('pywebpush.webpush') as mock_webpush:
-            with patch.object(settings, 'VAPID_PRIVATE_KEY', 'test-key', create=True):
+            with override_settings(VAPID_PRIVATE_KEY='test-key'):
                 from app.services.messaging.push import send_push_notification
                 send_push_notification(
                     user=self.user,
