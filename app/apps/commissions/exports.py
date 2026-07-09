@@ -5,10 +5,16 @@ from django.template.loader import render_to_string
 from django.utils import timezone
 from django.db.models import Sum as DSum
 from weasyprint import HTML
-from app.apps.commissions.services import calculate_estimated_commission, get_commission_rate
+from app.apps.commissions.services import (
+    calculate_estimated_commission,
+    calculate_estimated_commission_for_period,
+    get_commission_rate,
+    get_period_by_legacy_label,
+    legacy_month_range,
+)
 from app.apps.sales.models import Sale as SModel
 from app.apps.sellers.models import Seller as SellerM
-from app.apps.commissions.models import SellerCommission, CommissionAdjustment
+from app.apps.commissions.models import CommissionPeriod, SellerCommission, CommissionAdjustment
 
 logger = logging.getLogger(__name__)
 
@@ -18,10 +24,19 @@ def _fmt_br(val):
 
 
 def build_accounting_zip(tenant, month_int, year_int):
+    period = get_period_by_legacy_label(tenant, month_int, year_int)
+    if period:
+        start = period.start_date
+        end = period.end_date
+        competencia_label = period.display_label
+    else:
+        start, end = legacy_month_range(month_int, year_int)
+        competencia_label = f'{month_int:02d}/{year_int}'
+
     buf = BytesIO()
     with ZipFile(buf, 'w') as zf:
         sales = SModel.objects.filter(
-            tenant=tenant, sale_date__year=year_int, sale_date__month=month_int,
+            tenant=tenant, sale_date__gte=start, sale_date__lte=end,
         ).select_related('seller').order_by('sale_date', 'seller__name')
 
         csv1_lines = ['Data;Vendedor;CPF Vendedor;Valor (R$);Origem;Status;Observacao']
@@ -35,11 +50,9 @@ def build_accounting_zip(tenant, month_int, year_int):
 
         csv2_lines = ['Vendedor;CPF Vendedor;Total Vendido (R$);Taxa (%);Comissao Bruta (R$);Ajustes (R$);Comissao Liquida (R$);Status;Data Pagamento']
         for seller in SellerM.objects.filter(tenant=tenant, is_active=True):
-            sc = SellerCommission.objects.filter(
-                seller=seller, period__month=month_int, period__year=year_int,
-            ).select_related('period').first()
+            sc = SellerCommission.objects.filter(seller=seller, period=period).select_related('period').first() if period else None
             if sc:
-                est_comm, est_total = calculate_estimated_commission(seller, month_int, year_int)
+                est_comm, est_total = calculate_estimated_commission_for_period(seller, period)
                 comissao = sc.commission_amount
                 total = sc.total_sold_amount if sc.total_sold_amount else est_total
                 status_label = sc.get_status_display()
@@ -48,7 +61,10 @@ def build_accounting_zip(tenant, month_int, year_int):
                 total_adj = sum(a.difference for a in ads)
                 liquida = (sc.paid_amount or sc.amount_due) + total_adj
             else:
-                est_comm, est_total = calculate_estimated_commission(seller, month_int, year_int)
+                if period:
+                    est_comm, est_total = calculate_estimated_commission_for_period(seller, period)
+                else:
+                    est_comm, est_total = calculate_estimated_commission(seller, month_int, year_int)
                 total = est_total
                 comissao = est_comm
                 status_label = 'Estimativa'
@@ -67,7 +83,10 @@ def build_accounting_zip(tenant, month_int, year_int):
         total_sold_all = sum(s.amount for s in sales if s.status == 'ATIVA')
         total_comm_all = 0
         for seller in SellerM.objects.filter(tenant=tenant, is_active=True):
-            c, _ = calculate_estimated_commission(seller, month_int, year_int)
+            if period:
+                c, _ = calculate_estimated_commission_for_period(seller, period)
+            else:
+                c, _ = calculate_estimated_commission(seller, month_int, year_int)
             total_comm_all += c
         cnpj_val = 'Nao informado'
         try:
@@ -75,8 +94,8 @@ def build_accounting_zip(tenant, month_int, year_int):
         except Exception:
             pass
         csv3 = (
-            f'Empresa;CNPJ;Competencia;Total Vendido;Total Comissoes;Qtd Vendedores\n'
-            f'{tenant.company_name};{cnpj_val};{month_int:02d}/{year_int};{_fmt_br(total_sold_all)};'
+            f'Empresa;CNPJ;Competencia;Periodo;Total Vendido;Total Comissoes;Qtd Vendedores\n'
+            f'{tenant.company_name};{cnpj_val};{competencia_label};{start.strftime("%d/%m/%Y")} a {end.strftime("%d/%m/%Y")};{_fmt_br(total_sold_all)};'
             f'{_fmt_br(total_comm_all)};{SellerM.objects.filter(tenant=tenant, is_active=True).count()}'
         )
         zf.writestr(f'resumo_{month_int:02d}_{year_int}.csv', csv3.encode('utf-8-sig'))
@@ -84,10 +103,12 @@ def build_accounting_zip(tenant, month_int, year_int):
         sellers_for_pdf = []
         total_sold_pdf = 0
         for seller in SellerM.objects.filter(tenant=tenant, is_active=True):
-            est_comm, est_total = calculate_estimated_commission(seller, month_int, year_int)
-            sc = SellerCommission.objects.filter(
-                seller=seller, period__month=month_int, period__year=year_int,
-            ).select_related('period').first()
+            if period:
+                est_comm, est_total = calculate_estimated_commission_for_period(seller, period)
+                sc = SellerCommission.objects.filter(seller=seller, period=period).select_related('period').first()
+            else:
+                est_comm, est_total = calculate_estimated_commission(seller, month_int, year_int)
+                sc = None
             status_label = sc.get_status_display() if sc else 'Estimativa'
             commission_amount = sc.commission_amount if sc else est_comm
             comm_rate = float(sc.commission_rate if sc and sc.commission_rate else get_commission_rate(seller)) * 100
@@ -110,7 +131,8 @@ def build_accounting_zip(tenant, month_int, year_int):
         variacao = round((total_sold_pdf - prev_total) / prev_total * 100) if prev_total > 0 else None
 
         pdf_html = render_to_string('reports/relatorio_mensal.html', {
-            'tenant': tenant, 'competencia': f'{month_int:02d}/{year_int}',
+            'tenant': tenant, 'competencia': competencia_label,
+            'periodo': f'{start.strftime("%d/%m/%Y")} a {end.strftime("%d/%m/%Y")}',
             'data_geracao': timezone.now().strftime('%d/%m/%Y'),
             'sellers_data': sellers_for_pdf, 'total_sold': total_sold_pdf,
             'total_commissions': total_comm_all, 'total_aberta': 0, 'total_fechada': 0,
@@ -122,7 +144,7 @@ def build_accounting_zip(tenant, month_int, year_int):
         sellers_missing_cpf = [
             s for s in SellerM.objects.filter(tenant=tenant, is_active=True)
             if not s.cpf and SellerCommission.objects.filter(
-                seller=s, period__month=month_int, period__year=year_int,
+                seller=s, period=period,
             ).exists()
         ]
         if sellers_missing_cpf:

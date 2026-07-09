@@ -680,7 +680,11 @@ class RankingView(generics.GenericAPIView):
 
     def get(self, request):
         from app.apps.commissions.services import (
-            calculate_estimated_commission, get_commission_rate,
+            calculate_estimated_commission,
+            calculate_estimated_commission_for_period,
+            get_commission_rate,
+            get_period_by_legacy_label,
+            legacy_month_range,
         )
         from decimal import Decimal, ROUND_HALF_UP
 
@@ -695,13 +699,19 @@ class RankingView(generics.GenericAPIView):
             return Response({'error': 'Mes invalido (1-12).'}, status=400)
         if year < 2020:
             return Response({'error': 'Ano invalido.'}, status=400)
+        period = get_period_by_legacy_label(tenant, month, year)
+        if period:
+            start = period.start_date
+            end = period.end_date
+        else:
+            start, end = legacy_month_range(month, year)
 
         sales = Sale.objects.filter(
             tenant=tenant,
             origin=Sale.Origin.MANUAL,
             status='ATIVA',
-            sale_date__year=year,
-            sale_date__month=month,
+            sale_date__gte=start,
+            sale_date__lte=end,
         ).values('seller__uuid', 'seller__name', 'seller__commission_rate').annotate(
             total_sold=Sum('amount'),
             sale_count=Sum(1),
@@ -723,7 +733,10 @@ class RankingView(generics.GenericAPIView):
             seller_obj = sellers_map.get(str(seller_uuid))
             if seller_obj:
                 rate = get_commission_rate(seller_obj)
-                commission_estimada = int((Decimal(str(total_sold)) * Decimal(str(rate))).quantize(Decimal('1'), rounding=ROUND_HALF_UP))
+                if period:
+                    commission_estimada, _ = calculate_estimated_commission_for_period(seller_obj, period)
+                else:
+                    commission_estimada = int((Decimal(str(total_sold)) * Decimal(str(rate))).quantize(Decimal('1'), rounding=ROUND_HALF_UP))
             else:
                 rate = Decimal('0')
                 commission_estimada = 0

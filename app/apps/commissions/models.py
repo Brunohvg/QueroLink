@@ -1,4 +1,7 @@
 import uuid
+from datetime import date
+import calendar
+from django.core.exceptions import ValidationError
 from django.core.validators import MinValueValidator, MaxValueValidator
 from django.db import models
 from django.conf import settings
@@ -25,6 +28,9 @@ class CommissionPeriod(models.Model):
         validators=[MinValueValidator(1), MaxValueValidator(12)],
     )
     year = models.PositiveSmallIntegerField()
+    label = models.CharField(max_length=80, blank=True, default='')
+    start_date = models.DateField()
+    end_date = models.DateField()
     status = models.CharField(
         max_length=25, choices=Status.choices, default=Status.ABERTA
     )
@@ -78,21 +84,70 @@ class CommissionPeriod(models.Model):
         indexes = [
             models.Index(fields=['tenant', 'status']),
             models.Index(fields=['month', 'year']),
+            models.Index(fields=['tenant', 'start_date', 'end_date']),
         ]
 
     def __str__(self):
+        label = self.display_label
         return (
-            f"Competencia {self.month:02d}/{self.year} "
+            f"Competencia {label} "
             f"- {self.tenant.company_name} ({self.status})"
         )
+
+    @property
+    def display_label(self):
+        return self.label or f'{self.month:02d}/{self.year}'
+
+    def contains(self, ref_date):
+        return self.start_date <= ref_date <= self.end_date
+
+    def clean(self):
+        super().clean()
+        errors = {}
+        if not self.start_date:
+            errors['start_date'] = 'Data inicial obrigatoria.'
+        if not self.end_date:
+            errors['end_date'] = 'Data final obrigatoria.'
+        if self.start_date and self.end_date:
+            if self.end_date < self.start_date:
+                errors['end_date'] = 'Data final deve ser maior ou igual a data inicial.'
+            elif (self.end_date - self.start_date).days + 1 > 62:
+                errors['end_date'] = 'Competencia nao pode exceder 62 dias.'
+            overlap = CommissionPeriod.objects.filter(
+                tenant=self.tenant,
+                start_date__lte=self.end_date,
+                end_date__gte=self.start_date,
+            ).exclude(status=self.Status.CANCELADA)
+            if self.pk:
+                overlap = overlap.exclude(pk=self.pk)
+            if overlap.exists():
+                errors['start_date'] = 'Periodo sobrepoe outra competencia deste tenant.'
+        if errors:
+            raise ValidationError(errors)
+
+    def save(self, *args, **kwargs):
+        if not self.start_date and self.month and self.year:
+            self.start_date = date(self.year, self.month, 1)
+        if not self.end_date and self.month and self.year:
+            last_day = calendar.monthrange(self.year, self.month)[1]
+            self.end_date = date(self.year, self.month, last_day)
+        if not self.label:
+            self.label = f'{self.month:02d}/{self.year}'
+        super().save(*args, **kwargs)
 
     @classmethod
     def is_locked_for(cls, tenant, sale_date):
         from app.apps.commissions.models import SellerCommission
+        period = cls.objects.filter(
+            tenant=tenant,
+            start_date__lte=sale_date,
+            end_date__gte=sale_date,
+        ).exclude(status=cls.Status.CANCELADA).first()
+        if not period:
+            return set()
         locked = SellerCommission.objects.filter(
             seller__tenant=tenant,
-            period__month=sale_date.month,
-            period__year=sale_date.year,
+            period=period,
             status__in=[
                 SellerCommission.Status.FECHADA,
                 SellerCommission.Status.PAGA,
@@ -216,8 +271,8 @@ class SellerCommission(models.Model):
             seller=self.seller,
             origin=Sale.Origin.MANUAL,
             status='ATIVA',
-            sale_date__year=self.period.year,
-            sale_date__month=self.period.month,
+            sale_date__gte=self.period.start_date,
+            sale_date__lte=self.period.end_date,
         ).dates('sale_date', 'day')
         count = sales_dates.count()
         expected = self.expected_working_days or self.period.expected_working_days or 22
@@ -243,19 +298,15 @@ class SellerCommission(models.Model):
 
     def recalculate(self, commit=True):
         from app.apps.sales.models import Sale
-        import calendar
         from decimal import Decimal, ROUND_HALF_UP
-
-        last_day = calendar.monthrange(self.period.year, self.period.month)[1]
-        start = f"{self.period.year}-{self.period.month:02d}-01"
-        end = f"{self.period.year}-{self.period.month:02d}-{last_day}"
 
         total = Sale.objects.filter(
             tenant=self.period.tenant,
             seller=self.seller,
             origin=Sale.Origin.MANUAL,
             status='ATIVA',
-            sale_date__range=(start, end),
+            sale_date__gte=self.period.start_date,
+            sale_date__lte=self.period.end_date,
         ).aggregate(t=Sum('amount'))['t'] or 0
         self.total_sold_amount = total
         from app.apps.commissions.services import get_commission_rate

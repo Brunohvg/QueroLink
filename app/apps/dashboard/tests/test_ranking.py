@@ -1,4 +1,4 @@
-from datetime import date
+from datetime import date, timedelta
 from decimal import Decimal
 
 from unittest.mock import patch
@@ -7,6 +7,7 @@ from django.utils import timezone
 from django.contrib.auth import get_user_model
 
 from app.apps.accounts.models import Tenant
+from app.apps.commissions.models import CommissionPeriod
 from app.apps.sellers.models import Seller
 from app.apps.sales.models import Sale
 
@@ -52,6 +53,13 @@ class RankingPrivacyTest(TestCase):
         )
 
         self.today = timezone.localdate()
+        CommissionPeriod.objects.create(
+            tenant=self.tenant,
+            month=self.today.month,
+            year=self.today.year,
+            start_date=self.today - timedelta(days=1),
+            end_date=self.today + timedelta(days=1),
+        )
 
     def _create_sale(self, seller, amount_cents, origin='MANUAL'):
         return Sale.objects.create(
@@ -158,6 +166,14 @@ class RankingPrivateModeContentTest(TestCase):
             commission_rate=Decimal('0.01'),
             is_active=True,
         )
+        today = timezone.localdate()
+        CommissionPeriod.objects.create(
+            tenant=self.tenant,
+            month=today.month,
+            year=today.year,
+            start_date=today - timedelta(days=1),
+            end_date=today + timedelta(days=1),
+        )
 
     def test_private_mode_shows_tips_and_commission(self):
         self.tenant.ranking_visible_to_sellers = False
@@ -249,16 +265,16 @@ class RankingPrivateModeContentTest(TestCase):
 
         from django.test import RequestFactory
         from app.apps.dashboard.mobile_views import mobile_ranking
-        from datetime import date as dt
+        today = timezone.localdate()
 
-        with patch('django.utils.timezone.localdate', return_value=dt(2026, 7, 3)):
+        with patch('django.utils.timezone.localdate', return_value=today):
             factory = RequestFactory()
             request = factory.get('/mobile/ranking/')
             request.user = self.user
             response1 = mobile_ranking(request)
             content1 = response1.content.decode()
 
-        with patch('django.utils.timezone.localdate', return_value=dt(2026, 7, 4)):
+        with patch('django.utils.timezone.localdate', return_value=today + timedelta(days=1)):
             factory = RequestFactory()
             request = factory.get('/mobile/ranking/')
             request.user = self.user
@@ -293,7 +309,7 @@ class MobileDesempenhoTest(TestCase):
             is_active=True,
         )
 
-    def test_current_month_estimate_shows_when_no_period(self):
+    def test_current_period_missing_shows_message(self):
         Sale.objects.create(
             tenant=self.tenant,
             seller=self.seller,
@@ -313,9 +329,7 @@ class MobileDesempenhoTest(TestCase):
         response = mobile_meu_desempenho(request)
         content = response.content.decode()
 
-        self.assertIn('Estimativa', content)
-        self.assertIn('500,00', content)
-        self.assertIn('Periodo ainda nao aberto', content)
+        self.assertIn('Nenhuma competencia aberta para a data atual.', content)
 
     def test_current_month_estimate_none_when_sc_exists(self):
         Sale.objects.create(

@@ -51,11 +51,8 @@ def gestor_home(request):
         c = val % 100
         return f'{r:,}.{c:02d}'.replace(',', '.')
 
-    competencia = CommissionPeriod.objects.filter(
-        tenant=tenant,
-        month=hoje.month,
-        year=hoje.year,
-    ).first()
+    from app.apps.commissions.services import get_current_period
+    competencia = get_current_period(tenant)
 
     public_url = f"https://{settings.SERVICE_FQDN_WEB}/loja/{tenant.slug}/"
 

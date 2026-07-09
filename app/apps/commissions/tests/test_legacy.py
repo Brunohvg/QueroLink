@@ -19,6 +19,7 @@ from app.apps.commissions.services import (
     get_manual_sales_total,
     get_commission_rate,
     calculate_estimated_commission,
+    calculate_estimated_commission_for_period,
     get_or_create_period,
     sync_period_seller_commissions,
     close_seller_commissions,
@@ -34,6 +35,7 @@ from app.apps.commissions.services import (
     update_period,
     delete_period,
     cancel_period,
+    resolve_period_for_date,
 )
 
 User = get_user_model()
@@ -125,6 +127,158 @@ class TestCalculateEstimatedCommission(BaseTest):
         commission, total = calculate_estimated_commission(self.seller, 6, 2026)
         self.assertEqual(total, 8503050)
         self.assertEqual(commission, 85031)
+
+    def test_custom_range_ignores_calendar_month(self):
+        period = CommissionPeriod.objects.create(
+            tenant=self.tenant,
+            month=6,
+            year=2026,
+            label='MAIO/JUNHO 2026',
+            start_date=date(2026, 5, 21),
+            end_date=date(2026, 6, 20),
+        )
+        Sale.objects.create(
+            tenant=self.tenant,
+            seller=self.seller,
+            origin=Sale.Origin.MANUAL,
+            amount=100000,
+            sale_date=date(2026, 5, 25),
+            created_by=self.manager,
+        )
+        Sale.objects.create(
+            tenant=self.tenant,
+            seller=self.seller,
+            origin=Sale.Origin.MANUAL,
+            amount=200000,
+            sale_date=date(2026, 6, 25),
+            created_by=self.manager,
+        )
+
+        commission, total = calculate_estimated_commission_for_period(self.seller, period)
+
+        self.assertEqual(total, 100000)
+        self.assertEqual(commission, 1000)
+
+
+class TestCommissionPeriodRanges(BaseTest):
+    def test_legacy_period_defaults_to_calendar_range(self):
+        period = CommissionPeriod.objects.create(
+            tenant=self.tenant,
+            month=7,
+            year=2026,
+        )
+
+        self.assertEqual(period.start_date, date(2026, 7, 1))
+        self.assertEqual(period.end_date, date(2026, 7, 31))
+        self.assertEqual(period.display_label, '07/2026')
+
+    def test_can_create_custom_range(self):
+        period = CommissionPeriod.objects.create(
+            tenant=self.tenant,
+            month=7,
+            year=2026,
+            label='JULHO 2026',
+            start_date=date(2026, 6, 21),
+            end_date=date(2026, 7, 20),
+        )
+
+        self.assertTrue(period.contains(date(2026, 7, 1)))
+        self.assertFalse(period.contains(date(2026, 7, 21)))
+
+    def test_prevents_overlap_same_tenant(self):
+        CommissionPeriod.objects.create(
+            tenant=self.tenant,
+            month=5,
+            year=2026,
+            start_date=date(2026, 5, 21),
+            end_date=date(2026, 6, 20),
+        )
+        period = CommissionPeriod(
+            tenant=self.tenant,
+            month=6,
+            year=2026,
+            start_date=date(2026, 6, 15),
+            end_date=date(2026, 7, 14),
+        )
+
+        with self.assertRaises(Exception):
+            period.full_clean()
+
+    def test_allows_gap_between_periods(self):
+        CommissionPeriod.objects.create(
+            tenant=self.tenant,
+            month=5,
+            year=2026,
+            start_date=date(2026, 5, 1),
+            end_date=date(2026, 5, 20),
+        )
+        period = CommissionPeriod(
+            tenant=self.tenant,
+            month=6,
+            year=2026,
+            start_date=date(2026, 5, 25),
+            end_date=date(2026, 6, 20),
+        )
+
+        period.full_clean()
+
+    def test_resolve_period_for_date_uses_range_and_ignores_cancelled(self):
+        cancelled = CommissionPeriod.objects.create(
+            tenant=self.tenant,
+            month=5,
+            year=2026,
+            start_date=date(2026, 5, 21),
+            end_date=date(2026, 6, 20),
+            status=CommissionPeriod.Status.CANCELADA,
+        )
+        active = CommissionPeriod.objects.create(
+            tenant=self.tenant,
+            month=6,
+            year=2026,
+            start_date=date(2026, 6, 21),
+            end_date=date(2026, 7, 20),
+        )
+
+        self.assertIsNone(resolve_period_for_date(self.tenant, date(2026, 6, 10)))
+        self.assertEqual(resolve_period_for_date(self.tenant, date(2026, 7, 1)), active)
+        self.assertEqual(cancelled.status, CommissionPeriod.Status.CANCELADA)
+
+    def test_validate_sale_can_be_changed_uses_range(self):
+        period = CommissionPeriod.objects.create(
+            tenant=self.tenant,
+            month=6,
+            year=2026,
+            start_date=date(2026, 5, 21),
+            end_date=date(2026, 6, 20),
+        )
+        sc = SellerCommission.objects.create(period=period, seller=self.seller)
+        sc.freeze(self.manager, commit=True)
+
+        can_change, error = validate_sale_can_be_changed(
+            self.seller, date(2026, 5, 25), self.seller_user,
+        )
+
+        self.assertFalse(can_change)
+        self.assertIn('fechada', error)
+
+    def test_paid_period_blocks_sale_change(self):
+        period = CommissionPeriod.objects.create(
+            tenant=self.tenant,
+            month=6,
+            year=2026,
+            start_date=date(2026, 5, 21),
+            end_date=date(2026, 6, 20),
+        )
+        sc = SellerCommission.objects.create(period=period, seller=self.seller)
+        sc.freeze(self.manager, commit=True)
+        sc.mark_paid(self.manager, {'payment_date': date(2026, 7, 1)}, commit=True)
+
+        can_change, error = validate_sale_can_be_changed(
+            self.seller, date(2026, 6, 1), self.seller_user,
+        )
+
+        self.assertFalse(can_change)
+        self.assertIn('paga', error)
 
 
 class TestGetOrCreatePeriod(BaseTest):
