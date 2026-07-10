@@ -211,7 +211,7 @@ def mobile_home(request):
         else:
             month_total = Sale.objects.filter(
                 seller=seller,
-                origin=Sale.Origin.MANUAL,
+                origin__in=Sale.COMMISSION_ORIGINS,
                 status='ATIVA',
                 sale_date__gte=period.start_date,
                 sale_date__lte=period.end_date,
@@ -351,7 +351,7 @@ def mobile_lancar_venda(request):
 
             existing = Sale.objects.filter(
                 seller=seller,
-                origin=Sale.Origin.MANUAL,
+                origin__in=Sale.COMMISSION_ORIGINS,
                 sale_date=sale_date,
             ).first()
 
@@ -406,7 +406,7 @@ def mobile_lancar_venda(request):
                 query_date = date.fromisoformat(sale_date_str)
                 existing_sale = Sale.objects.filter(
                     seller=seller,
-                    origin=Sale.Origin.MANUAL,
+                    origin__in=Sale.COMMISSION_ORIGINS,
                     sale_date=query_date,
                 ).first()
             except (ValueError, Exception):
@@ -521,7 +521,7 @@ def mobile_meu_desempenho(request):
     if current_period:
         month_total = Sale.objects.filter(
             seller=seller,
-            origin=Sale.Origin.MANUAL,
+            origin__in=Sale.COMMISSION_ORIGINS,
             status='ATIVA',
             sale_date__gte=current_period.start_date,
             sale_date__lte=current_period.end_date,
@@ -688,7 +688,7 @@ def mobile_ranking(request):
 
     month_total_manual = Sale.objects.filter(
         seller=seller,
-        origin=Sale.Origin.MANUAL,
+        origin__in=Sale.COMMISSION_ORIGINS,
         status='ATIVA',
         sale_date__gte=current_period.start_date,
         sale_date__lte=current_period.end_date,

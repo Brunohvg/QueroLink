@@ -11,6 +11,9 @@ class Sale(models.Model):
     class Origin(models.TextChoices):
         LINK = 'LINK', 'Venda via Link de Pagamento'
         MANUAL = 'MANUAL', 'Lançamento Manual'
+        IMPORTADA = 'IMPORTADA', 'Importada'
+
+    COMMISSION_ORIGINS = [Origin.MANUAL, Origin.IMPORTADA]
 
     uuid = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     tenant = models.ForeignKey(Tenant, on_delete=models.CASCADE, related_name='sales')
@@ -94,4 +97,37 @@ class SaleChangeLog(models.Model):
         indexes = [
             models.Index(fields=['tenant', 'sale']),
             models.Index(fields=['changed_at']),
+        ]
+
+
+class SaleImportBatch(models.Model):
+    uuid = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    tenant = models.ForeignKey(
+        Tenant, on_delete=models.CASCADE, related_name='sale_import_batches',
+    )
+    filename = models.CharField(max_length=255)
+    file_hash = models.CharField(max_length=64)
+    uploaded_by = models.ForeignKey(
+        'accounts.User', on_delete=models.SET_NULL,
+        null=True, blank=True, related_name='sale_imports',
+    )
+    uploaded_at = models.DateTimeField(auto_now_add=True)
+    status = models.CharField(
+        max_length=20,
+        choices=[
+            ('PENDING', 'Pendente'),
+            ('IMPORTED', 'Importado'),
+            ('REJECTED', 'Rejeitado'),
+        ],
+        default='PENDING',
+    )
+    total_rows = models.PositiveIntegerField(default=0)
+    created_count = models.PositiveIntegerField(default=0)
+    duplicate_count = models.PositiveIntegerField(default=0)
+    error_count = models.PositiveIntegerField(default=0)
+
+    class Meta:
+        indexes = [
+            models.Index(fields=['tenant', 'file_hash']),
+            models.Index(fields=['uploaded_at']),
         ]

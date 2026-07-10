@@ -268,7 +268,7 @@ class SellerCommission(models.Model):
         sales_dates = Sale.objects.filter(
             tenant=self.period.tenant,
             seller=self.seller,
-            origin=Sale.Origin.MANUAL,
+            origin__in=Sale.COMMISSION_ORIGINS,
             status='ATIVA',
             sale_date__gte=self.period.start_date,
             sale_date__lte=self.period.end_date,
@@ -302,7 +302,7 @@ class SellerCommission(models.Model):
         total = Sale.objects.filter(
             tenant=self.period.tenant,
             seller=self.seller,
-            origin=Sale.Origin.MANUAL,
+            origin__in=Sale.COMMISSION_ORIGINS,
             status='ATIVA',
             sale_date__gte=self.period.start_date,
             sale_date__lte=self.period.end_date,

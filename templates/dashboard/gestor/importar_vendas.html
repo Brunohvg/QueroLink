@@ -1,145 +1,354 @@
 {% extends 'dashboard/base_desktop.html' %}
 {% block title %}Importar Vendas — Mérito{% endblock %}
 {% block content %}
-<div x-data="importPage()">
-  <h1 class="font-display text-[22px] font-bold text-gray-900 mb-6">Importar Vendas</h1>
+{% load static %}
+<div x-data="importPage()" class="max-w-4xl mx-auto">
 
-  <div class="surface-card mb-6">
-    <p class="text-[13px] text-gray-600 mb-4">Importe vendas do seu historico via arquivo CSV. O arquivo deve ter as colunas: data, vendedor, valor, observacao (opcional).</p>
-    <p class="text-[12px] text-gray-400 mb-4">Formatos aceitos para data: DD/MM/YYYY ou YYYY-MM-DD. Valor: com virgula (1.234,56) ou ponto (1234.56).</p>
-
-    <div class="border-2 border-dashed border-gray-200 rounded-2xl p-8 text-center hover:border-brand-300 transition-colors"
-         x-on:dragover.prevent x-on:drop.prevent="handleDrop($event)">
-      <input type="file" id="csv-file" accept=".csv" @change="handleFile($event)" class="hidden">
-      <label for="csv-file" class="cursor-pointer">
-        <div class="w-14 h-14 rounded-2xl bg-brand-50 flex items-center justify-center mx-auto mb-3">
-          <svg class="w-7 h-7 text-brand-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/></svg>
-        </div>
-        <p class="text-[14px] font-medium text-gray-700">Clique para selecionar ou arraste o arquivo CSV</p>
-        <p class="text-[12px] text-gray-400 mt-1" x-show="!filename">CSV com ate 500 linhas</p>
-        <p class="text-[13px] font-medium text-brand-600 mt-1" x-show="filename" x-text="filename"></p>
-      </label>
+  <div class="sticky top-0 z-10 -mx-6 px-6 py-4 bg-gray-50/90 backdrop-blur-lg border-b border-gray-200/60 mb-6">
+    <div class="flex items-center gap-3">
+      <a href="{% url 'dashboard:gestor_home' %}" class="flex items-center justify-center w-9 h-9 rounded-xl hover:bg-gray-200/60 transition-all active:scale-[0.97]">
+        <svg class="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path></svg>
+      </a>
+      <div>
+        <h1 class="font-display text-[20px] font-bold text-gray-900 tracking-tight">Importar Vendas</h1>
+        <p class="text-[13px] text-gray-500">Planilha CSV ou XLSX com preview antes de gravar</p>
+      </div>
     </div>
   </div>
 
-  <div x-show="preview.length > 0" class="surface-card">
-    <div class="flex items-center justify-between mb-4">
-      <h2 class="text-[14px] font-semibold text-gray-900">Preview</h2>
-      <span class="text-[12px] text-gray-500" x-text="validCount + ' de ' + preview.length + ' linhas validas'"></span>
+  <!-- Stepper -->
+  <div class="flex items-center justify-center gap-2 mb-8">
+    <template x-for="(s, idx) in ['Arquivo', 'Preview', 'Confirmacao']" :key="s">
+      <div class="flex items-center gap-2">
+        <div class="flex items-center gap-1.5" :class="step > idx ? 'text-brand-600' : step === idx+1 ? 'text-gray-900' : 'text-gray-300'">
+          <span class="w-7 h-7 rounded-full flex items-center justify-center text-[12px] font-bold border-2"
+                :class="step > idx ? 'bg-brand-600 text-white border-brand-600' : step === idx+1 ? 'border-gray-900 text-gray-900' : 'border-gray-200 text-gray-400'"
+                x-text="step > idx ? '\u2713' : idx+1"></span>
+          <span class="text-[13px] font-medium hidden sm:inline" x-text="s"></span>
+        </div>
+        <span x-show="idx < 2" class="w-8 sm:w-12 h-0.5" :class="step > idx+1 ? 'bg-brand-600' : 'bg-gray-200'"></span>
+      </div>
+    </template>
+  </div>
+
+  <!-- Step 1: Arquivo -->
+  <div x-show="step === 1" class="surface-card">
+    <p class="text-[13px] text-gray-600 mb-4">Importe vendas em lote via planilha CSV ou XLSX. Colunas esperadas: <strong>data</strong>, <strong>vendedor</strong>, <strong>valor</strong>, <strong>observacao</strong> (opcional).</p>
+    <p class="text-[12px] text-gray-400 mb-4">Formatos de data: DD/MM/YYYY ou YYYY-MM-DD. Valor: 1234,56 ou 1.234,56 ou 1234.56. Maximo 500 linhas.</p>
+
+    <div class="border-2 border-dashed rounded-2xl p-8 text-center transition-colors"
+         :class="dragOver ? 'border-brand-400 bg-brand-50/30' : 'border-gray-200 hover:border-brand-300'"
+         x-on:dragover.prevent="dragOver=true" x-on:dragleave.prevent="dragOver=false" x-on:drop.prevent="handleDrop($event); dragOver=false">
+      <input type="file" id="import-file" accept=".csv,.xlsx" @change="handleFile($event)" class="hidden">
+      <label for="import-file" class="cursor-pointer">
+        <div class="w-14 h-14 rounded-2xl bg-brand-50 flex items-center justify-center mx-auto mb-3">
+          <svg class="w-7 h-7 text-brand-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/></svg>
+        </div>
+        <p class="text-[14px] font-medium text-gray-700">Clique para selecionar ou arraste o arquivo</p>
+        <p class="text-[12px] text-gray-400 mt-1" x-show="!filename">CSV ou XLSX com ate 500 linhas</p>
+        <p class="text-[13px] font-medium text-brand-600 mt-1" x-show="filename" x-text="filename"></p>
+      </label>
     </div>
 
-    <div class="overflow-x-auto max-h-96">
-      <table class="w-full text-[12px]">
-        <thead>
-          <tr class="border-b border-gray-100">
-            <th class="text-left py-2 px-2 text-[10px] font-semibold text-gray-400 uppercase">#</th>
-            <th class="text-left py-2 px-2 text-[10px] font-semibold text-gray-400 uppercase">Data</th>
-            <th class="text-left py-2 px-2 text-[10px] font-semibold text-gray-400 uppercase">Vendedor</th>
-            <th class="text-right py-2 px-2 text-[10px] font-semibold text-gray-400 uppercase">Valor</th>
-            <th class="text-left py-2 px-2 text-[10px] font-semibold text-gray-400 uppercase">Observacao</th>
-            <th class="text-left py-2 px-2 text-[10px] font-semibold text-gray-400 uppercase">Status</th>
-          </tr>
-        </thead>
-        <tbody>
-          <template x-for="(r, i) in preview.slice(0, 20)" :key="i">
-            <tr :class="r.error ? 'bg-red-50' : ''">
-              <td class="py-1.5 px-2" x-text="i + 1"></td>
-              <td class="py-1.5 px-2" x-text="r.date"></td>
-              <td class="py-1.5 px-2" x-text="r.vendedor"></td>
-              <td class="py-1.5 px-2 text-right font-mono" x-text="r.valor"></td>
-              <td class="py-1.5 px-2 text-gray-500" x-text="r.observacao"></td>
-              <td class="py-1.5 px-2">
-                <span x-show="!r.error" class="text-emerald-600 text-[11px]">OK</span>
-                <span x-show="r.error" class="text-red-600 text-[11px] cursor-help" :title="r.error">Erro</span>
-              </td>
+    <div class="mt-4 flex items-center gap-3">
+      <a href="{% static 'downloads/modelo_importacao_vendas.csv' %}" download
+         class="text-[12px] px-3 py-1.5 rounded-lg bg-gray-100 hover:bg-brand-50 hover:text-brand-600 text-gray-600 font-medium transition flex items-center gap-1.5">
+        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+        Baixar modelo CSV
+      </a>
+    </div>
+
+    <div x-show="previewError" class="mt-4 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl text-[13px]" x-text="previewError"></div>
+    <div x-show="loading" class="mt-4 text-center text-gray-400 text-[13px]">Analisando arquivo...</div>
+  </div>
+
+  <!-- Step 2: Preview -->
+  <div x-show="step === 2">
+    <div class="surface-card mb-4">
+      <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
+        <h2 class="text-[15px] font-bold text-gray-900">Preview</h2>
+        <div class="flex items-center gap-1 flex-wrap">
+          <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-medium bg-emerald-50 text-emerald-700">
+            <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+            <span x-text="okCount + ' OK'"></span>
+          </span>
+          <span x-show="dupCount > 0" class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-medium bg-amber-50 text-amber-700">
+            <span class="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
+            <span x-text="dupCount + ' dup.'"></span>
+          </span>
+          <span x-show="errCount > 0" class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-medium bg-red-50 text-red-700">
+            <span class="w-1.5 h-1.5 rounded-full bg-red-500"></span>
+            <span x-text="errCount + ' erros'"></span>
+          </span>
+          <span x-show="selCount > 0" class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-medium bg-purple-50 text-purple-700">
+            <span class="w-1.5 h-1.5 rounded-full bg-purple-500"></span>
+            <span x-text="selCount + ' selecao'"></span>
+          </span>
+        </div>
+      </div>
+
+      <div x-show="alreadyImported" class="bg-amber-50 border border-amber-200 text-amber-700 px-4 py-2.5 rounded-xl text-[13px] mb-3 flex items-center gap-2">
+        <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"/></svg>
+        Este arquivo ja foi importado anteriormente. A confirmacao exigira forcar a reimportacao.
+      </div>
+
+      <div class="overflow-x-auto max-h-[50vh] rounded-xl border border-gray-100">
+        <table class="w-full text-[13px]">
+          <thead>
+            <tr class="bg-gray-50/80 sticky top-0">
+              <th class="text-left py-2.5 px-3 text-[11px] font-semibold text-gray-500 uppercase">#</th>
+              <th class="text-left py-2.5 px-3 text-[11px] font-semibold text-gray-500 uppercase">Data</th>
+              <th class="text-left py-2.5 px-3 text-[11px] font-semibold text-gray-500 uppercase">Vendedor</th>
+              <th class="text-right py-2.5 px-3 text-[11px] font-semibold text-gray-500 uppercase">Valor</th>
+              <th class="text-left py-2.5 px-3 text-[11px] font-semibold text-gray-500 uppercase">Observacao</th>
+              <th class="text-left py-2.5 px-3 text-[11px] font-semibold text-gray-500 uppercase">Periodo</th>
+              <th class="text-left py-2.5 px-3 text-[11px] font-semibold text-gray-500 uppercase">Status</th>
             </tr>
-          </template>
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            <template x-for="(r, idx) in results.slice(0, 100)" :key="idx">
+              <tr :class="'border-b border-gray-50 ' + (r.status === 'error' ? 'bg-red-50/30' : r.status === 'duplicate' ? 'bg-amber-50/30' : r.status === 'needs_selection' ? 'bg-purple-50/30' : '')">
+                <td class="py-2 px-3 text-gray-400" x-text="r.row_number"></td>
+                <td class="py-2 px-3 font-medium text-gray-700" x-text="r.sale_date ? new Date(r.sale_date+'T00:00:00').toLocaleDateString('pt-BR') : '—'"></td>
+                <td class="py-2 px-3">
+                  <span x-show="r.status !== 'needs_selection'" class="text-gray-800" x-text="r.resolved_seller_name || '—'"></span>
+                  <select x-show="r.status === 'needs_selection'" x-model="r._selected_seller" @change="onSellerSelected(r, idx)"
+                          class="px-2 py-1 bg-white border border-gray-200 rounded-lg text-[12px] outline-none">
+                    <option value="">Selecione...</option>
+                    <template x-for="sug in r.suggestions" :key="sug.uuid">
+                      <option :value="sug.uuid" x-text="sug.name"></option>
+                    </template>
+                  </select>
+                </td>
+                <td class="py-2 px-3 text-right font-mono text-gray-800" x-text="r.amount_cents ? 'R$ ' + (r.amount_cents/100).toFixed(2).replace('.',',') : '—'"></td>
+                <td class="py-2 px-3 text-gray-500 max-w-[120px] truncate" x-text="r.notes || '—'"></td>
+                <td class="py-2 px-3 text-[12px] text-gray-400" x-text="r.period_label || '—'"></td>
+                <td class="py-2 px-3">
+                  <span :class="'inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold ' +
+                    (r.status === 'ok' ? 'bg-emerald-50 text-emerald-700' :
+                     r.status === 'duplicate' ? 'bg-amber-50 text-amber-700' :
+                     r.status === 'needs_selection' ? 'bg-purple-50 text-purple-700' :
+                     'bg-red-50 text-red-700')"
+                    x-text="r.status === 'ok' ? 'OK' : r.status === 'duplicate' ? 'Duplicada' : r.status === 'needs_selection' ? 'Selecionar' : 'Erro'"></span>
+                  <span x-show="r.message" class="block text-[11px] text-gray-400 mt-0.5" x-text="r.message"></span>
+                </td>
+              </tr>
+            </template>
+          </tbody>
+        </table>
+      </div>
+      <p x-show="results.length > 100" class="text-[11px] text-gray-400 mt-2">Mostrando 100 de <span x-text="results.length"></span> linhas.</p>
     </div>
 
-    <div class="flex justify-end mt-6 pt-4 border-t border-gray-100">
-      <button @click="importSales()" :disabled="validCount === 0"
-              class="inline-flex items-center gap-2 bg-gray-900 hover:bg-gray-800 disabled:bg-gray-300 text-white font-semibold py-2.5 px-5 rounded-xl transition-all text-[14px] shadow-sm hover:shadow-md active:scale-[0.97]">
-        <span x-show="!importing">Importar <span x-text="validCount"></span> vendas</span>
-        <span x-show="importing">Importando...</span>
+    <div class="flex justify-between">
+      <button @click="step=1; results=[]" class="px-5 py-2.5 bg-white border border-gray-200 text-gray-700 font-medium rounded-xl transition-all text-[14px] hover:bg-gray-50 active:scale-[0.97]">
+        Voltar
+      </button>
+      <button @click="goToConfirm()" :disabled="importableCount === 0"
+              class="px-5 py-2.5 bg-gray-900 hover:bg-gray-800 disabled:bg-gray-300 disabled:cursor-not-allowed text-white font-semibold rounded-xl transition-all text-[14px] shadow-sm active:scale-[0.97]">
+        Continuar: <span x-text="importableCount"></span> vendas
       </button>
     </div>
   </div>
 
-  <div x-show="result" class="surface-card mt-4" x-transition>
-    <h3 class="text-[14px] font-semibold text-gray-900 mb-2">Resultado</h3>
-    <p class="text-[13px]"><span class="font-bold text-emerald-600" x-text="result?.imported || 0"></span> importadas, <span class="font-bold text-amber-600" x-text="result?.skipped || 0"></span> duplicatas puladas, <span class="font-bold text-red-600" x-text="(result?.errors || []).length"></span> erros</p>
+  <!-- Step 3: Confirmacao -->
+  <div x-show="step === 3" class="surface-card">
+    <h2 class="text-[15px] font-bold text-gray-900 mb-4">Confirmar Importacao</h2>
+
+    <div class="bg-brand-50 rounded-xl p-4 mb-4">
+      <p class="text-[14px] text-brand-800">
+        <strong x-text="importableCount"></strong> vendas de
+        <strong x-text="sellerCount"></strong> vendedor(es),
+        total <strong x-text="'R$ ' + (totalAmount/100).toFixed(2).replace('.',',')"></strong>
+      </p>
+    </div>
+
+    <div x-show="alreadyImported" class="bg-amber-50 border border-amber-200 text-amber-700 px-4 py-2.5 rounded-xl text-[13px] mb-4 flex items-center gap-2">
+      <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"/></svg>
+      Reimportacao: marque a caixa abaixo para confirmar.
+      <label class="flex items-center gap-1.5 ml-2 cursor-pointer">
+        <input type="checkbox" x-model="forceReimport" class="w-4 h-4 rounded border-gray-300 text-amber-500 focus:ring-amber-500">
+        <span class="text-[12px] font-medium">Forcar reimportacao</span>
+      </label>
+    </div>
+
+    <div class="flex justify-end gap-3">
+      <button @click="step=2" class="px-5 py-2.5 bg-white border border-gray-200 text-gray-700 font-medium rounded-xl transition-all text-[14px] hover:bg-gray-50 active:scale-[0.97]" :disabled="importing">
+        Voltar
+      </button>
+      <button @click="doImport()" :disabled="importing || (alreadyImported && !forceReimport)"
+              class="inline-flex items-center gap-2 bg-gray-900 hover:bg-gray-800 disabled:bg-gray-300 disabled:cursor-not-allowed text-white font-semibold py-2.5 px-5 rounded-xl transition-all text-[14px] shadow-sm active:scale-[0.97]">
+        <span x-show="!importing">Confirmar importacao</span>
+        <span x-show="importing">Importando...</span>
+      </button>
+    </div>
+
+    <!-- Resultado -->
+    <div x-show="result" class="mt-6 pt-6 border-t border-gray-100" x-transition>
+      <h3 class="text-[15px] font-bold text-gray-900 mb-3">Resultado</h3>
+      <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <div class="bg-gray-50 rounded-xl p-3 text-center">
+          <p class="text-[24px] font-bold text-gray-900" x-text="result.created"></p>
+          <p class="text-[11px] text-gray-500">Importadas</p>
+        </div>
+        <div class="bg-amber-50 rounded-xl p-3 text-center">
+          <p class="text-[24px] font-bold text-amber-600" x-text="result.duplicates"></p>
+          <p class="text-[11px] text-amber-600">Duplicadas</p>
+        </div>
+        <div class="bg-red-50 rounded-xl p-3 text-center">
+          <p class="text-[24px] font-bold text-red-600" x-text="(result.errors || []).length"></p>
+          <p class="text-[11px] text-red-600">Erros</p>
+        </div>
+        <div class="bg-gray-50 rounded-xl p-3 text-center">
+          <p class="text-[24px] font-bold text-gray-900" x-text="result.total"></p>
+          <p class="text-[11px] text-gray-500">Total</p>
+        </div>
+      </div>
+      <div class="mt-4">
+        <a href="{% url 'dashboard:gestor_vendedores' %}" class="text-[13px] text-brand-600 hover:text-brand-700 font-medium">
+          Ver vendedores
+        </a>
+      </div>
+    </div>
   </div>
+
 </div>
 
 <script>
 function importPage() {
     return {
-        preview: [],
+        step: 1,
         filename: '',
-        result: null,
+        file: null,
+        fileHash: '',
+        dragOver: false,
+        loading: false,
+        previewError: '',
+        results: [],
+        alreadyImported: false,
+        forceReimport: false,
         importing: false,
-        get validCount() { return this.preview.filter(function(r) { return !r.error; }).length; },
+        result: null,
 
-        handleFile(e) {
-            var file = e.target.files[0];
-            if (!file) return;
-            this.parseCSV(file);
+        get okCount() { return this.results.filter(function(r) { return r.status === 'ok'; }).length; },
+        get dupCount() { return this.results.filter(function(r) { return r.status === 'duplicate'; }).length; },
+        get errCount() { return this.results.filter(function(r) { return r.status === 'error'; }).length; },
+        get selCount() { return this.results.filter(function(r) { return r.status === 'needs_selection'; }).length; },
+        get importableCount() {
+            return this.results.filter(function(r) {
+                return r.status === 'ok' || (r.status === 'needs_selection' && r._selected_seller);
+            }).length;
         },
-        handleDrop(e) {
-            var file = e.dataTransfer.files[0];
-            if (!file) return;
-            this.parseCSV(file);
+        get totalAmount() {
+            return this.results.filter(function(r) {
+                return r.status === 'ok' || (r.status === 'needs_selection' && r._selected_seller);
+            }).reduce(function(a, r) { return a + (r.amount_cents || 0); }, 0);
         },
-        parseCSV(file) {
+        get sellerCount() {
+            var sellers = new Set();
+            this.results.forEach(function(r) {
+                var uid = r.resolved_seller_uuid || (r._selected_seller || r.resolved_seller);
+                if (uid && (r.status === 'ok' || r.status === 'needs_selection')) sellers.add(uid);
+            });
+            return sellers.size;
+        },
+
+        handleFile(e) { var f = e.target.files[0]; if (f) this.uploadFile(f); },
+        handleDrop(e) { var f = e.dataTransfer.files[0]; if (f) this.uploadFile(f); },
+
+        uploadFile(file) {
+            this.file = file;
+            this.filename = file.name;
+            this.previewError = '';
+            this.results = [];
+            this.result = null;
+            this.alreadyImported = false;
+            this.forceReimport = false;
+            this.loading = true;
+            this.step = 1;
+
+            var ext = file.name.split('.').pop().toLowerCase();
+            if (ext !== 'csv' && ext !== 'xlsx') {
+                this.previewError = 'Formato nao suportado. Envie CSV ou XLSX.';
+                this.loading = false;
+                return;
+            }
+            if (file.size > 5 * 1024 * 1024) {
+                this.previewError = 'Arquivo muito grande. Maximo 5MB.';
+                this.loading = false;
+                return;
+            }
+
             var self = this;
-            self.filename = file.name;
-            self.result = null;
-            var reader = new FileReader();
-            reader.onload = function(ev) {
-                var text = ev.target.result;
-                var lines = text.split(/\r?\n/).filter(function(l) { return l.trim(); });
-                if (lines.length < 2) { self.preview = []; return; }
-
-                var headers = lines[0].toLowerCase().split(/[,;]/).map(function(h) { return h.trim().replace(/"/g, ''); });
-                var dateIdx = headers.indexOf('data');
-                var sellerIdx = headers.indexOf('vendedor');
-                var valueIdx = headers.indexOf('valor');
-                var obsIdx = headers.indexOf('observacao');
-
-                self.preview = [];
-                for (var i = 1; i < Math.min(lines.length, 26); i++) {
-                    var cols = lines[i].split(/[,;]/).map(function(c) { return c.trim().replace(/"/g, ''); });
-                    var row = { date: cols[dateIdx] || '', vendedor: cols[sellerIdx] || '', valor: cols[valueIdx] || '', observacao: obsIdx >= 0 ? (cols[obsIdx] || '') : '', error: null };
-
-                    if (!row.date) row.error = 'Data obrigatoria';
-                    if (!row.vendedor) row.error = 'Vendedor obrigatorio';
-                    if (!row.valor) row.error = 'Valor obrigatorio';
-
-                    self.preview.push(row);
-                }
-            };
-            reader.readAsText(file);
+            var formData = new FormData();
+            formData.append('file', file);
+            fetch('/api/sales/import/preview/', {
+                method: 'POST',
+                headers: { 'X-CSRFToken': getCSRFToken() },
+                body: formData,
+            }).then(function(r) { return r.json(); }).then(function(data) {
+                if (data.error) { self.previewError = data.error; return; }
+                self.results = (data.results || []).map(function(r) { r._selected_seller = null; return r; });
+                self.fileHash = data.file_hash;
+                self.alreadyImported = data.already_imported;
+                self.step = 2;
+            }).catch(function() { self.previewError = 'Erro ao processar arquivo.'; })
+            .finally(function() { self.loading = false; });
         },
-        importSales() {
+
+        onSellerSelected(r, idx) {
+            if (!r._selected_seller) return;
+            var sug = r.suggestions.find(function(s) { return s.uuid === r._selected_seller; });
+            if (sug) {
+                r.resolved_seller_uuid = sug.uuid;
+                r.resolved_seller_name = sug.name;
+                r.status = 'ok';
+            }
+        },
+
+        goToConfirm() {
+            if (this.alreadyImported && !this.forceReimport) {
+                this.forceReimport = false;
+            }
+            this.step = 3;
+        },
+
+        doImport() {
             var self = this;
+            if (self.importing) return;
+            var rows = self.results.filter(function(r) {
+                return r.status === 'ok' || (r.status === 'needs_selection' && r._selected_seller);
+            }).map(function(r) {
+                return {
+                    row_number: r.row_number,
+                    resolved_seller_uuid: r.resolved_seller_uuid || (r._selected_seller || r.resolved_seller),
+                    amount_cents: r.amount_cents,
+                    sale_date: r.sale_date,
+                    notes: r.notes,
+                };
+            });
+            if (!rows.length) return;
+
             self.importing = true;
-            fetch('/api/sales/import/', {
+            fetch('/api/sales/import/confirm/', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCSRFToken() },
                 body: JSON.stringify({
-                    sales: self.preview.filter(function(r) { return !r.error; }).map(function(r) {
-                        var amount = parseFloat(r.valor.replace(/\./g, '').replace(',', '.')) || 0;
-                        return { date: r.date, seller_name: r.vendedor, amount_cents: Math.round(amount * 100), notes: r.observacao };
-                    })
+                    rows: rows,
+                    filename: self.filename,
+                    file_hash: self.fileHash,
+                    force_reimport: self.forceReimport,
                 }),
             }).then(function(r) { return r.json(); }).then(function(data) {
                 self.result = data;
-            }).catch(function(e) {
-                showToast('Erro ao importar: ' + e.message, 'error');
-            }).finally(function() { self.importing = false; });
-        }
+                if (data.error) {
+                    showToast(data.error, 'error');
+                } else if (data.created > 0) {
+                    showToast(data.created + ' vendas importadas com sucesso.', 'success');
+                }
+            }).catch(function() { showToast('Erro ao importar.', 'error'); })
+            .finally(function() { self.importing = false; });
+        },
     }
 }
 </script>

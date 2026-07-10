@@ -27,7 +27,7 @@ def get_manual_sales_total(seller, month, year):
     total = Sale.objects.filter(
         tenant=seller.tenant,
         seller=seller,
-        origin=Sale.Origin.MANUAL,
+        origin__in=Sale.COMMISSION_ORIGINS,
         status='ATIVA',
         sale_date__gte=start,
         sale_date__lte=end,
@@ -83,7 +83,7 @@ def get_period_sales_queryset(period):
 def get_manual_sales_total_for_period(seller, period):
     return get_period_sales_queryset(period).filter(
         seller=seller,
-        origin=Sale.Origin.MANUAL,
+        origin__in=Sale.COMMISSION_ORIGINS,
     ).aggregate(t=Sum('amount'))['t'] or 0
 
 
@@ -140,7 +140,7 @@ def sync_period_seller_commissions(period):
     sellers = Seller.objects.filter(tenant=tenant, is_active=True).select_related('tenant')
     sellers_with_manual = Seller.objects.filter(
         tenant=tenant,
-        sales__origin=Sale.Origin.MANUAL,
+        sales__origin__in=Sale.COMMISSION_ORIGINS,
         sales__sale_date__gte=period.start_date,
         sales__sale_date__lte=period.end_date,
     ).select_related('tenant')
@@ -172,7 +172,7 @@ def calculate_seller_working_days(period, seller):
     sales_dates = Sale.objects.filter(
         tenant=period.tenant,
         seller=seller,
-        origin=Sale.Origin.MANUAL,
+        origin__in=Sale.COMMISSION_ORIGINS,
         status='ATIVA',
         sale_date__gte=period.start_date,
         sale_date__lte=period.end_date,
@@ -496,7 +496,7 @@ def get_dashboard_data(tenant, month=None, year=None):
 
     total_vendido = Sale.objects.filter(
         tenant=tenant,
-        origin=Sale.Origin.MANUAL,
+        origin__in=Sale.COMMISSION_ORIGINS,
         status='ATIVA',
         sale_date__gte=start,
         sale_date__lte=end,
@@ -512,7 +512,7 @@ def get_dashboard_data(tenant, month=None, year=None):
             total = Sale.objects.filter(
                 tenant=tenant,
                 seller=s,
-                origin=Sale.Origin.MANUAL,
+                origin__in=Sale.COMMISSION_ORIGINS,
                 status='ATIVA',
                 sale_date__gte=start,
                 sale_date__lte=end,
@@ -541,7 +541,7 @@ def get_dashboard_data(tenant, month=None, year=None):
 
     sellers_with_sales = Seller.objects.filter(
         tenant=tenant,
-        sales__origin=Sale.Origin.MANUAL,
+        sales__origin__in=Sale.COMMISSION_ORIGINS,
         sales__sale_date__gte=start,
         sales__sale_date__lte=end,
     ).distinct().count()
@@ -549,7 +549,7 @@ def get_dashboard_data(tenant, month=None, year=None):
     sellers_no_sale_today = Seller.objects.filter(
         tenant=tenant, is_active=True,
     ).exclude(
-        sales__origin=Sale.Origin.MANUAL,
+        sales__origin__in=Sale.COMMISSION_ORIGINS,
         sales__sale_date=hoje,
     ).count()
 
@@ -557,7 +557,7 @@ def get_dashboard_data(tenant, month=None, year=None):
 
     top5_mes = Sale.objects.filter(
         tenant=tenant,
-        origin=Sale.Origin.MANUAL,
+        origin__in=Sale.COMMISSION_ORIGINS,
         status='ATIVA',
         sale_date__gte=start,
         sale_date__lte=end,
@@ -569,7 +569,7 @@ def get_dashboard_data(tenant, month=None, year=None):
     sellers_inativos = list(
         Seller.objects.filter(tenant=tenant, is_active=True).exclude(
             sales__sale_date__gte=semana_atras,
-            sales__origin=Sale.Origin.MANUAL,
+            sales__origin__in=Sale.COMMISSION_ORIGINS,
             sales__status='ATIVA',
         ).values_list('name', flat=True),
     )
@@ -578,7 +578,7 @@ def get_dashboard_data(tenant, month=None, year=None):
         tenant=tenant, is_active=True,
         sales__sale_date__gte=start,
         sales__sale_date__lte=end,
-        sales__origin=Sale.Origin.MANUAL,
+        sales__origin__in=Sale.COMMISSION_ORIGINS,
         sales__status='ATIVA',
     ).distinct().count()
 
@@ -587,7 +587,7 @@ def get_dashboard_data(tenant, month=None, year=None):
         has_inconsistency = True
 
     evolution = list(Sale.objects.filter(
-        tenant=tenant, origin=Sale.Origin.MANUAL, status='ATIVA',
+        tenant=tenant, origin__in=Sale.COMMISSION_ORIGINS, status='ATIVA',
         sale_date__gte=start, sale_date__lte=end,
     ).values('sale_date').annotate(
         total=Sum('amount'),
@@ -597,7 +597,7 @@ def get_dashboard_data(tenant, month=None, year=None):
     prev_year = year if month > 1 else year - 1
     prev_last_day = calendar.monthrange(prev_year, prev_month)[1]
     prev_total = Sale.objects.filter(
-        tenant=tenant, origin=Sale.Origin.MANUAL, status='ATIVA',
+        tenant=tenant, origin__in=Sale.COMMISSION_ORIGINS, status='ATIVA',
         sale_date__gte=date(prev_year, prev_month, 1),
         sale_date__lte=date(prev_year, prev_month, prev_last_day),
     ).aggregate(t=Sum('amount'))['t'] or 0
@@ -658,7 +658,7 @@ def get_missing_days_before_today(seller, month, year):
         Sale.objects.filter(
             tenant=seller.tenant,
             seller=seller,
-            origin=Sale.Origin.MANUAL,
+            origin__in=Sale.COMMISSION_ORIGINS,
             status='ATIVA',
             sale_date__gte=start,
             sale_date__lte=end,

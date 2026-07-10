@@ -171,73 +171,125 @@ class SaleViewSet(viewsets.ModelViewSet):
         log_action(self.request, 'sale.deleted', instance=instance)
         instance.delete()
 
-    @action(detail=False, methods=['post'], permission_classes=[IsAuthenticated, IsManagerOrAdmin], url_path='import')
-    def import_sales(self, request):
-        sales_data = request.data.get('sales', [])
-        if not isinstance(sales_data, list):
-            return Response({'error': 'sales deve ser uma lista.'}, status=400)
-        if len(sales_data) > 500:
-            return Response({'error': 'Maximo 500 vendas por vez.'}, status=400)
+    @action(detail=False, methods=['post'], permission_classes=[IsAuthenticated, IsManagerOrAdmin], url_path='import/preview')
+    def import_preview(self, request):
+        file_obj = request.FILES.get('file')
+        if not file_obj:
+            return Response({'error': 'Arquivo obrigatorio.'}, status=400)
+
+        if file_obj.size > 5 * 1024 * 1024:
+            return Response({'error': 'Arquivo muito grande. Maximo 5MB.'}, status=400)
+
+        name = file_obj.name.lower()
+        content_bytes = file_obj.read()
+
+        from app.apps.sales.services import (
+            _parse_csv, _parse_xlsx, normalize_headers, preview_import_rows,
+        )
+        from hashlib import sha256
+        from app.apps.sales.models import SaleImportBatch
+
+        file_hash = sha256(content_bytes).hexdigest()
+
+        if name.endswith('.csv'):
+            content = content_bytes.decode('utf-8-sig')
+            rows = _parse_csv(content)
+        elif name.endswith('.xlsx'):
+            import io
+            rows = _parse_xlsx(content_bytes)
+            if rows is None:
+                return Response({'error': 'Arquivo XLSX invalido.'}, status=400)
+        else:
+            return Response({'error': 'Formato nao suportado. Envie CSV ou XLSX.'}, status=400)
+
+        if not rows or len(rows) < 2:
+            return Response({'error': 'Arquivo vazio ou sem dados.'}, status=400)
+
+        headers = rows[0]
+        data_rows = rows[1:]
+        header_map = normalize_headers(headers)
+
+        if 'date' not in header_map or 'seller' not in header_map or 'amount' not in header_map:
+            missing = []
+            if 'date' not in header_map:
+                missing.append('data')
+            if 'seller' not in header_map:
+                missing.append('vendedor')
+            if 'amount' not in header_map:
+                missing.append('valor')
+            return Response({
+                'error': f'Cabecalhos obrigatorios nao encontrados: {", ".join(missing)}.',
+            }, status=400)
+
+        if len(data_rows) > 500:
+            return Response({'error': 'Maximo 500 linhas por importacao.'}, status=400)
 
         tenant = request.user.tenant
-        imported = 0
-        skipped = 0
-        errors = []
+        results = preview_import_rows(tenant, data_rows, header_map)
 
-        with transaction.atomic():
-            for idx, item in enumerate(sales_data):
-                try:
-                    seller_uuid = item.get('seller_uuid')
-                    amount_cents = item.get('amount_cents')
-                    date_str = item.get('date')
-                    notes = item.get('notes', '')
+        dupe_batch = SaleImportBatch.objects.filter(
+            tenant=tenant, file_hash=file_hash,
+        ).first()
+        already_imported = dupe_batch is not None
 
-                    if not seller_uuid or not amount_cents or not date_str:
-                        errors.append({'index': idx, 'error': 'Campos obrigatorios: seller_uuid, amount_cents, date'})
-                        continue
+        return Response({
+            'filename': file_obj.name,
+            'file_hash': file_hash,
+            'total_rows': len(data_rows),
+            'headers': headers,
+            'results': results,
+            'already_imported': already_imported,
+            'ok_count': sum(1 for r in results if r['status'] == 'ok'),
+            'duplicate_count': sum(1 for r in results if r['status'] == 'duplicate'),
+            'error_count': sum(1 for r in results if r['status'] == 'error'),
+            'needs_selection_count': sum(1 for r in results if r['status'] == 'needs_selection'),
+        })
 
-                    seller = Seller.objects.filter(uuid=seller_uuid, tenant=tenant).first()
-                    if not seller:
-                        errors.append({'index': idx, 'error': f'Vendedor nao encontrado: {seller_uuid}'})
-                        continue
+    @action(detail=False, methods=['post'], permission_classes=[IsAuthenticated, IsManagerOrAdmin], url_path='import/confirm')
+    def import_confirm(self, request):
+        confirmed = request.data.get('rows', [])
+        filename = request.data.get('filename', '')
+        file_hash = request.data.get('file_hash', '')
+        force = request.data.get('force_reimport', False)
 
-                    try:
-                        sale_date = date.fromisoformat(date_str)
-                    except (ValueError, TypeError):
-                        errors.append({'index': idx, 'error': f'Data invalida: {date_str}'})
-                        continue
+        if not confirmed:
+            return Response({'error': 'Nenhuma linha para importar.'}, status=400)
+        if not filename or not file_hash:
+            return Response({'error': 'filename e file_hash obrigatorios.'}, status=400)
 
-                    if amount_cents <= 0:
-                        errors.append({'index': idx, 'error': 'Valor deve ser maior que zero.'})
-                        continue
+        tenant = request.user.tenant
 
-                    exists = Sale.objects.filter(
-                        seller=seller, sale_date=sale_date, amount=amount_cents, tenant=tenant,
-                    ).exists()
-                    if exists:
-                        skipped += 1
-                        continue
+        from app.apps.sales.models import SaleImportBatch
+        existing = SaleImportBatch.objects.filter(
+            tenant=tenant, file_hash=file_hash,
+        ).first()
+        if existing and not force:
+            return Response({
+                'error': 'Este arquivo ja foi importado. Use force_reimport para confirmar.',
+                'existing_batch_uuid': str(existing.uuid),
+            }, status=409)
 
-                    sale_obj = Sale.objects.create(
-                        tenant=tenant,
-                        seller=seller,
-                        origin=Sale.Origin.MANUAL,
-                        amount=amount_cents,
-                        sale_date=sale_date,
-                        notes=str(notes)[:500] if notes else '',
-                        created_by=request.user,
-                    )
-                    from app.apps.commissions.services import ensure_seller_commission
-                    ensure_seller_commission(seller, sale_date)
-                    imported += 1
-                except Exception as e:
-                    errors.append({'index': idx, 'error': str(e)})
+        from app.apps.sales.services import import_sales as do_import
 
-            if errors and not imported:
-                transaction.set_rollback(True)
-                return Response({'error': 'Nenhuma venda importada. Corrija os erros.', 'errors': errors}, status=400)
+        try:
+            result = do_import(
+                tenant, request.user, confirmed, filename, file_hash,
+            )
+        except ValueError as e:
+            return Response({'error': str(e)}, status=400)
 
-        return Response({'imported': imported, 'skipped': skipped, 'errors': errors})
+        log_action(
+            request, 'sales_import',
+            changes={
+                'filename': filename,
+                'file_hash': file_hash,
+                'created': result['created'],
+                'duplicates': result['duplicates'],
+                'errors_count': len(result['errors']),
+            },
+        )
+
+        return Response(result, status=200)
 
     @action(detail=True, methods=['patch'], permission_classes=[IsAuthenticated, IsManagerOrAdmin], url_path='manager-update')
     def manager_update(self, request, pk=None):
@@ -818,7 +870,7 @@ class RankingView(generics.GenericAPIView):
 
         sales = Sale.objects.filter(
             tenant=tenant,
-            origin=Sale.Origin.MANUAL,
+            origin__in=Sale.COMMISSION_ORIGINS,
             status='ATIVA',
             sale_date__gte=start,
             sale_date__lte=end,
@@ -974,7 +1026,7 @@ class SellerDetailView(generics.GenericAPIView):
 
         manual_sales_qs = Sale.objects.filter(
             tenant=tenant, seller=seller,
-            origin=Sale.Origin.MANUAL,
+            origin__in=Sale.COMMISSION_ORIGINS,
             sale_date__gte=start, sale_date__lte=end,
         ).order_by('-sale_date', '-created_at')
 
@@ -1096,12 +1148,12 @@ class SellerDetailView(generics.GenericAPIView):
             me = date(cy, cm, calendar.monthrange(cy, cm)[1])
             mt = Sale.objects.filter(
                 tenant=tenant, seller=seller,
-                origin=Sale.Origin.MANUAL, status='ATIVA',
+                origin__in=Sale.COMMISSION_ORIGINS, status='ATIVA',
                 sale_date__gte=ms, sale_date__lte=me,
             ).aggregate(t=Sum('amount'))['t'] or 0
             mc = Sale.objects.filter(
                 tenant=tenant, seller=seller,
-                origin=Sale.Origin.MANUAL, status='ATIVA',
+                origin__in=Sale.COMMISSION_ORIGINS, status='ATIVA',
                 sale_date__gte=ms, sale_date__lte=me,
             ).count()
             sc_c = commissions.filter(
@@ -1179,7 +1231,7 @@ class SellerReportCsvView(generics.GenericAPIView):
 
         sales = Sale.objects.filter(
             tenant=tenant, seller=seller,
-            origin=Sale.Origin.MANUAL,
+            origin__in=Sale.COMMISSION_ORIGINS,
             sale_date__gte=start, sale_date__lte=end,
         ).order_by('sale_date')
 
@@ -1270,7 +1322,7 @@ class SellerReportExcelView(generics.GenericAPIView):
 
         sales = Sale.objects.filter(
             tenant=tenant, seller=seller,
-            origin=Sale.Origin.MANUAL,
+            origin__in=Sale.COMMISSION_ORIGINS,
             sale_date__gte=start, sale_date__lte=end,
         ).order_by('sale_date')
 
@@ -1398,7 +1450,7 @@ class SellerReportPdfView(generics.GenericAPIView):
 
         sales = Sale.objects.filter(
             tenant=tenant, seller=seller,
-            origin=Sale.Origin.MANUAL,
+            origin__in=Sale.COMMISSION_ORIGINS,
             sale_date__gte=start, sale_date__lte=end,
         ).order_by('sale_date')
 
