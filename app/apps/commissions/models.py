@@ -78,6 +78,7 @@ class CommissionPeriod(models.Model):
         constraints = [
             models.UniqueConstraint(
                 fields=['tenant', 'month', 'year'],
+                condition=~models.Q(status='CANCELADA'),
                 name='unique_period_per_tenant',
             ),
         ]

@@ -614,7 +614,7 @@ class CommissionPeriodCreateSerializer(serializers.ModelSerializer):
             attrs['year'] = year
         if CommissionPeriod.objects.filter(
             tenant=tenant, month=month, year=year,
-        ).exists():
+        ).exclude(status=CommissionPeriod.Status.CANCELADA).exists():
             raise serializers.ValidationError(
                 f'A competencia {month:02d}/{year} ja existe. '
                 'Use Atualizar valores para sincronizar os dados.'
