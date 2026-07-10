@@ -572,6 +572,8 @@ class CommissionPeriodCreateSerializer(serializers.ModelSerializer):
             'expected_working_days', 'notes',
         ]
         extra_kwargs = {
+            'month': {'required': False},
+            'year': {'required': False},
             'label': {'required': False, 'allow_blank': True},
             'start_date': {'required': True},
             'end_date': {'required': True},
@@ -604,6 +606,12 @@ class CommissionPeriodCreateSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError({'end_date': 'Data final deve ser maior ou igual a data inicial.'})
         if (end_date - start_date).days + 1 > 62:
             raise serializers.ValidationError({'end_date': 'Competencia nao pode exceder 62 dias.'})
+        if month is None:
+            month = end_date.month
+            attrs['month'] = month
+        if year is None:
+            year = end_date.year
+            attrs['year'] = year
         if CommissionPeriod.objects.filter(
             tenant=tenant, month=month, year=year,
         ).exists():

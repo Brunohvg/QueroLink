@@ -64,7 +64,8 @@
               <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
             </div>
             <div>
-              <h3 class="text-[17px] font-bold text-gray-900" x-text="String(p.month).padStart(2,'0')+'/'+p.year"></h3>
+              <h3 class="text-[17px] font-bold text-gray-900" x-text="periodLabel(p)"></h3>
+              <p class="text-[12px] text-gray-500 mt-0.5" x-text="periodRange(p)"></p>
               <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-medium mt-1"
                     :class="{'bg-gray-100 text-gray-600': p.status==='ABERTA',
                              'bg-amber-50 text-amber-700': p.status==='PARCIALMENTE_FECHADA',
@@ -237,18 +238,18 @@
         </div>
         <div><h3 class="text-[17px] font-bold text-gray-900">Criar competencia</h3><p class="text-[12px] text-gray-400">Defina o periodo e os dias uteis esperados</p></div>
       </div>
+      <div class="mb-4">
+        <label class="block text-[13px] font-medium text-gray-700 mb-1.5">Nome da competencia</label>
+        <input type="text" x-model="createLabel" class="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-[14px] outline-none transition-all focus:border-brand-400 focus:ring-2 focus:ring-brand-100" placeholder="Ex: 21/06 a 20/07">
+      </div>
       <div class="flex gap-3 mb-4">
         <div class="flex-1">
-          <label class="block text-[13px] font-medium text-gray-700 mb-1.5">Mes</label>
-          <select x-model="createMonth" @change="calcCalendar()" class="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-[14px] outline-none transition-all focus:border-brand-400 focus:ring-2 focus:ring-brand-100">
-            <template x-for="m in 12" :key="m"><option :value="m" x-text="String(m).padStart(2,'0')"></option></template>
-          </select>
+          <label class="block text-[13px] font-medium text-gray-700 mb-1.5">Inicio</label>
+          <input type="date" x-model="createStartDate" @change="calcCalendar()" class="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-[14px] outline-none transition-all focus:border-brand-400 focus:ring-2 focus:ring-brand-100">
         </div>
         <div class="flex-1">
-          <label class="block text-[13px] font-medium text-gray-700 mb-1.5">Ano</label>
-          <select x-model="createYear" @change="calcCalendar()" class="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-[14px] outline-none transition-all focus:border-brand-400 focus:ring-2 focus:ring-brand-100">
-            <template x-for="y in 10" :key="y"><option :value="2024 + y - 1" x-text="2024 + y - 1"></option></template>
-          </select>
+          <label class="block text-[13px] font-medium text-gray-700 mb-1.5">Fim</label>
+          <input type="date" x-model="createEndDate" @change="calcCalendar()" class="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-[14px] outline-none transition-all focus:border-brand-400 focus:ring-2 focus:ring-brand-100">
         </div>
       </div>
       <div class="mb-4">
@@ -260,7 +261,7 @@
           <div class="grid grid-cols-7 gap-0 text-center">
             <template x-for="n in calendarOffset" :key="'e'+n"><div class="py-1"></div></template>
             <template x-for="(day, idx) in calendarDays" :key="'d'+idx">
-              <div class="py-1 text-[13px] rounded-lg" :class="calendarIsWeekend(day) ? 'text-gray-300' : 'text-gray-700 font-medium'" x-text="day"></div>
+              <div class="py-1 text-[13px] rounded-lg" :class="calendarIsWeekend(day.date) ? 'text-gray-300' : 'text-gray-700 font-medium'" x-text="day.day"></div>
             </template>
           </div>
         </div>
@@ -292,10 +293,14 @@
         <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-sky-400 to-sky-500 flex items-center justify-center shadow-sm">
           <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
         </div>
-        <div><h3 class="text-[17px] font-bold text-gray-900">Editar Competencia</h3><p class="text-[12px] text-gray-400" x-text="editPeriod ? String(editPeriod.month).padStart(2,'0')+'/'+editPeriod.year : ''"></p></div>
+        <div><h3 class="text-[17px] font-bold text-gray-900">Editar Competencia</h3><p class="text-[12px] text-gray-400" x-text="editPeriod ? periodLabel(editPeriod) + ' - ' + periodRange(editPeriod) : ''"></p></div>
       </div>
-      <div class="mb-3"><label class="block text-[13px] font-medium text-gray-700 mb-1.5">Mes</label><input type="number" x-model="editMonth" min="1" max="12" :disabled="editHasSales" class="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-[14px] outline-none transition-all focus:border-brand-400 focus:ring-2 focus:ring-brand-100 disabled:bg-gray-100 disabled:text-gray-400"><p x-show="editHasSales" class="text-[11px] text-amber-600 mt-1.5 flex items-center gap-1"><svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"/></svg>Nao e possivel alterar mes/ano com lancamentos.</p></div>
-      <div class="mb-3"><label class="block text-[13px] font-medium text-gray-700 mb-1.5">Ano</label><input type="number" x-model="editYear" min="2020" max="2100" :disabled="editHasSales" class="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-[14px] outline-none transition-all focus:border-brand-400 focus:ring-2 focus:ring-brand-100 disabled:bg-gray-100 disabled:text-gray-400"></div>
+      <div class="mb-3"><label class="block text-[13px] font-medium text-gray-700 mb-1.5">Nome da competencia</label><input type="text" x-model="editLabel" class="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-[14px] outline-none transition-all focus:border-brand-400 focus:ring-2 focus:ring-brand-100"></div>
+      <div class="flex gap-3 mb-3">
+        <div class="flex-1"><label class="block text-[13px] font-medium text-gray-700 mb-1.5">Inicio</label><input type="date" x-model="editStartDate" :disabled="editHasSales" class="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-[14px] outline-none transition-all focus:border-brand-400 focus:ring-2 focus:ring-brand-100 disabled:bg-gray-100 disabled:text-gray-400"></div>
+        <div class="flex-1"><label class="block text-[13px] font-medium text-gray-700 mb-1.5">Fim</label><input type="date" x-model="editEndDate" :disabled="editHasSales" class="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-[14px] outline-none transition-all focus:border-brand-400 focus:ring-2 focus:ring-brand-100 disabled:bg-gray-100 disabled:text-gray-400"></div>
+      </div>
+      <p x-show="editHasSales" class="text-[11px] text-amber-600 mb-3 flex items-center gap-1"><svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"/></svg>Nao e possivel alterar datas com lancamentos.</p>
       <div class="mb-3"><label class="block text-[13px] font-medium text-gray-700 mb-1.5">Dias trabalhados esperados</label><input type="number" x-model="editExpectedDays" min="1" max="31" class="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-[14px] outline-none transition-all focus:border-brand-400 focus:ring-2 focus:ring-brand-100"></div>
       <div class="mb-4"><label class="block text-[13px] font-medium text-gray-700 mb-1.5">Observacao</label><textarea x-model="editNotes" class="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-[14px] outline-none transition-all focus:border-brand-400 focus:ring-2 focus:ring-brand-100" rows="2"></textarea></div>
       <div class="flex gap-3 justify-end pt-2 border-t border-gray-100">
@@ -470,7 +475,10 @@
             <tbody>
               <template x-for="p in filteredFinished()" :key="p.uuid">
                 <tr class="border-b border-gray-50 hover:bg-gray-50/50 transition-colors">
-                  <td class="px-4 py-3.5 font-semibold text-[14px] text-gray-900" x-text="String(p.month).padStart(2,'0')+'/'+p.year"></td>
+                  <td class="px-4 py-3.5 font-semibold text-[14px] text-gray-900">
+                    <span x-text="periodLabel(p)"></span>
+                    <span class="block text-[12px] font-normal text-gray-500" x-text="periodRange(p)"></span>
+                  </td>
                   <td class="px-4 py-3.5">
                     <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-medium"
                           :class="{'bg-emerald-50 text-emerald-700': p.status==='PAGA', 'bg-red-50 text-red-700': p.status==='CANCELADA'}">
@@ -516,8 +524,8 @@ function getCSRFToken() {
 function fechamentoPage() {
     return {
         periods: [],
-        showCreateModal: false, createMonth: '', createYear: '', createExpectedDays: 22, createNotes: '',
-        showEditModal: false, editPeriod: null, editMonth: 6, editYear: 2026, editExpectedDays: 22, editNotes: '', editHasSales: false,
+        showCreateModal: false, createLabel: '', createStartDate: '', createEndDate: '', createExpectedDays: 22, createNotes: '',
+        showEditModal: false, editPeriod: null, editLabel: '', editStartDate: '', editEndDate: '', editExpectedDays: 22, editNotes: '', editHasSales: false,
         showDeleteModal: false, deletePeriod: null, deleteConfirmText: '',
         showCancelModal: false, cancelPeriod: null, cancelReason: '',
         showCloseModal: false, closePeriod: null, closeSellers: [],
@@ -582,8 +590,25 @@ function fechamentoPage() {
         },
         hasExportFeature() { return {{ has_export|yesno:"true,false" }}; },
         showError(d) {
-            showToast(d.error || d.detail || d.message || 'Erro inesperado', 'error');
+            if (d && typeof d === 'object') {
+                var messages = [];
+                Object.keys(d).forEach(function(k) {
+                    var v = d[k];
+                    if (Array.isArray(v)) messages.push(v.join(' '));
+                    else if (typeof v === 'string') messages.push(v);
+                });
+                if (messages.length) { showToast(messages.join(' '), 'error'); return; }
+            }
+            showToast((d && (d.error || d.detail || d.message)) || 'Erro inesperado', 'error');
         },
+        periodLabel(p) { return p.display_label || p.label || (String(p.month).padStart(2,'0') + '/' + p.year); },
+        formatDateBR(iso) {
+            if (!iso) return '';
+            var parts = iso.split('-');
+            if (parts.length !== 3) return iso;
+            return parts[2] + '/' + parts[1] + '/' + parts[0];
+        },
+        periodRange(p) { return this.formatDateBR(p.start_date) + ' a ' + this.formatDateBR(p.end_date); },
         getCommissions(p) { return p.seller_commissions || []; },
         totalVendido(p) { return this.getCommissions(p).reduce((a,c)=>a+(c.total_sold_amount||0),0); },
         totalComissao(p) { return this.getCommissions(p).reduce((a,c)=>a+(c.commission_amount||0),0); },
@@ -607,52 +632,78 @@ function fechamentoPage() {
         },
         openCreateModal() {
             var d = new Date();
-            var tryMonth = d.getMonth() + 1;
-            var tryYear = d.getFullYear();
-            var exists = this.periods.some(p => p.month === tryMonth && p.year === tryYear);
-            if (exists) {
-                tryMonth += 1;
-                if (tryMonth > 12) { tryMonth = 1; tryYear += 1; }
-                while (this.periods.some(p => p.month === tryMonth && p.year === tryYear)) {
-                    tryMonth += 1;
-                    if (tryMonth > 12) { tryMonth = 1; tryYear += 1; }
-                }
-            }
-            this.createMonth = tryMonth;
-            this.createYear = tryYear;
+            var y = d.getFullYear();
+            var m = d.getMonth();
+            this.createStartDate = new Date(y, m, 21).toISOString().slice(0, 10);
+            this.createEndDate = new Date(y, m + 1, 20).toISOString().slice(0, 10);
+            this.createLabel = this.formatDateBR(this.createStartDate).slice(0, 5) + ' a ' + this.formatDateBR(this.createEndDate).slice(0, 5);
             this.createNotes = '';
             this.showCreateModal = true;
             this.$nextTick(() => this.calcCalendar());
         },
         calendarOffset: 0, calendarDays: [],
         calcCalendar() {
-            var m = parseInt(this.createMonth);
-            var y = parseInt(this.createYear);
-            var first = new Date(y, m - 1, 1);
+            if (!this.createStartDate || !this.createEndDate) {
+                this.calendarOffset = 0;
+                this.calendarDays = [];
+                this.createExpectedDays = 0;
+                return;
+            }
+            var start = new Date(this.createStartDate + 'T00:00:00');
+            var end = new Date(this.createEndDate + 'T00:00:00');
+            if (end < start) {
+                this.calendarOffset = 0;
+                this.calendarDays = [];
+                this.createExpectedDays = 0;
+                return;
+            }
+            var first = new Date(start.getFullYear(), start.getMonth(), start.getDate());
             this.calendarOffset = first.getDay();
-            var total = new Date(y, m, 0).getDate();
             var days = [];
-            for (var i = 1; i <= total; i++) days.push(i);
+            for (var cur = new Date(start); cur <= end; cur.setDate(cur.getDate() + 1)) {
+                days.push({day: cur.getDate(), date: new Date(cur)});
+            }
             this.calendarDays = days;
             this.createExpectedDays = this.calendarWeekdays();
         },
         calendarWeekdays() {
-            var m = parseInt(this.createMonth);
-            var y = parseInt(this.createYear);
             var count = 0;
-            var total = new Date(y, m, 0).getDate();
-            for (var d = 1; d <= total; d++) { var day = new Date(y, m - 1, d).getDay(); if (day !== 0 && day !== 6) count++; }
+            this.calendarDays.forEach(function(item) {
+                var day = item.date.getDay();
+                if (day !== 0 && day !== 6) count++;
+            });
             return count;
         },
-        calendarIsWeekday(day) { var m=parseInt(this.createMonth);var y=parseInt(this.createYear);var dow=new Date(y,m-1,day).getDay();return dow!==0&&dow!==6; },
-        calendarIsWeekend(day) { return !this.calendarIsWeekday(day); },
+        calendarIsWeekday(dateObj) { var dow = dateObj.getDay(); return dow !== 0 && dow !== 6; },
+        calendarIsWeekend(dateObj) { return !this.calendarIsWeekday(dateObj); },
         async doCreate() {
-            var r = await fetch('/api/commissions/periods/', { method:'POST', headers:{'Content-Type':'application/json','X-CSRFToken':getCSRFToken()}, body:JSON.stringify({month:parseInt(this.createMonth),year:parseInt(this.createYear),expected_working_days:parseInt(this.createExpectedDays),notes:this.createNotes}) });
+            var end = this.createEndDate ? new Date(this.createEndDate + 'T00:00:00') : null;
+            var body = {
+                label: this.createLabel,
+                start_date: this.createStartDate,
+                end_date: this.createEndDate,
+                expected_working_days: parseInt(this.createExpectedDays),
+                notes: this.createNotes
+            };
+            if (end) {
+                body.month = end.getMonth() + 1;
+                body.year = end.getFullYear();
+            }
+            var r = await fetch('/api/commissions/periods/', { method:'POST', headers:{'Content-Type':'application/json','X-CSRFToken':getCSRFToken()}, body:JSON.stringify(body) });
             if (r.ok) { this.showCreateModal = false; this.load(); } else { var d = await r.json(); this.showError(d); }
         },
-        openEditModal(p) { this.editPeriod=p;this.editMonth=p.month;this.editYear=p.year;this.editExpectedDays=p.expected_working_days||22;this.editNotes=p.notes||'';this.editHasSales=(p.seller_commissions||[]).length>0;this.showEditModal=true; },
+        openEditModal(p) { this.editPeriod=p;this.editLabel=p.label||p.display_label||'';this.editStartDate=p.start_date;this.editEndDate=p.end_date;this.editExpectedDays=p.expected_working_days||22;this.editNotes=p.notes||'';this.editHasSales=(p.seller_commissions||[]).length>0;this.showEditModal=true; },
         async doEdit() {
-            var body={};if(parseInt(this.editMonth)!==this.editPeriod.month)body.month=parseInt(this.editMonth);if(parseInt(this.editYear)!==this.editPeriod.year)body.year=parseInt(this.editYear);body.expected_working_days=parseInt(this.editExpectedDays);body.notes=this.editNotes;
+            var body={};
+            if (this.editLabel !== (this.editPeriod.label || '')) body.label = this.editLabel;
+            if (!this.editHasSales && this.editStartDate !== this.editPeriod.start_date) body.start_date = this.editStartDate;
+            if (!this.editHasSales && this.editEndDate !== this.editPeriod.end_date) {
+                body.end_date = this.editEndDate;
+                var end = new Date(this.editEndDate + 'T00:00:00');
+                body.month = end.getMonth() + 1;
+                body.year = end.getFullYear();
+            }
+            body.expected_working_days=parseInt(this.editExpectedDays);body.notes=this.editNotes;
             var r=await fetch('/api/commissions/periods/'+this.editPeriod.uuid+'/',{method:'PATCH',headers:{'Content-Type':'application/json','X-CSRFToken':getCSRFToken()},body:JSON.stringify(body)});
             if(r.ok){this.showEditModal=false;this.load();}else{var d=await r.json();this.showError(d);}
         },

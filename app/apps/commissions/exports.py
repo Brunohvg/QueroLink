@@ -120,14 +120,24 @@ def build_accounting_zip(tenant, month_int, year_int):
             total_sold_pdf += est_total
         sellers_for_pdf.sort(key=lambda s: s['total_sold'], reverse=True)
 
-        prev_month = month_int - 1
-        prev_year = year_int
-        if prev_month == 0:
-            prev_month = 12
-            prev_year -= 1
-        prev_total = SModel.objects.filter(
-            tenant=tenant, status='ATIVA', sale_date__month=prev_month, sale_date__year=prev_year,
-        ).aggregate(t=DSum('amount'))['t'] or 0
+        prev_period = None
+        if period:
+            prev_period = CommissionPeriod.objects.filter(
+                tenant=tenant,
+                end_date__lt=period.start_date,
+            ).exclude(
+                status=CommissionPeriod.Status.CANCELADA,
+            ).order_by('-end_date').first()
+
+        if prev_period:
+            prev_total = SModel.objects.filter(
+                tenant=tenant,
+                status='ATIVA',
+                sale_date__gte=prev_period.start_date,
+                sale_date__lte=prev_period.end_date,
+            ).aggregate(t=DSum('amount'))['t'] or 0
+        else:
+            prev_total = 0
         variacao = round((total_sold_pdf - prev_total) / prev_total * 100) if prev_total > 0 else None
 
         pdf_html = render_to_string('reports/relatorio_mensal.html', {

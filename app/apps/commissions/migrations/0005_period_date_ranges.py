@@ -47,8 +47,4 @@ class Migration(migrations.Migration):
             name='end_date',
             field=models.DateField(),
         ),
-        migrations.AddIndex(
-            model_name='commissionperiod',
-            index=models.Index(fields=['tenant', 'start_date', 'end_date'], name='commissions_tenant__fb33df_idx'),
-        ),
     ]

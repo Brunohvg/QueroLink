@@ -3,6 +3,7 @@ import logging
 from datetime import date
 from decimal import Decimal, ROUND_HALF_UP
 
+from django.core.exceptions import ValidationError
 from django.utils import timezone
 from django.db import transaction
 from django.db.models import Sum
@@ -820,9 +821,15 @@ def update_period(period, data, user):
     new_start = data.get('start_date')
     new_end = data.get('end_date')
     if isinstance(new_start, str):
-        new_start = date.fromisoformat(new_start)
+        try:
+            new_start = date.fromisoformat(new_start)
+        except ValueError:
+            raise ValueError('Data inicial invalida.')
     if isinstance(new_end, str):
-        new_end = date.fromisoformat(new_end)
+        try:
+            new_end = date.fromisoformat(new_end)
+        except ValueError:
+            raise ValueError('Data final invalida.')
     start_changed = new_start is not None and new_start != period.start_date
     end_changed = new_end is not None and new_end != period.end_date
 
@@ -847,7 +854,15 @@ def update_period(period, data, user):
     if not changed_fields:
         return period, changed_fields
 
-    period.full_clean()
+    try:
+        period.full_clean()
+    except ValidationError as exc:
+        if hasattr(exc, 'message_dict'):
+            messages = []
+            for field_messages in exc.message_dict.values():
+                messages.extend(field_messages)
+            raise ValueError(' '.join(messages))
+        raise ValueError(' '.join(exc.messages))
     period.save(update_fields=changed_fields + ['updated_at'])
 
     if 'expected_working_days' in changed_fields:

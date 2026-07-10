@@ -84,7 +84,6 @@ class CommissionPeriod(models.Model):
         indexes = [
             models.Index(fields=['tenant', 'status']),
             models.Index(fields=['month', 'year']),
-            models.Index(fields=['tenant', 'start_date', 'end_date']),
         ]
 
     def __str__(self):
