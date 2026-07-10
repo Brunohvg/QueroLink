@@ -622,7 +622,11 @@ def gestor_fechamento(request):
     has_export = bool(
         tenant and getattr(settings, 'PLAN_FEATURES', {}).get(tenant.plan, {}).get('export_contabil', False)
     )
-    return render(request, 'dashboard/gestor/fechamento.html', {'has_export': has_export})
+    return render(request, 'dashboard/gestor/fechamento.html', {
+        'has_export': has_export,
+        'accountant_email': tenant.accountant_email if tenant else '',
+        'accountant_auto_send': tenant.accountant_auto_send if tenant else False,
+    })
 
 
 @login_required

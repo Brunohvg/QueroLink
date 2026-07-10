@@ -125,7 +125,7 @@
         </div>
       </div>
 
-      <div class="px-6 py-2 border-b border-gray-100 flex items-center gap-2">
+      <div class="px-6 py-2 border-b border-gray-100 flex items-center gap-2 flex-wrap">
         <a :href="'/api/financial/commissions/'+p.uuid+'/csv/'"
            class="text-[12px] px-3 py-1.5 rounded-lg hover:bg-gray-100 text-gray-600 font-medium transition flex items-center gap-1.5">
           <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
@@ -138,6 +138,49 @@
           <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
           Recibos do periodo (PDF)
         </a>
+        <div class="ml-auto flex items-center gap-2">
+          <span x-show="accountantAutoSend && !p.sent_to_accounting_at && p.status !== 'CANCELADA'"
+                class="text-[12px] text-gray-500 flex items-center gap-1.5">
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+            Envio automatico ativado
+          </span>
+          <button x-show="canSendToAccountant(p)" @click="sendToAccounting(p)"
+                  :disabled="!accountantEmail || sendingAccounting === p.uuid"
+                  class="text-[12px] px-3 py-1.5 rounded-lg bg-brand-600 hover:bg-brand-700 text-white font-medium transition flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
+                  x-text="sendingAccounting === p.uuid ? 'Enviando...' : 'Enviar para contabilidade'">
+          </button>
+          <button x-show="!accountantEmail && accountingSendEligible(p)"
+                  disabled
+                  class="text-[12px] px-3 py-1.5 rounded-lg bg-gray-100 text-gray-400 font-medium transition flex items-center gap-1.5 cursor-not-allowed"
+                  title="Configure o e-mail da contabilidade em Configuracoes">
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"/></svg>
+            Configure o e-mail da contabilidade
+          </button>
+          <template x-if="p.sent_to_accounting_at">
+            <div class="flex items-center gap-2">
+              <span class="text-[12px] text-gray-500 flex items-center gap-1.5">
+                <svg class="w-3.5 h-3.5 text-sky-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
+                Enviado em <span x-text="formatSentDate(p.sent_to_accounting_at)"></span>
+              </span>
+              <button x-show="canResendToAccountant(p) && showResendConfirm !== p.uuid"
+                      @click="confirmResend(p)"
+                      :disabled="sendingAccounting === p.uuid"
+                      class="text-[12px] px-3 py-1.5 rounded-lg hover:bg-amber-50 text-amber-600 font-medium transition flex items-center gap-1.5 disabled:opacity-50">
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+                Reenviar
+              </button>
+              <template x-if="canResendToAccountant(p) && showResendConfirm === p.uuid">
+                <div class="flex items-center gap-1.5">
+                  <span class="text-[12px] text-amber-600">Confirmar reenvio?</span>
+                  <button @click="resendToAccounting(p)" :disabled="sendingAccounting === p.uuid"
+                          class="text-[12px] px-2.5 py-1 rounded-lg bg-amber-500 hover:bg-amber-600 text-white font-medium transition disabled:opacity-50">Sim</button>
+                  <button @click="cancelResend()"
+                          class="text-[12px] px-2.5 py-1 rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-600 font-medium transition">Nao</button>
+                </div>
+              </template>
+            </div>
+          </template>
+        </div>
       </div>
 
       <template x-if="p.seller_commissions && p.seller_commissions.length">
@@ -231,59 +274,69 @@
   </template>
 
   <div x-show="showCreateModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm" @click.self="showCreateModal=false">
-    <div class="bg-white rounded-2xl shadow-xl p-6 w-full max-w-lg mx-4" @click.stop>
-      <div class="flex items-center gap-3 mb-5">
-        <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-brand-400 to-brand-500 flex items-center justify-center shadow-sm">
-          <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
-        </div>
-        <div><h3 class="text-[17px] font-bold text-gray-900">Criar competencia</h3><p class="text-[12px] text-gray-400">Defina o periodo e os dias uteis esperados</p></div>
-      </div>
-      <div class="mb-4">
-        <label class="block text-[13px] font-medium text-gray-700 mb-1.5">Nome da competencia</label>
-        <input type="text" x-model="createLabel" class="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-[14px] outline-none transition-all focus:border-brand-400 focus:ring-2 focus:ring-brand-100" placeholder="Ex: 21/06 a 20/07">
-      </div>
-      <div class="flex gap-3 mb-4">
-        <div class="flex-1">
-          <label class="block text-[13px] font-medium text-gray-700 mb-1.5">Inicio</label>
-          <input type="date" x-model="createStartDate" @change="calcCalendar()" class="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-[14px] outline-none transition-all focus:border-brand-400 focus:ring-2 focus:ring-brand-100">
-        </div>
-        <div class="flex-1">
-          <label class="block text-[13px] font-medium text-gray-700 mb-1.5">Fim</label>
-          <input type="date" x-model="createEndDate" @change="calcCalendar()" class="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-[14px] outline-none transition-all focus:border-brand-400 focus:ring-2 focus:ring-brand-100">
-        </div>
-      </div>
-      <div class="mb-4">
-        <label class="block text-[13px] font-medium text-gray-700 mb-1.5">Calendario de dias uteis</label>
-        <div class="bg-gray-50 rounded-xl p-4 border border-gray-200">
-          <div class="grid grid-cols-7 gap-0 text-center mb-1">
-            <template x-for="d in ['Dom','Seg','Ter','Qua','Qui','Sex','Sab']" :key="d"><div class="text-[11px] font-semibold text-gray-400 py-1" x-text="d"></div></template>
+    <div class="bg-white rounded-2xl shadow-xl p-6 w-full max-w-lg mx-4 max-h-[90vh] overflow-y-auto" @click.stop>
+      <div class="flex items-center justify-between mb-5">
+        <div class="flex items-center gap-3">
+          <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-brand-400 to-brand-500 flex items-center justify-center shadow-sm">
+            <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
           </div>
-          <div class="grid grid-cols-7 gap-0 text-center">
-            <template x-for="n in calendarOffset" :key="'e'+n"><div class="py-1"></div></template>
-            <template x-for="(day, idx) in calendarDays" :key="'d'+idx">
-              <div class="py-1 text-[13px] rounded-lg" :class="calendarIsWeekend(day.date) ? 'text-gray-300' : 'text-gray-700 font-medium'" x-text="day.day"></div>
-            </template>
-          </div>
+          <div><h3 class="text-[17px] font-bold text-gray-900">Criar competencia</h3><p class="text-[12px] text-gray-400">Defina o periodo e os dias uteis esperados</p></div>
+        </div>
+        <button @click="showCreateModal=false" class="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-gray-100 transition text-gray-400">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+        </button>
+      </div>
+      <form @submit.prevent="doCreate()" novalidate>
+      <div class="mb-4">
+        <label class="block text-[13px] font-medium text-gray-700 mb-1.5">Nome da competencia <span class="text-red-400">*</span></label>
+        <input type="text" x-model="createLabel" required
+               class="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-[14px] outline-none transition-all focus:border-brand-400 focus:ring-2 focus:ring-brand-100"
+               :class="{'border-red-300 ring-1 ring-red-100': createError.label}"
+               placeholder="Ex: 21/06 a 20/07">
+        <p x-show="createError.label" class="text-[11px] text-red-500 mt-1" x-text="createError.label"></p>
+      </div>
+      <div class="flex flex-col sm:flex-row gap-3 mb-4">
+        <div class="flex-1">
+          <label class="block text-[13px] font-medium text-gray-700 mb-1.5">Inicio <span class="text-red-400">*</span></label>
+          <input type="date" x-model="createStartDate" required
+                 @change="onCreateDatesChanged()"
+                 class="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-[14px] outline-none transition-all focus:border-brand-400 focus:ring-2 focus:ring-brand-100"
+                 :class="{'border-red-300 ring-1 ring-red-100': createError.start_date}">
+          <p x-show="createError.start_date" class="text-[11px] text-red-500 mt-1" x-text="createError.start_date"></p>
+        </div>
+        <div class="flex-1">
+          <label class="block text-[13px] font-medium text-gray-700 mb-1.5">Fim <span class="text-red-400">*</span></label>
+          <input type="date" x-model="createEndDate" required
+                 @change="onCreateDatesChanged()"
+                 class="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-[14px] outline-none transition-all focus:border-brand-400 focus:ring-2 focus:ring-brand-100"
+                 :class="{'border-red-300 ring-1 ring-red-100': createError.end_date}">
+          <p x-show="createError.end_date" class="text-[11px] text-red-500 mt-1" x-text="createError.end_date"></p>
         </div>
       </div>
-      <div class="flex gap-3 mb-4">
-        <div class="flex-1">
-          <label class="block text-[13px] font-medium text-gray-700 mb-1.5">Dias uteis <span class="text-gray-400 font-normal">(calculado)</span></label>
-          <input type="number" x-model="createExpectedDays" min="1" max="31" class="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-[14px] outline-none transition-all focus:border-brand-400 focus:ring-2 focus:ring-brand-100">
-        </div>
-        <div class="flex-1">
-          <label class="block text-[13px] font-medium text-gray-700 mb-1.5">Dias totais</label>
-          <div class="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-[14px] text-gray-500" x-text="calendarDays.length"></div>
-        </div>
+      <p x-show="createStartDate && createEndDate" class="text-[13px] text-brand-600 bg-brand-50 rounded-xl px-4 py-2.5 mb-4 flex items-center gap-2">
+        <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+        <span><strong x-text="createTotalDays"></strong> dias no periodo · <strong x-text="createCalculatedWeekdays"></strong> dias uteis estimados</span>
+      </p>
+      <div class="mb-4">
+        <label class="block text-[13px] font-medium text-gray-700 mb-1.5">Dias uteis esperados</label>
+        <input type="number" x-model="createExpectedDays" min="1" max="62"
+               class="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-[14px] outline-none transition-all focus:border-brand-400 focus:ring-2 focus:ring-brand-100">
+        <p class="text-[11px] text-gray-400 mt-1" x-show="createExpectedDays > 0">O gestor pode ajustar este valor manualmente.</p>
       </div>
       <div class="mb-4">
         <label class="block text-[13px] font-medium text-gray-700 mb-1.5">Observacao <span class="text-gray-400 font-normal">(opcional)</span></label>
-        <textarea x-model="createNotes" class="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-[14px] outline-none transition-all focus:border-brand-400 focus:ring-2 focus:ring-brand-100" rows="2" placeholder="Ex: Feriados no dia 15 e 20"></textarea>
+        <textarea x-model="createNotes" rows="2" placeholder="Ex: Feriados no dia 15 e 20"
+                  class="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-[14px] outline-none transition-all focus:border-brand-400 focus:ring-2 focus:ring-brand-100"></textarea>
       </div>
+      <div x-show="createError.detail" class="bg-red-50 border border-red-200 text-red-700 px-3.5 py-2.5 rounded-xl text-[12px] font-medium mb-4" x-text="createError.detail"></div>
       <div class="flex gap-3 justify-end pt-2 border-t border-gray-100">
-        <button @click="showCreateModal=false" class="px-5 py-2.5 bg-white border border-gray-200 text-gray-700 font-medium rounded-xl transition-all text-[14px] hover:bg-gray-50 active:scale-[0.97]">Cancelar</button>
-        <button @click="doCreate()" class="px-5 py-2.5 bg-gray-900 hover:bg-gray-800 text-white font-semibold rounded-xl transition-all text-[14px] shadow-sm active:scale-[0.97]">Criar competencia</button>
+        <button type="button" @click="showCreateModal=false" :disabled="creating"
+                class="px-5 py-2.5 bg-white border border-gray-200 text-gray-700 font-medium rounded-xl transition-all text-[14px] hover:bg-gray-50 active:scale-[0.97] disabled:opacity-50">Cancelar</button>
+        <button type="submit" :disabled="creating"
+                class="px-5 py-2.5 bg-gray-900 hover:bg-gray-800 text-white font-semibold rounded-xl transition-all text-[14px] shadow-sm active:scale-[0.97] disabled:opacity-50 disabled:cursor-not-allowed"
+                x-text="creating ? 'Criando...' : 'Criar competencia'"></button>
       </div>
+      </form>
     </div>
   </div>
 
@@ -525,6 +578,7 @@ function fechamentoPage() {
     return {
         periods: [],
         showCreateModal: false, createLabel: '', createStartDate: '', createEndDate: '', createExpectedDays: 22, createNotes: '',
+        creating: false, createError: {}, createTotalDays: 0, createCalculatedWeekdays: 0,
         showEditModal: false, editPeriod: null, editLabel: '', editStartDate: '', editEndDate: '', editExpectedDays: 22, editNotes: '', editHasSales: false,
         showDeleteModal: false, deletePeriod: null, deleteConfirmText: '',
         showCancelModal: false, cancelPeriod: null, cancelReason: '',
@@ -589,6 +643,74 @@ function fechamentoPage() {
             return dates.reduce(function(a,b) { return a > b ? a : b; });
         },
         hasExportFeature() { return {{ has_export|yesno:"true,false" }}; },
+        accountantEmail: '{{ accountant_email|escapejs }}' || '',
+        accountantAutoSend: {{ accountant_auto_send|yesno:"true,false" }},
+        sendingAccounting: null,
+        showResendConfirm: null,
+        canSendToAccountant(p) {
+            if (p.status === 'CANCELADA') return false;
+            if (p.sent_to_accounting_at) return false;
+            if (this.accountantAutoSend) return false;
+            var scs = p.seller_commissions || [];
+            if (!scs.length) return false;
+            var hasOpen = scs.some(function(sc) { return sc.status === 'ABERTA' || sc.status === 'REABERTA'; });
+            return !hasOpen;
+        },
+        canResendToAccountant(p) {
+            if (p.status === 'CANCELADA') return false;
+            if (!p.sent_to_accounting_at) return false;
+            var scs = p.seller_commissions || [];
+            if (!scs.length) return false;
+            var hasOpen = scs.some(function(sc) { return sc.status === 'ABERTA' || sc.status === 'REABERTA'; });
+            return !hasOpen;
+        },
+        accountingSendEligible(p) { return this.canSendToAccountant(p) || this.canResendToAccountant(p); },
+        async sendToAccounting(p) {
+            if (this.sendingAccounting === p.uuid) return;
+            this.sendingAccounting = p.uuid;
+            try {
+                var r = await fetch('/api/commissions/periods/' + p.uuid + '/send_accounting/', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json', 'X-CSRFToken': getCSRFToken()},
+                    body: JSON.stringify({}),
+                });
+                var d = await r.json();
+                if (r.ok || r.status === 202) {
+                    showToast('Envio agendado com sucesso.', 'success');
+                    this.load();
+                } else {
+                    showToast(d.error || d.detail || 'Erro ao agendar envio.', 'error');
+                }
+            } catch(e) { showToast('Erro de conexao.', 'error'); }
+            finally { this.sendingAccounting = null; }
+        },
+        confirmResend(p) { this.showResendConfirm = p.uuid; },
+        cancelResend() { this.showResendConfirm = null; },
+        async resendToAccounting(p) {
+            if (this.sendingAccounting === p.uuid) return;
+            this.sendingAccounting = p.uuid;
+            this.showResendConfirm = null;
+            try {
+                var r = await fetch('/api/commissions/periods/' + p.uuid + '/send_accounting/', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json', 'X-CSRFToken': getCSRFToken()},
+                    body: JSON.stringify({force_resend: true}),
+                });
+                var d = await r.json();
+                if (r.ok || r.status === 202) {
+                    showToast('Reenvio agendado com sucesso.', 'success');
+                    this.load();
+                } else {
+                    showToast(d.error || d.detail || 'Erro ao agendar reenvio.', 'error');
+                }
+            } catch(e) { showToast('Erro de conexao.', 'error'); }
+            finally { this.sendingAccounting = null; }
+        },
+        formatSentDate(iso) {
+            if (!iso) return '';
+            var d = new Date(iso);
+            return d.toLocaleDateString('pt-BR') + ' as ' + d.toLocaleTimeString('pt-BR', {hour:'2-digit', minute:'2-digit'});
+        },
         showError(d) {
             if (d && typeof d === 'object') {
                 var messages = [];
@@ -634,63 +756,78 @@ function fechamentoPage() {
             var d = new Date();
             var y = d.getFullYear();
             var m = d.getMonth();
-            this.createStartDate = new Date(y, m, 21).toISOString().slice(0, 10);
-            this.createEndDate = new Date(y, m + 1, 20).toISOString().slice(0, 10);
-            this.createLabel = this.formatDateBR(this.createStartDate).slice(0, 5) + ' a ' + this.formatDateBR(this.createEndDate).slice(0, 5);
+            this.createLabel = '';
+            this.createStartDate = '';
+            this.createEndDate = '';
+            this.createExpectedDays = 22;
             this.createNotes = '';
+            this.creating = false;
+            this.createError = {};
+            this.createTotalDays = 0;
+            this.createCalculatedWeekdays = 0;
             this.showCreateModal = true;
-            this.$nextTick(() => this.calcCalendar());
+            this.$nextTick(() => {
+                this.createStartDate = new Date(y, m, 21).toISOString().slice(0, 10);
+                this.createEndDate = new Date(y, m + 1, 20).toISOString().slice(0, 10);
+                this.createLabel = this.formatDateBR(this.createStartDate).slice(0, 5) + ' a ' + this.formatDateBR(this.createEndDate).slice(0, 5);
+                this.onCreateDatesChanged();
+            });
         },
-        calendarOffset: 0, calendarDays: [],
-        calcCalendar() {
+        onCreateDatesChanged() {
             if (!this.createStartDate || !this.createEndDate) {
-                this.calendarOffset = 0;
-                this.calendarDays = [];
+                this.createTotalDays = 0;
+                this.createCalculatedWeekdays = 0;
                 this.createExpectedDays = 0;
                 return;
             }
             var start = new Date(this.createStartDate + 'T00:00:00');
             var end = new Date(this.createEndDate + 'T00:00:00');
             if (end < start) {
-                this.calendarOffset = 0;
-                this.calendarDays = [];
+                this.createTotalDays = 0;
+                this.createCalculatedWeekdays = 0;
                 this.createExpectedDays = 0;
                 return;
             }
-            var first = new Date(start.getFullYear(), start.getMonth(), start.getDate());
-            this.calendarOffset = first.getDay();
-            var days = [];
+            var total = 0, weekdays = 0;
             for (var cur = new Date(start); cur <= end; cur.setDate(cur.getDate() + 1)) {
-                days.push({day: cur.getDate(), date: new Date(cur)});
+                total++;
+                var dow = cur.getDay();
+                if (dow !== 0 && dow !== 6) weekdays++;
             }
-            this.calendarDays = days;
-            this.createExpectedDays = this.calendarWeekdays();
+            this.createTotalDays = total;
+            this.createCalculatedWeekdays = weekdays;
+            this.createExpectedDays = weekdays;
         },
-        calendarWeekdays() {
-            var count = 0;
-            this.calendarDays.forEach(function(item) {
-                var day = item.date.getDay();
-                if (day !== 0 && day !== 6) count++;
-            });
-            return count;
-        },
-        calendarIsWeekday(dateObj) { var dow = dateObj.getDay(); return dow !== 0 && dow !== 6; },
-        calendarIsWeekend(dateObj) { return !this.calendarIsWeekday(dateObj); },
         async doCreate() {
-            var end = this.createEndDate ? new Date(this.createEndDate + 'T00:00:00') : null;
+            if (this.creating) return;
+            this.createError = {};
+            if (!this.createLabel.trim()) { this.createError = {label: 'Nome da competencia e obrigatorio.'}; return; }
+            if (!this.createStartDate) { this.createError = {start_date: 'Data inicial e obrigatoria.'}; return; }
+            if (!this.createEndDate) { this.createError = {end_date: 'Data final e obrigatoria.'}; return; }
+            var end = new Date(this.createEndDate + 'T00:00:00');
             var body = {
                 label: this.createLabel,
                 start_date: this.createStartDate,
                 end_date: this.createEndDate,
-                expected_working_days: parseInt(this.createExpectedDays),
-                notes: this.createNotes
+                expected_working_days: parseInt(this.createExpectedDays) || 22,
+                notes: this.createNotes,
+                month: end.getMonth() + 1,
+                year: end.getFullYear()
             };
-            if (end) {
-                body.month = end.getMonth() + 1;
-                body.year = end.getFullYear();
-            }
-            var r = await fetch('/api/commissions/periods/', { method:'POST', headers:{'Content-Type':'application/json','X-CSRFToken':getCSRFToken()}, body:JSON.stringify(body) });
-            if (r.ok) { this.showCreateModal = false; this.load(); } else { var d = await r.json(); this.showError(d); }
+            this.creating = true;
+            try {
+                var r = await fetch('/api/commissions/periods/', { method:'POST', headers:{'Content-Type':'application/json','X-CSRFToken':getCSRFToken()}, body:JSON.stringify(body) });
+                if (r.ok) { this.showCreateModal = false; this.load(); } else {
+                    var d = await r.json();
+                    if (d && typeof d === 'object') {
+                        this.createError = d;
+                    } else {
+                        this.createError = {detail: (d && (d.error || d.detail)) || 'Erro ao criar competencia.'};
+                    }
+                }
+            } catch(e) {
+                this.createError = {detail: 'Erro de conexao.'};
+            } finally { this.creating = false; }
         },
         openEditModal(p) { this.editPeriod=p;this.editLabel=p.label||p.display_label||'';this.editStartDate=p.start_date;this.editEndDate=p.end_date;this.editExpectedDays=p.expected_working_days||22;this.editNotes=p.notes||'';this.editHasSales=(p.seller_commissions||[]).length>0;this.showEditModal=true; },
         async doEdit() {
