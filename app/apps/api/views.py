@@ -385,6 +385,80 @@ class CommissionPeriodViewSet(viewsets.ModelViewSet):
 
     @action(
         detail=True, methods=['post'],
+        permission_classes=[IsAuthenticated, IsManagerOrAdmin],
+    )
+    @method_decorator(ratelimit(key='user', rate='10/h', method='POST', block=True))
+    def send_accounting(self, request, pk=None):
+        period = self.get_object()
+        tenant = request.user.tenant
+
+        if period.tenant_id != tenant.pk:
+            return Response(
+                {'error': 'Competencia nao pertence ao seu tenant.'},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        if not tenant.accountant_email:
+            return Response(
+                {'error': 'Cadastre o e-mail do contador em Configuracoes.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if period.status == CommissionPeriod.Status.CANCELADA:
+            return Response(
+                {'error': 'Competencia cancelada nao pode ser enviada.'},
+                status=status.HTTP_409_CONFLICT,
+            )
+
+        force_resend = request.data.get('force_resend', False)
+        if period.sent_to_accounting_at and not force_resend:
+            return Response(
+                {'error': 'Competencia ja foi enviada. Use force_resend para reenviar.'},
+                status=status.HTTP_409_CONFLICT,
+            )
+
+        scs = list(period.seller_commissions.all())
+        if not scs:
+            return Response(
+                {'error': 'Nenhum vendedor sincronizado nesta competencia.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        open_statuses = [
+            SellerCommission.Status.ABERTA,
+            SellerCommission.Status.REABERTA,
+        ]
+        has_open = any(sc.status in open_statuses for sc in scs)
+        if has_open:
+            return Response(
+                {'error': 'Existem vendedores com comissao em aberto. Feche todas antes de enviar.'},
+                status=status.HTTP_409_CONFLICT,
+            )
+
+        from app.apps.notifications.tasks import send_accounting_package_email
+
+        send_accounting_package_email.delay(
+            str(tenant.uuid),
+            period.month,
+            period.year,
+            requested_by_user_id=str(request.user.pk),
+        )
+
+        log_action(
+            request, 'commission_period.send_accounting', instance=period,
+            changes={
+                'month': period.month, 'year': period.year,
+                'force_resend': force_resend,
+            },
+        )
+
+        return Response({
+            'message': 'Envio agendado com sucesso.',
+            'detail': f'Pacote contabil sera enviado para {tenant.accountant_email}.',
+        }, status=status.HTTP_202_ACCEPTED)
+
+    @action(
+        detail=True, methods=['post'],
         permission_classes=[IsAuthenticated, IsFinancialOrAdmin],
     )
     @method_decorator(ratelimit(key='user', rate='30/h', method='POST', block=True))
