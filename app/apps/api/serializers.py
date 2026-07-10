@@ -5,7 +5,7 @@ from rest_framework import serializers
 from django.db import IntegrityError, transaction
 from django.utils import timezone
 
-from app.apps.sales.models import Sale
+from app.apps.sales.models import Sale, SaleChangeLog
 from app.apps.sellers.models import Seller
 from app.apps.sellers.capacity import SellerCapacityExceeded, ensure_seller_capacity
 from app.apps.commissions.models import (
@@ -628,6 +628,36 @@ class CommissionPeriodCreateSerializer(serializers.ModelSerializer):
                 {'start_date': 'Periodo sobrepoe outra competencia deste tenant.'}
             )
         return attrs
+
+
+class ManagerSaleUpdateSerializer(serializers.Serializer):
+    amount = serializers.IntegerField(required=False, min_value=1, max_value=10_000_000)
+    sale_date = serializers.DateField(required=False)
+    notes = serializers.CharField(required=False, allow_blank=True, max_length=255)
+    reason = serializers.CharField(required=True, min_length=5)
+
+    def validate(self, attrs):
+        if 'reason' not in attrs or not attrs.get('reason', '').strip():
+            raise serializers.ValidationError({'reason': 'Motivo é obrigatório (mínimo 5 caracteres).'})
+        return attrs
+
+
+class SaleChangeLogSerializer(serializers.ModelSerializer):
+    changed_by_name = serializers.SerializerMethodField()
+    action_display = serializers.CharField(source='get_action_display', read_only=True)
+
+    class Meta:
+        model = SaleChangeLog
+        fields = [
+            'uuid', 'action', 'action_display', 'changed_by_name',
+            'changed_at', 'field_changes', 'reason',
+        ]
+        read_only_fields = fields
+
+    def get_changed_by_name(self, obj):
+        if obj.changed_by:
+            return obj.changed_by.get_full_name() or obj.changed_by.username
+        return 'Sistema'
 
 
 class ChangePasswordSerializer(serializers.Serializer):
