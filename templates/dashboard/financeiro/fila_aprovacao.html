@@ -50,7 +50,7 @@
     </template>
     <div x-show="!periodGroups.length" class="text-center py-12 text-gray-500">Nenhuma comissão aguardando pagamento.</div>
 
-    <div x-show="showPay" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40" @click.self="showPay=false">
+    <div x-show="showPay" x-cloak class="fixed inset-0 z-50 flex items-center justify-center bg-black/40" @click.self="showPay=false">
         <div class="bg-white rounded-2xl shadow-xl p-6 w-full max-w-md mx-4">
             <h3 class="text-[18px] font-semibold mb-3">Pagar Comissões</h3>
             <p class="text-[13px] text-gray-500 mb-2"><span x-text="selected.size"></span> vendedor(es) — Total: <strong x-text="formatMoneyBRL(selectedTotal())"></strong></p>
@@ -68,7 +68,7 @@
         </div>
     </div>
 
-    <div x-show="showReopen" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40" @click.self="showReopen=false">
+    <div x-show="showReopen" x-cloak class="fixed inset-0 z-50 flex items-center justify-center bg-black/40" @click.self="showReopen=false">
         <div class="bg-white rounded-2xl shadow-xl p-6 w-full max-w-md mx-4">
             <h3 class="text-[18px] font-semibold mb-3">Reverter Comissões</h3>
             <p class="text-[13px] text-gray-500 mb-2"><span x-text="selected.size"></span> vendedor(es).</p>
