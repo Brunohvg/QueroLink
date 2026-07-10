@@ -271,20 +271,23 @@ class CommissionPeriodLockedTest(TestCase):
 
 
 class CommissionPeriodCustomDateFlowTest(TestCase):
+    TEST_ONLY_MANAGER_PASSWORD = 'test-only-password-8371'
+
     def setUp(self):
         cache.clear()
         self.tenant = Tenant.objects.create(
             company_name='Bibelo Datas', cnpj='44444444444444',
         )
         self.manager = User.objects.create_user(
-            username='gestor_datas', password='gestor123',
+            username='gestor_datas', password=self.TEST_ONLY_MANAGER_PASSWORD,
             role=User.Role.MANAGER, tenant=self.tenant,
         )
 
     def _auth_manager(self):
         client = APIClient()
         resp = client.post(reverse('api-login'), {
-            'username': self.manager.username, 'password': 'gestor123',
+            'username': self.manager.username,
+            'password': self.TEST_ONLY_MANAGER_PASSWORD,
         }, format='json')
         self.assertIn('access', resp.data)
         client.credentials(HTTP_AUTHORIZATION=f'Bearer {resp.data["access"]}')
