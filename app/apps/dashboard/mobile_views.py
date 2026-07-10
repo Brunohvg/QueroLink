@@ -454,7 +454,7 @@ def mobile_minhas_vendas(request):
         SaleChangeLog.objects.filter(
             sale__in=list(sales.values_list('pk', flat=True)),
         ).values('sale_id').annotate(
-            count=Count('id'),
+            count=Count('uuid'),
         ).values_list('sale_id', 'count')
     )
 

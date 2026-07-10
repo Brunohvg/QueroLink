@@ -720,11 +720,37 @@ class CommissionPeriodViewSet(viewsets.ModelViewSet):
         pdf = HTML(string=full_html).write_pdf()
         return HttpResponse(pdf, content_type='application/pdf')
 
+    @action(detail=False, methods=['get'], permission_classes=[IsAuthenticated, IsManagerOrAdmin], url_path='suggest')
+    def suggest(self, request):
+        from app.apps.commissions.services import suggest_period_range
+
+        tenant = request.user.tenant
+        hoje = timezone.localdate()
+        try:
+            month = int(request.query_params.get('month', hoje.month))
+            year = int(request.query_params.get('year', hoje.year))
+        except (ValueError, TypeError):
+            return Response({'error': 'Mes/ano invalidos.'}, status=status.HTTP_400_BAD_REQUEST)
+        if month < 1 or month > 12:
+            return Response({'error': 'Mes deve estar entre 1 e 12.'}, status=status.HTTP_400_BAD_REQUEST)
+        if year < 2000 or year > 2100:
+            return Response({'error': 'Ano invalido.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        start, end = suggest_period_range(tenant, month, year)
+        return Response({
+            'month': month,
+            'year': year,
+            'period_start_day': tenant.period_start_day,
+            'start_date': start.isoformat(),
+            'end_date': end.isoformat(),
+        })
+
     @action(detail=False, methods=['get'], permission_classes=[IsAuthenticated, IsManagerOrAdmin], url_path='preview')
     def preview(self, request):
         from datetime import date
         from app.apps.commissions.services import (
             calculate_estimated_commission, get_missing_days_before_today,
+            count_sales_outside_periods,
         )
 
         tenant = request.user.tenant
@@ -763,6 +789,7 @@ class CommissionPeriodViewSet(viewsets.ModelViewSet):
                 'total_sold': total_sold,
                 'total_commission': total_commission,
             },
+            'sales_outside_periods': count_sales_outside_periods(tenant),
             'month': month,
             'year': year,
         })
@@ -977,7 +1004,11 @@ class ManagerSalesListView(generics.ListAPIView):
 
     def get_queryset(self):
         tenant = self.request.user.tenant
-        qs = Sale.objects.select_related('seller').filter(tenant=tenant)
+        if self.request.query_params.get('fora_de_periodo') == '1':
+            from app.apps.commissions.services import get_sales_outside_periods_queryset
+            qs = get_sales_outside_periods_queryset(tenant).select_related('seller')
+        else:
+            qs = Sale.objects.select_related('seller').filter(tenant=tenant)
         seller_uuid = self.request.query_params.get('seller')
         if seller_uuid:
             qs = qs.filter(seller__uuid=seller_uuid)
@@ -1050,7 +1081,7 @@ class SellerDetailView(generics.GenericAPIView):
             SaleChangeLog.objects.filter(
                 sale__in=[s.pk for s in manual_sales_qs_slice],
             ).values('sale_id').annotate(
-                count=Count('id'),
+                count=Count('uuid'),
             ).values_list('sale_id', 'count')
         )
         for s in manual_sales_qs_slice:

@@ -162,7 +162,7 @@
             Configure o e-mail da contabilidade
           </button>
           <template x-if="p.sent_to_accounting_at">
-            <div class="flex items-center gap-2">
+      <div class="flex items-center gap-2 flex-wrap justify-end">
               <span class="text-[12px] text-gray-500 flex items-center gap-1.5">
                 <svg class="w-3.5 h-3.5 text-sky-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
                 Enviado em <span x-text="formatSentDate(p.sent_to_accounting_at)"></span>
@@ -292,6 +292,22 @@
         </button>
       </div>
       <form @submit.prevent="doCreate()" novalidate>
+      <div class="flex flex-col sm:flex-row gap-3 mb-4">
+        <div class="flex-1">
+          <label class="block text-[13px] font-medium text-gray-700 mb-1.5">Competencia (mes)</label>
+          <select x-model.number="createMonth" @change="applySuggestion()"
+                  class="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-[14px] outline-none transition-all focus:border-brand-400 focus:ring-2 focus:ring-brand-100">
+            <template x-for="m in 12" :key="m"><option :value="m" x-text="String(m).padStart(2,'0')"></option></template>
+          </select>
+        </div>
+        <div class="flex-1">
+          <label class="block text-[13px] font-medium text-gray-700 mb-1.5">Ano</label>
+          <select x-model.number="createYear" @change="applySuggestion()"
+                  class="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-[14px] outline-none transition-all focus:border-brand-400 focus:ring-2 focus:ring-brand-100">
+            <template x-for="y in [2024,2025,2026,2027,2028]" :key="y"><option :value="y" x-text="y"></option></template>
+          </select>
+        </div>
+      </div>
       <div class="mb-4">
         <label class="block text-[13px] font-medium text-gray-700 mb-1.5">Nome da competencia <span class="text-red-400">*</span></label>
         <input type="text" x-model="createLabel" required
@@ -321,6 +337,9 @@
       <p x-show="createStartDate && createEndDate" class="text-[13px] text-brand-600 bg-brand-50 rounded-xl px-4 py-2.5 mb-4 flex items-center gap-2">
         <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
         <span><strong x-text="createTotalDays"></strong> dias no periodo · <strong x-text="createCalculatedWeekdays"></strong> dias uteis estimados</span>
+      </p>
+      <p x-show="createStartDate && createEndDate" class="text-[12px] text-gray-500 mb-4">
+        Vendas de <strong x-text="formatDateBR(createStartDate)"></strong> a <strong x-text="formatDateBR(createEndDate)"></strong> entrarao nesta competencia.
       </p>
       <div class="mb-4">
         <label class="block text-[13px] font-medium text-gray-700 mb-1.5">Dias uteis esperados</label>
@@ -584,6 +603,7 @@ function fechamentoPage() {
         periods: [],
         showCreateModal: false, createLabel: '', createStartDate: '', createEndDate: '', createExpectedDays: 22, createNotes: '',
         creating: false, createError: {}, createTotalDays: 0, createCalculatedWeekdays: 0,
+        createMonth: (new Date()).getMonth() + 1, createYear: (new Date()).getFullYear(),
         showEditModal: false, editPeriod: null, editLabel: '', editStartDate: '', editEndDate: '', editExpectedDays: 22, editNotes: '', editHasSales: false,
         showDeleteModal: false, deletePeriod: null, deleteConfirmText: '',
         showCancelModal: false, cancelPeriod: null, cancelReason: '',
@@ -759,8 +779,8 @@ function fechamentoPage() {
         },
         openCreateModal() {
             var d = new Date();
-            var y = d.getFullYear();
-            var m = d.getMonth();
+            this.createMonth = d.getMonth() + 1;
+            this.createYear = d.getFullYear();
             this.createLabel = '';
             this.createStartDate = '';
             this.createEndDate = '';
@@ -771,12 +791,19 @@ function fechamentoPage() {
             this.createTotalDays = 0;
             this.createCalculatedWeekdays = 0;
             this.showCreateModal = true;
-            this.$nextTick(() => {
-                this.createStartDate = new Date(y, m, 21).toISOString().slice(0, 10);
-                this.createEndDate = new Date(y, m + 1, 20).toISOString().slice(0, 10);
-                this.createLabel = this.formatDateBR(this.createStartDate).slice(0, 5) + ' a ' + this.formatDateBR(this.createEndDate).slice(0, 5);
-                this.onCreateDatesChanged();
-            });
+            this.$nextTick(() => { this.applySuggestion(); });
+        },
+        async applySuggestion() {
+            try {
+                var r = await fetch('/api/commissions/periods/suggest/?month=' + this.createMonth + '&year=' + this.createYear);
+                if (r.ok) {
+                    var d = await r.json();
+                    this.createStartDate = d.start_date;
+                    this.createEndDate = d.end_date;
+                    this.createLabel = this.formatDateBR(d.start_date).slice(0, 5) + ' a ' + this.formatDateBR(d.end_date).slice(0, 5);
+                    this.onCreateDatesChanged();
+                }
+            } catch(e) { /* sugestao e opcional; datas continuam editaveis */ }
         },
         onCreateDatesChanged() {
             if (!this.createStartDate || !this.createEndDate) {

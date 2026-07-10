@@ -41,6 +41,18 @@ def legacy_month_range(month, year):
     return start, date(year, month, last_day)
 
 
+def suggest_period_range(tenant, month, year):
+    day = getattr(tenant, 'period_start_day', 1) or 1
+    if day <= 1:
+        return legacy_month_range(month, year)
+    if month > 1:
+        start = date(year, month - 1, day)
+    else:
+        start = date(year - 1, 12, day)
+    end = date(year, month, day - 1)
+    return start, end
+
+
 def get_period_by_legacy_label(tenant, month, year):
     return CommissionPeriod.objects.filter(
         tenant=tenant,
@@ -113,26 +125,61 @@ def calculate_estimated_commission(seller, month, year):
     return commission, total
 
 
-def get_or_create_period(tenant, month, year, expected_working_days=None):
-    start, end = legacy_month_range(month, year)
+def get_or_create_period(tenant, month, year, expected_working_days=None,
+                         start_date=None, end_date=None):
+    if start_date is None or end_date is None:
+        suggested_start, suggested_end = suggest_period_range(tenant, month, year)
+        if start_date is None:
+            start_date = suggested_start
+        if end_date is None:
+            end_date = suggested_end
     period, created = CommissionPeriod.objects.get_or_create(
         tenant=tenant,
         month=month,
         year=year,
         defaults={
             'label': f'{month:02d}/{year}',
-            'start_date': start,
-            'end_date': end,
+            'start_date': start_date,
+            'end_date': end_date,
             'expected_working_days': expected_working_days or 22,
             'status': CommissionPeriod.Status.ABERTA,
         },
     )
+    if created:
+        logger.warning(
+            'periodo %s auto-criado com range sugerido %s–%s',
+            period.display_label, start_date, end_date,
+        )
     if created and expected_working_days:
         period.expected_working_days = expected_working_days
         period.save(update_fields=['expected_working_days'])
     if created:
         sync_period_seller_commissions(period)
     return period, created
+
+
+def get_sales_outside_periods_queryset(tenant):
+    from django.db.models import Q
+
+    hoje = timezone.localdate()
+    qs = Sale.objects.filter(
+        tenant=tenant,
+        status='ATIVA',
+        sale_date__lt=hoje,
+    )
+    ranges = CommissionPeriod.objects.filter(tenant=tenant).exclude(
+        status=CommissionPeriod.Status.CANCELADA,
+    ).values_list('start_date', 'end_date')
+    covered = Q()
+    for start, end in ranges:
+        covered |= Q(sale_date__gte=start, sale_date__lte=end)
+    if covered:
+        qs = qs.exclude(covered)
+    return qs
+
+
+def count_sales_outside_periods(tenant):
+    return get_sales_outside_periods_queryset(tenant).count()
 
 
 def sync_period_seller_commissions(period):
