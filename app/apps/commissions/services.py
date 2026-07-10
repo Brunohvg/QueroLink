@@ -41,6 +41,16 @@ def legacy_month_range(month, year):
     return start, date(year, month, last_day)
 
 
+MESES = [
+    'Janeiro', 'Fevereiro', 'Marco', 'Abril', 'Maio', 'Junho',
+    'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro',
+]
+
+
+def suggest_label(end_date):
+    return f'{MESES[end_date.month - 1]}/{end_date.year}'
+
+
 def get_period_by_legacy_label(tenant, month, year):
     return CommissionPeriod.objects.filter(
         tenant=tenant,
@@ -120,7 +130,7 @@ def get_or_create_period(tenant, month, year, expected_working_days=None):
         month=month,
         year=year,
         defaults={
-            'label': f'{month:02d}/{year}',
+            'label': suggest_label(end),
             'start_date': start,
             'end_date': end,
             'expected_working_days': expected_working_days or 22,

@@ -1,44 +1,59 @@
 {% extends 'dashboard/base_desktop.html' %}
-{% block title %}Competencias de Comissao — Mérito{% endblock %}
+{% block title %}Competências de Comissão — Mérito{% endblock %}
 {% block content %}
 <div x-data="fechamentoPage()" x-init="load()" class="max-w-7xl mx-auto">
 
   <div class="sticky top-0 z-10 -mx-6 px-6 py-4 bg-gray-50/90 backdrop-blur-lg border-b border-gray-200/60 mb-6">
-    <div class="flex items-center justify-between">
+    <div class="flex items-center justify-between gap-4 flex-wrap">
       <div>
-        <h1 class="font-display text-[22px] font-bold text-gray-900 tracking-tight">Competencias</h1>
-        <p class="text-[13px] text-gray-500 mt-0.5" x-text="tab==='active' ? 'Gerencie fechamento, envio e pagamento' : 'Competencias finalizadas e pagas'"></p>
+        <h1 class="font-display text-[22px] font-bold text-gray-900 tracking-tight">Competências</h1>
+        <p class="text-[13px] text-gray-500 mt-0.5" x-text="tab==='active' ? 'Gerencie fechamento, envio e pagamento' : 'Competências finalizadas e pagas'"></p>
       </div>
       <div class="flex items-center gap-2">
-        <div class="flex gap-0 bg-white rounded-xl p-1 border border-gray-200 shadow-sm">
-          <button @click="switchTab('active')"
-                  :class="tab === 'active' ? 'bg-gray-900 text-white' : 'text-gray-500 hover:text-gray-700'"
-                  class="px-4 py-2 rounded-lg text-[13px] font-medium transition-all">Operacional</button>
-          <button @click="switchTab('historico')"
-                  :class="tab === 'historico' ? 'bg-gray-900 text-white' : 'text-gray-500 hover:text-gray-700'"
-                  class="px-4 py-2 rounded-lg text-[13px] font-medium transition-all">Historico</button>
-        </div>
-        <button @click="load()"
-                class="inline-flex items-center gap-2 bg-white border border-gray-200 hover:border-gray-300 text-gray-700 font-medium py-2.5 px-4 rounded-xl transition-all text-[14px] shadow-sm hover:shadow active:scale-[0.97]">
-          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
-          Sincronizar
-        </button>
         <button @click="openCreateModal()"
-                class="inline-flex items-center gap-2 bg-gray-900 hover:bg-gray-800 text-white font-semibold py-2.5 px-5 rounded-xl transition-all text-[14px] shadow-sm hover:shadow-md active:scale-[0.97]">
+                class="inline-flex items-center gap-2 bg-brand-500 hover:bg-brand-600 text-white font-semibold py-2.5 px-5 rounded-xl transition-all text-[14px] shadow-sm hover:shadow-md active:scale-[0.97]">
           <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
-          Nova Competencia
+          Nova Competência
         </button>
         <a href="{% url 'dashboard:gestor_previa_fechamento' %}"
-           class="inline-flex items-center gap-2 bg-amber-50 hover:bg-amber-100 border border-amber-200 text-amber-700 font-medium py-2.5 px-4 rounded-xl transition-all text-[14px] shadow-sm hover:shadow active:scale-[0.97]">
-          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
-          Previa do mes
-        </a>
-        <a href="{% url 'dashboard:gestor_importar_vendas' %}"
            class="inline-flex items-center gap-2 bg-white border border-gray-200 hover:border-gray-300 text-gray-700 font-medium py-2.5 px-4 rounded-xl transition-all text-[14px] shadow-sm hover:shadow active:scale-[0.97]">
-          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/></svg>
-          Importar vendas
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
+          Prévia do mês
         </a>
+        <div class="relative" @click.outside="showMoreMenu=false">
+          <button @click="showMoreMenu=!showMoreMenu"
+                  class="inline-flex items-center gap-1 bg-white border border-gray-200 hover:border-gray-300 text-gray-700 font-medium py-2.5 px-3 rounded-xl transition-all text-[14px] shadow-sm hover:shadow active:scale-[0.97]"
+                  title="Mais ações">
+            <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M6 10a2 2 0 100 4 2 2 0 000-4zm6 0a2 2 0 100 4 2 2 0 000-4zm6 0a2 2 0 100 4 2 2 0 000-4z"/></svg>
+          </button>
+          <div x-show="showMoreMenu" x-transition
+               class="absolute right-0 mt-2 w-52 bg-white rounded-xl border border-gray-100 shadow-lg py-1.5 z-20">
+            <a href="{% url 'dashboard:gestor_importar_vendas' %}"
+               class="flex items-center gap-2.5 px-4 py-2.5 text-[13px] text-gray-700 hover:bg-gray-50 transition">
+              <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/></svg>
+              Importar vendas
+            </a>
+            <button @click="showMoreMenu=false; load()"
+                    class="w-full flex items-center gap-2.5 px-4 py-2.5 text-[13px] text-gray-700 hover:bg-gray-50 transition text-left">
+              <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
+              Sincronizar
+            </button>
+            <button @click="showMoreMenu=false; switchTab('historico')"
+                    class="w-full flex items-center gap-2.5 px-4 py-2.5 text-[13px] text-gray-700 hover:bg-gray-50 transition text-left">
+              <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+              Histórico
+            </button>
+          </div>
+        </div>
       </div>
+    </div>
+    <div class="flex items-center gap-6 mt-4 border-b border-transparent">
+      <button @click="switchTab('active')"
+              :class="tab === 'active' ? 'text-brand-600 border-brand-500' : 'text-gray-500 hover:text-gray-700 border-transparent'"
+              class="pb-2 -mb-px border-b-2 text-[13px] font-medium transition-all">Operacional</button>
+      <button @click="switchTab('historico')"
+              :class="tab === 'historico' ? 'text-brand-600 border-brand-500' : 'text-gray-500 hover:text-gray-700 border-transparent'"
+              class="pb-2 -mb-px border-b-2 text-[13px] font-medium transition-all">Histórico</button>
     </div>
   </div>
 
@@ -48,20 +63,20 @@
     <div class="w-16 h-16 mx-auto mb-4 rounded-2xl bg-gray-50 flex items-center justify-center">
       <svg class="w-8 h-8 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
     </div>
-    <p class="text-[15px] font-medium text-gray-500 mb-1">Nenhuma competencia encontrada</p>
-    <p class="text-[13px] text-gray-400 mb-5">Crie uma nova competencia para começar</p>
-    <button @click="openCreateModal()" class="inline-flex items-center gap-2 bg-gray-900 hover:bg-gray-800 text-white font-semibold py-2.5 px-5 rounded-xl transition-all text-[14px] shadow-sm hover:shadow-md active:scale-[0.97]">
+    <p class="text-[15px] font-medium text-gray-500 mb-1">Nenhuma competência encontrada</p>
+    <p class="text-[13px] text-gray-400 mb-5">Crie uma nova competência para começar</p>
+    <button @click="openCreateModal()" class="inline-flex items-center gap-2 bg-brand-500 hover:bg-brand-600 text-white font-semibold py-2.5 px-5 rounded-xl transition-all text-[14px] shadow-sm hover:shadow-md active:scale-[0.97]">
       <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
-      Criar competencia
+      Criar competência
     </button>
   </div>
 
   <template x-for="p in periods" :key="p.uuid">
     <div class="bg-white rounded-2xl border border-gray-100 shadow-[0_1px_3px_-1px_rgba(0,0,0,0.04),0_4px_16px_-4px_rgba(67,97,238,0.06)] overflow-hidden mb-5">
       <div class="px-6 py-5 border-b border-gray-100">
-        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div class="flex items-start justify-between gap-3 mb-4">
           <div class="flex items-center gap-3">
-            <div class="w-10 h-10 rounded-xl flex items-center justify-center shadow-sm"
+            <div class="w-10 h-10 rounded-xl flex items-center justify-center shadow-sm flex-shrink-0"
                  :class="{'bg-gradient-to-br from-brand-400 to-brand-500': p.status==='ABERTA',
                           'bg-gradient-to-br from-amber-400 to-amber-500': p.status==='PARCIALMENTE_FECHADA'||p.status==='FECHADA',
                           'bg-gradient-to-br from-emerald-400 to-emerald-500': p.status==='PARCIALMENTE_PAGA'||p.status==='PAGA',
@@ -69,42 +84,59 @@
               <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
             </div>
             <div>
-              <h3 class="text-[17px] font-bold text-gray-900" x-text="periodLabel(p)"></h3>
+              <h3 class="text-[18px] font-bold text-gray-900" x-text="periodLabel(p)"></h3>
               <p class="text-[12px] text-gray-500 mt-0.5" x-text="periodRange(p)"></p>
-              <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-medium mt-1"
-                    :class="{'bg-gray-100 text-gray-600': p.status==='ABERTA',
-                             'bg-amber-50 text-amber-700': p.status==='PARCIALMENTE_FECHADA',
-                             'bg-warning-50 text-warning-700': p.status==='FECHADA',
-                             'bg-indigo-50 text-indigo-700': p.status==='PARCIALMENTE_PAGA',
-                             'bg-emerald-50 text-emerald-700': p.status==='PAGA',
-                             'bg-red-50 text-red-700': p.status==='CANCELADA'}">
-                <span class="w-1.5 h-1.5 rounded-full"
-                      :class="{'bg-gray-400': p.status==='ABERTA',
-                               'bg-amber-500': p.status==='PARCIALMENTE_FECHADA',
-                               'bg-warning-500': p.status==='FECHADA',
-                               'bg-indigo-500': p.status==='PARCIALMENTE_PAGA',
-                               'bg-emerald-500': p.status==='PAGA',
-                               'bg-red-500': p.status==='CANCELADA'}"></span>
-                <span x-text="p.status.replace(/_/g,' ')"></span>
-              </span>
             </div>
           </div>
-          <div class="flex items-center gap-4 sm:gap-6 text-[12px] sm:text-[13px] flex-wrap">
-            <span class="text-gray-500">Vendido: <strong class="text-gray-800" x-text="formatMoneyBRL(totalVendido(p))"></strong></span>
-            <span class="text-gray-500">Comissao: <strong class="text-brand-600" x-text="formatMoneyBRL(totalComissao(p))"></strong></span>
-            <span class="text-gray-500">Vendedores: <strong class="text-gray-800" x-text="(p.seller_commissions||[]).length"></strong></span>
-            <span x-show="p.closed_at" class="text-gray-500">Fechamento: <strong class="text-gray-800" x-text="new Date(p.closed_at).toLocaleDateString('pt-BR')"></strong></span>
-            <span x-show="p.paid_at" class="text-gray-500">Pagamento: <strong class="text-emerald-600" x-text="new Date(p.paid_at).toLocaleDateString('pt-BR')"></strong></span>
-            <span x-show="p.sent_to_accounting_at" class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-sky-50 text-sky-700">
-              <span class="w-1.5 h-1.5 rounded-full bg-sky-500"></span>
-              Enviada a contabilidade
-            </span>
-            <span x-show="nextAction(p)"
-                  class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-brand-50 text-brand-700">
-              <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6"/></svg>
-              <span x-text="nextAction(p)"></span>
-            </span>
+          <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-medium flex-shrink-0"
+                :class="{'bg-gray-100 text-gray-600': p.status==='ABERTA',
+                         'bg-amber-50 text-amber-700': p.status==='PARCIALMENTE_FECHADA',
+                         'bg-warning-50 text-warning-700': p.status==='FECHADA',
+                         'bg-indigo-50 text-indigo-700': p.status==='PARCIALMENTE_PAGA',
+                         'bg-emerald-50 text-emerald-700': p.status==='PAGA',
+                         'bg-red-50 text-red-700': p.status==='CANCELADA'}">
+            <span class="w-1.5 h-1.5 rounded-full"
+                  :class="{'bg-gray-400': p.status==='ABERTA',
+                           'bg-amber-500': p.status==='PARCIALMENTE_FECHADA',
+                           'bg-warning-500': p.status==='FECHADA',
+                           'bg-indigo-500': p.status==='PARCIALMENTE_PAGA',
+                           'bg-emerald-500': p.status==='PAGA',
+                           'bg-red-500': p.status==='CANCELADA'}"></span>
+            <span x-text="p.status.replace(/_/g,' ')"></span>
+          </span>
+        </div>
+
+        <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          <div class="bg-gray-50/70 rounded-xl px-3 py-2.5">
+            <p class="text-[11px] font-medium text-gray-400 uppercase tracking-wider mb-0.5">Vendido</p>
+            <p class="text-[16px] font-bold text-gray-900" x-text="formatMoneyBRL(totalVendido(p))"></p>
           </div>
+          <div class="bg-gray-50/70 rounded-xl px-3 py-2.5">
+            <p class="text-[11px] font-medium text-gray-400 uppercase tracking-wider mb-0.5">Comissão</p>
+            <p class="text-[16px] font-bold text-brand-600" x-text="formatMoneyBRL(totalComissao(p))"></p>
+          </div>
+          <div class="bg-gray-50/70 rounded-xl px-3 py-2.5">
+            <p class="text-[11px] font-medium text-gray-400 uppercase tracking-wider mb-0.5">Vendedores</p>
+            <p class="text-[16px] font-bold text-gray-900" x-text="(p.seller_commissions||[]).length"></p>
+          </div>
+          <div class="bg-gray-50/70 rounded-xl px-3 py-2.5">
+            <p class="text-[11px] font-medium text-gray-400 uppercase tracking-wider mb-0.5">Dias úteis</p>
+            <p class="text-[16px] font-bold text-gray-900" x-text="(p.expected_working_days||22)"></p>
+          </div>
+        </div>
+
+        <div class="flex items-center gap-4 mt-3 text-[12px] flex-wrap">
+          <span x-show="p.closed_at" class="text-gray-500">Fechamento: <strong class="text-gray-800" x-text="p.closed_at ? new Date(p.closed_at).toLocaleDateString('pt-BR') : ''"></strong></span>
+          <span x-show="p.paid_at" class="text-gray-500">Pagamento: <strong class="text-emerald-600" x-text="p.paid_at ? new Date(p.paid_at).toLocaleDateString('pt-BR') : ''"></strong></span>
+          <span x-show="p.sent_to_accounting_at" class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-sky-50 text-sky-700">
+            <span class="w-1.5 h-1.5 rounded-full bg-sky-500"></span>
+            Enviada à contabilidade
+          </span>
+          <span x-show="nextAction(p)"
+                class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-brand-50 text-brand-700 ml-auto">
+            <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6"/></svg>
+            <span x-text="nextAction(p)"></span>
+          </span>
         </div>
       </div>
 
@@ -115,15 +147,15 @@
         <button @click="selectProntos(p)" class="text-[12px] px-3 py-1.5 rounded-lg bg-gray-100 hover:bg-brand-50 hover:text-brand-600 text-gray-600 font-medium transition">Prontos</button>
         <button @click="clearSelection(p)" class="text-[12px] px-3 py-1.5 rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-600 font-medium transition">Limpar</button>
         <div class="ml-auto flex items-center gap-1">
-          <button @click="openEditModal(p)" class="text-[12px] px-3 py-1.5 rounded-lg hover:bg-gray-100 text-gray-600 font-medium transition flex items-center gap-1.5">
+          <button @click="openEditModal(p)" class="text-[12px] px-3 py-1.5 rounded-lg hover:bg-gray-100 text-gray-500 font-medium transition flex items-center gap-1.5">
             <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
             Editar
           </button>
-          <button @click="openDeleteModal(p)" x-show="p.status==='ABERTA'" class="text-[12px] px-3 py-1.5 rounded-lg hover:bg-red-50 text-red-500 font-medium transition flex items-center gap-1.5">
+          <button @click="openDeleteModal(p)" x-show="p.status==='ABERTA'" class="text-[12px] px-3 py-1.5 rounded-lg hover:bg-gray-100 text-gray-500 font-medium transition flex items-center gap-1.5">
             <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
             Excluir
           </button>
-          <button @click="openCancelModal(p)" x-show="p.status!=='PAGA' && p.status!=='CANCELADA'" class="text-[12px] px-3 py-1.5 rounded-lg hover:bg-amber-50 text-amber-600 font-medium transition flex items-center gap-1.5">
+          <button @click="openCancelModal(p)" x-show="p.status!=='PAGA' && p.status!=='CANCELADA'" class="text-[12px] px-3 py-1.5 rounded-lg hover:bg-red-50 text-red-500 font-medium transition flex items-center gap-1.5">
             <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
             Cancelar
           </button>
@@ -141,13 +173,13 @@
            target="_blank"
            class="text-[12px] px-3 py-1.5 rounded-lg hover:bg-brand-50 text-brand-600 font-medium transition flex items-center gap-1.5">
           <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
-          Recibos do periodo (PDF)
+          Recibos do período (PDF)
         </a>
         <div class="ml-auto flex items-center gap-2">
           <span x-show="accountantAutoSend && !p.sent_to_accounting_at && p.status !== 'CANCELADA'"
                 class="text-[12px] text-gray-500 flex items-center gap-1.5">
             <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
-            Envio automatico ativado
+            Envio automático ativado
           </span>
           <button x-show="canSendToAccountant(p)" @click="sendToAccounting(p)"
                   :disabled="!accountantEmail || sendingAccounting === p.uuid"
@@ -157,7 +189,7 @@
           <button x-show="!accountantEmail && accountingSendEligible(p)"
                   disabled
                   class="text-[12px] px-3 py-1.5 rounded-lg bg-gray-100 text-gray-400 font-medium transition flex items-center gap-1.5 cursor-not-allowed"
-                  title="Configure o e-mail da contabilidade em Configuracoes">
+                  title="Configure o e-mail da contabilidade em Configurações">
             <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"/></svg>
             Configure o e-mail da contabilidade
           </button>
@@ -180,7 +212,7 @@
                   <button @click="resendToAccounting(p)" :disabled="sendingAccounting === p.uuid"
                           class="text-[12px] px-2.5 py-1 rounded-lg bg-amber-500 hover:bg-amber-600 text-white font-medium transition disabled:opacity-50">Sim</button>
                   <button @click="cancelResend()"
-                          class="text-[12px] px-2.5 py-1 rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-600 font-medium transition">Nao</button>
+                          class="text-[12px] px-2.5 py-1 rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-600 font-medium transition">Não</button>
                 </div>
               </template>
             </div>
@@ -195,12 +227,12 @@
               <tr class="bg-gray-50/80">
                 <th class="px-4 py-3 text-[11px] font-semibold text-gray-500 uppercase tracking-wider w-10"></th>
                 <th class="px-4 py-3 text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Vendedor</th>
-                <th class="px-4 py-3 text-[11px] font-semibold text-gray-500 uppercase tracking-wider hidden sm:table-cell">Dias</th>
-                <th class="px-4 py-3 text-[11px] font-semibold text-gray-500 uppercase tracking-wider hidden sm:table-cell">Faltam</th>
-                <th class="px-4 py-3 text-[11px] font-semibold text-gray-500 uppercase tracking-wider hidden md:table-cell">Operac.</th>
+                <th class="px-4 py-3 text-[11px] font-semibold text-gray-500 uppercase tracking-wider hidden sm:table-cell" title="Dias com lançamento / dias do período">Dias lanç.</th>
+                <th x-show="daysUntilEnd(p) !== null && daysUntilEnd(p) <= 5" class="px-4 py-3 text-[11px] font-semibold text-amber-600 uppercase tracking-wider hidden sm:table-cell">Faltam</th>
+                <th class="px-4 py-3 text-[11px] font-semibold text-gray-500 uppercase tracking-wider hidden md:table-cell">Operacional</th>
                 <th class="px-4 py-3 text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Total</th>
                 <th class="px-4 py-3 text-[11px] font-semibold text-gray-500 uppercase tracking-wider hidden sm:table-cell">Taxa</th>
-                <th class="px-4 py-3 text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Comissao</th>
+                <th class="px-4 py-3 text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Comissão</th>
                 <th class="px-4 py-3 text-[11px] font-semibold text-gray-500 uppercase tracking-wider hidden lg:table-cell">Pago</th>
                 <th class="px-4 py-3 text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Status</th>
               </tr>
@@ -216,8 +248,8 @@
                   <td class="px-4 py-3.5">
                     <a :href="'/dashboard/gestor/vendedores/' + sc.seller_uuid + '/'" class="text-[14px] font-semibold text-gray-900 hover:text-brand-600 transition-colors" x-text="sc.seller_name"></a>
                   </td>
-                  <td class="px-4 py-3.5 text-[13px] text-gray-700 hidden sm:table-cell" x-text="(sc.submitted_days_count||0)+'/'+(sc.expected_working_days||22)"></td>
-                  <td class="px-4 py-3.5 text-[13px] text-gray-500 hidden sm:table-cell" x-text="sc.missing_days_count||0"></td>
+                  <td class="px-4 py-3.5 text-[13px] text-gray-700 hidden sm:table-cell" :title="'Dias com lançamento / dias do período: '+(sc.submitted_days_count||0)+' de '+(sc.expected_working_days||22)" x-text="(sc.submitted_days_count||0)+'/'+(sc.expected_working_days||22)"></td>
+                  <td x-show="daysUntilEnd(p) !== null && daysUntilEnd(p) <= 5" class="px-4 py-3.5 text-[13px] text-amber-600 font-medium hidden sm:table-cell" x-text="sc.missing_days_count||0"></td>
                   <td class="px-4 py-3.5 hidden md:table-cell">
                     <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-medium"
                           :class="{'bg-emerald-50 text-emerald-700': sc.operational_status==='PRONTO', 'bg-amber-50 text-amber-700': sc.operational_status==='PENDENTE', 'bg-gray-100 text-gray-600': !sc.operational_status||sc.operational_status==='SEM_LANCAMENTO'}">
@@ -252,11 +284,11 @@
         </div>
       </template>
 
-      <p x-show="!p.seller_commissions||!p.seller_commissions.length" class="text-[13px] text-gray-500 py-6 text-center">Nenhum vendedor sincronizado nesta competencia.</p>
+      <p x-show="!p.seller_commissions||!p.seller_commissions.length" class="text-[13px] text-gray-500 py-6 text-center">Nenhum vendedor sincronizado nesta competência.</p>
 
       <div x-show="selectedCount(p) > 0 && nextAction(p) !== null" class="px-6 py-4 border-t border-gray-100 bg-gray-50/50 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
         <p class="text-[13px] text-gray-600">
-          <span class="font-semibold text-gray-800" x-text="selectedCount(p)"></span> selecionado(s) — Comissao total: <strong class="text-brand-600" x-text="selectedTotal(p)"></strong>
+          <span class="font-semibold text-gray-800" x-text="selectedCount(p)"></span> selecionado(s) — Comissão total: <strong class="text-brand-600" x-text="selectedTotal(p)"></strong>
         </p>
         <div class="flex gap-2">
           <button @click="closeSelected(p)" class="inline-flex items-center gap-1.5 bg-gray-900 hover:bg-gray-800 text-white font-medium py-2 px-4 rounded-xl transition-all text-[13px] shadow-sm active:scale-[0.97]">
@@ -285,7 +317,7 @@
           <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-brand-400 to-brand-500 flex items-center justify-center shadow-sm">
             <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
           </div>
-          <div><h3 class="text-[17px] font-bold text-gray-900">Criar competencia</h3><p class="text-[12px] text-gray-400">Defina o periodo e os dias uteis esperados</p></div>
+          <div><h3 class="text-[17px] font-bold text-gray-900">Criar competência</h3><p class="text-[12px] text-gray-400">Defina o período e os dias úteis esperados</p></div>
         </div>
         <button @click="showCreateModal=false" class="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-gray-100 transition text-gray-400">
           <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
@@ -293,16 +325,16 @@
       </div>
       <form @submit.prevent="doCreate()" novalidate>
       <div class="mb-4">
-        <label class="block text-[13px] font-medium text-gray-700 mb-1.5">Nome da competencia <span class="text-red-400">*</span></label>
+        <label class="block text-[13px] font-medium text-gray-700 mb-1.5">Competência <span class="text-red-400">*</span></label>
         <input type="text" x-model="createLabel" required
                class="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-[14px] outline-none transition-all focus:border-brand-400 focus:ring-2 focus:ring-brand-100"
                :class="{'border-red-300 ring-1 ring-red-100': createError.label}"
-               placeholder="Ex: 21/06 a 20/07">
+               placeholder="Ex.: Agosto/2026">
         <p x-show="createError.label" class="text-[11px] text-red-500 mt-1" x-text="createError.label"></p>
       </div>
       <div class="flex flex-col sm:flex-row gap-3 mb-4">
         <div class="flex-1">
-          <label class="block text-[13px] font-medium text-gray-700 mb-1.5">Inicio <span class="text-red-400">*</span></label>
+          <label class="block text-[13px] font-medium text-gray-700 mb-1.5">Início <span class="text-red-400">*</span></label>
           <input type="date" x-model="createStartDate" required
                  @change="onCreateDatesChanged()"
                  class="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-[14px] outline-none transition-all focus:border-brand-400 focus:ring-2 focus:ring-brand-100"
@@ -318,19 +350,26 @@
           <p x-show="createError.end_date" class="text-[11px] text-red-500 mt-1" x-text="createError.end_date"></p>
         </div>
       </div>
-      <p x-show="createStartDate && createEndDate" class="text-[13px] text-brand-600 bg-brand-50 rounded-xl px-4 py-2.5 mb-4 flex items-center gap-2">
+      <p x-show="createStartDate && createEndDate && !createDatesInvalid" class="text-[13px] text-brand-600 bg-brand-50 rounded-xl px-4 py-2.5 mb-2 flex items-center gap-2">
         <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
-        <span><strong x-text="createTotalDays"></strong> dias no periodo · <strong x-text="createCalculatedWeekdays"></strong> dias uteis estimados</span>
+        <span>Vendas de <strong x-text="formatDateBR(createStartDate)"></strong> a <strong x-text="formatDateBR(createEndDate)"></strong> entrarão nesta competência.</span>
+      </p>
+      <p x-show="createDatesInvalid" class="text-[13px] text-red-600 bg-red-50 rounded-xl px-4 py-2.5 mb-2 flex items-center gap-2">
+        <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"/></svg>
+        <span>Data final deve ser posterior à inicial.</span>
+      </p>
+      <p x-show="createStartDate && createEndDate && !createDatesInvalid" class="text-[12px] text-gray-400 mb-4">
+        <strong x-text="createTotalDays"></strong> dias no período · <strong x-text="createCalculatedWeekdays"></strong> dias úteis estimados
       </p>
       <div class="mb-4">
-        <label class="block text-[13px] font-medium text-gray-700 mb-1.5">Dias uteis esperados</label>
+        <label class="block text-[13px] font-medium text-gray-700 mb-1.5">Dias úteis esperados</label>
         <input type="number" x-model="createExpectedDays" min="1" max="62"
                class="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-[14px] outline-none transition-all focus:border-brand-400 focus:ring-2 focus:ring-brand-100">
-        <p class="text-[11px] text-gray-400 mt-1" x-show="createExpectedDays > 0">O gestor pode ajustar este valor manualmente.</p>
+        <p class="text-[11px] text-gray-400 mt-1">Dias úteis estimados automaticamente. Ajuste se houver feriados.</p>
       </div>
       <div class="mb-4">
-        <label class="block text-[13px] font-medium text-gray-700 mb-1.5">Observacao <span class="text-gray-400 font-normal">(opcional)</span></label>
-        <textarea x-model="createNotes" rows="2" placeholder="Ex: Feriados no dia 15 e 20"
+        <label class="block text-[13px] font-medium text-gray-700 mb-1.5">Observação <span class="text-gray-400 font-normal">(opcional)</span></label>
+        <textarea x-model="createNotes" rows="2" placeholder="Ex.: Feriados no dia 15 e 20"
                   class="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-[14px] outline-none transition-all focus:border-brand-400 focus:ring-2 focus:ring-brand-100"></textarea>
       </div>
       <div x-show="createError.detail" class="bg-red-50 border border-red-200 text-red-700 px-3.5 py-2.5 rounded-xl text-[12px] font-medium mb-4" x-text="createError.detail"></div>
@@ -338,8 +377,10 @@
         <button type="button" @click="showCreateModal=false" :disabled="creating"
                 class="px-5 py-2.5 bg-white border border-gray-200 text-gray-700 font-medium rounded-xl transition-all text-[14px] hover:bg-gray-50 active:scale-[0.97] disabled:opacity-50">Cancelar</button>
         <button type="submit" :disabled="creating"
-                class="px-5 py-2.5 bg-gray-900 hover:bg-gray-800 text-white font-semibold rounded-xl transition-all text-[14px] shadow-sm active:scale-[0.97] disabled:opacity-50 disabled:cursor-not-allowed"
-                x-text="creating ? 'Criando...' : 'Criar competencia'"></button>
+                class="inline-flex items-center gap-2 px-5 py-2.5 bg-brand-500 hover:bg-brand-600 text-white font-semibold rounded-xl transition-all text-[14px] shadow-sm active:scale-[0.97] disabled:opacity-50 disabled:cursor-not-allowed">
+          <svg x-show="creating" class="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
+          <span x-text="creating ? 'Criando...' : 'Criar competência'"></span>
+        </button>
       </div>
       </form>
     </div>
@@ -351,16 +392,16 @@
         <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-sky-400 to-sky-500 flex items-center justify-center shadow-sm">
           <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
         </div>
-        <div><h3 class="text-[17px] font-bold text-gray-900">Editar Competencia</h3><p class="text-[12px] text-gray-400" x-text="editPeriod ? periodLabel(editPeriod) + ' - ' + periodRange(editPeriod) : ''"></p></div>
+        <div><h3 class="text-[17px] font-bold text-gray-900">Editar Competência</h3><p class="text-[12px] text-gray-400" x-text="editPeriod ? periodLabel(editPeriod) + ' - ' + periodRange(editPeriod) : ''"></p></div>
       </div>
-      <div class="mb-3"><label class="block text-[13px] font-medium text-gray-700 mb-1.5">Nome da competencia</label><input type="text" x-model="editLabel" class="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-[14px] outline-none transition-all focus:border-brand-400 focus:ring-2 focus:ring-brand-100"></div>
+      <div class="mb-3"><label class="block text-[13px] font-medium text-gray-700 mb-1.5">Competência</label><input type="text" x-model="editLabel" class="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-[14px] outline-none transition-all focus:border-brand-400 focus:ring-2 focus:ring-brand-100"></div>
       <div class="flex gap-3 mb-3">
-        <div class="flex-1"><label class="block text-[13px] font-medium text-gray-700 mb-1.5">Inicio</label><input type="date" x-model="editStartDate" :disabled="editHasSales" class="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-[14px] outline-none transition-all focus:border-brand-400 focus:ring-2 focus:ring-brand-100 disabled:bg-gray-100 disabled:text-gray-400"></div>
+        <div class="flex-1"><label class="block text-[13px] font-medium text-gray-700 mb-1.5">Início</label><input type="date" x-model="editStartDate" :disabled="editHasSales" class="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-[14px] outline-none transition-all focus:border-brand-400 focus:ring-2 focus:ring-brand-100 disabled:bg-gray-100 disabled:text-gray-400"></div>
         <div class="flex-1"><label class="block text-[13px] font-medium text-gray-700 mb-1.5">Fim</label><input type="date" x-model="editEndDate" :disabled="editHasSales" class="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-[14px] outline-none transition-all focus:border-brand-400 focus:ring-2 focus:ring-brand-100 disabled:bg-gray-100 disabled:text-gray-400"></div>
       </div>
-      <p x-show="editHasSales" class="text-[11px] text-amber-600 mb-3 flex items-center gap-1"><svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"/></svg>Nao e possivel alterar datas com lancamentos.</p>
+      <p x-show="editHasSales" class="text-[11px] text-amber-600 mb-3 flex items-center gap-1"><svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"/></svg>Não é possível alterar datas com lançamentos.</p>
       <div class="mb-3"><label class="block text-[13px] font-medium text-gray-700 mb-1.5">Dias trabalhados esperados</label><input type="number" x-model="editExpectedDays" min="1" max="31" class="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-[14px] outline-none transition-all focus:border-brand-400 focus:ring-2 focus:ring-brand-100"></div>
-      <div class="mb-4"><label class="block text-[13px] font-medium text-gray-700 mb-1.5">Observacao</label><textarea x-model="editNotes" class="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-[14px] outline-none transition-all focus:border-brand-400 focus:ring-2 focus:ring-brand-100" rows="2"></textarea></div>
+      <div class="mb-4"><label class="block text-[13px] font-medium text-gray-700 mb-1.5">Observação</label><textarea x-model="editNotes" class="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-[14px] outline-none transition-all focus:border-brand-400 focus:ring-2 focus:ring-brand-100" rows="2"></textarea></div>
       <div class="flex gap-3 justify-end pt-2 border-t border-gray-100">
         <button @click="showEditModal=false" class="px-5 py-2.5 bg-white border border-gray-200 text-gray-700 font-medium rounded-xl transition-all text-[14px] hover:bg-gray-50 active:scale-[0.97]">Cancelar</button>
         <button @click="doEdit()" class="px-5 py-2.5 bg-gray-900 hover:bg-gray-800 text-white font-semibold rounded-xl transition-all text-[14px] shadow-sm active:scale-[0.97]">Salvar</button>
@@ -373,9 +414,9 @@
       <div class="w-14 h-14 mx-auto mb-4 rounded-2xl bg-red-50 flex items-center justify-center">
         <svg class="w-7 h-7 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
       </div>
-      <h3 class="text-[17px] font-bold text-gray-900 mb-2">Excluir Competencia</h3>
-      <p class="text-[13px] text-gray-500 mb-1" x-text="deletePeriod ? String(deletePeriod.month).padStart(2,'0')+'/'+deletePeriod.year : ''"></p>
-      <p class="text-[13px] text-gray-500 mb-5">Isso remove registros de comissao, mas nao apaga vendas manuais.</p>
+      <h3 class="text-[17px] font-bold text-gray-900 mb-2">Excluir Competência</h3>
+      <p class="text-[13px] text-gray-500 mb-1" x-text="deletePeriod ? (deletePeriod.display_label || deletePeriod.label || (String(deletePeriod.month).padStart(2,'0')+'/'+deletePeriod.year)) : ''"></p>
+      <p class="text-[13px] text-gray-500 mb-5">Isso remove registros de comissão, mas não apaga vendas manuais.</p>
       <div class="text-left mb-5">
         <label class="block text-[13px] font-medium text-gray-700 mb-1.5">Digite <strong>EXCLUIR</strong> para confirmar</label>
         <input type="text" x-model="deleteConfirmText" class="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-[14px] outline-none transition-all focus:border-red-400 focus:ring-2 focus:ring-red-100" placeholder="EXCLUIR">
@@ -393,13 +434,13 @@
         <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-amber-400 to-amber-500 flex items-center justify-center shadow-sm">
           <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
         </div>
-        <div><h3 class="text-[17px] font-bold text-gray-900">Cancelar Competencia</h3><p class="text-[12px] text-gray-400" x-text="cancelPeriod ? String(cancelPeriod.month).padStart(2,'0')+'/'+cancelPeriod.year : ''"></p></div>
+        <div><h3 class="text-[17px] font-bold text-gray-900">Cancelar Competência</h3><p class="text-[12px] text-gray-400" x-text="cancelPeriod ? (cancelPeriod.display_label || cancelPeriod.label || (String(cancelPeriod.month).padStart(2,'0')+'/'+cancelPeriod.year)) : ''"></p></div>
       </div>
-      <p class="text-[13px] text-gray-500 mb-5">Cancelar mantem o historico e bloqueia o uso. Vendas manuais nao serao apagadas.</p>
-      <div class="mb-4"><label class="block text-[13px] font-medium text-gray-700 mb-1.5">Motivo do cancelamento *</label><textarea x-model="cancelReason" class="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-[14px] outline-none transition-all focus:border-amber-400 focus:ring-2 focus:ring-amber-100" rows="3" placeholder="Motivo obrigatorio"></textarea></div>
+      <p class="text-[13px] text-gray-500 mb-5">Cancelar mantém o histórico e bloqueia o uso. Vendas manuais não serão apagadas.</p>
+      <div class="mb-4"><label class="block text-[13px] font-medium text-gray-700 mb-1.5">Motivo do cancelamento *</label><textarea x-model="cancelReason" class="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-[14px] outline-none transition-all focus:border-amber-400 focus:ring-2 focus:ring-amber-100" rows="3" placeholder="Motivo obrigatório"></textarea></div>
       <div class="flex gap-3 justify-end pt-2 border-t border-gray-100">
         <button @click="showCancelModal=false" class="px-5 py-2.5 bg-white border border-gray-200 text-gray-700 font-medium rounded-xl transition-all text-[14px] hover:bg-gray-50 active:scale-[0.97]">Voltar</button>
-        <button @click="doCancel()" class="px-5 py-2.5 bg-amber-500 hover:bg-amber-600 text-white font-semibold rounded-xl transition-all text-[14px] shadow-sm active:scale-[0.97]" :disabled="!cancelReason.trim()">Cancelar competencia</button>
+        <button @click="doCancel()" class="px-5 py-2.5 bg-amber-500 hover:bg-amber-600 text-white font-semibold rounded-xl transition-all text-[14px] shadow-sm active:scale-[0.97]" :disabled="!cancelReason.trim()">Cancelar competência</button>
       </div>
     </div>
   </div>
@@ -410,7 +451,7 @@
         <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-brand-400 to-brand-500 flex items-center justify-center shadow-sm">
           <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
         </div>
-        <div><h3 class="text-[17px] font-bold text-gray-900">Fechar Comissoes</h3><p class="text-[12px] text-gray-400" x-text="closeSellers.length + ' vendedor(es) selecionado(s)'"></p></div>
+        <div><h3 class="text-[17px] font-bold text-gray-900">Fechar Comissões</h3><p class="text-[12px] text-gray-400" x-text="closeSellers.length + ' vendedor(es) selecionado(s)'"></p></div>
       </div>
       <div class="bg-gray-50 rounded-xl p-4 mb-4 max-h-36 overflow-y-auto">
         <template x-for="s in closeSellers" :key="s.id">
@@ -420,10 +461,13 @@
           </div>
         </template>
       </div>
-      <p class="text-[12px] text-gray-500 mb-4">Somente os listados serao fechados. Os demais continuarao abertos.</p>
+      <p class="text-[12px] text-gray-500 mb-4">Somente os listados serão fechados. Os demais continuarão abertos.</p>
       <div class="flex gap-3 justify-end pt-2 border-t border-gray-100">
-        <button @click="showCloseModal=false" class="px-5 py-2.5 bg-white border border-gray-200 text-gray-700 font-medium rounded-xl transition-all text-[14px] hover:bg-gray-50 active:scale-[0.97]">Cancelar</button>
-        <button @click="doClose()" class="px-5 py-2.5 bg-gray-900 hover:bg-gray-800 text-white font-semibold rounded-xl transition-all text-[14px] shadow-sm active:scale-[0.97]">Confirmar fechamento</button>
+        <button @click="showCloseModal=false" :disabled="closing" class="px-5 py-2.5 bg-white border border-gray-200 text-gray-700 font-medium rounded-xl transition-all text-[14px] hover:bg-gray-50 active:scale-[0.97] disabled:opacity-50">Cancelar</button>
+        <button @click="doClose()" :disabled="closing" class="inline-flex items-center gap-2 px-5 py-2.5 bg-brand-500 hover:bg-brand-600 text-white font-semibold rounded-xl transition-all text-[14px] shadow-sm active:scale-[0.97] disabled:opacity-50 disabled:cursor-not-allowed">
+          <svg x-show="closing" class="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
+          <span x-text="closing ? 'Fechando...' : 'Confirmar fechamento'"></span>
+        </button>
       </div>
     </div>
   </div>
@@ -434,7 +478,7 @@
         <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-400 to-emerald-500 flex items-center justify-center shadow-sm">
           <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
         </div>
-        <div><h3 class="text-[17px] font-bold text-gray-900">Pagar Comissoes</h3><p class="text-[12px] text-gray-400" x-text="paySellers.length + ' vendedor(es)'"></p></div>
+        <div><h3 class="text-[17px] font-bold text-gray-900">Pagar Comissões</h3><p class="text-[12px] text-gray-400" x-text="paySellers.length + ' vendedor(es)'"></p></div>
       </div>
       <div class="bg-gray-50 rounded-xl p-4 mb-4 max-h-36 overflow-y-auto">
         <template x-for="s in paySellers" :key="s.id">
@@ -446,14 +490,17 @@
       </div>
       <p class="text-[12px] text-red-500 mb-4 flex items-center gap-1.5">
         <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"/></svg>
-        Confirme apenas se o pagamento ja foi realizado. Nao podera ser revertido.
+        Confirme apenas se o pagamento já foi realizado. Não poderá ser revertido.
       </p>
       <div class="mb-3"><label class="block text-[13px] font-medium text-gray-700 mb-1.5">Data</label><input type="date" x-model="payDate" class="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-[14px] outline-none transition-all focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100"></div>
       <div class="mb-3"><label class="block text-[13px] font-medium text-gray-700 mb-1.5">Forma</label><select x-model="payMethod" class="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-[14px] outline-none transition-all focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100"><option value="">Selecione</option><option value="pix">PIX</option><option value="ted">TED</option><option value="dinheiro">Dinheiro</option><option value="outro">Outro</option></select></div>
-      <div class="mb-4"><label class="block text-[13px] font-medium text-gray-700 mb-1.5">Observacao</label><textarea x-model="payNotes" class="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-[14px] outline-none transition-all focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100" rows="2"></textarea></div>
+      <div class="mb-4"><label class="block text-[13px] font-medium text-gray-700 mb-1.5">Observação</label><textarea x-model="payNotes" class="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-[14px] outline-none transition-all focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100" rows="2"></textarea></div>
       <div class="flex gap-3 justify-end pt-2 border-t border-gray-100">
-        <button @click="showPayModal=false" class="px-5 py-2.5 bg-white border border-gray-200 text-gray-700 font-medium rounded-xl transition-all text-[14px] hover:bg-gray-50 active:scale-[0.97]">Cancelar</button>
-        <button @click="doPay()" class="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold rounded-xl transition-all text-[14px] shadow-sm active:scale-[0.97]">Confirmar Pagamento</button>
+        <button @click="showPayModal=false" :disabled="paying" class="px-5 py-2.5 bg-white border border-gray-200 text-gray-700 font-medium rounded-xl transition-all text-[14px] hover:bg-gray-50 active:scale-[0.97] disabled:opacity-50">Cancelar</button>
+        <button @click="doPay()" :disabled="paying" class="inline-flex items-center gap-2 px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold rounded-xl transition-all text-[14px] shadow-sm active:scale-[0.97] disabled:opacity-50 disabled:cursor-not-allowed">
+          <svg x-show="paying" class="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
+          <span x-text="paying ? 'Confirmando...' : 'Confirmar Pagamento'"></span>
+        </button>
       </div>
     </div>
   </div>
@@ -464,7 +511,7 @@
         <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-amber-400 to-amber-500 flex items-center justify-center shadow-sm">
           <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
         </div>
-        <div><h3 class="text-[17px] font-bold text-gray-900">Reverter Comissoes</h3><p class="text-[12px] text-gray-400" x-text="reopenSellers.length + ' vendedor(es)'"></p></div>
+        <div><h3 class="text-[17px] font-bold text-gray-900">Reverter Comissões</h3><p class="text-[12px] text-gray-400" x-text="reopenSellers.length + ' vendedor(es)'"></p></div>
       </div>
       <div class="bg-gray-50 rounded-xl p-4 mb-4 max-h-36 overflow-y-auto">
         <template x-for="s in reopenSellers" :key="s.id">
@@ -474,10 +521,10 @@
           </div>
         </template>
       </div>
-      <div class="mb-4"><label class="block text-[13px] font-medium text-gray-700 mb-1.5">Motivo *</label><textarea x-model="reopenReason" class="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-[14px] outline-none transition-all focus:border-amber-400 focus:ring-2 focus:ring-amber-100" rows="3" placeholder="Motivo obrigatorio"></textarea></div>
+      <div class="mb-4"><label class="block text-[13px] font-medium text-gray-700 mb-1.5">Motivo *</label><textarea x-model="reopenReason" class="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-[14px] outline-none transition-all focus:border-amber-400 focus:ring-2 focus:ring-amber-100" rows="3" placeholder="Motivo obrigatório"></textarea></div>
       <div class="flex gap-3 justify-end pt-2 border-t border-gray-100">
         <button @click="showReopenModal=false" class="px-5 py-2.5 bg-white border border-gray-200 text-gray-700 font-medium rounded-xl transition-all text-[14px] hover:bg-gray-50 active:scale-[0.97]">Cancelar</button>
-        <button @click="doReopen()" class="px-5 py-2.5 bg-amber-500 hover:bg-amber-600 text-white font-semibold rounded-xl transition-all text-[14px] shadow-sm active:scale-[0.97]" :disabled="!reopenReason.trim()">Confirmar Reversao</button>
+        <button @click="doReopen()" class="px-5 py-2.5 bg-amber-500 hover:bg-amber-600 text-white font-semibold rounded-xl transition-all text-[14px] shadow-sm active:scale-[0.97]" :disabled="!reopenReason.trim()">Confirmar Reversão</button>
       </div>
     </div>
   </div>
@@ -511,7 +558,7 @@
       <div class="w-14 h-14 mx-auto mb-4 rounded-2xl bg-gray-50 flex items-center justify-center">
         <svg class="w-7 h-7 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4"/></svg>
       </div>
-      <p class="text-[14px] font-medium text-gray-500">Nenhuma competencia finalizada ainda.</p>
+      <p class="text-[14px] font-medium text-gray-500">Nenhuma competência finalizada ainda.</p>
     </div>
 
     <template x-if="!finishedLoading && filteredFinished().length">
@@ -520,14 +567,14 @@
           <table class="w-full text-left">
             <thead>
               <tr class="bg-gray-50/80">
-                <th class="px-4 py-3 text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Competencia</th>
+                <th class="px-4 py-3 text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Competência</th>
                 <th class="px-4 py-3 text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Status</th>
                 <th class="px-4 py-3 text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Vendedores</th>
-                <th class="px-4 py-3 text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Comissoes</th>
+                <th class="px-4 py-3 text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Comissões</th>
                 <th class="px-4 py-3 text-[11px] font-semibold text-gray-500 uppercase tracking-wider hidden md:table-cell">Fechada em</th>
                 <th class="px-4 py-3 text-[11px] font-semibold text-gray-500 uppercase tracking-wider hidden md:table-cell">Enviada em</th>
                 <th class="px-4 py-3 text-[11px] font-semibold text-gray-500 uppercase tracking-wider hidden md:table-cell">Paga em</th>
-                <th class="px-4 py-3 text-[11px] font-semibold text-gray-500 uppercase tracking-wider text-right">Acoes</th>
+                <th class="px-4 py-3 text-[11px] font-semibold text-gray-500 uppercase tracking-wider text-right">Ações</th>
               </tr>
             </thead>
             <tbody>
@@ -552,7 +599,7 @@
                   <td class="px-4 py-3.5 text-right">
                     <a :href="'/api/reports/accounting/'+p.year+'/'+p.month+'/'" target="_blank"
                        class="text-[12px] font-medium text-brand-600 hover:text-brand-700 px-2 py-1 rounded-lg hover:bg-brand-50 transition"
-                       :title="hasExportFeature() ? 'Baixar pacote ZIP' : 'Disponivel no plano Pro'">
+                       :title="hasExportFeature() ? 'Baixar pacote ZIP' : 'Disponível no plano Pro'">
                       <svg class="w-4 h-4 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
                       Baixar
                     </a>
@@ -583,15 +630,16 @@ function fechamentoPage() {
     return {
         periods: [],
         showCreateModal: false, createLabel: '', createStartDate: '', createEndDate: '', createExpectedDays: 22, createNotes: '',
-        creating: false, createError: {}, createTotalDays: 0, createCalculatedWeekdays: 0,
+        creating: false, createError: {}, createTotalDays: 0, createCalculatedWeekdays: 0, createDatesInvalid: false,
         showEditModal: false, editPeriod: null, editLabel: '', editStartDate: '', editEndDate: '', editExpectedDays: 22, editNotes: '', editHasSales: false,
         showDeleteModal: false, deletePeriod: null, deleteConfirmText: '',
         showCancelModal: false, cancelPeriod: null, cancelReason: '',
-        showCloseModal: false, closePeriod: null, closeSellers: [],
-        showPayModal: false, payPeriod: null, paySellers: [], payDate: '', payMethod: '', payNotes: '',
+        showCloseModal: false, closePeriod: null, closeSellers: [], closing: false,
+        showPayModal: false, payPeriod: null, paySellers: [], payDate: '', payMethod: '', payNotes: '', paying: false,
         showReopenModal: false, reopenPeriod: null, reopenSellers: [], reopenReason: '',
         selected: new Map(),
         tab: 'active',
+        showMoreMenu: false,
         finishedPeriods: [],
         finishedFilterMonth: '', finishedFilterYear: '', finishedFilterSeller: '', finishedFilterStatus: '',
         finishedLoading: false,
@@ -686,7 +734,7 @@ function fechamentoPage() {
                 } else {
                     showToast(d.error || d.detail || 'Erro ao agendar envio.', 'error');
                 }
-            } catch(e) { showToast('Erro de conexao.', 'error'); }
+            } catch(e) { showToast('Erro de conexão.', 'error'); }
             finally { this.sendingAccounting = null; }
         },
         confirmResend(p) { this.showResendConfirm = p.uuid; },
@@ -708,7 +756,7 @@ function fechamentoPage() {
                 } else {
                     showToast(d.error || d.detail || 'Erro ao agendar reenvio.', 'error');
                 }
-            } catch(e) { showToast('Erro de conexao.', 'error'); }
+            } catch(e) { showToast('Erro de conexão.', 'error'); }
             finally { this.sendingAccounting = null; }
         },
         formatSentDate(iso) {
@@ -736,6 +784,14 @@ function fechamentoPage() {
             return parts[2] + '/' + parts[1] + '/' + parts[0];
         },
         periodRange(p) { return this.formatDateBR(p.start_date) + ' a ' + this.formatDateBR(p.end_date); },
+        daysUntilEnd(p) {
+            if (!p.end_date) return null;
+            var end = new Date(p.end_date + 'T00:00:00');
+            var today = new Date();
+            today.setHours(0, 0, 0, 0);
+            if (end < today) return null;
+            return Math.round((end - today) / 86400000);
+        },
         getCommissions(p) { return p.seller_commissions || []; },
         totalVendido(p) { return this.getCommissions(p).reduce((a,c)=>a+(c.total_sold_amount||0),0); },
         totalComissao(p) { return this.getCommissions(p).reduce((a,c)=>a+(c.commission_amount||0),0); },
@@ -751,8 +807,8 @@ function fechamentoPage() {
             if (p.status === 'PAGA' || p.status === 'CANCELADA') return null;
             var scs = p.seller_commissions || [];
             var hasOpen = scs.some(function(sc){ return sc.status === 'ABERTA' || sc.status === 'REABERTA'; });
-            if (hasOpen) return 'Fechar comissoes';
-            if (!p.sent_to_accounting_at) return 'Enviar a contabilidade';
+            if (hasOpen) return 'Fechar comissões';
+            if (!p.sent_to_accounting_at) return 'Enviar à contabilidade';
             var hasClosed = scs.some(function(sc){ return sc.status === 'FECHADA' || sc.status === 'AJUSTADA'; });
             if (hasClosed) return 'Registrar pagamento';
             return 'Concluir pagamentos';
@@ -770,15 +826,27 @@ function fechamentoPage() {
             this.createError = {};
             this.createTotalDays = 0;
             this.createCalculatedWeekdays = 0;
+            this.createDatesInvalid = false;
             this.showCreateModal = true;
             this.$nextTick(() => {
                 this.createStartDate = new Date(y, m, 21).toISOString().slice(0, 10);
                 this.createEndDate = new Date(y, m + 1, 20).toISOString().slice(0, 10);
-                this.createLabel = this.formatDateBR(this.createStartDate).slice(0, 5) + ' a ' + this.formatDateBR(this.createEndDate).slice(0, 5);
+                this.createLabel = this.suggestLabel(this.createEndDate);
                 this.onCreateDatesChanged();
             });
         },
+        suggestLabel(isoEnd) {
+            var MESES = ['Janeiro','Fevereiro','Marco','Abril','Maio','Junho',
+                         'Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+            if (!isoEnd) return '';
+            var parts = isoEnd.split('-');
+            if (parts.length !== 3) return '';
+            var monthIdx = parseInt(parts[1], 10) - 1;
+            if (monthIdx < 0 || monthIdx > 11) return '';
+            return MESES[monthIdx] + '/' + parts[0];
+        },
         onCreateDatesChanged() {
+            this.createDatesInvalid = false;
             if (!this.createStartDate || !this.createEndDate) {
                 this.createTotalDays = 0;
                 this.createCalculatedWeekdays = 0;
@@ -788,6 +856,7 @@ function fechamentoPage() {
             var start = new Date(this.createStartDate + 'T00:00:00');
             var end = new Date(this.createEndDate + 'T00:00:00');
             if (end < start) {
+                this.createDatesInvalid = true;
                 this.createTotalDays = 0;
                 this.createCalculatedWeekdays = 0;
                 this.createExpectedDays = 0;
@@ -806,9 +875,10 @@ function fechamentoPage() {
         async doCreate() {
             if (this.creating) return;
             this.createError = {};
-            if (!this.createLabel.trim()) { this.createError = {label: 'Nome da competencia e obrigatorio.'}; return; }
-            if (!this.createStartDate) { this.createError = {start_date: 'Data inicial e obrigatoria.'}; return; }
-            if (!this.createEndDate) { this.createError = {end_date: 'Data final e obrigatoria.'}; return; }
+            if (!this.createLabel.trim()) { this.createLabel = this.suggestLabel(this.createEndDate); }
+            if (!this.createLabel.trim()) { this.createError = {label: 'Competência é obrigatória.'}; return; }
+            if (!this.createStartDate) { this.createError = {start_date: 'Data inicial é obrigatória.'}; return; }
+            if (!this.createEndDate) { this.createError = {end_date: 'Data final é obrigatória.'}; return; }
             var end = new Date(this.createEndDate + 'T00:00:00');
             var body = {
                 label: this.createLabel,
@@ -820,6 +890,8 @@ function fechamentoPage() {
                 year: end.getFullYear()
             };
             this.creating = true;
+            var self = this;
+            setTimeout(function(){ self.creating = false; }, 10000);
             try {
                 var r = await fetch('/api/commissions/periods/', { method:'POST', headers:{'Content-Type':'application/json','X-CSRFToken':getCSRFToken()}, body:JSON.stringify(body) });
                 if (r.ok) { this.showCreateModal = false; this.load(); } else {
@@ -827,11 +899,11 @@ function fechamentoPage() {
                     if (d && typeof d === 'object') {
                         this.createError = d;
                     } else {
-                        this.createError = {detail: (d && (d.error || d.detail)) || 'Erro ao criar competencia.'};
+                        this.createError = {detail: (d && (d.error || d.detail)) || 'Erro ao criar competência.'};
                     }
                 }
             } catch(e) {
-                this.createError = {detail: 'Erro de conexao.'};
+                this.createError = {detail: 'Erro de conexão.'};
             } finally { this.creating = false; }
         },
         openEditModal(p) { this.editPeriod=p;this.editLabel=p.label||p.display_label||'';this.editStartDate=p.start_date;this.editEndDate=p.end_date;this.editExpectedDays=p.expected_working_days||22;this.editNotes=p.notes||'';this.editHasSales=(p.seller_commissions||[]).length>0;this.showEditModal=true; },
@@ -867,8 +939,14 @@ function fechamentoPage() {
             this.closePeriod=p;this.closeSellers=sellers;this.showCloseModal=true;
         },
         async doClose() {
-            var r=await fetch('/api/commissions/periods/'+this.closePeriod.uuid+'/close_sellers/',{method:'POST',headers:{'Content-Type':'application/json','X-CSRFToken':getCSRFToken()},body:JSON.stringify({seller_commission_ids:this.closeSellers.map(s=>s.id)})});
-            if(r.ok){this.showCloseModal=false;this.load();}else{var d=await r.json();this.showError(d);}
+            if (this.closing) return;
+            this.closing = true;
+            var self = this;
+            setTimeout(function(){ self.closing = false; }, 10000);
+            try {
+                var r=await fetch('/api/commissions/periods/'+this.closePeriod.uuid+'/close_sellers/',{method:'POST',headers:{'Content-Type':'application/json','X-CSRFToken':getCSRFToken()},body:JSON.stringify({seller_commission_ids:this.closeSellers.map(s=>s.id)})});
+                if(r.ok){this.showCloseModal=false;this.load();}else{var d=await r.json();this.showError(d);}
+            } finally { this.closing = false; }
         },
         confirmMarkPaid(p) {
             var ids=[];var sellers=[];this.getCommissions(p).forEach(sc=>{if(this.selected.has(sc.id)&&sc.status==='FECHADA'){ids.push(sc.id);sellers.push(sc);}});
@@ -876,8 +954,14 @@ function fechamentoPage() {
             this.payPeriod=p;this.paySellers=sellers;this.payDate='';this.payMethod='';this.payNotes='';this.showPayModal=true;
         },
         async doPay() {
-            var r=await fetch('/api/commissions/periods/'+this.payPeriod.uuid+'/pay_sellers/',{method:'POST',headers:{'Content-Type':'application/json','X-CSRFToken':getCSRFToken()},body:JSON.stringify({seller_commission_ids:this.paySellers.map(s=>s.id),payment_date:this.payDate,payment_method:this.payMethod,payment_notes:this.payNotes})});
-            if(r.ok){this.showPayModal=false;this.load();}else{var d=await r.json();this.showError(d);}
+            if (this.paying) return;
+            this.paying = true;
+            var self = this;
+            setTimeout(function(){ self.paying = false; }, 10000);
+            try {
+                var r=await fetch('/api/commissions/periods/'+this.payPeriod.uuid+'/pay_sellers/',{method:'POST',headers:{'Content-Type':'application/json','X-CSRFToken':getCSRFToken()},body:JSON.stringify({seller_commission_ids:this.paySellers.map(s=>s.id),payment_date:this.payDate,payment_method:this.payMethod,payment_notes:this.payNotes})});
+                if(r.ok){this.showPayModal=false;this.load();}else{var d=await r.json();this.showError(d);}
+            } finally { this.paying = false; }
         },
         openReopenModal(p) {
             var ids=[];var sellers=[];this.getCommissions(p).forEach(sc=>{if(this.selected.has(sc.id)&&sc.status==='FECHADA'){ids.push(sc.id);sellers.push(sc);}});
