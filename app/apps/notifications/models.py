@@ -122,6 +122,7 @@ class Notification(models.Model):
     channel = models.CharField(max_length=20, choices=MessageTemplate.Channel.choices)
     recipient = EncryptedCharField(max_length=600)
     message_body = EncryptedTextField()
+    secondary_body = EncryptedTextField(blank=True, null=True)
     status = models.CharField(max_length=20, choices=Status.choices, default=Status.PENDING)
     retry_count = models.PositiveIntegerField(default=0)
     error_log = models.TextField(blank=True, null=True)

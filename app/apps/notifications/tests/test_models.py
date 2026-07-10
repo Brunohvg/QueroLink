@@ -202,6 +202,19 @@ class DefaultMessageTemplateServiceTest(TestCase):
         )
         self.assertEqual(template.body, custom_body)
 
+    def test_default_seller_credentials_template_points_to_next_message(self):
+        body = next(
+            body
+            for event_type, channel, body in DEFAULT_MESSAGE_TEMPLATES
+            if (
+                event_type == MessageTemplate.EventType.SELLER_CREDENTIALS
+                and channel == MessageTemplate.Channel.WHATSAPP
+            )
+        )
+
+        self.assertNotIn('{{senha}}', body)
+        self.assertIn('proxima mensagem', body)
+
     def test_backfill_command_dry_run_and_apply(self):
         dry_run_output = io.StringIO()
         call_command('backfill_message_templates', '--dry-run', stdout=dry_run_output)

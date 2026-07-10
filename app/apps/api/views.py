@@ -16,7 +16,7 @@ from django.utils.decorators import method_decorator
 from rest_framework_simplejwt.views import TokenObtainPairView
 from drf_spectacular.utils import extend_schema, OpenApiParameter, OpenApiTypes
 
-from app.apps.sales.models import Sale
+from app.apps.sales.models import Sale, SaleChangeLog
 from app.apps.sellers.models import Seller
 from app.apps.commissions.models import (
     CommissionPeriod,
@@ -26,6 +26,7 @@ from app.apps.commissions.models import (
 from app.apps.commissions.services import (
     calculate_estimated_commission,
     get_commission_rate,
+    get_period_by_legacy_label,
 )
 from app.apps.accounts.models import User
 
@@ -38,6 +39,8 @@ from .serializers import (
     CommissionPeriodSerializer,
     CommissionPeriodCreateSerializer,
     ChangePasswordSerializer,
+    ManagerSaleUpdateSerializer,
+    SaleChangeLogSerializer,
 )
 from .permissions import IsManagerOrAdmin, IsFinancialOrAdmin, IsSellerOwner
 from app.apps.audit.utils import log_action
@@ -78,8 +81,8 @@ class SellerViewSet(viewsets.ModelViewSet):
             return Response(
                 {'error': 'Vendedor sem usuario vinculado.'}, status=400,
             )
-        from django.utils.crypto import get_random_string
-        password = get_random_string(12)
+        from app.apps.accounts.utils import generate_temp_password
+        password = generate_temp_password()
         seller.user.set_password(password)
         seller.user.save()
         try:
@@ -113,7 +116,6 @@ class SellerViewSet(viewsets.ModelViewSet):
         return Response(result, status=status.HTTP_200_OK)
 
     def perform_destroy(self, instance):
-        from app.apps.sales.models import Sale
         if Sale.objects.filter(seller=instance).exists():
             from rest_framework import serializers as drf_ser
             raise drf_ser.ValidationError({
@@ -169,73 +171,159 @@ class SaleViewSet(viewsets.ModelViewSet):
         log_action(self.request, 'sale.deleted', instance=instance)
         instance.delete()
 
-    @action(detail=False, methods=['post'], permission_classes=[IsAuthenticated, IsManagerOrAdmin], url_path='import')
-    def import_sales(self, request):
-        sales_data = request.data.get('sales', [])
-        if not isinstance(sales_data, list):
-            return Response({'error': 'sales deve ser uma lista.'}, status=400)
-        if len(sales_data) > 500:
-            return Response({'error': 'Maximo 500 vendas por vez.'}, status=400)
+    @action(detail=False, methods=['post'], permission_classes=[IsAuthenticated, IsManagerOrAdmin], url_path='import/preview')
+    def import_preview(self, request):
+        file_obj = request.FILES.get('file')
+        if not file_obj:
+            return Response({'error': 'Arquivo obrigatorio.'}, status=400)
+
+        if file_obj.size > 5 * 1024 * 1024:
+            return Response({'error': 'Arquivo muito grande. Maximo 5MB.'}, status=400)
+
+        name = file_obj.name.lower()
+        content_bytes = file_obj.read()
+
+        from app.apps.sales.services import (
+            _parse_csv, _parse_xlsx, normalize_headers, preview_import_rows,
+        )
+        from hashlib import sha256
+        from app.apps.sales.models import SaleImportBatch
+
+        file_hash = sha256(content_bytes).hexdigest()
+
+        if name.endswith('.csv'):
+            content = content_bytes.decode('utf-8-sig')
+            rows = _parse_csv(content)
+        elif name.endswith('.xlsx'):
+            import io
+            rows = _parse_xlsx(content_bytes)
+            if rows is None:
+                return Response({'error': 'Arquivo XLSX invalido.'}, status=400)
+        else:
+            return Response({'error': 'Formato nao suportado. Envie CSV ou XLSX.'}, status=400)
+
+        if not rows or len(rows) < 2:
+            return Response({'error': 'Arquivo vazio ou sem dados.'}, status=400)
+
+        headers = rows[0]
+        data_rows = rows[1:]
+        header_map = normalize_headers(headers)
+
+        if 'date' not in header_map or 'seller' not in header_map or 'amount' not in header_map:
+            missing = []
+            if 'date' not in header_map:
+                missing.append('data')
+            if 'seller' not in header_map:
+                missing.append('vendedor')
+            if 'amount' not in header_map:
+                missing.append('valor')
+            return Response({
+                'error': f'Cabecalhos obrigatorios nao encontrados: {", ".join(missing)}.',
+            }, status=400)
+
+        if len(data_rows) > 500:
+            return Response({'error': 'Maximo 500 linhas por importacao.'}, status=400)
 
         tenant = request.user.tenant
-        imported = 0
-        skipped = 0
-        errors = []
+        results = preview_import_rows(tenant, data_rows, header_map)
 
-        with transaction.atomic():
-            for idx, item in enumerate(sales_data):
-                try:
-                    seller_uuid = item.get('seller_uuid')
-                    amount_cents = item.get('amount_cents')
-                    date_str = item.get('date')
-                    notes = item.get('notes', '')
+        dupe_batch = SaleImportBatch.objects.filter(
+            tenant=tenant, file_hash=file_hash,
+        ).first()
+        already_imported = dupe_batch is not None
 
-                    if not seller_uuid or not amount_cents or not date_str:
-                        errors.append({'index': idx, 'error': 'Campos obrigatorios: seller_uuid, amount_cents, date'})
-                        continue
+        return Response({
+            'filename': file_obj.name,
+            'file_hash': file_hash,
+            'total_rows': len(data_rows),
+            'headers': headers,
+            'results': results,
+            'already_imported': already_imported,
+            'ok_count': sum(1 for r in results if r['status'] == 'ok'),
+            'duplicate_count': sum(1 for r in results if r['status'] == 'duplicate'),
+            'error_count': sum(1 for r in results if r['status'] == 'error'),
+            'needs_selection_count': sum(1 for r in results if r['status'] == 'needs_selection'),
+        })
 
-                    seller = Seller.objects.filter(uuid=seller_uuid, tenant=tenant).first()
-                    if not seller:
-                        errors.append({'index': idx, 'error': f'Vendedor nao encontrado: {seller_uuid}'})
-                        continue
+    @action(detail=False, methods=['post'], permission_classes=[IsAuthenticated, IsManagerOrAdmin], url_path='import/confirm')
+    def import_confirm(self, request):
+        confirmed = request.data.get('rows', [])
+        filename = request.data.get('filename', '')
+        file_hash = request.data.get('file_hash', '')
+        force = request.data.get('force_reimport', False)
 
-                    try:
-                        sale_date = date.fromisoformat(date_str)
-                    except (ValueError, TypeError):
-                        errors.append({'index': idx, 'error': f'Data invalida: {date_str}'})
-                        continue
+        if not confirmed:
+            return Response({'error': 'Nenhuma linha para importar.'}, status=400)
+        if not filename or not file_hash:
+            return Response({'error': 'filename e file_hash obrigatorios.'}, status=400)
 
-                    if amount_cents <= 0:
-                        errors.append({'index': idx, 'error': 'Valor deve ser maior que zero.'})
-                        continue
+        tenant = request.user.tenant
 
-                    exists = Sale.objects.filter(
-                        seller=seller, sale_date=sale_date, amount=amount_cents, tenant=tenant,
-                    ).exists()
-                    if exists:
-                        skipped += 1
-                        continue
+        from app.apps.sales.models import SaleImportBatch
+        existing = SaleImportBatch.objects.filter(
+            tenant=tenant, file_hash=file_hash,
+        ).first()
+        if existing and not force:
+            return Response({
+                'error': 'Este arquivo ja foi importado. Use force_reimport para confirmar.',
+                'existing_batch_uuid': str(existing.uuid),
+            }, status=409)
 
-                    sale_obj = Sale.objects.create(
-                        tenant=tenant,
-                        seller=seller,
-                        origin=Sale.Origin.MANUAL,
-                        amount=amount_cents,
-                        sale_date=sale_date,
-                        notes=str(notes)[:500] if notes else '',
-                        created_by=request.user,
-                    )
-                    from app.apps.commissions.services import ensure_seller_commission
-                    ensure_seller_commission(seller, sale_date)
-                    imported += 1
-                except Exception as e:
-                    errors.append({'index': idx, 'error': str(e)})
+        from app.apps.sales.services import import_sales as do_import
 
-            if errors and not imported:
-                transaction.set_rollback(True)
-                return Response({'error': 'Nenhuma venda importada. Corrija os erros.', 'errors': errors}, status=400)
+        try:
+            result = do_import(
+                tenant, request.user, confirmed, filename, file_hash,
+            )
+        except ValueError as e:
+            return Response({'error': str(e)}, status=400)
 
-        return Response({'imported': imported, 'skipped': skipped, 'errors': errors})
+        log_action(
+            request, 'sales_import',
+            changes={
+                'filename': filename,
+                'file_hash': file_hash,
+                'created': result['created'],
+                'duplicates': result['duplicates'],
+                'errors_count': len(result['errors']),
+            },
+        )
+
+        return Response(result, status=200)
+
+    @action(detail=True, methods=['patch'], permission_classes=[IsAuthenticated, IsManagerOrAdmin], url_path='manager-update')
+    def manager_update(self, request, pk=None):
+        sale = self.get_object()
+        serializer = ManagerSaleUpdateSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        data = serializer.validated_data
+        reason = data.pop('reason')
+
+        from app.apps.sales.services import update_sale_as_manager
+
+        try:
+            sale, changed = update_sale_as_manager(sale, request.user, data, reason)
+        except ValueError as e:
+            return Response({'error': str(e)}, status=status.HTTP_409_CONFLICT)
+
+        if not changed:
+            return Response({'message': 'Nenhuma alteração detectada.', 'changed': False})
+
+        return Response({
+            'message': 'Venda atualizada com sucesso.',
+            'changed': True,
+            'sale': SaleSerializer(sale).data,
+        })
+
+    @action(detail=True, methods=['get'], permission_classes=[IsAuthenticated, IsSellerOwner | IsManagerOrAdmin], url_path='history')
+    def history(self, request, pk=None):
+        sale = self.get_object()
+        qs = SaleChangeLog.objects.filter(
+            sale=sale, tenant=request.user.tenant,
+        ).select_related('changed_by').order_by('-changed_at')
+        serializer = SaleChangeLogSerializer(qs, many=True)
+        return Response(serializer.data)
 
 
 class CommissionPeriodViewSet(viewsets.ModelViewSet):
@@ -381,6 +469,80 @@ class CommissionPeriodViewSet(viewsets.ModelViewSet):
             'reopened': len(commissions),
             'message': f'{len(commissions)} vendedor(es) reaberto(s).',
         })
+
+    @action(
+        detail=True, methods=['post'],
+        permission_classes=[IsAuthenticated, IsManagerOrAdmin],
+    )
+    @method_decorator(ratelimit(key='user', rate='10/h', method='POST', block=True))
+    def send_accounting(self, request, pk=None):
+        period = self.get_object()
+        tenant = request.user.tenant
+
+        if period.tenant_id != tenant.pk:
+            return Response(
+                {'error': 'Competencia nao pertence ao seu tenant.'},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        if not tenant.accountant_email:
+            return Response(
+                {'error': 'Cadastre o e-mail do contador em Configuracoes.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if period.status == CommissionPeriod.Status.CANCELADA:
+            return Response(
+                {'error': 'Competencia cancelada nao pode ser enviada.'},
+                status=status.HTTP_409_CONFLICT,
+            )
+
+        force_resend = request.data.get('force_resend', False)
+        if period.sent_to_accounting_at and not force_resend:
+            return Response(
+                {'error': 'Competencia ja foi enviada. Use force_resend para reenviar.'},
+                status=status.HTTP_409_CONFLICT,
+            )
+
+        scs = list(period.seller_commissions.all())
+        if not scs:
+            return Response(
+                {'error': 'Nenhum vendedor sincronizado nesta competencia.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        open_statuses = [
+            SellerCommission.Status.ABERTA,
+            SellerCommission.Status.REABERTA,
+        ]
+        has_open = any(sc.status in open_statuses for sc in scs)
+        if has_open:
+            return Response(
+                {'error': 'Existem vendedores com comissao em aberto. Feche todas antes de enviar.'},
+                status=status.HTTP_409_CONFLICT,
+            )
+
+        from app.apps.notifications.tasks import send_accounting_package_email
+
+        send_accounting_package_email.delay(
+            str(tenant.uuid),
+            period.month,
+            period.year,
+            requested_by_user_id=str(request.user.pk),
+        )
+
+        log_action(
+            request, 'commission_period.send_accounting', instance=period,
+            changes={
+                'month': period.month, 'year': period.year,
+                'force_resend': force_resend,
+            },
+        )
+
+        return Response({
+            'message': 'Envio agendado com sucesso.',
+            'detail': f'Pacote contabil sera enviado para {tenant.accountant_email}.',
+        }, status=status.HTTP_202_ACCEPTED)
 
     @action(
         detail=True, methods=['post'],
@@ -680,7 +842,11 @@ class RankingView(generics.GenericAPIView):
 
     def get(self, request):
         from app.apps.commissions.services import (
-            calculate_estimated_commission, get_commission_rate,
+            calculate_estimated_commission,
+            calculate_estimated_commission_for_period,
+            get_commission_rate,
+            get_period_by_legacy_label,
+            legacy_month_range,
         )
         from decimal import Decimal, ROUND_HALF_UP
 
@@ -695,13 +861,19 @@ class RankingView(generics.GenericAPIView):
             return Response({'error': 'Mes invalido (1-12).'}, status=400)
         if year < 2020:
             return Response({'error': 'Ano invalido.'}, status=400)
+        period = get_period_by_legacy_label(tenant, month, year)
+        if period:
+            start = period.start_date
+            end = period.end_date
+        else:
+            start, end = legacy_month_range(month, year)
 
         sales = Sale.objects.filter(
             tenant=tenant,
-            origin=Sale.Origin.MANUAL,
+            origin__in=Sale.COMMISSION_ORIGINS,
             status='ATIVA',
-            sale_date__year=year,
-            sale_date__month=month,
+            sale_date__gte=start,
+            sale_date__lte=end,
         ).values('seller__uuid', 'seller__name', 'seller__commission_rate').annotate(
             total_sold=Sum('amount'),
             sale_count=Sum(1),
@@ -723,7 +895,10 @@ class RankingView(generics.GenericAPIView):
             seller_obj = sellers_map.get(str(seller_uuid))
             if seller_obj:
                 rate = get_commission_rate(seller_obj)
-                commission_estimada = int((Decimal(str(total_sold)) * Decimal(str(rate))).quantize(Decimal('1'), rounding=ROUND_HALF_UP))
+                if period:
+                    commission_estimada, _ = calculate_estimated_commission_for_period(seller_obj, period)
+                else:
+                    commission_estimada = int((Decimal(str(total_sold)) * Decimal(str(rate))).quantize(Decimal('1'), rounding=ROUND_HALF_UP))
             else:
                 rate = Decimal('0')
                 commission_estimada = 0
@@ -851,7 +1026,7 @@ class SellerDetailView(generics.GenericAPIView):
 
         manual_sales_qs = Sale.objects.filter(
             tenant=tenant, seller=seller,
-            origin=Sale.Origin.MANUAL,
+            origin__in=Sale.COMMISSION_ORIGINS,
             sale_date__gte=start, sale_date__lte=end,
         ).order_by('-sale_date', '-created_at')
 
@@ -868,8 +1043,17 @@ class SellerDetailView(generics.GenericAPIView):
             t=Sum('amount'),
         )['t'] or 0
 
+        manual_sales_qs_slice = list(manual_sales_qs[:200])
         manual_sales = []
-        for s in manual_sales_qs[:200]:
+        from django.db.models import Count
+        log_counts = dict(
+            SaleChangeLog.objects.filter(
+                sale__in=[s.pk for s in manual_sales_qs_slice],
+            ).values('sale_id').annotate(
+                count=Count('id'),
+            ).values_list('sale_id', 'count')
+        )
+        for s in manual_sales_qs_slice:
             manual_sales.append({
                 'uuid': str(s.uuid),
                 'amount': s.amount,
@@ -877,6 +1061,8 @@ class SellerDetailView(generics.GenericAPIView):
                 'origin_display': s.get_origin_display(),
                 'sale_date': s.sale_date.isoformat(),
                 'notes': s.notes or '',
+                'status': s.status,
+                'change_log_count': log_counts.get(str(s.uuid), 0),
             })
 
         link_sales = []
@@ -962,12 +1148,12 @@ class SellerDetailView(generics.GenericAPIView):
             me = date(cy, cm, calendar.monthrange(cy, cm)[1])
             mt = Sale.objects.filter(
                 tenant=tenant, seller=seller,
-                origin=Sale.Origin.MANUAL, status='ATIVA',
+                origin__in=Sale.COMMISSION_ORIGINS, status='ATIVA',
                 sale_date__gte=ms, sale_date__lte=me,
             ).aggregate(t=Sum('amount'))['t'] or 0
             mc = Sale.objects.filter(
                 tenant=tenant, seller=seller,
-                origin=Sale.Origin.MANUAL, status='ATIVA',
+                origin__in=Sale.COMMISSION_ORIGINS, status='ATIVA',
                 sale_date__gte=ms, sale_date__lte=me,
             ).count()
             sc_c = commissions.filter(
@@ -1045,7 +1231,7 @@ class SellerReportCsvView(generics.GenericAPIView):
 
         sales = Sale.objects.filter(
             tenant=tenant, seller=seller,
-            origin=Sale.Origin.MANUAL,
+            origin__in=Sale.COMMISSION_ORIGINS,
             sale_date__gte=start, sale_date__lte=end,
         ).order_by('sale_date')
 
@@ -1136,7 +1322,7 @@ class SellerReportExcelView(generics.GenericAPIView):
 
         sales = Sale.objects.filter(
             tenant=tenant, seller=seller,
-            origin=Sale.Origin.MANUAL,
+            origin__in=Sale.COMMISSION_ORIGINS,
             sale_date__gte=start, sale_date__lte=end,
         ).order_by('sale_date')
 
@@ -1264,7 +1450,7 @@ class SellerReportPdfView(generics.GenericAPIView):
 
         sales = Sale.objects.filter(
             tenant=tenant, seller=seller,
-            origin=Sale.Origin.MANUAL,
+            origin__in=Sale.COMMISSION_ORIGINS,
             sale_date__gte=start, sale_date__lte=end,
         ).order_by('sale_date')
 
@@ -1706,6 +1892,7 @@ class MonthlyReportView(generics.GenericAPIView):
             return Response({'error': 'Mes/ano invalidos.'}, status=400)
 
         from app.apps.commissions.services import calculate_estimated_commission
+        period = get_period_by_legacy_label(tenant, month_int, year_int)
         sellers = Seller.objects.filter(tenant=tenant, is_active=True)
         sellers_data = []
         total_sold = 0
@@ -1752,15 +1939,24 @@ class MonthlyReportView(generics.GenericAPIView):
         sellers_data.sort(key=lambda s: s['total_sold'], reverse=True)
         total_commissions = total_commission_aberta + total_commission_fechada + total_commission_paga
 
-        prev_month = month_int - 1
-        prev_year = year_int
-        if prev_month == 0:
-            prev_month = 12
-            prev_year -= 1
-        prev_total = Sale.objects.filter(
-            tenant=tenant, status='ATIVA',
-            sale_date__month=prev_month, sale_date__year=prev_year,
-        ).aggregate(t=Sum('amount'))['t'] or 0
+        prev_period = None
+        if period:
+            prev_period = CommissionPeriod.objects.filter(
+                tenant=tenant,
+                end_date__lt=period.start_date,
+            ).exclude(
+                status=CommissionPeriod.Status.CANCELADA,
+            ).order_by('-end_date').first()
+
+        if prev_period:
+            prev_total = Sale.objects.filter(
+                tenant=tenant,
+                status='ATIVA',
+                sale_date__gte=prev_period.start_date,
+                sale_date__lte=prev_period.end_date,
+            ).aggregate(t=Sum('amount'))['t'] or 0
+        else:
+            prev_total = 0
         variacao = round((total_sold - prev_total) / prev_total * 100) if prev_total > 0 else None
 
         from django.template.loader import render_to_string

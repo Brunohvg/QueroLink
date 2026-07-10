@@ -5,7 +5,7 @@ from rest_framework import serializers
 from django.db import IntegrityError, transaction
 from django.utils import timezone
 
-from app.apps.sales.models import Sale
+from app.apps.sales.models import Sale, SaleChangeLog
 from app.apps.sellers.models import Seller
 from app.apps.sellers.capacity import SellerCapacityExceeded, ensure_seller_capacity
 from app.apps.commissions.models import (
@@ -14,6 +14,7 @@ from app.apps.commissions.models import (
     CommissionAdjustment,
 )
 from app.apps.accounts.models import Tenant, User
+from app.apps.accounts.utils import generate_temp_password
 from app.apps.accounts.validators import clean_phone, validate_phone_br
 from app.apps.accounts.fields import compute_hash
 
@@ -31,7 +32,7 @@ def _create_unique_seller_user(tenant, seller_name, used_usernames=None):
             n += 1
             username = f'{base}-{n}'
 
-        password = get_random_string(12)
+        password = generate_temp_password()
         try:
             with transaction.atomic():
                 user = User.objects.create_user(
@@ -526,11 +527,13 @@ class SellerCommissionReadSerializer(serializers.ModelSerializer):
 class CommissionPeriodSerializer(serializers.ModelSerializer):
     seller_commissions = serializers.SerializerMethodField()
     is_current_month = serializers.SerializerMethodField()
+    display_label = serializers.CharField(read_only=True)
 
     class Meta:
         model = CommissionPeriod
         fields = [
-            'uuid', 'tenant', 'month', 'year', 'status',
+            'uuid', 'tenant', 'month', 'year', 'label', 'display_label',
+            'start_date', 'end_date', 'status',
             'expected_working_days', 'notes',
             'closed_at', 'paid_at', 'adjusted_at',
             'adjustment_reason', 'cancelled_at', 'cancel_reason',
@@ -558,14 +561,22 @@ class CommissionPeriodSerializer(serializers.ModelSerializer):
 
     def get_is_current_month(self, obj):
         hoje = timezone.localdate()
-        return obj.month == hoje.month and obj.year == hoje.year
+        return obj.contains(hoje)
 
 
 class CommissionPeriodCreateSerializer(serializers.ModelSerializer):
     class Meta:
         model = CommissionPeriod
-        fields = ['month', 'year', 'expected_working_days', 'notes']
+        fields = [
+            'month', 'year', 'label', 'start_date', 'end_date',
+            'expected_working_days', 'notes',
+        ]
         extra_kwargs = {
+            'month': {'required': False},
+            'year': {'required': False},
+            'label': {'required': False, 'allow_blank': True},
+            'start_date': {'required': True},
+            'end_date': {'required': True},
             'expected_working_days': {'required': False},
             'notes': {'required': False},
         }
@@ -585,6 +596,22 @@ class CommissionPeriodCreateSerializer(serializers.ModelSerializer):
         tenant = request.user.tenant
         month = attrs.get('month')
         year = attrs.get('year')
+        start_date = attrs.get('start_date')
+        end_date = attrs.get('end_date')
+        if not start_date:
+            raise serializers.ValidationError({'start_date': 'Data inicial obrigatoria.'})
+        if not end_date:
+            raise serializers.ValidationError({'end_date': 'Data final obrigatoria.'})
+        if end_date < start_date:
+            raise serializers.ValidationError({'end_date': 'Data final deve ser maior ou igual a data inicial.'})
+        if (end_date - start_date).days + 1 > 62:
+            raise serializers.ValidationError({'end_date': 'Competencia nao pode exceder 62 dias.'})
+        if month is None:
+            month = end_date.month
+            attrs['month'] = month
+        if year is None:
+            year = end_date.year
+            attrs['year'] = year
         if CommissionPeriod.objects.filter(
             tenant=tenant, month=month, year=year,
         ).exists():
@@ -592,7 +619,45 @@ class CommissionPeriodCreateSerializer(serializers.ModelSerializer):
                 f'A competencia {month:02d}/{year} ja existe. '
                 'Use Atualizar valores para sincronizar os dados.'
             )
+        if CommissionPeriod.objects.filter(
+            tenant=tenant,
+            start_date__lte=end_date,
+            end_date__gte=start_date,
+        ).exclude(status=CommissionPeriod.Status.CANCELADA).exists():
+            raise serializers.ValidationError(
+                {'start_date': 'Periodo sobrepoe outra competencia deste tenant.'}
+            )
         return attrs
+
+
+class ManagerSaleUpdateSerializer(serializers.Serializer):
+    amount = serializers.IntegerField(required=False, min_value=1, max_value=10_000_000)
+    sale_date = serializers.DateField(required=False)
+    notes = serializers.CharField(required=False, allow_blank=True, max_length=255)
+    reason = serializers.CharField(required=True, min_length=5)
+
+    def validate(self, attrs):
+        if 'reason' not in attrs or not attrs.get('reason', '').strip():
+            raise serializers.ValidationError({'reason': 'Motivo é obrigatório (mínimo 5 caracteres).'})
+        return attrs
+
+
+class SaleChangeLogSerializer(serializers.ModelSerializer):
+    changed_by_name = serializers.SerializerMethodField()
+    action_display = serializers.CharField(source='get_action_display', read_only=True)
+
+    class Meta:
+        model = SaleChangeLog
+        fields = [
+            'uuid', 'action', 'action_display', 'changed_by_name',
+            'changed_at', 'field_changes', 'reason',
+        ]
+        read_only_fields = fields
+
+    def get_changed_by_name(self, obj):
+        if obj.changed_by:
+            return obj.changed_by.get_full_name() or obj.changed_by.username
+        return 'Sistema'
 
 
 class ChangePasswordSerializer(serializers.Serializer):
@@ -615,8 +680,3 @@ class ChangePasswordSerializer(serializers.Serializer):
 def slugify(value):
     from django.utils.text import slugify as _slugify
     return _slugify(value)
-
-
-def get_random_string(length):
-    from django.utils.crypto import get_random_string as _get_random_string
-    return _get_random_string(length)

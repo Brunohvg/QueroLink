@@ -3,6 +3,7 @@ import logging
 from datetime import date
 from decimal import Decimal, ROUND_HALF_UP
 
+from django.core.exceptions import ValidationError
 from django.utils import timezone
 from django.db import transaction
 from django.db.models import Sum
@@ -19,18 +20,78 @@ logger = logging.getLogger(__name__)
 
 
 def get_manual_sales_total(seller, month, year):
-    start = date(year, month, 1)
-    last_day = calendar.monthrange(year, month)[1]
-    end = date(year, month, last_day)
+    period = get_period_by_legacy_label(seller.tenant, month, year)
+    if period:
+        return get_manual_sales_total_for_period(seller, period)
+    start, end = legacy_month_range(month, year)
     total = Sale.objects.filter(
         tenant=seller.tenant,
         seller=seller,
-        origin=Sale.Origin.MANUAL,
+        origin__in=Sale.COMMISSION_ORIGINS,
         status='ATIVA',
         sale_date__gte=start,
         sale_date__lte=end,
     ).aggregate(t=Sum('amount'))['t'] or 0
     return total
+
+
+def legacy_month_range(month, year):
+    start = date(year, month, 1)
+    last_day = calendar.monthrange(year, month)[1]
+    return start, date(year, month, last_day)
+
+
+def get_period_by_legacy_label(tenant, month, year):
+    return CommissionPeriod.objects.filter(
+        tenant=tenant,
+        month=month,
+        year=year,
+    ).exclude(status=CommissionPeriod.Status.CANCELADA).first()
+
+
+def resolve_period_for_date(tenant, ref_date):
+    return CommissionPeriod.objects.filter(
+        tenant=tenant,
+        start_date__lte=ref_date,
+        end_date__gte=ref_date,
+    ).exclude(status=CommissionPeriod.Status.CANCELADA).order_by('start_date').first()
+
+
+def get_current_period(tenant):
+    today = timezone.localdate()
+    return CommissionPeriod.objects.filter(
+        tenant=tenant,
+        start_date__lte=today,
+        end_date__gte=today,
+        status__in=[
+            CommissionPeriod.Status.ABERTA,
+            CommissionPeriod.Status.PARCIALMENTE_FECHADA,
+            CommissionPeriod.Status.PARCIALMENTE_PAGA,
+        ],
+    ).first()
+
+
+def get_period_sales_queryset(period):
+    return Sale.objects.filter(
+        tenant=period.tenant,
+        status='ATIVA',
+        sale_date__gte=period.start_date,
+        sale_date__lte=period.end_date,
+    )
+
+
+def get_manual_sales_total_for_period(seller, period):
+    return get_period_sales_queryset(period).filter(
+        seller=seller,
+        origin__in=Sale.COMMISSION_ORIGINS,
+    ).aggregate(t=Sum('amount'))['t'] or 0
+
+
+def calculate_estimated_commission_for_period(seller, period):
+    total = get_manual_sales_total_for_period(seller, period)
+    rate = get_commission_rate(seller)
+    commission = int((total * rate).quantize(Decimal('1'), rounding=ROUND_HALF_UP))
+    return commission, total
 
 
 def get_commission_rate(seller):
@@ -43,6 +104,9 @@ def get_commission_rate(seller):
 
 
 def calculate_estimated_commission(seller, month, year):
+    period = get_period_by_legacy_label(seller.tenant, month, year)
+    if period:
+        return calculate_estimated_commission_for_period(seller, period)
     total = get_manual_sales_total(seller, month, year)
     rate = get_commission_rate(seller)
     commission = int((total * rate).quantize(Decimal('1'), rounding=ROUND_HALF_UP))
@@ -50,11 +114,15 @@ def calculate_estimated_commission(seller, month, year):
 
 
 def get_or_create_period(tenant, month, year, expected_working_days=None):
+    start, end = legacy_month_range(month, year)
     period, created = CommissionPeriod.objects.get_or_create(
         tenant=tenant,
         month=month,
         year=year,
         defaults={
+            'label': f'{month:02d}/{year}',
+            'start_date': start,
+            'end_date': end,
             'expected_working_days': expected_working_days or 22,
             'status': CommissionPeriod.Status.ABERTA,
         },
@@ -72,9 +140,9 @@ def sync_period_seller_commissions(period):
     sellers = Seller.objects.filter(tenant=tenant, is_active=True).select_related('tenant')
     sellers_with_manual = Seller.objects.filter(
         tenant=tenant,
-        sales__origin=Sale.Origin.MANUAL,
-        sales__sale_date__year=period.year,
-        sales__sale_date__month=period.month,
+        sales__origin__in=Sale.COMMISSION_ORIGINS,
+        sales__sale_date__gte=period.start_date,
+        sales__sale_date__lte=period.end_date,
     ).select_related('tenant')
     all_sellers = (sellers | sellers_with_manual).distinct()
 
@@ -104,10 +172,10 @@ def calculate_seller_working_days(period, seller):
     sales_dates = Sale.objects.filter(
         tenant=period.tenant,
         seller=seller,
-        origin=Sale.Origin.MANUAL,
+        origin__in=Sale.COMMISSION_ORIGINS,
         status='ATIVA',
-        sale_date__year=period.year,
-        sale_date__month=period.month,
+        sale_date__gte=period.start_date,
+        sale_date__lte=period.end_date,
     ).dates('sale_date', 'day')
     count = sales_dates.count()
     expected = period.expected_working_days or 22
@@ -404,26 +472,35 @@ def get_links_data(tenant, month=None, year=None):
 def get_dashboard_data(tenant, month=None, year=None):
     hoje = timezone.localdate()
 
-    if month is None:
-        month = hoje.month
-    if year is None:
-        year = hoje.year
+    period = None
+    if month is None and year is None:
+        period = get_current_period(tenant)
+    else:
+        if month is None:
+            month = hoje.month
+        if year is None:
+            year = hoje.year
+        period = get_period_by_legacy_label(tenant, month, year)
 
-    start = date(year, month, 1)
-    last_day = calendar.monthrange(year, month)[1]
-    end = date(year, month, last_day)
+    if period:
+        start = period.start_date
+        end = period.end_date
+        month = period.month
+        year = period.year
+    else:
+        if month is None:
+            month = hoje.month
+        if year is None:
+            year = hoje.year
+        start, end = legacy_month_range(month, year)
 
     total_vendido = Sale.objects.filter(
         tenant=tenant,
-        origin=Sale.Origin.MANUAL,
+        origin__in=Sale.COMMISSION_ORIGINS,
         status='ATIVA',
         sale_date__gte=start,
         sale_date__lte=end,
     ).aggregate(t=Sum('amount'))['t'] or 0
-
-    period = CommissionPeriod.objects.filter(
-        tenant=tenant, month=month, year=year,
-    ).first()
 
     if period:
         summary = calculate_period_summary(period)
@@ -432,7 +509,14 @@ def get_dashboard_data(tenant, month=None, year=None):
         sellers_ativos = Seller.objects.filter(tenant=tenant, is_active=True)
         comissao_estimada = 0
         for s in sellers_ativos:
-            total = get_manual_sales_total(s, month, year)
+            total = Sale.objects.filter(
+                tenant=tenant,
+                seller=s,
+                origin__in=Sale.COMMISSION_ORIGINS,
+                status='ATIVA',
+                sale_date__gte=start,
+                sale_date__lte=end,
+            ).aggregate(t=Sum('amount'))['t'] or 0
             rate = get_commission_rate(s)
             comissao_estimada += int((total * rate).quantize(Decimal('1'), rounding=ROUND_HALF_UP))
 
@@ -457,7 +541,7 @@ def get_dashboard_data(tenant, month=None, year=None):
 
     sellers_with_sales = Seller.objects.filter(
         tenant=tenant,
-        sales__origin=Sale.Origin.MANUAL,
+        sales__origin__in=Sale.COMMISSION_ORIGINS,
         sales__sale_date__gte=start,
         sales__sale_date__lte=end,
     ).distinct().count()
@@ -465,7 +549,7 @@ def get_dashboard_data(tenant, month=None, year=None):
     sellers_no_sale_today = Seller.objects.filter(
         tenant=tenant, is_active=True,
     ).exclude(
-        sales__origin=Sale.Origin.MANUAL,
+        sales__origin__in=Sale.COMMISSION_ORIGINS,
         sales__sale_date=hoje,
     ).count()
 
@@ -473,7 +557,7 @@ def get_dashboard_data(tenant, month=None, year=None):
 
     top5_mes = Sale.objects.filter(
         tenant=tenant,
-        origin=Sale.Origin.MANUAL,
+        origin__in=Sale.COMMISSION_ORIGINS,
         status='ATIVA',
         sale_date__gte=start,
         sale_date__lte=end,
@@ -485,7 +569,7 @@ def get_dashboard_data(tenant, month=None, year=None):
     sellers_inativos = list(
         Seller.objects.filter(tenant=tenant, is_active=True).exclude(
             sales__sale_date__gte=semana_atras,
-            sales__origin=Sale.Origin.MANUAL,
+            sales__origin__in=Sale.COMMISSION_ORIGINS,
             sales__status='ATIVA',
         ).values_list('name', flat=True),
     )
@@ -494,7 +578,7 @@ def get_dashboard_data(tenant, month=None, year=None):
         tenant=tenant, is_active=True,
         sales__sale_date__gte=start,
         sales__sale_date__lte=end,
-        sales__origin=Sale.Origin.MANUAL,
+        sales__origin__in=Sale.COMMISSION_ORIGINS,
         sales__status='ATIVA',
     ).distinct().count()
 
@@ -503,7 +587,7 @@ def get_dashboard_data(tenant, month=None, year=None):
         has_inconsistency = True
 
     evolution = list(Sale.objects.filter(
-        tenant=tenant, origin=Sale.Origin.MANUAL, status='ATIVA',
+        tenant=tenant, origin__in=Sale.COMMISSION_ORIGINS, status='ATIVA',
         sale_date__gte=start, sale_date__lte=end,
     ).values('sale_date').annotate(
         total=Sum('amount'),
@@ -513,7 +597,7 @@ def get_dashboard_data(tenant, month=None, year=None):
     prev_year = year if month > 1 else year - 1
     prev_last_day = calendar.monthrange(prev_year, prev_month)[1]
     prev_total = Sale.objects.filter(
-        tenant=tenant, origin=Sale.Origin.MANUAL, status='ATIVA',
+        tenant=tenant, origin__in=Sale.COMMISSION_ORIGINS, status='ATIVA',
         sale_date__gte=date(prev_year, prev_month, 1),
         sale_date__lte=date(prev_year, prev_month, prev_last_day),
     ).aggregate(t=Sum('amount'))['t'] or 0
@@ -524,6 +608,7 @@ def get_dashboard_data(tenant, month=None, year=None):
             'end': end.isoformat(),
             'month': month,
             'year': year,
+            'label': period.display_label if period else f'{month:02d}/{year}',
         },
         'total_vendido': total_vendido,
         'commission_aberta': summary['commission_aberta'],
@@ -557,11 +642,14 @@ def get_dashboard_data(tenant, month=None, year=None):
 def get_missing_days_before_today(seller, month, year):
     today = timezone.localdate()
     from datetime import timedelta
-    import calendar as cal_mod
+    period = get_period_by_legacy_label(seller.tenant, month, year)
 
-    last_day = cal_mod.monthrange(year, month)[1]
-    start = date(year, month, 1)
-    end = min(today - timedelta(days=1), date(year, month, last_day))
+    if period:
+        start = period.start_date
+        end = min(today - timedelta(days=1), period.end_date)
+    else:
+        start, month_end = legacy_month_range(month, year)
+        end = min(today - timedelta(days=1), month_end)
 
     if start > end:
         return []
@@ -570,7 +658,7 @@ def get_missing_days_before_today(seller, month, year):
         Sale.objects.filter(
             tenant=seller.tenant,
             seller=seller,
-            origin=Sale.Origin.MANUAL,
+            origin__in=Sale.COMMISSION_ORIGINS,
             status='ATIVA',
             sale_date__gte=start,
             sale_date__lte=end,
@@ -590,7 +678,9 @@ def get_missing_days_before_today(seller, month, year):
 
 def ensure_seller_commission(seller, sale_date):
     period = CommissionPeriod.objects.filter(
-        tenant=seller.tenant, month=sale_date.month, year=sale_date.year,
+        tenant=seller.tenant,
+        start_date__lte=sale_date,
+        end_date__gte=sale_date,
         status__in=[
             CommissionPeriod.Status.ABERTA,
             CommissionPeriod.Status.PARCIALMENTE_FECHADA,
@@ -612,11 +702,7 @@ def ensure_seller_commission(seller, sale_date):
 
 
 def validate_sale_can_be_changed(seller, sale_date, user):
-    period = CommissionPeriod.objects.filter(
-        tenant=seller.tenant,
-        month=sale_date.month,
-        year=sale_date.year,
-    ).first()
+    period = resolve_period_for_date(seller.tenant, sale_date)
     if not period:
         return True, None
 
@@ -655,12 +741,12 @@ def can_edit_period_dates(period):
     has_sales = Sale.objects.filter(
         tenant=period.tenant,
         status='ATIVA',
-        sale_date__year=period.year,
-        sale_date__month=period.month,
+        sale_date__gte=period.start_date,
+        sale_date__lte=period.end_date,
     ).exists()
     if has_sales:
         return False, (
-            'Nao e possivel alterar mes ou ano de uma competencia '
+            'Nao e possivel alterar datas de uma competencia '
             'que ja possui lancamentos manuais vinculados.'
         )
     has_closed = SellerCommission.objects.filter(
@@ -674,7 +760,7 @@ def can_edit_period_dates(period):
     ).exists()
     if has_closed:
         return False, (
-            'Nao e possivel alterar mes ou ano com vendedores '
+            'Nao e possivel alterar datas com vendedores '
             'fechados ou pagos.'
         )
     return True, None
@@ -724,10 +810,30 @@ def update_period(period, data, user):
         period.notes = data['notes']
         changed_fields.append('notes')
 
+    if 'label' in data:
+        new_label = (data.get('label') or '').strip()
+        if new_label != period.label:
+            period.label = new_label
+            changed_fields.append('label')
+
     month_changed = 'month' in data and int(data['month']) != period.month
     year_changed = 'year' in data and int(data['year']) != period.year
+    new_start = data.get('start_date')
+    new_end = data.get('end_date')
+    if isinstance(new_start, str):
+        try:
+            new_start = date.fromisoformat(new_start)
+        except ValueError:
+            raise ValueError('Data inicial invalida.')
+    if isinstance(new_end, str):
+        try:
+            new_end = date.fromisoformat(new_end)
+        except ValueError:
+            raise ValueError('Data final invalida.')
+    start_changed = new_start is not None and new_start != period.start_date
+    end_changed = new_end is not None and new_end != period.end_date
 
-    if month_changed or year_changed:
+    if month_changed or year_changed or start_changed or end_changed:
         can_edit, msg = can_edit_period_dates(period)
         if not can_edit:
             raise ValueError(msg)
@@ -738,10 +844,25 @@ def update_period(period, data, user):
     if year_changed:
         period.year = int(data['year'])
         changed_fields.append('year')
+    if start_changed:
+        period.start_date = new_start
+        changed_fields.append('start_date')
+    if end_changed:
+        period.end_date = new_end
+        changed_fields.append('end_date')
 
     if not changed_fields:
         return period, changed_fields
 
+    try:
+        period.full_clean()
+    except ValidationError as exc:
+        if hasattr(exc, 'message_dict'):
+            messages = []
+            for field_messages in exc.message_dict.values():
+                messages.extend(field_messages)
+            raise ValueError(' '.join(messages))
+        raise ValueError(' '.join(exc.messages))
     period.save(update_fields=changed_fields + ['updated_at'])
 
     if 'expected_working_days' in changed_fields:

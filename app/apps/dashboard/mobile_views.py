@@ -196,45 +196,45 @@ def mobile_home(request):
         today_total = today_manual.amount if today_manual else 0
         has_entry_today = today_manual is not None
 
-        month_total = Sale.objects.filter(
-            seller=seller,
-            origin=Sale.Origin.MANUAL,
-            status='ATIVA',
-            sale_date__year=today.year,
-            sale_date__month=today.month,
-        ).aggregate(total=Sum('amount'))['total'] or 0
-
-        month_link_total = Sale.objects.filter(
-            seller=seller,
-            origin=Sale.Origin.LINK,
-            status='ATIVA',
-            sale_date__year=today.year,
-            sale_date__month=today.month,
-        ).aggregate(total=Sum('amount'))['total'] or 0
-
         from app.apps.commissions.services import (
-            calculate_estimated_commission,
+            calculate_estimated_commission_for_period,
+            get_current_period,
         )
 
-        period = CommissionPeriod.objects.filter(
-            tenant=seller.tenant,
-            month=today.month,
-            year=today.year,
-        ).first()
+        period = get_current_period(seller.tenant)
+        no_current_period_message = None
+        if not period:
+            no_current_period_message = 'Nenhuma competencia aberta para a data atual.'
+            month_total = 0
+            month_link_total = 0
+            sc = None
+        else:
+            month_total = Sale.objects.filter(
+                seller=seller,
+                origin__in=Sale.COMMISSION_ORIGINS,
+                status='ATIVA',
+                sale_date__gte=period.start_date,
+                sale_date__lte=period.end_date,
+            ).aggregate(total=Sum('amount'))['total'] or 0
 
-        sc = SellerCommission.objects.filter(
-            seller=seller,
-            period__month=today.month,
-            period__year=today.year,
-        ).first()
+            month_link_total = Sale.objects.filter(
+                seller=seller,
+                origin=Sale.Origin.LINK,
+                status='ATIVA',
+                sale_date__gte=period.start_date,
+                sale_date__lte=period.end_date,
+            ).aggregate(total=Sum('amount'))['total'] or 0
+
+            sc = SellerCommission.objects.filter(
+                seller=seller,
+                period=period,
+            ).first()
 
         sc_status = sc.status if sc else None
         is_editable = sc.is_editable if sc else True
 
         if sc_status in (SellerCommission.Status.ABERTA, SellerCommission.Status.REABERTA):
-            comissao_valor, _ = calculate_estimated_commission(
-                seller, today.month, today.year,
-            )
+            comissao_valor, _ = calculate_estimated_commission_for_period(seller, period)
             comissao_label = 'Estimada'
         elif sc_status == SellerCommission.Status.FECHADA:
             comissao_valor = sc.amount_due
@@ -246,13 +246,11 @@ def mobile_home(request):
             comissao_valor = sc.amount_due
             comissao_label = 'Ajustada'
         else:
-            if not sc:
-                comissao_valor, _ = calculate_estimated_commission(
-                    seller, today.month, today.year,
-                )
+            if not sc and period:
+                comissao_valor, _ = calculate_estimated_commission_for_period(seller, period)
                 comissao_label = 'Estimada'
             else:
-                comissao_valor = sc.commission_amount
+                comissao_valor = sc.commission_amount if sc else 0
                 comissao_label = ''
 
         periodo_status = period.status if period else None
@@ -283,6 +281,12 @@ def mobile_home(request):
             'comissao_estimada': comissao_valor,
             'comissao_label': comissao_label,
             'periodo_status': periodo_status,
+            'periodo_label': period.display_label if period else '',
+            'periodo_range': (
+                f'{period.start_date.strftime("%d/%m/%Y")} a {period.end_date.strftime("%d/%m/%Y")}'
+                if period else ''
+            ),
+            'no_current_period_message': no_current_period_message,
             'is_editable': is_editable,
             'seller_commission_status': sc_status,
             'missing_past_days': missing_past_days,
@@ -347,7 +351,7 @@ def mobile_lancar_venda(request):
 
             existing = Sale.objects.filter(
                 seller=seller,
-                origin=Sale.Origin.MANUAL,
+                origin__in=Sale.COMMISSION_ORIGINS,
                 sale_date=sale_date,
             ).first()
 
@@ -402,7 +406,7 @@ def mobile_lancar_venda(request):
                 query_date = date.fromisoformat(sale_date_str)
                 existing_sale = Sale.objects.filter(
                     seller=seller,
-                    origin=Sale.Origin.MANUAL,
+                    origin__in=Sale.COMMISSION_ORIGINS,
                     sale_date=query_date,
                 ).first()
             except (ValueError, Exception):
@@ -410,11 +414,9 @@ def mobile_lancar_venda(request):
 
     today = timezone.localdate()
     reference_date = existing_sale.sale_date if existing_sale else today
-    sc = SellerCommission.objects.filter(
-        seller=seller,
-        period__month=reference_date.month,
-        period__year=reference_date.year,
-    ).first()
+    from app.apps.commissions.services import resolve_period_for_date
+    period = resolve_period_for_date(seller.tenant, reference_date)
+    sc = SellerCommission.objects.filter(seller=seller, period=period).first() if period else None
     is_editable = sc.is_editable if sc else True
     sc_status = sc.status if sc else None
 
@@ -445,8 +447,18 @@ def mobile_minhas_vendas(request):
     )
 
     from app.apps.commissions.models import SellerCommission
+    from app.apps.sales.models import SaleChangeLog
+    from django.db.models import Count
 
-    locked_months = set(
+    log_counts = dict(
+        SaleChangeLog.objects.filter(
+            sale__in=list(sales.values_list('pk', flat=True)),
+        ).values('sale_id').annotate(
+            count=Count('id'),
+        ).values_list('sale_id', 'count')
+    )
+
+    locked_periods = list(
         SellerCommission.objects.filter(
             seller=seller,
             status__in=[
@@ -455,13 +467,14 @@ def mobile_minhas_vendas(request):
                 SellerCommission.Status.AJUSTADA,
                 SellerCommission.Status.CANCELADA,
             ],
-        ).values_list('period__month', 'period__year')
+        ).select_related('period')
     )
 
     today = timezone.localdate()
     sales_data = []
     for s in sales:
-        is_locked = (s.sale_date.month, s.sale_date.year) in locked_months
+        is_locked = any(sc.period.contains(s.sale_date) for sc in locked_periods)
+        log_count = log_counts.get(str(s.uuid), 0)
         sales_data.append({
             'uuid': str(s.uuid),
             'amount': s.amount,
@@ -473,6 +486,7 @@ def mobile_minhas_vendas(request):
             'date_iso': s.sale_date.isoformat(),
             'canDelete': s.origin == Sale.Origin.MANUAL and not is_locked,
             'canEdit': s.origin == Sale.Origin.MANUAL and not is_locked,
+            'change_log_count': log_count,
         })
 
     return render(request, 'mobile/minhas_vendas.html', {
@@ -498,45 +512,51 @@ def mobile_meu_desempenho(request):
         })
 
     today = timezone.localdate()
-    month_total = Sale.objects.filter(
-        seller=seller,
-        origin=Sale.Origin.MANUAL,
-        status='ATIVA',
-        sale_date__year=today.year,
-        sale_date__month=today.month,
-    ).aggregate(total=Sum('amount'))['total'] or 0
-
-    from app.apps.commissions.services import calculate_estimated_commission
-
-    comissao_estimada, _ = calculate_estimated_commission(
-        seller, today.month, today.year,
+    from app.apps.commissions.services import (
+        calculate_estimated_commission_for_period,
+        get_current_period,
     )
+
+    current_period = get_current_period(seller.tenant)
+    if current_period:
+        month_total = Sale.objects.filter(
+            seller=seller,
+            origin__in=Sale.COMMISSION_ORIGINS,
+            status='ATIVA',
+            sale_date__gte=current_period.start_date,
+            sale_date__lte=current_period.end_date,
+        ).aggregate(total=Sum('amount'))['total'] or 0
+        comissao_estimada, _ = calculate_estimated_commission_for_period(
+            seller, current_period,
+        )
+    else:
+        month_total = 0
+        comissao_estimada = 0
 
     commissions = SellerCommission.objects.filter(
         seller=seller,
-    ).select_related('period').order_by('-period__year', '-period__month')
+    ).select_related('period').order_by('-period__start_date')
 
     commissions_data = []
     has_current_month_sc = False
     for sc in commissions:
         if sc.period.status == CommissionPeriod.Status.ABERTA:
-            est, total_est = calculate_estimated_commission(
-                seller, sc.period.month, sc.period.year,
-            )
+            est, total_est = calculate_estimated_commission_for_period(seller, sc.period)
             sc.total_sold_amount = total_est
             sc.commission_amount = est
-        if sc.period.month == today.month and sc.period.year == today.year:
+        if current_period and sc.period_id == current_period.uuid:
             has_current_month_sc = True
         commissions_data.append(sc)
 
     current_estimate = None
-    if not has_current_month_sc:
-        est, total_est = calculate_estimated_commission(
-            seller, today.month, today.year,
+    if current_period and not has_current_month_sc:
+        est, total_est = calculate_estimated_commission_for_period(
+            seller, current_period,
         )
         current_estimate = {
-            'month': today.month,
-            'year': today.year,
+            'month': current_period.month,
+            'year': current_period.year,
+            'label': current_period.display_label,
             'total_sold': total_est,
             'commission': est,
         }
@@ -546,8 +566,12 @@ def mobile_meu_desempenho(request):
         'month_total': month_total,
         'comissao_estimada': comissao_estimada,
         'commissions': commissions_data,
-        'current_month': f'{today.month:02d}/{today.year}',
+        'current_month': current_period.display_label if current_period else '',
         'current_estimate': current_estimate,
+        'no_current_period_message': (
+            'Nenhuma competencia aberta para a data atual.'
+            if not current_period else None
+        ),
     })
 
 
@@ -597,13 +621,34 @@ def mobile_ranking(request):
     today = timezone.localdate()
     from app.apps.sales.models import Sale
     from django.db.models import Sum
-    from app.apps.commissions.services import calculate_estimated_commission
+    from app.apps.commissions.services import (
+        calculate_estimated_commission_for_period,
+        get_current_period,
+    )
+
+    current_period = get_current_period(seller.tenant)
+    if not current_period:
+        return render(request, 'mobile/ranking.html', {
+            'seller': seller,
+            'ranking': [],
+            'seller_pos': None,
+            'my_total': 0,
+            'my_estimated_commission': 0,
+            'total_sellers': 0,
+            'visible_to_sellers': seller.tenant.ranking_visible_to_sellers,
+            'current_month': '',
+            'goal': None,
+            'goal_progress': None,
+            'goal_remaining': None,
+            'tips': [],
+            'no_current_period_message': 'Nenhuma competencia aberta para a data atual.',
+        })
 
     ranking_qs = Sale.objects.filter(
         tenant=seller.tenant,
         status='ATIVA',
-        sale_date__year=today.year,
-        sale_date__month=today.month,
+        sale_date__gte=current_period.start_date,
+        sale_date__lte=current_period.end_date,
     ).values('seller__uuid', 'seller__name').annotate(
         total=Sum('amount'),
     ).order_by('-total')
@@ -635,25 +680,25 @@ def mobile_ranking(request):
 
     my_estimated_commission = 0
     try:
-        my_estimated_commission, _ = calculate_estimated_commission(
-            seller, today.month, today.year,
+        my_estimated_commission, _ = calculate_estimated_commission_for_period(
+            seller, current_period,
         )
     except Exception:
         pass
 
     month_total_manual = Sale.objects.filter(
         seller=seller,
-        origin=Sale.Origin.MANUAL,
+        origin__in=Sale.COMMISSION_ORIGINS,
         status='ATIVA',
-        sale_date__year=today.year,
-        sale_date__month=today.month,
+        sale_date__gte=current_period.start_date,
+        sale_date__lte=current_period.end_date,
     ).aggregate(total=Sum('amount'))['total'] or 0
     month_link_total = Sale.objects.filter(
         seller=seller,
         origin=Sale.Origin.LINK,
         status='ATIVA',
-        sale_date__year=today.year,
-        sale_date__month=today.month,
+        sale_date__gte=current_period.start_date,
+        sale_date__lte=current_period.end_date,
     ).aggregate(total=Sum('amount'))['total'] or 0
     combined_month_total = month_total_manual + month_link_total
 
@@ -674,7 +719,7 @@ def mobile_ranking(request):
         'my_estimated_commission': my_estimated_commission,
         'total_sellers': total_sellers,
         'visible_to_sellers': visible_to_sellers,
-        'current_month': f'{today.month:02d}/{today.year}',
+        'current_month': current_period.display_label,
         'goal': goal,
         'goal_progress': goal_progress,
         'goal_remaining': goal_remaining,
