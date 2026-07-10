@@ -525,21 +525,30 @@ def send_accounting_package_email(self, tenant_uuid, month, year, requested_by_u
             return
 
     from app.apps.commissions.exports import build_accounting_zip, _fmt_br
+    from app.apps.commissions.services import get_period_by_legacy_label, legacy_month_range
     from app.apps.sellers.models import Seller as SellerM
     from app.apps.sales.models import Sale as SModel
 
+    period = get_period_by_legacy_label(tenant, month_int, year_int)
+    if period:
+        start = period.start_date
+        end = period.end_date
+        competencia = period.display_label
+    else:
+        start, end = legacy_month_range(month_int, year_int)
+        competencia = f'{month_int:02d}/{year_int}'
     zip_bytes = build_accounting_zip(tenant, month_int, year_int)
 
     total_sold_all = SModel.objects.filter(
         tenant=tenant, status='ATIVA',
-        sale_date__year=year_int, sale_date__month=month_int,
+        sale_date__gte=start, sale_date__lte=end,
     ).aggregate(t=DSum('amount'))['t'] or 0
 
-    competencia = f'{month_int:02d}/{year_int}'
     senders = SellerM.objects.filter(tenant=tenant, is_active=True).count()
     msg = EmailMessage(
         subject=f'[{tenant.company_name}] Fechamento de comissoes — {competencia}',
         body=f'Competencia: {competencia}\n'
+             f'Periodo: {start.strftime("%d/%m/%Y")} a {end.strftime("%d/%m/%Y")}\n'
              f'Vendedores ativos: {senders}\n'
              f'Total vendido: {_fmt_br(total_sold_all)}\n\n'
              f'Segue em anexo o pacote contabil com vendas, comissoes e resumo.\n'
@@ -550,8 +559,6 @@ def send_accounting_package_email(self, tenant_uuid, month, year, requested_by_u
     msg.attach(f'contabilidade_{year_int}_{month_int:02d}.zip', zip_bytes, 'application/zip')
     msg.send()
 
-    from app.apps.commissions.models import CommissionPeriod
-    period = CommissionPeriod.objects.filter(tenant=tenant, month=month_int, year=year_int).first()
     if period and not period.sent_to_accounting_at:
         period.sent_to_accounting_at = timezone.now()
         if requested_by_user_id:

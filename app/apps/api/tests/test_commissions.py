@@ -268,3 +268,129 @@ class CommissionPeriodLockedTest(TestCase):
             self.tenant, date(2026, 6, 15),
         )
         self.assertIn(self.seller.pk, locked)
+
+
+class CommissionPeriodCustomDateFlowTest(TestCase):
+    TEST_ONLY_MANAGER_PASSWORD = 'test-only-password-8371'
+
+    def setUp(self):
+        cache.clear()
+        self.tenant = Tenant.objects.create(
+            company_name='Bibelo Datas', cnpj='44444444444444',
+        )
+        self.manager = User.objects.create_user(
+            username='gestor_datas', password=self.TEST_ONLY_MANAGER_PASSWORD,
+            role=User.Role.MANAGER, tenant=self.tenant,
+        )
+
+    def _auth_manager(self):
+        client = APIClient()
+        resp = client.post(reverse('api-login'), {
+            'username': self.manager.username,
+            'password': self.TEST_ONLY_MANAGER_PASSWORD,
+        }, format='json')
+        self.assertIn('access', resp.data)
+        client.credentials(HTTP_AUTHORIZATION=f'Bearer {resp.data["access"]}')
+        return client
+
+    def test_manager_creates_custom_date_period_without_calendar_overwrite(self):
+        client = self._auth_manager()
+
+        response = client.post(reverse('api-commission-period-list'), {
+            'label': '21/06 a 20/07',
+            'start_date': '2026-06-21',
+            'end_date': '2026-07-20',
+            'expected_working_days': 22,
+        }, format='json')
+
+        self.assertEqual(response.status_code, 201, response.data)
+        period = CommissionPeriod.objects.get(tenant=self.tenant)
+        self.assertEqual(period.label, '21/06 a 20/07')
+        self.assertEqual(period.start_date, date(2026, 6, 21))
+        self.assertEqual(period.end_date, date(2026, 7, 20))
+        self.assertEqual(period.month, 7)
+        self.assertEqual(period.year, 2026)
+        self.assertNotEqual(period.start_date, date(2026, 7, 1))
+
+    def test_manager_create_validation_returns_friendly_errors(self):
+        client = self._auth_manager()
+
+        missing = client.post(reverse('api-commission-period-list'), {
+            'label': 'Sem datas',
+        }, format='json')
+        self.assertEqual(missing.status_code, 400)
+        self.assertIn('start_date', missing.data)
+        self.assertIn('end_date', missing.data)
+
+        inverted = client.post(reverse('api-commission-period-list'), {
+            'label': 'Invertida',
+            'start_date': '2026-07-20',
+            'end_date': '2026-06-21',
+        }, format='json')
+        self.assertEqual(inverted.status_code, 400)
+        self.assertIn('Data final deve ser maior', str(inverted.data))
+
+        long_range = client.post(reverse('api-commission-period-list'), {
+            'label': 'Longa',
+            'start_date': '2026-01-01',
+            'end_date': '2026-03-05',
+        }, format='json')
+        self.assertEqual(long_range.status_code, 400)
+        self.assertIn('62 dias', str(long_range.data))
+
+    def test_manager_create_overlap_returns_friendly_error(self):
+        CommissionPeriod.objects.create(
+            tenant=self.tenant,
+            month=6,
+            year=2026,
+            start_date=date(2026, 5, 21),
+            end_date=date(2026, 6, 20),
+        )
+        client = self._auth_manager()
+
+        response = client.post(reverse('api-commission-period-list'), {
+            'label': 'Sobreposta',
+            'start_date': '2026-06-15',
+            'end_date': '2026-07-14',
+        }, format='json')
+
+        self.assertEqual(response.status_code, 400)
+        self.assertIn('sobrepoe', str(response.data))
+
+    def test_manager_edits_label_and_safe_range_with_date_fields(self):
+        period = CommissionPeriod.objects.create(
+            tenant=self.tenant,
+            month=7,
+            year=2026,
+            label='Original',
+            start_date=date(2026, 6, 21),
+            end_date=date(2026, 7, 20),
+        )
+        client = self._auth_manager()
+
+        response = client.patch(reverse('api-commission-period-detail', args=[period.uuid]), {
+            'label': 'Ajustada',
+            'start_date': '2026-06-22',
+            'end_date': '2026-07-21',
+            'month': 7,
+            'year': 2026,
+        }, format='json')
+
+        self.assertEqual(response.status_code, 200, response.data)
+        period.refresh_from_db()
+        self.assertEqual(period.label, 'Ajustada')
+        self.assertEqual(period.start_date, date(2026, 6, 22))
+        self.assertEqual(period.end_date, date(2026, 7, 21))
+
+    def test_period_screen_uses_date_inputs_and_shows_label_range_helpers(self):
+        self.client.force_login(self.manager)
+
+        response = self.client.get(reverse('dashboard:gestor_fechamento'))
+
+        self.assertEqual(response.status_code, 200)
+        html = response.content.decode()
+        self.assertIn('x-model="createLabel"', html)
+        self.assertIn('type="date" x-model="createStartDate"', html)
+        self.assertIn('type="date" x-model="createEndDate"', html)
+        self.assertIn('periodLabel(p)', html)
+        self.assertIn('periodRange(p)', html)

@@ -26,6 +26,7 @@ from app.apps.commissions.models import (
 from app.apps.commissions.services import (
     calculate_estimated_commission,
     get_commission_rate,
+    get_period_by_legacy_label,
 )
 from app.apps.accounts.models import User
 
@@ -680,7 +681,11 @@ class RankingView(generics.GenericAPIView):
 
     def get(self, request):
         from app.apps.commissions.services import (
-            calculate_estimated_commission, get_commission_rate,
+            calculate_estimated_commission,
+            calculate_estimated_commission_for_period,
+            get_commission_rate,
+            get_period_by_legacy_label,
+            legacy_month_range,
         )
         from decimal import Decimal, ROUND_HALF_UP
 
@@ -695,13 +700,19 @@ class RankingView(generics.GenericAPIView):
             return Response({'error': 'Mes invalido (1-12).'}, status=400)
         if year < 2020:
             return Response({'error': 'Ano invalido.'}, status=400)
+        period = get_period_by_legacy_label(tenant, month, year)
+        if period:
+            start = period.start_date
+            end = period.end_date
+        else:
+            start, end = legacy_month_range(month, year)
 
         sales = Sale.objects.filter(
             tenant=tenant,
             origin=Sale.Origin.MANUAL,
             status='ATIVA',
-            sale_date__year=year,
-            sale_date__month=month,
+            sale_date__gte=start,
+            sale_date__lte=end,
         ).values('seller__uuid', 'seller__name', 'seller__commission_rate').annotate(
             total_sold=Sum('amount'),
             sale_count=Sum(1),
@@ -723,7 +734,10 @@ class RankingView(generics.GenericAPIView):
             seller_obj = sellers_map.get(str(seller_uuid))
             if seller_obj:
                 rate = get_commission_rate(seller_obj)
-                commission_estimada = int((Decimal(str(total_sold)) * Decimal(str(rate))).quantize(Decimal('1'), rounding=ROUND_HALF_UP))
+                if period:
+                    commission_estimada, _ = calculate_estimated_commission_for_period(seller_obj, period)
+                else:
+                    commission_estimada = int((Decimal(str(total_sold)) * Decimal(str(rate))).quantize(Decimal('1'), rounding=ROUND_HALF_UP))
             else:
                 rate = Decimal('0')
                 commission_estimada = 0
@@ -1706,6 +1720,7 @@ class MonthlyReportView(generics.GenericAPIView):
             return Response({'error': 'Mes/ano invalidos.'}, status=400)
 
         from app.apps.commissions.services import calculate_estimated_commission
+        period = get_period_by_legacy_label(tenant, month_int, year_int)
         sellers = Seller.objects.filter(tenant=tenant, is_active=True)
         sellers_data = []
         total_sold = 0
@@ -1752,15 +1767,24 @@ class MonthlyReportView(generics.GenericAPIView):
         sellers_data.sort(key=lambda s: s['total_sold'], reverse=True)
         total_commissions = total_commission_aberta + total_commission_fechada + total_commission_paga
 
-        prev_month = month_int - 1
-        prev_year = year_int
-        if prev_month == 0:
-            prev_month = 12
-            prev_year -= 1
-        prev_total = Sale.objects.filter(
-            tenant=tenant, status='ATIVA',
-            sale_date__month=prev_month, sale_date__year=prev_year,
-        ).aggregate(t=Sum('amount'))['t'] or 0
+        prev_period = None
+        if period:
+            prev_period = CommissionPeriod.objects.filter(
+                tenant=tenant,
+                end_date__lt=period.start_date,
+            ).exclude(
+                status=CommissionPeriod.Status.CANCELADA,
+            ).order_by('-end_date').first()
+
+        if prev_period:
+            prev_total = Sale.objects.filter(
+                tenant=tenant,
+                status='ATIVA',
+                sale_date__gte=prev_period.start_date,
+                sale_date__lte=prev_period.end_date,
+            ).aggregate(t=Sum('amount'))['t'] or 0
+        else:
+            prev_total = 0
         variacao = round((total_sold - prev_total) / prev_total * 100) if prev_total > 0 else None
 
         from django.template.loader import render_to_string
