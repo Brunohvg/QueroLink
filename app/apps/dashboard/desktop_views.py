@@ -444,7 +444,7 @@ def whatsapp_connection_state(request):
         return JsonResponse({'error': 'Tenant nao encontrado.'}, status=400)
 
     from app.services.messaging.whatsapp import (
-        WhatsappClient, InstanceNotFoundError,
+        WhatsappClient, WhatsAppError, InstanceNotFoundError,
         AuthenticationError, ConnectionError,
     )
 

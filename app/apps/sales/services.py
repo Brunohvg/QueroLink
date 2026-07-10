@@ -167,6 +167,7 @@ def _parse_csv(content):
 
 def _parse_xlsx(content_bytes):
     try:
+        import io
         import openpyxl
         wb = openpyxl.load_workbook(io.BytesIO(content_bytes), read_only=True)
         ws = wb.active

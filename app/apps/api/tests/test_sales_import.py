@@ -314,3 +314,25 @@ class SalesImportTest(TestCase):
         self.assertEqual(batch.filename, 'batch.csv')
         self.assertEqual(batch.status, 'IMPORTED')
         self.assertEqual(batch.created_count, 1)
+
+    def test_preview_xlsx_valid(self):
+        try:
+            import openpyxl
+        except ImportError:
+            self.skipTest('openpyxl nao instalado neste ambiente')
+
+        wb = openpyxl.Workbook()
+        ws = wb.active
+        ws.append(['data', 'vendedor', 'valor', 'observacao'])
+        ws.append(['15/06/2026', 'Carlos Silva', '1500,00', 'Venda teste'])
+        ws.append(['16/06/2026', 'Ana Souza', '2300.50', 'Outra venda'])
+        buf = io.BytesIO()
+        wb.save(buf)
+        content = buf.getvalue()
+
+        client = self._auth(self.manager)
+        resp = self._upload_preview(client, 'test.xlsx', content)
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(resp.data['total_rows'], 2)
+        self.assertEqual(resp.data['ok_count'], 2)
+
