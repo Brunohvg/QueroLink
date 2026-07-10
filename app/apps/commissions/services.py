@@ -63,6 +63,22 @@ def suggest_period_range(tenant, month, year):
     return start, end
 
 
+def suggest_next_open_month(tenant, max_lookahead=24):
+    hoje = timezone.localdate()
+    month, year = hoje.month, hoje.year
+    for _ in range(max_lookahead):
+        exists = CommissionPeriod.objects.filter(
+            tenant=tenant, month=month, year=year,
+        ).exclude(status=CommissionPeriod.Status.CANCELADA).exists()
+        if not exists:
+            return month, year
+        if month == 12:
+            month, year = 1, year + 1
+        else:
+            month += 1
+    return month, year
+
+
 def get_period_by_legacy_label(tenant, month, year):
     return CommissionPeriod.objects.filter(
         tenant=tenant,

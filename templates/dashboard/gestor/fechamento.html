@@ -814,9 +814,6 @@ function fechamentoPage() {
             return 'Concluir pagamentos';
         },
         openCreateModal() {
-            var d = new Date();
-            var y = d.getFullYear();
-            var m = d.getMonth();
             this.createLabel = '';
             this.createStartDate = '';
             this.createEndDate = '';
@@ -828,14 +825,16 @@ function fechamentoPage() {
             this.createCalculatedWeekdays = 0;
             this.createDatesInvalid = false;
             this.showCreateModal = true;
-            this.$nextTick(() => { this.applySuggestion(m + 1, y); });
+            this.$nextTick(() => { this.applySuggestion(); });
         },
         async applySuggestion(month, year) {
             var d = new Date();
             var fbY = year || d.getFullYear();
             var fbM = month || (d.getMonth() + 1);
+            var url = '/api/commissions/periods/suggest/';
+            if (month && year) url += '?month=' + month + '&year=' + year;
             try {
-                var r = await fetch('/api/commissions/periods/suggest/?month=' + fbM + '&year=' + fbY);
+                var r = await fetch(url);
                 if (r.ok) {
                     var data = await r.json();
                     this.createStartDate = data.start_date;

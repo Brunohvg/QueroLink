@@ -722,15 +722,24 @@ class CommissionPeriodViewSet(viewsets.ModelViewSet):
 
     @action(detail=False, methods=['get'], permission_classes=[IsAuthenticated, IsManagerOrAdmin], url_path='suggest')
     def suggest(self, request):
-        from app.apps.commissions.services import suggest_period_range
+        from app.apps.commissions.services import (
+            suggest_period_range, suggest_next_open_month,
+        )
 
         tenant = request.user.tenant
-        hoje = timezone.localdate()
-        try:
-            month = int(request.query_params.get('month', hoje.month))
-            year = int(request.query_params.get('year', hoje.year))
-        except (ValueError, TypeError):
-            return Response({'error': 'Mes/ano invalidos.'}, status=status.HTTP_400_BAD_REQUEST)
+        month_param = request.query_params.get('month')
+        year_param = request.query_params.get('year')
+
+        if month_param is None and year_param is None:
+            month, year = suggest_next_open_month(tenant)
+        else:
+            hoje = timezone.localdate()
+            try:
+                month = int(month_param) if month_param is not None else hoje.month
+                year = int(year_param) if year_param is not None else hoje.year
+            except (ValueError, TypeError):
+                return Response({'error': 'Mes/ano invalidos.'}, status=status.HTTP_400_BAD_REQUEST)
+
         if month < 1 or month > 12:
             return Response({'error': 'Mes deve estar entre 1 e 12.'}, status=status.HTTP_400_BAD_REQUEST)
         if year < 2000 or year > 2100:

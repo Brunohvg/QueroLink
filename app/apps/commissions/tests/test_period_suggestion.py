@@ -2,11 +2,15 @@ from datetime import date
 
 from django.test import TestCase
 from django.urls import reverse
+from django.utils import timezone
 from django.contrib.auth import get_user_model
 from rest_framework.test import APIClient
 
 from app.apps.accounts.models import Tenant
-from app.apps.commissions.services import suggest_period_range
+from app.apps.commissions.models import CommissionPeriod
+from app.apps.commissions.services import (
+    suggest_period_range, suggest_next_open_month,
+)
 
 User = get_user_model()
 
@@ -39,6 +43,27 @@ class SuggestPeriodRangeServiceTests(TestCase):
         self.assertEqual(start, date(2025, 12, 21))
         self.assertEqual(end, date(2026, 1, 20))
 
+    def test_next_open_month_skips_existing(self):
+        hoje = timezone.localdate()
+        s, e = suggest_period_range(self.tenant, hoje.month, hoje.year)
+        CommissionPeriod.objects.create(
+            tenant=self.tenant, month=hoje.month, year=hoje.year,
+            start_date=s, end_date=e,
+        )
+        month, year = suggest_next_open_month(self.tenant)
+        self.assertNotEqual((month, year), (hoje.month, hoje.year))
+
+    def test_next_open_month_ignores_cancelled(self):
+        hoje = timezone.localdate()
+        s, e = suggest_period_range(self.tenant, hoje.month, hoje.year)
+        CommissionPeriod.objects.create(
+            tenant=self.tenant, month=hoje.month, year=hoje.year,
+            start_date=s, end_date=e,
+            status=CommissionPeriod.Status.CANCELADA,
+        )
+        month, year = suggest_next_open_month(self.tenant)
+        self.assertEqual((month, year), (hoje.month, hoje.year))
+
 
 class SuggestEndpointTests(TestCase):
     TEST_ONLY_PASSWORD = 'test-only-password-2211'
@@ -68,6 +93,26 @@ class SuggestEndpointTests(TestCase):
         self.assertEqual(resp.data['start_date'], '2026-07-21')
         self.assertEqual(resp.data['end_date'], '2026-08-20')
         self.assertEqual(resp.data['period_start_day'], 21)
+
+    def test_suggest_without_params_uses_next_open_month(self):
+        hoje = timezone.localdate()
+        existing_start, existing_end = suggest_period_range(
+            self.tenant, hoje.month, hoje.year,
+        )
+        CommissionPeriod.objects.create(
+            tenant=self.tenant, month=hoje.month, year=hoje.year,
+            start_date=existing_start, end_date=existing_end,
+        )
+        expected_m, expected_y = suggest_next_open_month(self.tenant)
+
+        client = self._auth()
+        resp = client.get('/api/commissions/periods/suggest/')
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(resp.data['month'], expected_m)
+        self.assertEqual(resp.data['year'], expected_y)
+        self.assertNotEqual((resp.data['month'], resp.data['year']),
+                            (hoje.month, hoje.year))
+
 
     def test_suggest_rejects_invalid_month(self):
         client = self._auth()
