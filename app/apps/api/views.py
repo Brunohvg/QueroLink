@@ -16,7 +16,7 @@ from django.utils.decorators import method_decorator
 from rest_framework_simplejwt.views import TokenObtainPairView
 from drf_spectacular.utils import extend_schema, OpenApiParameter, OpenApiTypes
 
-from app.apps.sales.models import Sale
+from app.apps.sales.models import Sale, SaleChangeLog
 from app.apps.sellers.models import Seller
 from app.apps.commissions.models import (
     CommissionPeriod,
@@ -39,6 +39,8 @@ from .serializers import (
     CommissionPeriodSerializer,
     CommissionPeriodCreateSerializer,
     ChangePasswordSerializer,
+    ManagerSaleUpdateSerializer,
+    SaleChangeLogSerializer,
 )
 from .permissions import IsManagerOrAdmin, IsFinancialOrAdmin, IsSellerOwner
 from app.apps.audit.utils import log_action
@@ -114,7 +116,6 @@ class SellerViewSet(viewsets.ModelViewSet):
         return Response(result, status=status.HTTP_200_OK)
 
     def perform_destroy(self, instance):
-        from app.apps.sales.models import Sale
         if Sale.objects.filter(seller=instance).exists():
             from rest_framework import serializers as drf_ser
             raise drf_ser.ValidationError({
@@ -237,6 +238,40 @@ class SaleViewSet(viewsets.ModelViewSet):
                 return Response({'error': 'Nenhuma venda importada. Corrija os erros.', 'errors': errors}, status=400)
 
         return Response({'imported': imported, 'skipped': skipped, 'errors': errors})
+
+    @action(detail=True, methods=['patch'], permission_classes=[IsAuthenticated, IsManagerOrAdmin], url_path='manager-update')
+    def manager_update(self, request, pk=None):
+        sale = self.get_object()
+        serializer = ManagerSaleUpdateSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        data = serializer.validated_data
+        reason = data.pop('reason')
+
+        from app.apps.sales.services import update_sale_as_manager
+
+        try:
+            sale, changed = update_sale_as_manager(sale, request.user, data, reason)
+        except ValueError as e:
+            return Response({'error': str(e)}, status=status.HTTP_409_CONFLICT)
+
+        if not changed:
+            return Response({'message': 'Nenhuma alteração detectada.', 'changed': False})
+
+        return Response({
+            'message': 'Venda atualizada com sucesso.',
+            'changed': True,
+            'sale': SaleSerializer(sale).data,
+        })
+
+    @action(detail=True, methods=['get'], permission_classes=[IsAuthenticated, IsSellerOwner | IsManagerOrAdmin], url_path='history')
+    def history(self, request, pk=None):
+        sale = self.get_object()
+        qs = SaleChangeLog.objects.filter(
+            sale=sale, tenant=request.user.tenant,
+        ).select_related('changed_by').order_by('-changed_at')
+        serializer = SaleChangeLogSerializer(qs, many=True)
+        return Response(serializer.data)
 
 
 class CommissionPeriodViewSet(viewsets.ModelViewSet):
@@ -882,8 +917,17 @@ class SellerDetailView(generics.GenericAPIView):
             t=Sum('amount'),
         )['t'] or 0
 
+        manual_sales_qs_slice = list(manual_sales_qs[:200])
         manual_sales = []
-        for s in manual_sales_qs[:200]:
+        from django.db.models import Count
+        log_counts = dict(
+            SaleChangeLog.objects.filter(
+                sale__in=[s.pk for s in manual_sales_qs_slice],
+            ).values('sale_id').annotate(
+                count=Count('id'),
+            ).values_list('sale_id', 'count')
+        )
+        for s in manual_sales_qs_slice:
             manual_sales.append({
                 'uuid': str(s.uuid),
                 'amount': s.amount,
@@ -891,6 +935,8 @@ class SellerDetailView(generics.GenericAPIView):
                 'origin_display': s.get_origin_display(),
                 'sale_date': s.sale_date.isoformat(),
                 'notes': s.notes or '',
+                'status': s.status,
+                'change_log_count': log_counts.get(str(s.uuid), 0),
             })
 
         link_sales = []

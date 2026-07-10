@@ -66,3 +66,32 @@ class Sale(models.Model):
             raise ValidationError(
                 "O vendedor nao pertence ao tenant da venda."
             )
+
+
+class SaleChangeLog(models.Model):
+    class Action(models.TextChoices):
+        UPDATE = 'UPDATE', 'Atualização'
+        CREATE_IMPORT = 'CREATE_IMPORT', 'Criação por Importação'
+        VOID = 'VOID', 'Estorno'
+
+    uuid = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    sale = models.ForeignKey(
+        Sale, on_delete=models.CASCADE, related_name='change_logs',
+    )
+    tenant = models.ForeignKey(
+        Tenant, on_delete=models.CASCADE, related_name='sale_change_logs',
+    )
+    action = models.CharField(max_length=20, choices=Action.choices)
+    changed_by = models.ForeignKey(
+        'accounts.User', on_delete=models.SET_NULL,
+        null=True, blank=True, related_name='sale_changes',
+    )
+    changed_at = models.DateTimeField(auto_now_add=True)
+    field_changes = models.JSONField(default=dict, blank=True)
+    reason = models.TextField(blank=True, default='')
+
+    class Meta:
+        indexes = [
+            models.Index(fields=['tenant', 'sale']),
+            models.Index(fields=['changed_at']),
+        ]

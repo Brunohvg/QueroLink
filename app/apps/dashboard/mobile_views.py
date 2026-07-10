@@ -447,6 +447,16 @@ def mobile_minhas_vendas(request):
     )
 
     from app.apps.commissions.models import SellerCommission
+    from app.apps.sales.models import SaleChangeLog
+    from django.db.models import Count
+
+    log_counts = dict(
+        SaleChangeLog.objects.filter(
+            sale__in=list(sales.values_list('pk', flat=True)),
+        ).values('sale_id').annotate(
+            count=Count('id'),
+        ).values_list('sale_id', 'count')
+    )
 
     locked_periods = list(
         SellerCommission.objects.filter(
@@ -464,6 +474,7 @@ def mobile_minhas_vendas(request):
     sales_data = []
     for s in sales:
         is_locked = any(sc.period.contains(s.sale_date) for sc in locked_periods)
+        log_count = log_counts.get(str(s.uuid), 0)
         sales_data.append({
             'uuid': str(s.uuid),
             'amount': s.amount,
@@ -475,6 +486,7 @@ def mobile_minhas_vendas(request):
             'date_iso': s.sale_date.isoformat(),
             'canDelete': s.origin == Sale.Origin.MANUAL and not is_locked,
             'canEdit': s.origin == Sale.Origin.MANUAL and not is_locked,
+            'change_log_count': log_count,
         })
 
     return render(request, 'mobile/minhas_vendas.html', {

@@ -154,6 +154,7 @@
             <th class="px-4 py-3 text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Data</th>
             <th class="px-4 py-3 text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Valor</th>
             <th class="px-4 py-3 text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Observacao</th>
+            <th class="px-4 py-3 text-[11px] font-semibold text-gray-500 uppercase tracking-wider text-right">Acoes</th>
           </tr>
         </thead>
         <tbody>
@@ -165,12 +166,123 @@
                 <span x-text="s.notes || '—'"></span>
                 <span x-show="s.status === 'ESTORNADA'" class="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-semibold bg-red-50 text-red-600 ml-2">Estornada</span>
               </td>
+              <td class="px-4 py-3.5 text-right">
+                <div class="flex items-center justify-end gap-1">
+                  <button @click="openEditSale(s)" x-show="s.status !== 'ESTORNADA' && s.origin === 'MANUAL'"
+                          class="tap-target flex items-center justify-center w-8 h-8 text-gray-300 hover:text-brand-500 transition rounded-lg hover:bg-brand-50 active:scale-[0.95]"
+                          title="Editar venda">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
+                  </button>
+                  <button @click="openHistory(s)"
+                          class="tap-target flex items-center justify-center w-8 h-8 text-gray-300 hover:text-amber-500 transition rounded-lg hover:bg-amber-50 active:scale-[0.95] relative"
+                          title="Historico de alteracoes">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                    <span x-show="s.change_log_count > 0"
+                          class="absolute -top-1 -right-1 w-4 h-4 bg-amber-500 text-white rounded-full text-[8px] font-bold flex items-center justify-center"
+                          x-text="s.change_log_count"></span>
+                  </button>
+                </div>
+              </td>
             </tr>
           </template>
         </tbody>
       </table>
     </div>
     <p class="px-6 pb-3 text-[10px] text-gray-400">Vendas estornadas nao entram nos totais.</p>
+
+    <!-- Modal de edicao -->
+    <div x-show="editModalOpen" class="fixed inset-0 z-50 flex items-center justify-center p-4"
+         x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100"
+         x-transition:leave="transition ease-in duration-150" x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0"
+         @keydown.escape.window="editModalOpen = false">
+      <div class="fixed inset-0 bg-black/40 backdrop-blur-sm" @click="editModalOpen = false"></div>
+      <div class="relative bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 z-10"
+           @click.outside="editModalOpen = false">
+        <div class="flex items-center justify-between mb-5">
+          <h3 class="text-[16px] font-bold text-gray-900">Editar Venda</h3>
+          <button @click="editModalOpen = false" class="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-gray-100 transition text-gray-400">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+          </button>
+        </div>
+        <div class="space-y-4">
+          <div>
+            <label class="text-[12px] font-semibold text-gray-500 uppercase tracking-wide block mb-1.5">Valor (R$)</label>
+            <input type="number" step="0.01" min="0.01" max="100000" x-model="editForm.amount_display"
+                   class="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-[14px] outline-none transition-all focus:border-brand-400 focus:ring-2 focus:ring-brand-100">
+          </div>
+          <div>
+            <label class="text-[12px] font-semibold text-gray-500 uppercase tracking-wide block mb-1.5">Data</label>
+            <input type="date" x-model="editForm.sale_date"
+                   class="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-[14px] outline-none transition-all focus:border-brand-400 focus:ring-2 focus:ring-brand-100">
+          </div>
+          <div>
+            <label class="text-[12px] font-semibold text-gray-500 uppercase tracking-wide block mb-1.5">Observacao</label>
+            <input type="text" x-model="editForm.notes" maxlength="255"
+                   class="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-[14px] outline-none transition-all focus:border-brand-400 focus:ring-2 focus:ring-brand-100">
+          </div>
+          <div>
+            <label class="text-[12px] font-semibold text-gray-500 uppercase tracking-wide block mb-1.5">
+              Motivo <span class="text-red-500">*</span>
+            </label>
+            <textarea x-model="editForm.reason" rows="2" maxlength="500"
+                      class="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-[14px] outline-none transition-all focus:border-brand-400 focus:ring-2 focus:ring-brand-100 resize-none"
+                      placeholder="Por que esta alteracao e necessaria?"></textarea>
+            <p x-show="editForm.reason.length > 0 && editForm.reason.length < 5" class="text-[11px] text-red-500 mt-1">Minimo de 5 caracteres</p>
+          </div>
+          <div x-show="editError" class="bg-red-50 border border-red-200 text-red-700 px-3.5 py-2.5 rounded-xl text-[12px] font-medium" x-text="editError"></div>
+          <div class="flex gap-3 pt-1">
+            <button @click="editModalOpen = false"
+                    class="flex-1 px-4 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl text-[13px] font-medium transition active:scale-[0.98]">
+              Cancelar
+            </button>
+            <button @click="saveEditSale()" :disabled="editSaving"
+                    class="flex-1 px-4 py-2.5 bg-brand-600 hover:bg-brand-700 text-white rounded-xl text-[13px] font-medium transition active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed"
+                    x-text="editSaving ? 'Salvando...' : 'Salvar'">
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modal de historico -->
+    <div x-show="historyModalOpen" class="fixed inset-0 z-50 flex items-center justify-center p-4"
+         x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100"
+         x-transition:leave="transition ease-in duration-150" x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0"
+         @keydown.escape.window="historyModalOpen = false">
+      <div class="fixed inset-0 bg-black/40 backdrop-blur-sm" @click="historyModalOpen = false"></div>
+      <div class="relative bg-white rounded-2xl shadow-2xl w-full max-w-lg p-6 z-10 max-h-[80vh] overflow-y-auto"
+           @click.outside="historyModalOpen = false">
+        <div class="flex items-center justify-between mb-5">
+          <h3 class="text-[16px] font-bold text-gray-900">Historico de Alteracoes</h3>
+          <button @click="historyModalOpen = false" class="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-gray-100 transition text-gray-400">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+          </button>
+        </div>
+        <template x-if="historyData.length === 0">
+          <p class="text-center text-gray-400 py-8 text-[13px]">Nenhuma alteracao registrada para esta venda.</p>
+        </template>
+        <template x-for="(entry, idx) in historyData" :key="entry.uuid">
+          <div class="relative pb-6 pl-8" :class="idx < historyData.length - 1 ? 'border-l-2 border-gray-100' : ''">
+            <div class="absolute left-[-7px] top-1 w-3 h-3 rounded-full"
+                 :class="entry.action === 'UPDATE' ? 'bg-amber-500' : entry.action === 'VOID' ? 'bg-red-500' : 'bg-brand-500'"></div>
+            <div class="text-[12px] text-gray-400" x-text="new Date(entry.changed_at).toLocaleString('pt-BR')"></div>
+            <div class="text-[13px] font-medium text-gray-800" x-text="entry.changed_by_name"></div>
+            <div class="text-[12px] text-gray-500 mt-0.5" x-text="entry.action_display"></div>
+            <div x-show="entry.reason" class="mt-1 text-[12px] text-gray-600 bg-gray-50 rounded-lg px-3 py-1.5 italic" x-text="'\"' + entry.reason + '\"'"></div>
+            <div class="mt-2 space-y-1">
+              <template x-for="(change, field) in entry.field_changes" :key="field">
+                <div class="text-[12px] text-gray-600 flex items-center gap-2">
+                  <span class="font-medium text-gray-700 capitalize" x-text="field === 'amount' ? 'Valor' : field === 'sale_date' ? 'Data' : field"></span>
+                  <span class="text-gray-400 line-through" x-text="field === 'amount' ? formatMoneyBRL(change.old) : change.old"></span>
+                  <span class="text-gray-300">&rarr;</span>
+                  <span class="font-medium text-emerald-600" x-text="field === 'amount' ? formatMoneyBRL(change.new) : change.new"></span>
+                </div>
+              </template>
+            </div>
+          </div>
+        </template>
+      </div>
+    </div>
   </div>
 
   <div class="bg-white rounded-2xl border border-gray-100 shadow-[0_1px_3px_-1px_rgba(0,0,0,0.04),0_4px_16px_-4px_rgba(67,97,238,0.06)] overflow-hidden mb-6" x-show="sellerData?.link_sales?.length">
@@ -256,6 +368,12 @@ function sellerDetailPage() {
         endDate: '',
         sellerId: '',
         chart: null,
+        editModalOpen: false,
+        editForm: { uuid: '', amount_display: '', sale_date: '', notes: '', reason: '' },
+        editSaving: false,
+        editError: '',
+        historyModalOpen: false,
+        historyData: [],
         init(sellerId) { this.sellerId = sellerId; this.load(); },
         async load() {
             var apiUrl = '/api/manager/seller/' + this.sellerId + '/';
@@ -298,6 +416,59 @@ function sellerDetailPage() {
         exportCsv() { window.open('/api/manager/seller/' + this.sellerId + '/csv/?' + this.buildParams()); },
         exportXlsx() { window.open('/api/manager/seller/' + this.sellerId + '/xlsx/?' + this.buildParams()); },
         exportPdf() { window.open('/api/manager/seller/' + this.sellerId + '/pdf/?' + this.buildParams()); },
+        openEditSale(s) {
+            this.editForm.uuid = s.uuid;
+            this.editForm.amount_display = (s.amount / 100).toFixed(2).replace('.', ',');
+            this.editForm.sale_date = s.sale_date;
+            this.editForm.notes = s.notes || '';
+            this.editForm.reason = '';
+            this.editError = '';
+            this.editModalOpen = true;
+        },
+        async saveEditSale() {
+            if (this.editSaving) return;
+            var reason = (this.editForm.reason || '').trim();
+            if (reason.length < 5) { this.editError = 'Motivo deve ter no minimo 5 caracteres.'; return; }
+            this.editSaving = true;
+            this.editError = '';
+            try {
+                var amountStr = (this.editForm.amount_display || '').replace(',', '.').replace(/[^0-9.]/g, '');
+                var amountCents = Math.round(parseFloat(amountStr || '0') * 100);
+                var body = { reason: reason };
+                if (amountCents > 0) body.amount = amountCents;
+                if (this.editForm.sale_date) body.sale_date = this.editForm.sale_date;
+                body.notes = (this.editForm.notes || '').trim();
+                var r = await fetch('/api/sales/' + this.editForm.uuid + '/manager-update/', {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCSRFToken() },
+                    body: JSON.stringify(body),
+                });
+                var data = await r.json();
+                if (r.ok) {
+                    this.editModalOpen = false;
+                    showToast('Venda atualizada com sucesso.', 'success');
+                    this.load();
+                } else {
+                    this.editError = data.error || data.detail || 'Erro ao atualizar venda.';
+                }
+            } catch(e) {
+                this.editError = 'Erro de conexao. Tente novamente.';
+            } finally {
+                this.editSaving = false;
+            }
+        },
+        async openHistory(s) {
+            this.historyData = [];
+            this.historyModalOpen = true;
+            try {
+                var r = await fetch('/api/sales/' + s.uuid + '/history/');
+                if (r.ok) {
+                    this.historyData = await r.json();
+                }
+            } catch(e) {
+                console.error('Erro ao carregar historico:', e);
+            }
+        },
     }
 }
 </script>
