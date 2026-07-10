@@ -178,6 +178,18 @@ def gestor_configuracoes(request):
                     'event_vars_json': EVENT_VARIABLES,
                 })
 
+        period_start_day = request.POST.get('period_start_day', '').strip()
+        if period_start_day:
+            try:
+                psd = int(period_start_day)
+            except (ValueError, TypeError):
+                messages.error(request, 'Dia de inicio do periodo invalido.')
+            else:
+                if 1 <= psd <= 28:
+                    tenant.period_start_day = psd
+                else:
+                    messages.error(request, 'Dia de inicio do periodo deve estar entre 1 e 28.')
+
         link_expires = request.POST.get('link_expires_in', '').strip()
         if link_expires:
             try:
