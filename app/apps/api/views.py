@@ -192,7 +192,15 @@ class SaleViewSet(viewsets.ModelViewSet):
         file_hash = sha256(content_bytes).hexdigest()
 
         if name.endswith('.csv'):
-            content = content_bytes.decode('utf-8-sig')
+            content = None
+            for _enc in ('utf-8-sig', 'cp1252', 'latin-1'):
+                try:
+                    content = content_bytes.decode(_enc)
+                    break
+                except UnicodeDecodeError:
+                    continue
+            if content is None:
+                content = content_bytes.decode('utf-8', errors='replace')
             rows = _parse_csv(content)
         elif name.endswith('.xlsx'):
             import io

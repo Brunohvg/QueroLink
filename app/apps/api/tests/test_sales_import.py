@@ -97,6 +97,20 @@ class SalesImportTest(TestCase):
         self.assertEqual(resp.data['ok_count'], 2)
         self.assertFalse(resp.data['already_imported'])
 
+    def test_preview_latin1_csv_accepted(self):
+        csv = self._csv_content([
+            'data;vendedor;valor;observacao',
+            '15/06/2026;Carlos Silva;1500,00;Venda Importação',
+            '16/06/2026;Ana Souza;2300.50;Observação com acento',
+        ])
+        client = self._auth(self.manager)
+        resp = self._upload_preview(
+            client, 'latin.csv', csv.encode('cp1252'),
+        )
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(resp.data['total_rows'], 2)
+        self.assertEqual(resp.data['ok_count'], 2)
+
     def test_preview_br_date_accepted(self):
         csv = self._csv_content([
             'data;vendedor;valor',
