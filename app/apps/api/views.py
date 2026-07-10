@@ -1050,7 +1050,7 @@ class SellerDetailView(generics.GenericAPIView):
             SaleChangeLog.objects.filter(
                 sale__in=[s.pk for s in manual_sales_qs_slice],
             ).values('sale_id').annotate(
-                count=Count('id'),
+                count=Count('uuid'),
             ).values_list('sale_id', 'count')
         )
         for s in manual_sales_qs_slice:
