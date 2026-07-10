@@ -1,6 +1,6 @@
 {% extends 'dashboard/base_desktop.html' %}
 {% load currency_filters %}
-{% block title %}Previa de Fechamento — Mérito{% endblock %}
+{% block title %}Prévia de Fechamento — Mérito{% endblock %}
 {% block content %}
 <div x-data="previaPage()" x-init="load()">
   <div class="sticky top-0 z-10 -mx-6 px-6 py-4 bg-amber-50/80 backdrop-blur-lg border-b border-amber-200 mb-6">
@@ -8,8 +8,8 @@
       <div class="flex items-center gap-3">
         <svg class="w-6 h-6 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
         <div>
-          <h1 class="font-display text-[18px] font-bold text-amber-800">PREVIA — nenhum registro foi criado</h1>
-          <p class="text-[12px] text-amber-600">Voce esta visualizando uma estimativa. Nenhum dado foi alterado.</p>
+          <h1 class="font-display text-[18px] font-bold text-amber-800">PRÉVIA — nenhum registro foi criado</h1>
+          <p class="text-[12px] text-amber-600">Você está visualizando uma estimativa. Nenhum dado foi alterado.</p>
         </div>
       </div>
       <div class="flex items-center gap-3">
@@ -34,7 +34,7 @@
         <p class="font-display text-[28px] font-bold text-gray-900" x-text="formatMoneyBRL(totals?.total_sold || 0)"></p>
       </div>
       <div>
-        <p class="text-[11px] font-semibold text-gray-400 uppercase tracking-wider">Total comissoes (estimado)</p>
+        <p class="text-[11px] font-semibold text-gray-400 uppercase tracking-wider">Total comissões (estimado)</p>
         <p class="font-display text-[28px] font-bold text-emerald-600" x-text="formatMoneyBRL(totals?.total_commission || 0)"></p>
       </div>
     </div>
@@ -47,8 +47,8 @@
             <th class="text-left py-3 px-3 text-[11px] font-semibold text-gray-400 uppercase">Vendedor</th>
             <th class="text-right py-3 px-3 text-[11px] font-semibold text-gray-400 uppercase">Total vendido</th>
             <th class="text-right py-3 px-3 text-[11px] font-semibold text-gray-400 uppercase">Taxa</th>
-            <th class="text-right py-3 px-3 text-[11px] font-semibold text-gray-400 uppercase">Comissao</th>
-            <th class="text-center py-3 px-3 text-[11px] font-semibold text-gray-400 uppercase">Dias sem lanc.</th>
+            <th class="text-right py-3 px-3 text-[11px] font-semibold text-gray-400 uppercase">Comissão</th>
+            <th class="text-center py-3 px-3 text-[11px] font-semibold text-gray-400 uppercase">Dias sem lançamento</th>
           </tr>
         </thead>
         <tbody>
@@ -59,7 +59,10 @@
               <td class="py-2.5 px-3 text-right text-gray-500" x-text="(s.commission_rate * 100).toFixed(2) + '%'"></td>
               <td class="py-2.5 px-3 text-right font-semibold text-emerald-600" x-text="formatMoneyBRL(s.commission_amount)"></td>
               <td class="py-2.5 px-3 text-center">
-                <span x-show="s.has_missing_days" class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium bg-amber-50 text-amber-700" x-text="s.missing_days_count + ' dias'"></span>
+                <span x-show="s.has_missing_days"
+                      class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium"
+                      :class="missingBadgeClass(s.missing_days_count)"
+                      x-text="s.missing_days_count + ' de ' + periodWorkingDays + ' dias sem lançamento'"></span>
                 <span x-show="!s.has_missing_days" class="text-[11px] text-emerald-600">Completo</span>
               </td>
             </tr>
@@ -79,9 +82,19 @@
     {% endverbatim %}
 
     <div class="text-center mt-6 pt-4 border-t border-gray-100">
-      <a href="{% url 'dashboard:gestor_fechamento' %}" class="inline-flex items-center gap-2 bg-brand-500 hover:bg-brand-600 text-white font-semibold py-3 px-6 rounded-xl transition-all text-[14px] shadow-md hover:shadow-lg active:scale-[0.97]">
+      <a href="{% url 'dashboard:gestor_fechamento' %}"
+         x-show="!confirmingOpen"
+         @click="confirmOpen($event)"
+         class="inline-flex items-center gap-2 bg-amber-500 hover:bg-amber-600 text-white font-semibold py-3 px-6 rounded-xl transition-all text-[14px] shadow-md hover:shadow-lg active:scale-[0.97]">
         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
-        Abrir periodo e fechar comissoes
+        Abrir período e fechar comissões
+      </a>
+      <a href="{% url 'dashboard:gestor_fechamento' %}"
+         x-show="confirmingOpen"
+         x-cloak
+         class="inline-flex items-center gap-2 bg-amber-600 hover:bg-amber-700 text-white font-semibold py-3 px-6 rounded-xl transition-all text-[14px] shadow-md hover:shadow-lg active:scale-[0.97]">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"/></svg>
+        Confirmar fechamento? (clique novamente)
       </a>
     </div>
   </div>
@@ -94,20 +107,49 @@ function previaPage() {
         year: {{ current_year }},
         sellers: [],
         totals: null,
+        periodWorkingDays: 0,
+        confirmingOpen: false,
+        _confirmTimer: null,
+        confirmOpen(e) {
+            if (!this.confirmingOpen) {
+                e.preventDefault();
+                this.confirmingOpen = true;
+                var self = this;
+                this._confirmTimer = setTimeout(function(){ self.confirmingOpen = false; }, 5000);
+            }
+        },
+        computeWorkingDays() {
+            var y = parseInt(this.year, 10);
+            var m = parseInt(this.month, 10);
+            var daysInMonth = new Date(y, m, 0).getDate();
+            var count = 0;
+            for (var d = 1; d <= daysInMonth; d++) {
+                var dow = new Date(y, m - 1, d).getDay();
+                if (dow !== 0 && dow !== 6) count++;
+            }
+            this.periodWorkingDays = count;
+        },
+        missingBadgeClass(missing) {
+            var total = this.periodWorkingDays || 0;
+            if (total > 0 && missing > total * 0.8) return 'bg-red-50 text-red-700';
+            if (total > 0 && missing > total * 0.5) return 'bg-amber-50 text-amber-700';
+            return 'bg-gray-100 text-gray-600';
+        },
         load() {
             var self = this;
+            this.computeWorkingDays();
             fetch('/api/commissions/periods/preview/?month=' + self.month + '&year=' + self.year + '&_=' + Date.now(), {
                 headers: { 'Accept': 'application/json' },
                 credentials: 'same-origin',
             }).then(function(r) {
-                if (!r.ok) throw new Error('Erro ao carregar previa');
+                if (!r.ok) throw new Error('Erro ao carregar prévia');
                 return r.json();
             }).then(function(data) {
                 self.sellers = data.sellers;
                 self.totals = data.totals;
             }).catch(function(e) {
                 console.error(e);
-                showToast('Erro ao carregar previa: ' + e.message, 'error');
+                showToast('Erro ao carregar prévia: ' + e.message, 'error');
             });
         }
     }

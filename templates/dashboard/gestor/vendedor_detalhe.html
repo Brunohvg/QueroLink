@@ -191,7 +191,7 @@
     <p class="px-6 pb-3 text-[10px] text-gray-400">Vendas estornadas nao entram nos totais.</p>
 
     <!-- Modal de edicao -->
-    <div x-show="editModalOpen" class="fixed inset-0 z-50 flex items-center justify-center p-4"
+    <div x-show="editModalOpen" x-cloak class="fixed inset-0 z-50 flex items-center justify-center p-4"
          x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100"
          x-transition:leave="transition ease-in duration-150" x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0"
          @keydown.escape.window="editModalOpen = false">
@@ -245,7 +245,7 @@
     </div>
 
     <!-- Modal de historico -->
-    <div x-show="historyModalOpen" class="fixed inset-0 z-50 flex items-center justify-center p-4"
+    <div x-show="historyModalOpen" x-cloak class="fixed inset-0 z-50 flex items-center justify-center p-4"
          x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100"
          x-transition:leave="transition ease-in duration-150" x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0"
          @keydown.escape.window="historyModalOpen = false">

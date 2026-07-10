@@ -284,7 +284,7 @@
     </div>
   </div>
 
-  <div x-show="showRefundModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm" @click.self="showRefundModal=false">
+  <div x-show="showRefundModal" x-cloak class="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm" @click.self="showRefundModal=false">
     <div class="bg-white rounded-2xl shadow-xl p-6 w-full max-w-sm mx-4" @click.stop>
       <div class="flex items-center gap-3 mb-5">
         <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-amber-400 to-amber-500 flex items-center justify-center shadow-sm">
