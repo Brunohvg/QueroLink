@@ -828,12 +828,28 @@ function fechamentoPage() {
             this.createCalculatedWeekdays = 0;
             this.createDatesInvalid = false;
             this.showCreateModal = true;
-            this.$nextTick(() => {
-                this.createStartDate = new Date(y, m, 21).toISOString().slice(0, 10);
-                this.createEndDate = new Date(y, m + 1, 20).toISOString().slice(0, 10);
-                this.createLabel = this.suggestLabel(this.createEndDate);
-                this.onCreateDatesChanged();
-            });
+            this.$nextTick(() => { this.applySuggestion(m + 1, y); });
+        },
+        async applySuggestion(month, year) {
+            var d = new Date();
+            var fbY = year || d.getFullYear();
+            var fbM = month || (d.getMonth() + 1);
+            try {
+                var r = await fetch('/api/commissions/periods/suggest/?month=' + fbM + '&year=' + fbY);
+                if (r.ok) {
+                    var data = await r.json();
+                    this.createStartDate = data.start_date;
+                    this.createEndDate = data.end_date;
+                } else {
+                    this.createStartDate = new Date(fbY, fbM - 1, 21).toISOString().slice(0, 10);
+                    this.createEndDate = new Date(fbY, fbM, 20).toISOString().slice(0, 10);
+                }
+            } catch (e) {
+                this.createStartDate = new Date(fbY, fbM - 1, 21).toISOString().slice(0, 10);
+                this.createEndDate = new Date(fbY, fbM, 20).toISOString().slice(0, 10);
+            }
+            this.createLabel = this.suggestLabel(this.createEndDate);
+            this.onCreateDatesChanged();
         },
         suggestLabel(isoEnd) {
             var MESES = ['Janeiro','Fevereiro','Marco','Abril','Maio','Junho',

@@ -720,6 +720,31 @@ class CommissionPeriodViewSet(viewsets.ModelViewSet):
         pdf = HTML(string=full_html).write_pdf()
         return HttpResponse(pdf, content_type='application/pdf')
 
+    @action(detail=False, methods=['get'], permission_classes=[IsAuthenticated, IsManagerOrAdmin], url_path='suggest')
+    def suggest(self, request):
+        from app.apps.commissions.services import suggest_period_range
+
+        tenant = request.user.tenant
+        hoje = timezone.localdate()
+        try:
+            month = int(request.query_params.get('month', hoje.month))
+            year = int(request.query_params.get('year', hoje.year))
+        except (ValueError, TypeError):
+            return Response({'error': 'Mes/ano invalidos.'}, status=status.HTTP_400_BAD_REQUEST)
+        if month < 1 or month > 12:
+            return Response({'error': 'Mes deve estar entre 1 e 12.'}, status=status.HTTP_400_BAD_REQUEST)
+        if year < 2000 or year > 2100:
+            return Response({'error': 'Ano invalido.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        start, end = suggest_period_range(tenant, month, year)
+        return Response({
+            'month': month,
+            'year': year,
+            'period_start_day': tenant.period_start_day,
+            'start_date': start.isoformat(),
+            'end_date': end.isoformat(),
+        })
+
     @action(detail=False, methods=['get'], permission_classes=[IsAuthenticated, IsManagerOrAdmin], url_path='preview')
     def preview(self, request):
         from datetime import date

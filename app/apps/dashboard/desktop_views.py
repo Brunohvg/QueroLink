@@ -185,6 +185,18 @@ def gestor_configuracoes(request):
             except ValueError:
                 pass
 
+        period_start_day = request.POST.get('period_start_day', '').strip()
+        if period_start_day:
+            try:
+                psd = int(period_start_day)
+            except (ValueError, TypeError):
+                messages.error(request, 'Dia de inicio do periodo invalido.')
+            else:
+                if 1 <= psd <= 28:
+                    tenant.period_start_day = psd
+                else:
+                    messages.error(request, 'Dia de inicio do periodo deve estar entre 1 e 28.')
+
         tenant.pix_enabled = request.POST.get('pix_enabled') == '1'
         tenant.ranking_visible_to_sellers = request.POST.get('ranking_visible_to_sellers') == '1'
         tenant.accountant_email = request.POST.get('accountant_email', '').strip() or None

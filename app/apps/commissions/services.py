@@ -51,6 +51,18 @@ def suggest_label(end_date):
     return f'{MESES[end_date.month - 1]}/{end_date.year}'
 
 
+def suggest_period_range(tenant, month, year):
+    day = getattr(tenant, 'period_start_day', 1) or 1
+    if day <= 1:
+        return legacy_month_range(month, year)
+    if month > 1:
+        start = date(year, month - 1, day)
+    else:
+        start = date(year - 1, 12, day)
+    end = date(year, month, day - 1)
+    return start, end
+
+
 def get_period_by_legacy_label(tenant, month, year):
     return CommissionPeriod.objects.filter(
         tenant=tenant,

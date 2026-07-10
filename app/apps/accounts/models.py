@@ -1,6 +1,7 @@
 import uuid
 from django.db import models
 from django.core.exceptions import ValidationError
+from django.core.validators import MinValueValidator, MaxValueValidator
 from django.core.cache import cache
 from django.contrib.auth.models import AbstractUser
 from django.utils.text import slugify
@@ -33,6 +34,11 @@ class Tenant(models.Model):
     correios_cartao = models.CharField(max_length=30, blank=True, null=True,
         help_text='Cartao de postagem (opcional)')
     default_commission_rate = models.DecimalField(max_digits=5, decimal_places=4, default=0.01)
+    period_start_day = models.PositiveSmallIntegerField(
+        default=21,
+        validators=[MinValueValidator(1), MaxValueValidator(28)],
+        help_text='Dia de inicio do ciclo de comissao (ex.: 21 sugere periodos de 21 a 20).',
+    )
     link_expires_in = models.PositiveIntegerField(
         default=1200,
         help_text="Tempo de expiracao do link de pagamento em minutos (padrao 1200 = 20h)",
