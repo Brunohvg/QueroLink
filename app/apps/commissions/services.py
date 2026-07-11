@@ -937,6 +937,79 @@ def validate_sale_can_be_changed(seller, sale_date, user):
     return True, None
 
 
+# Estados de periodo que bloqueiam edicao/exclusao (regra central).
+_LOCKED_PERIOD_STATUSES = (
+    CommissionPeriod.Status.FECHADA,
+    CommissionPeriod.Status.PAGA,
+    CommissionPeriod.Status.CANCELADA,
+)
+# Estados de SellerCommission que bloqueiam edicao/exclusao (regra central).
+_LOCKED_SC_STATUSES = (
+    SellerCommission.Status.FECHADA,
+    SellerCommission.Status.PAGA,
+    SellerCommission.Status.AJUSTADA,
+    SellerCommission.Status.CANCELADA,
+)
+
+
+def build_sale_change_permission_resolver(seller, periods=None):
+    """Fabrica um resolvedor em lote da regra de edicao/exclusao de vendas.
+
+    Reproduz EXATAMENTE a regra central `validate_sale_can_be_changed`
+    (competencia inexistente => liberado; SellerCommission editavel => liberado;
+    caso contrario bloqueado), adicionando as travas de origem e status da
+    venda. Carrega periodos e comissoes do vendedor UMA vez (sem query por
+    venda), retornando `can_change(sale) -> bool`.
+
+    Fatores considerados:
+    - Sale.origin (apenas MANUAL pode ser alterada; IMPORTADA/LINK sao RO);
+    - Sale.status (ESTORNADA e somente leitura);
+    - CommissionPeriod.status (FECHADA/PAGA/CANCELADA bloqueia);
+    - SellerCommission.status (FECHADA/PAGA/AJUSTADA/CANCELADA bloqueia);
+    - competencia inexistente (liberado, como na regra central).
+
+    Observacao: periodos CANCELADOS sao considerados aqui (uma venda dentro de
+    um range cancelado deve ficar bloqueada), diferentemente de
+    `resolve_period_for_date`, que os ignora para fins de selecao financeira.
+
+    `periods` pode ser passado ja carregado (todos os periodos do tenant,
+    inclusive CANCELADOS) para evitar uma segunda query quando o chamador ja
+    possui a lista.
+    """
+    tenant = seller.tenant
+    if periods is None:
+        periods = list(
+            CommissionPeriod.objects.filter(tenant=tenant).order_by('start_date')
+        )
+    sc_by_period = {
+        sc.period_id: sc
+        for sc in SellerCommission.objects.filter(seller=seller)
+    }
+
+    def _resolve_period(sale_date):
+        for p in periods:
+            if p.start_date <= sale_date <= p.end_date:
+                return p
+        return None
+
+    def can_change(sale):
+        if sale.origin != Sale.Origin.MANUAL:
+            return False
+        if sale.status != 'ATIVA':
+            return False
+        period = _resolve_period(sale.sale_date)
+        if not period:
+            return True
+        if period.status in _LOCKED_PERIOD_STATUSES:
+            return False
+        sc = sc_by_period.get(period.uuid)
+        if not sc:
+            return True
+        return sc.status not in _LOCKED_SC_STATUSES
+
+    return can_change
+
+
 def has_paid_commission(period):
     return SellerCommission.objects.filter(
         period=period,
