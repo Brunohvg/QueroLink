@@ -4,7 +4,7 @@ import uuid
 from django.shortcuts import render, redirect, get_object_or_404
 
 logger = logging.getLogger(__name__)
-from django.http import JsonResponse, HttpResponseForbidden
+from django.http import JsonResponse, HttpResponseForbidden, Http404
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.utils import timezone
@@ -39,10 +39,13 @@ def gestor_home(request):
         return redirect('dashboard:gestor_home')
 
     from app.apps.commissions.services import (
-        build_period_selector_context, get_dashboard_data,
+        build_period_selector_context, get_dashboard_data, PeriodNotFound,
     )
     from datetime import timedelta
-    selector_ctx = build_period_selector_context(request, tenant)
+    try:
+        selector_ctx = build_period_selector_context(request, tenant)
+    except PeriodNotFound as exc:
+        raise Http404(str(exc)) from exc
     selected_period = selector_ctx['selected_period']
 
     data = get_dashboard_data(tenant, period=selected_period)
@@ -604,8 +607,13 @@ def gestor_vendedores(request):
     tenant = request.user.tenant
     selector_ctx = {}
     if tenant:
-        from app.apps.commissions.services import build_period_selector_context
-        selector_ctx = build_period_selector_context(request, tenant)
+        from app.apps.commissions.services import (
+            build_period_selector_context, PeriodNotFound,
+        )
+        try:
+            selector_ctx = build_period_selector_context(request, tenant)
+        except PeriodNotFound as exc:
+            raise Http404(str(exc)) from exc
     return render(request, 'dashboard/gestor/vendedores.html', {
         'periods': selector_ctx.get('periods', []),
         'has_periods': selector_ctx.get('has_periods', False),
@@ -635,8 +643,13 @@ def gestor_vendedor_detalhe(request, seller_id):
     except Seller.DoesNotExist:
         return redirect('dashboard:gestor_vendedores')
 
-    from app.apps.commissions.services import build_period_selector_context
-    selector_ctx = build_period_selector_context(request, tenant)
+    from app.apps.commissions.services import (
+        build_period_selector_context, PeriodNotFound,
+    )
+    try:
+        selector_ctx = build_period_selector_context(request, tenant)
+    except PeriodNotFound as exc:
+        raise Http404(str(exc)) from exc
 
     return render(request, 'dashboard/gestor/vendedor_detalhe.html', {
         'seller': seller,

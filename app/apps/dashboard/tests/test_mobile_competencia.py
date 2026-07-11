@@ -8,7 +8,7 @@ from django.contrib.auth import get_user_model
 from app.apps.accounts.models import Tenant
 from app.apps.commissions.models import CommissionPeriod, SellerCommission
 from app.apps.sellers.models import Seller
-from app.apps.sales.models import Sale
+from app.apps.sales.models import Sale, SaleChangeLog
 
 User = get_user_model()
 
@@ -132,3 +132,14 @@ class MobileCompetenciaFirstTest(TestCase):
         self.assertEqual(resp.status_code, 200)
         self.assertEqual(resp.context['month_total'], 0)
         self.assertIsNotNone(resp.context['no_current_period_message'])
+
+    def test_minhas_vendas_change_log_count_is_one(self):
+        sale = Sale.objects.get(sale_date=date(2026, 6, 25))
+        SaleChangeLog.objects.create(
+            sale=sale, tenant=self.tenant,
+            action=SaleChangeLog.Action.UPDATE,
+            changed_by=self.seller_user, reason='Correcao',
+        )
+        response = self.client.get('/dashboard/mobile/vendas/')
+        by_uuid = {item['uuid']: item for item in response.context['sales_json']}
+        self.assertEqual(by_uuid[str(sale.uuid)]['change_log_count'], 1)

@@ -486,7 +486,7 @@ def mobile_minhas_vendas(request):
     sales_data = []
     for s in sales:
         is_locked = any(sc.period.contains(s.sale_date) for sc in locked_periods)
-        log_count = log_counts.get(str(s.uuid), 0)
+        log_count = log_counts.get(s.uuid, 0)
         comp = _resolve_competencia(s.sale_date)
         competencia_label = ''
         if comp and comp.month != s.sale_date.month:

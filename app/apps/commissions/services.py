@@ -118,9 +118,6 @@ class PeriodNotFound(Exception):
 
 
 def get_default_period(tenant):
-    period = get_current_period(tenant)
-    if period:
-        return period
     today = timezone.localdate()
     covering = list(
         CommissionPeriod.objects.filter(
@@ -152,10 +149,13 @@ def resolve_selected_period(request, tenant):
         period_param = request.query_params.get('period') if hasattr(request, 'query_params') else None
 
     if period_param:
-        period = CommissionPeriod.objects.filter(
-            uuid=period_param,
-            tenant=tenant,
-        ).exclude(status=CommissionPeriod.Status.CANCELADA).first()
+        try:
+            period = CommissionPeriod.objects.filter(
+                uuid=period_param,
+                tenant=tenant,
+            ).exclude(status=CommissionPeriod.Status.CANCELADA).first()
+        except (ValidationError, ValueError):
+            period = None
         if not period:
             raise PeriodNotFound('Competencia nao encontrada.')
         return period
@@ -186,9 +186,6 @@ def build_period_selector_context(request, tenant):
     periods = get_selectable_periods(tenant)
     try:
         selected = resolve_selected_period(request, tenant)
-        integrity_error = None
-    except PeriodNotFound:
-        selected = None
         integrity_error = None
     except PeriodIntegrityError as exc:
         selected = None
@@ -620,7 +617,41 @@ def get_dashboard_data(tenant, month=None, year=None, period=None):
 
     if period is None:
         if month is None and year is None:
-            period = get_current_period(tenant)
+            period = get_default_period(tenant)
+            if period is None:
+                vendedores_ativos = Seller.objects.filter(
+                    tenant=tenant, is_active=True,
+                ).count()
+                return {
+                    'period': None,
+                    'prev_period_label': None,
+                    'total_vendido': 0,
+                    'commission_aberta': 0,
+                    'commission_fechada': 0,
+                    'commission_paga': 0,
+                    'period_status': None,
+                    'has_inconsistency': False,
+                    'vendedores_ativos': vendedores_ativos,
+                    'vendedores_total': Seller.objects.filter(tenant=tenant).count(),
+                    'vendedores_com_venda': 0,
+                    'vendedores_sem_lancamento_hoje': vendedores_ativos,
+                    'vendedores_abertos': 0,
+                    'vendedores_fechados': 0,
+                    'vendedores_pagos': 0,
+                    'vendedores_prontos': 0,
+                    'vendedores_pendentes': 0,
+                    'vendedores_sem_lancamento_periodo': vendedores_ativos,
+                    'links_gerados': 0,
+                    'links_pagos': 0,
+                    'links_pendentes': 0,
+                    'links_recusados': 0,
+                    'valor_gerado_links': 0,
+                    'valor_pago_links': 0,
+                    'top5_mes': [],
+                    'sellers_inativos': [],
+                    'evolution': [],
+                    'comparison_prev': 0,
+                }
         else:
             if month is None:
                 month = hoje.month

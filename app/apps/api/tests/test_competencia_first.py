@@ -1,5 +1,7 @@
 from datetime import date
 from decimal import Decimal
+import io
+from unittest.mock import patch
 
 from django.test import TestCase
 from django.urls import reverse
@@ -9,7 +11,7 @@ from rest_framework.test import APIClient
 from app.apps.accounts.models import Tenant, User
 from app.apps.sellers.models import Seller
 from app.apps.commissions.models import CommissionPeriod, SellerCommission
-from app.apps.sales.models import Sale
+from app.apps.sales.models import Sale, SaleChangeLog
 
 
 class CompetenciaFirstTest(TestCase):
@@ -179,8 +181,16 @@ class CompetenciaFirstTest(TestCase):
     # 3: lista de vendedores - total e comissao usam o mesmo periodo (ABERTA => taxa x total)
     def test_seller_list_total_times_rate_equals_commission(self):
         client = self._auth(self.manager, 'gestor123')
-        url = f'/api/manager/seller/{self.seller.uuid}/'
-        data = client.get(url + f'?period={self.period.uuid}').json()
+        list_response = client.get(reverse('api-seller-list'))
+        self.assertEqual(list_response.status_code, 200)
+        self.assertEqual(
+            [item['uuid'] for item in list_response.json()],
+            [str(self.seller.uuid)],
+        )
+        detail_url = f'/api/manager/seller/{self.seller.uuid}/'
+        data = client.get(
+            detail_url + f'?period={self.period.uuid}',
+        ).json()
         total = data['manual_total']
         commission = data['selected_period_commission']['commission_amount']
         self.assertEqual(commission, round(total * 0.01))
@@ -211,6 +221,49 @@ class CompetenciaFirstTest(TestCase):
         ctx = build_period_selector_context(_Req(), self.tenant)
         self.assertFalse(ctx['has_periods'])
         self.assertIsNone(ctx['selected_period'])
+
+    def test_two_periods_covering_today_raise_integrity_error(self):
+        from app.apps.commissions.services import get_default_period, PeriodIntegrityError
+        from django.utils import timezone
+
+        today = timezone.localdate()
+        second = CommissionPeriod.objects.create(
+            tenant=self.tenant, month=1 if today.month == 12 else today.month + 1,
+            year=today.year + 1 if today.month == 12 else today.year,
+            start_date=today.replace(year=today.year + 2),
+            end_date=today.replace(year=today.year + 2),
+        )
+        CommissionPeriod.objects.filter(uuid=second.uuid).update(
+            start_date=today, end_date=today,
+        )
+        with self.assertRaises(PeriodIntegrityError):
+            get_default_period(self.tenant)
+
+    def test_other_tenant_period_in_html_view_returns_404(self):
+        other_period = CommissionPeriod.objects.create(
+            tenant=self.tenant2, month=8, year=2026,
+            start_date=date(2026, 7, 21), end_date=date(2026, 8, 20),
+        )
+        self.client.force_login(self.manager)
+        response = self.client.get(
+            reverse('dashboard:gestor_vendedores') + f'?period={other_period.uuid}',
+        )
+        self.assertEqual(response.status_code, 404)
+
+    def test_sale_change_log_count_is_one(self):
+        sale = Sale.objects.get(sale_date=date(2026, 6, 25))
+        SaleChangeLog.objects.create(
+            sale=sale, tenant=self.tenant,
+            action=SaleChangeLog.Action.UPDATE,
+            changed_by=self.manager, reason='Correcao',
+        )
+        client = self._auth(self.manager, 'gestor123')
+        response = client.get(
+            f'/api/manager/seller/{self.seller.uuid}/'
+            + f'?period={self.period.uuid}',
+        )
+        by_uuid = {item['uuid']: item for item in response.json()['manual_sales']}
+        self.assertEqual(by_uuid[str(sale.uuid)]['change_log_count'], 1)
 
 
 class StatementCompetenciaTest(TestCase):
@@ -310,6 +363,14 @@ class ManagerCompetenciaExportTest(TestCase):
             tenant=self.tenant, seller=self.seller, origin=Sale.Origin.MANUAL,
             amount=200000, sale_date='2026-07-05', created_by=self.seller_user,
         )
+        Sale.objects.create(
+            tenant=self.tenant, seller=self.seller, origin=Sale.Origin.IMPORTADA,
+            amount=50000, sale_date='2026-07-10', created_by=self.seller_user,
+        )
+        Sale.objects.create(
+            tenant=self.tenant, seller=self.seller, origin=Sale.Origin.IMPORTADA,
+            amount=999999, sale_date='2026-07-21', created_by=self.seller_user,
+        )
 
     def _auth(self):
         client = APIClient()
@@ -328,3 +389,85 @@ class ManagerCompetenciaExportTest(TestCase):
         self.assertIn('30.00', content)
         self.assertIn('2026-06-25', content)
         self.assertIn('2026-07-05', content)
+
+    def test_csv_period_contains_only_period_sales(self):
+        client = self._auth()
+        response = client.get(
+            reverse('api-seller-report-csv', args=[self.seller.uuid])
+            + f'?period={self.period.uuid}',
+        )
+        content = response.content.decode('utf-8')
+        self.assertIn('2026-06-25', content)
+        self.assertIn('2026-07-05', content)
+        self.assertIn('2026-07-10', content)
+        self.assertNotIn('2026-07-21', content)
+
+    def test_xlsx_period_contains_same_sales(self):
+        from openpyxl import load_workbook
+
+        client = self._auth()
+        response = client.get(
+            reverse('api-seller-report-xlsx', args=[self.seller.uuid])
+            + f'?period={self.period.uuid}',
+        )
+        workbook = load_workbook(io.BytesIO(response.content), data_only=True)
+        rows = list(workbook.active.iter_rows(values_only=True))
+        rendered = '\n'.join(str(value) for row in rows for value in row if value)
+        self.assertIn('25/06/2026', rendered)
+        self.assertIn('05/07/2026', rendered)
+        self.assertIn('10/07/2026', rendered)
+        self.assertNotIn('21/07/2026', rendered)
+
+    def test_pdf_period_contains_sales_label_range_and_imported_origin(self):
+        client = self._auth()
+        with patch('weasyprint.HTML') as html_class:
+            html_class.return_value.write_pdf.return_value = b'%PDF-1.4'
+            response = client.get(
+                reverse('api-seller-report-pdf', args=[self.seller.uuid])
+                + f'?period={self.period.uuid}',
+            )
+        self.assertEqual(response.status_code, 200)
+        html = html_class.call_args.kwargs['string']
+        self.assertIn(self.period.display_label, html)
+        self.assertIn('21/06/2026', html)
+        self.assertIn('20/07/2026', html)
+        self.assertIn('25/06/2026', html)
+        self.assertIn('05/07/2026', html)
+        self.assertIn('10/07/2026', html)
+        self.assertNotIn('21/07/2026', html)
+        self.assertIn('Importada', html)
+
+    def test_custom_range_exports_do_not_show_official_commission(self):
+        client = self._auth()
+        query = '?start=2026-06-25&end=2026-07-05'
+        notice = 'Comissão oficial disponível apenas por competência'
+
+        csv_response = client.get(
+            reverse('api-seller-report-csv', args=[self.seller.uuid]) + query,
+        )
+        csv_content = csv_response.content.decode('utf-8')
+        self.assertIn(notice, csv_content)
+        self.assertNotIn('Comissao calculada', csv_content)
+
+        from openpyxl import load_workbook
+        xlsx_response = client.get(
+            reverse('api-seller-report-xlsx', args=[self.seller.uuid]) + query,
+        )
+        workbook = load_workbook(io.BytesIO(xlsx_response.content), data_only=True)
+        xlsx_text = '\n'.join(
+            str(value)
+            for row in workbook.active.iter_rows(values_only=True)
+            for value in row if value
+        )
+        self.assertIn(notice, xlsx_text)
+        self.assertNotIn('Comissao calculada', xlsx_text)
+
+        with patch('weasyprint.HTML') as html_class:
+            html_class.return_value.write_pdf.return_value = b'%PDF-1.4'
+            pdf_response = client.get(
+                reverse('api-seller-report-pdf', args=[self.seller.uuid]) + query,
+            )
+        self.assertEqual(pdf_response.status_code, 200)
+        pdf_html = html_class.call_args.kwargs['string']
+        self.assertIn(notice, pdf_html)
+        self.assertNotIn('Comissao calculada', pdf_html)

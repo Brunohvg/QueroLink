@@ -24,6 +24,7 @@
     <p class="subtitle">{{ tenant.company_name }} — {{ seller.phone }}</p>
 
     <div class="info">
+        {% if report_period %}<p><strong>Competencia:</strong> {{ report_period.display_label }}</p>{% endif %}
         <p><strong>Periodo:</strong> {{ start|date:"d/m/Y" }} a {{ end|date:"d/m/Y" }}</p>
         <p><strong>Total vendido (lancamentos manuais):</strong> R$ {{ total_fmt }}</p>
         <p><strong>Total de lancamentos:</strong> {{ sales|length }} registro{{ sales|length|pluralize }}</p>
@@ -37,6 +38,8 @@
         {% if commission.paid_at %}
         <p><strong>Pagamento:</strong> {{ commission.paid_at|date:"d/m/Y" }}{% if commission.paid_amount %} — {{ commission.paid_amount|brl }}{% endif %}</p>
         {% endif %}
+        {% elif commission_notice %}
+        <p><strong>{{ commission_notice }}</strong></p>
         {% endif %}
     </div>
 
@@ -47,19 +50,21 @@
 
     <table>
         <thead>
-            <tr><th>Data</th><th>Valor</th><th>Observacao</th></tr>
+            <tr><th>Data</th><th>Valor</th><th>Origem</th><th>Observacao</th></tr>
         </thead>
         <tbody>
             {% for s in sales %}
             <tr>
                 <td>{{ s.sale_date|date:"d/m/Y" }}</td>
                 <td>{{ s.amount|brl }}</td>
+                <td>{{ s.get_origin_display }}</td>
                 <td>{{ s.notes|default:"—" }}</td>
             </tr>
             {% endfor %}
             <tr class="total-row">
                 <td><strong>TOTAL</strong></td>
                 <td><strong>R$ {{ total_fmt }}</strong></td>
+                <td></td>
                 <td></td>
             </tr>
         </tbody>

@@ -1040,11 +1040,10 @@ class SellerDetailView(generics.GenericAPIView):
     permission_classes = [IsAuthenticated, IsManagerOrAdmin]
 
     def get(self, request, seller_id=None):
-        import calendar
         from app.apps.commissions.services import (
-            resolve_selected_period, get_previous_period,
+            resolve_selected_period,
             calculate_estimated_commission_for_period,
-            get_period_by_legacy_label, PeriodNotFound, PeriodIntegrityError,
+            PeriodNotFound, PeriodIntegrityError,
         )
 
         tenant = request.user.tenant
@@ -1060,8 +1059,6 @@ class SellerDetailView(generics.GenericAPIView):
         start_str = request.query_params.get('start')
         end_str = request.query_params.get('end')
         period_param = request.query_params.get('period')
-        hoje = timezone.localdate()
-
         selected_period = None
         is_custom = False
 
@@ -1079,28 +1076,31 @@ class SellerDetailView(generics.GenericAPIView):
             start = date.fromisoformat(start_str)
             end = date.fromisoformat(end_str)
         else:
-            month = int(request.query_params.get('month', hoje.month))
-            year = int(request.query_params.get('year', hoje.year))
-            selected_period = get_period_by_legacy_label(tenant, month, year)
+            try:
+                selected_period = resolve_selected_period(request, tenant)
+            except PeriodIntegrityError as exc:
+                return Response({'error': str(exc)}, status=409)
             if selected_period:
                 start = selected_period.start_date
                 end = selected_period.end_date
             else:
-                start = date(year, month, 1)
-                last_day = calendar.monthrange(year, month)[1]
-                end = date(year, month, last_day)
+                start = end = None
 
-        manual_sales_qs = Sale.objects.filter(
-            tenant=tenant, seller=seller,
-            origin__in=Sale.COMMISSION_ORIGINS,
-            sale_date__gte=start, sale_date__lte=end,
-        ).order_by('-sale_date', '-created_at')
+        if start is None:
+            manual_sales_qs = Sale.objects.none()
+            link_sales_qs = Sale.objects.none()
+        else:
+            manual_sales_qs = Sale.objects.filter(
+                tenant=tenant, seller=seller,
+                origin__in=Sale.COMMISSION_ORIGINS,
+                sale_date__gte=start, sale_date__lte=end,
+            ).order_by('-sale_date', '-created_at')
 
-        link_sales_qs = Sale.objects.filter(
-            tenant=tenant, seller=seller,
-            origin=Sale.Origin.LINK,
-            sale_date__gte=start, sale_date__lte=end,
-        ).order_by('-sale_date', '-created_at')
+            link_sales_qs = Sale.objects.filter(
+                tenant=tenant, seller=seller,
+                origin=Sale.Origin.LINK,
+                sale_date__gte=start, sale_date__lte=end,
+            ).order_by('-sale_date', '-created_at')
 
         manual_total = manual_sales_qs.filter(status='ATIVA').aggregate(
             t=Sum('amount'),
@@ -1128,7 +1128,7 @@ class SellerDetailView(generics.GenericAPIView):
                 'sale_date': s.sale_date.isoformat(),
                 'notes': s.notes or '',
                 'status': s.status,
-                'change_log_count': log_counts.get(str(s.uuid), 0),
+                'change_log_count': log_counts.get(s.uuid, 0),
             })
 
         link_sales = []
@@ -1166,9 +1166,8 @@ class SellerDetailView(generics.GenericAPIView):
             commission_amount = sc.commission_amount
 
             if period_status == CommissionPeriod.Status.ABERTA:
-                from app.apps.commissions.services import calculate_estimated_commission
-                est, total = calculate_estimated_commission(
-                    seller, sc.period.month, sc.period.year,
+                est, total = calculate_estimated_commission_for_period(
+                    seller, sc.period,
                 )
                 total_sold = total
                 commission_amount = est
@@ -1284,7 +1283,10 @@ class SellerDetailView(generics.GenericAPIView):
                 ),
                 'username': seller.user.username if seller.user else None,
             },
-            'period': {'start': start.isoformat(), 'end': end.isoformat()},
+            'period': (
+                {'start': start.isoformat(), 'end': end.isoformat()}
+                if start else None
+            ),
             'is_custom_range': is_custom,
             'selected_period': selected_period_data,
             'selected_period_commission': selected_period_commission,
@@ -1307,7 +1309,6 @@ class SellerReportCsvView(generics.GenericAPIView):
     def get(self, request, seller_id=None):
         import csv
         import io
-        import calendar
         from app.apps.commissions.services import resolve_selected_period, PeriodNotFound, PeriodIntegrityError
 
         tenant = request.user.tenant
@@ -1316,8 +1317,8 @@ class SellerReportCsvView(generics.GenericAPIView):
         start_str = request.query_params.get('start')
         end_str = request.query_params.get('end')
         period_param = request.query_params.get('period')
-        hoje = timezone.localdate()
         report_period = None
+        is_custom = False
 
         if period_param:
             try:
@@ -1329,13 +1330,18 @@ class SellerReportCsvView(generics.GenericAPIView):
             start = report_period.start_date
             end = report_period.end_date
         elif start_str and end_str:
+            is_custom = True
             start = date.fromisoformat(start_str)
             end = date.fromisoformat(end_str)
         else:
-            month = int(request.query_params.get('month', hoje.month))
-            year = int(request.query_params.get('year', hoje.year))
-            start = date(year, month, 1)
-            end = date(year, month, calendar.monthrange(year, month)[1])
+            try:
+                report_period = resolve_selected_period(request, tenant)
+            except PeriodIntegrityError as exc:
+                return Response({'error': str(exc)}, status=409)
+            if not report_period:
+                return Response({'detail': 'Nenhuma competencia disponivel.'})
+            start = report_period.start_date
+            end = report_period.end_date
 
         sales = Sale.objects.filter(
             tenant=tenant, seller=seller,
@@ -1343,9 +1349,6 @@ class SellerReportCsvView(generics.GenericAPIView):
             sale_date__gte=start, sale_date__lte=end,
         ).order_by('sale_date')
 
-        if report_period is None:
-            from app.apps.commissions.services import get_period_by_legacy_label
-            report_period = get_period_by_legacy_label(tenant, start.month, start.year)
         commission = SellerCommission.objects.filter(
             seller=seller, period=report_period,
         ).first() if report_period else None
@@ -1389,6 +1392,10 @@ class SellerReportCsvView(generics.GenericAPIView):
             writer.writerow([
                 'Status', status_display, '',
             ])
+        elif is_custom:
+            writer.writerow([
+                'Comissão oficial disponível apenas por competência', '', '',
+            ])
         writer.writerow([])
         writer.writerow([f'Vendedor: {seller.name}'])
         writer.writerow([f'Empresa: {tenant.company_name}'])
@@ -1409,7 +1416,6 @@ class SellerReportExcelView(generics.GenericAPIView):
 
     def get(self, request, seller_id=None):
         import io
-        import calendar
         from openpyxl import Workbook
         from openpyxl.styles import Font, Alignment, PatternFill
         from app.apps.commissions.services import resolve_selected_period, PeriodNotFound, PeriodIntegrityError
@@ -1420,8 +1426,8 @@ class SellerReportExcelView(generics.GenericAPIView):
         start_str = request.query_params.get('start')
         end_str = request.query_params.get('end')
         period_param = request.query_params.get('period')
-        hoje = timezone.localdate()
         report_period = None
+        is_custom = False
 
         if period_param:
             try:
@@ -1433,13 +1439,18 @@ class SellerReportExcelView(generics.GenericAPIView):
             start = report_period.start_date
             end = report_period.end_date
         elif start_str and end_str:
+            is_custom = True
             start = date.fromisoformat(start_str)
             end = date.fromisoformat(end_str)
         else:
-            month = int(request.query_params.get('month', hoje.month))
-            year = int(request.query_params.get('year', hoje.year))
-            start = date(year, month, 1)
-            end = date(year, month, calendar.monthrange(year, month)[1])
+            try:
+                report_period = resolve_selected_period(request, tenant)
+            except PeriodIntegrityError as exc:
+                return Response({'error': str(exc)}, status=409)
+            if not report_period:
+                return Response({'detail': 'Nenhuma competencia disponivel.'})
+            start = report_period.start_date
+            end = report_period.end_date
 
         sales = Sale.objects.filter(
             tenant=tenant, seller=seller,
@@ -1447,9 +1458,6 @@ class SellerReportExcelView(generics.GenericAPIView):
             sale_date__gte=start, sale_date__lte=end,
         ).order_by('sale_date')
 
-        if report_period is None:
-            from app.apps.commissions.services import get_period_by_legacy_label
-            report_period = get_period_by_legacy_label(tenant, start.month, start.year)
         commission = SellerCommission.objects.filter(
             seller=seller, period=report_period,
         ).first() if report_period else None
@@ -1525,6 +1533,11 @@ class SellerReportExcelView(generics.GenericAPIView):
                 'Status',
                 status_display, '',
             ])
+        elif is_custom:
+            ws.append([])
+            ws.append([
+                'Comissão oficial disponível apenas por competência', '', '',
+            ])
 
         ws.column_dimensions['A'].width = 14
         ws.column_dimensions['B'].width = 18
@@ -1551,7 +1564,6 @@ class SellerReportPdfView(generics.GenericAPIView):
     permission_classes = [IsAuthenticated, IsManagerOrAdmin]
 
     def get(self, request, seller_id=None):
-        import calendar
         from django.template.loader import render_to_string
         from app.apps.commissions.services import resolve_selected_period, PeriodNotFound, PeriodIntegrityError
 
@@ -1563,6 +1575,7 @@ class SellerReportPdfView(generics.GenericAPIView):
         period_param = request.query_params.get('period')
         hoje = timezone.localdate()
         report_period = None
+        is_custom = False
 
         if period_param:
             try:
@@ -1574,13 +1587,18 @@ class SellerReportPdfView(generics.GenericAPIView):
             start = report_period.start_date
             end = report_period.end_date
         elif start_str and end_str:
+            is_custom = True
             start = date.fromisoformat(start_str)
             end = date.fromisoformat(end_str)
         else:
-            month = int(request.query_params.get('month', hoje.month))
-            year = int(request.query_params.get('year', hoje.year))
-            start = date(year, month, 1)
-            end = date(year, month, calendar.monthrange(year, month)[1])
+            try:
+                report_period = resolve_selected_period(request, tenant)
+            except PeriodIntegrityError as exc:
+                return Response({'error': str(exc)}, status=409)
+            if not report_period:
+                return Response({'detail': 'Nenhuma competencia disponivel.'})
+            start = report_period.start_date
+            end = report_period.end_date
 
         sales = Sale.objects.filter(
             tenant=tenant, seller=seller,
@@ -1590,9 +1608,6 @@ class SellerReportPdfView(generics.GenericAPIView):
 
         total = sum(s.amount for s in sales)
 
-        if report_period is None:
-            from app.apps.commissions.services import get_period_by_legacy_label
-            report_period = get_period_by_legacy_label(tenant, start.month, start.year)
         commission = SellerCommission.objects.filter(
             seller=seller, period=report_period,
         ).first() if report_period else None
@@ -1631,6 +1646,11 @@ class SellerReportPdfView(generics.GenericAPIView):
             'total': total,
             'total_fmt': total_fmt,
             'commission': commission,
+            'commission_notice': (
+                'Comissão oficial disponível apenas por competência'
+                if is_custom else ''
+            ),
+            'report_period': report_period,
             'commission_amount': commission_amount,
             'commission_amount_fmt': commission_amount_fmt,
             'rate_fmt': rate_fmt,
@@ -1958,13 +1978,15 @@ class SellerStatementView(generics.GenericAPIView):
         statement_period = None
         is_month_fallback = False
 
-        if period_param:
+        if period_param or (year is None and month is None):
             try:
                 statement_period = resolve_selected_period(request, seller.tenant)
             except PeriodNotFound:
                 return Response({'error': 'Competencia nao encontrada.'}, status=404)
             except PeriodIntegrityError as exc:
                 return Response({'error': str(exc)}, status=409)
+            if not statement_period:
+                return Response({'detail': 'Nenhuma competencia disponivel.'})
             start = statement_period.start_date
             end = statement_period.end_date
             year_int = statement_period.year
