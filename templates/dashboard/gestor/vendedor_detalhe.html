@@ -84,10 +84,10 @@
     {% verbatim %}
     <p class="text-[12px] text-gray-500 mt-3" x-show="mode === 'period' && sellerData?.selected_period">
       Competencia <span class="font-semibold" x-text="sellerData?.selected_period?.display_label"></span> ·
-      <span x-text="sellerData?.selected_period ? new Date(sellerData.selected_period.start_date+'T00:00:00').toLocaleDateString('pt-BR') + ' a ' + new Date(sellerData.selected_period.end_date+'T00:00:00').toLocaleDateString('pt-BR') : ''"></span>
+      <span x-text="sellerData?.selected_period ? formatCivilDate(sellerData.selected_period.start_date) + ' a ' + formatCivilDate(sellerData.selected_period.end_date) : ''"></span>
     </p>
     <p class="text-[12px] text-amber-600 mt-3" x-show="mode === 'custom'">
-      Periodo customizado <span class="font-semibold" x-text="startDate && endDate ? (new Date(startDate+'T00:00:00').toLocaleDateString('pt-BR') + ' a ' + new Date(endDate+'T00:00:00').toLocaleDateString('pt-BR')) : ''"></span> — a comissao oficial e calculada por competencia.
+      Periodo customizado <span class="font-semibold" x-text="startDate && endDate ? (formatCivilDate(startDate) + ' a ' + formatCivilDate(endDate)) : ''"></span> — a comissao oficial e calculada por competencia.
     </p>
     {% endverbatim %}
   </div>
@@ -173,7 +173,7 @@
         <tbody>
           <template x-for="s in sellerData?.manual_sales" :key="s.uuid">
             <tr class="border-b border-gray-50 hover:bg-gray-50/50 transition-colors">
-              <td class="px-4 py-3.5 text-[13px] text-gray-500" x-text="new Date(s.sale_date).toLocaleDateString('pt-BR')"></td>
+              <td class="px-4 py-3.5 text-[13px] text-gray-500" x-text="formatCivilDate(s.sale_date)"></td>
               <td class="px-4 py-3.5 font-semibold text-[14px]" :class="s.status === 'ESTORNADA' ? 'text-gray-400 line-through opacity-60' : 'text-gray-900'" x-text="formatMoneyBRL(s.amount)"></td>
               <td class="px-4 py-3.5 text-[13px] text-gray-500">
                 <span x-text="s.notes || '—'"></span>
@@ -315,7 +315,7 @@
         <tbody>
           <template x-for="s in sellerData?.link_sales" :key="s.uuid">
             <tr class="border-b border-gray-50 hover:bg-gray-50/50 transition-colors">
-              <td class="px-4 py-3.5 text-[13px] text-gray-500" x-text="new Date(s.sale_date).toLocaleDateString('pt-BR')"></td>
+              <td class="px-4 py-3.5 text-[13px] text-gray-500" x-text="formatCivilDate(s.sale_date)"></td>
               <td class="px-4 py-3.5 font-semibold text-[14px]" :class="s.status === 'ESTORNADA' ? 'text-gray-400 line-through opacity-60' : 'text-gray-900'" x-text="formatMoneyBRL(s.amount)"></td>
               <td class="px-4 py-3.5 text-[13px] text-gray-500">
                 <span x-text="s.notes || '—'"></span>
@@ -409,7 +409,7 @@ function sellerDetailPage() {
             this.chart = new Chart(ctx, {
                 type: 'line',
                 data: {
-                    labels: this.sellerData.evolution.map(e => new Date(e.date).toLocaleDateString('pt-BR', {day: '2-digit', month: '2-digit'})),
+                    labels: this.sellerData.evolution.map(e => formatCivilDate(e.date, {day: '2-digit', month: '2-digit'})),
                     datasets: [{
                         label: 'Total (R$)',
                         data: this.sellerData.evolution.map(e => e.total / 100),
