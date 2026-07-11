@@ -50,16 +50,16 @@
   <div class="bg-white rounded-2xl border border-gray-100 shadow-[0_1px_3px_-1px_rgba(0,0,0,0.04),0_4px_16px_-4px_rgba(67,97,238,0.06)] p-5 mb-6">
     <div class="flex flex-col sm:flex-row flex-wrap items-start sm:items-center gap-3">
       <div class="flex items-center gap-2">
-        <label class="text-[13px] font-medium text-gray-500">Mes:</label>
-        <select x-model="month" @change="load()" class="px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-[13px] outline-none transition-all focus:border-brand-400 focus:ring-2 focus:ring-brand-100">
-          <template x-for="m in 12" :key="m"><option :value="m" x-text="String(m).padStart(2,'0')"></option></template>
-        </select>
-        <select x-model="year" @change="load()" class="px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-[13px] outline-none transition-all focus:border-brand-400 focus:ring-2 focus:ring-brand-100">
-          <option value="2024">2024</option><option value="2025">2025</option><option value="2026">2026</option><option value="2027">2027</option><option value="2028">2028</option>
+        <label class="text-[13px] font-medium text-gray-500">Modo:</label>
+        <select x-model="mode" @change="onModeChange()" class="px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-[13px] outline-none transition-all focus:border-brand-400 focus:ring-2 focus:ring-brand-100">
+          <option value="period">Competencia</option>
+          <option value="custom">Periodo personalizado</option>
         </select>
       </div>
-      <span class="text-[13px] text-gray-300 hidden sm:inline">|</span>
-      <div class="flex items-center gap-2">
+      <div class="flex items-center gap-2" x-show="mode === 'period'">
+        {% include 'components/_period_selector.html' with periods=periods selected_period_uuid=selected_period_uuid has_periods=has_periods %}
+      </div>
+      <div class="flex items-center gap-2" x-show="mode === 'custom'">
         <label class="text-[13px] font-medium text-gray-500">De:</label>
         <input type="date" x-model="startDate" @change="load()" class="px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-[13px] outline-none transition-all focus:border-brand-400 focus:ring-2 focus:ring-brand-100">
         <label class="text-[13px] font-medium text-gray-500">ate:</label>
@@ -81,6 +81,15 @@
         </button>
       </div>
     </div>
+    {% verbatim %}
+    <p class="text-[12px] text-gray-500 mt-3" x-show="mode === 'period' && sellerData?.selected_period">
+      Competencia <span class="font-semibold" x-text="sellerData?.selected_period?.display_label"></span> ·
+      <span x-text="sellerData?.selected_period ? new Date(sellerData.selected_period.start_date+'T00:00:00').toLocaleDateString('pt-BR') + ' a ' + new Date(sellerData.selected_period.end_date+'T00:00:00').toLocaleDateString('pt-BR') : ''"></span>
+    </p>
+    <p class="text-[12px] text-amber-600 mt-3" x-show="mode === 'custom'">
+      Periodo customizado <span class="font-semibold" x-text="startDate && endDate ? (new Date(startDate+'T00:00:00').toLocaleDateString('pt-BR') + ' a ' + new Date(endDate+'T00:00:00').toLocaleDateString('pt-BR')) : ''"></span> — a comissao oficial e calculada por competencia.
+    </p>
+    {% endverbatim %}
   </div>
 
   {% verbatim %}
@@ -97,8 +106,12 @@
       <div class="absolute top-0 right-0 w-32 h-32 bg-gradient-to-bl from-emerald-50/60 to-transparent rounded-full -mr-8 -mt-8"></div>
       <div class="relative">
         <p class="text-[11px] font-semibold text-gray-400 uppercase tracking-[0.08em] mb-2">Comissao</p>
-        <p class="font-display text-[28px] font-bold text-emerald-600 leading-none" x-text="formatMoneyBRL(sellerData?.commissions?.[0]?.commission_amount || 0)"></p>
-        <p class="text-[13px] text-gray-500 mt-2">Taxa: <span class="font-medium text-emerald-600" x-text="sellerData?.seller?.commission_rate ? (sellerData.seller.commission_rate*100).toFixed(2)+'%' : '-'"></span></p>
+        <p class="font-display text-[28px] font-bold text-emerald-600 leading-none" x-text="mode === 'custom' ? '—' : formatMoneyBRL(sellerData?.selected_period_commission?.commission_amount || 0)"></p>
+        <p class="text-[13px] text-gray-500 mt-2" x-show="mode !== 'custom'">Taxa: <span class="font-medium text-emerald-600" x-text="sellerData?.selected_period_commission ? (sellerData.selected_period_commission.commission_rate*100).toFixed(2)+'%' : '-'"></span>
+          <span x-show="sellerData?.selected_period_commission?.is_estimated" class="text-[11px] text-gray-400">· estimativa</span>
+          <span x-show="sellerData?.selected_period_commission && !sellerData?.selected_period_commission?.is_estimated" class="text-[11px] text-gray-400">· congelada</span>
+        </p>
+        <p class="text-[12px] text-amber-600 mt-2" x-show="mode === 'custom'" title="A comissao oficial e calculada por competencia">A comissao oficial e calculada por competencia.</p>
       </div>
     </div>
     <div class="relative overflow-hidden bg-white rounded-2xl p-5 border border-gray-100 shadow-[0_1px_3px_-1px_rgba(0,0,0,0.04),0_4px_16px_-4px_rgba(67,97,238,0.06)]">
@@ -117,12 +130,12 @@
       <div class="h-64"><canvas id="evolutionChart"></canvas></div>
     </div>
     <div class="bg-white rounded-2xl border border-gray-100 shadow-[0_1px_3px_-1px_rgba(0,0,0,0.04),0_4px_16px_-4px_rgba(67,97,238,0.06)] p-6" x-show="sellerData?.comparison?.length">
-      <h3 class="text-[13px] font-semibold text-gray-400 uppercase tracking-wider mb-4">Comparacao mensal</h3>
+      <h3 class="text-[13px] font-semibold text-gray-400 uppercase tracking-wider mb-4">Comparacao entre competencias</h3>
       <div class="overflow-x-auto">
         <table class="w-full text-left text-[13px]">
           <thead>
             <tr class="bg-gray-50/80">
-              <th class="px-4 py-3 text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Mes</th>
+              <th class="px-4 py-3 text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Competencia</th>
               <th class="px-4 py-3 text-[11px] font-semibold text-gray-500 uppercase tracking-wider text-right">Vendas</th>
               <th class="px-4 py-3 text-[11px] font-semibold text-gray-500 uppercase tracking-wider text-right">Total</th>
               <th class="px-4 py-3 text-[11px] font-semibold text-gray-500 uppercase tracking-wider text-right">Comissao</th>
@@ -362,8 +375,8 @@
 function sellerDetailPage() {
     return {
         sellerData: null,
-        month: new Date().getMonth() + 1,
-        year: new Date().getFullYear(),
+        mode: 'period',
+        periodUuid: '',
         startDate: '',
         endDate: '',
         sellerId: '',
@@ -374,13 +387,18 @@ function sellerDetailPage() {
         editError: '',
         historyModalOpen: false,
         historyData: [],
-        init(sellerId) { this.sellerId = sellerId; this.load(); },
+        init(sellerId) {
+            this.sellerId = sellerId;
+            var pageParams = new URLSearchParams(window.location.search);
+            this.periodUuid = pageParams.get('period') || '';
+            this.load();
+        },
+        onModeChange() {
+            if (this.mode === 'period') { this.startDate = ''; this.endDate = ''; this.load(); }
+        },
         async load() {
             var apiUrl = '/api/manager/seller/' + this.sellerId + '/';
-            var params = new URLSearchParams();
-            if (this.startDate && this.endDate) { params.set('start', this.startDate); params.set('end', this.endDate); }
-            else { params.set('month', this.month); params.set('year', this.year); }
-            var r = await fetch(apiUrl + '?' + params.toString());
+            var r = await fetch(apiUrl + '?' + this.buildParams());
             this.sellerData = await r.json();
             this.$nextTick(() => this.drawChart());
         },
@@ -409,8 +427,11 @@ function sellerDetailPage() {
         },
         buildParams() {
             var p = new URLSearchParams();
-            if (this.startDate && this.endDate) { p.set('start', this.startDate); p.set('end', this.endDate); }
-            else { p.set('month', this.month); p.set('year', this.year); }
+            if (this.mode === 'custom' && this.startDate && this.endDate) {
+                p.set('start', this.startDate); p.set('end', this.endDate);
+            } else if (this.periodUuid) {
+                p.set('period', this.periodUuid);
+            }
             return p.toString();
         },
         exportCsv() { window.open('/api/manager/seller/' + this.sellerId + '/csv/?' + this.buildParams()); },

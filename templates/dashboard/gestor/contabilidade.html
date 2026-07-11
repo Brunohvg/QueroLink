@@ -75,7 +75,7 @@
       <tbody>
         {% for c in competencias %}
         <tr class="border-b border-gray-50 hover:bg-gray-50/50">
-          <td class="py-2.5 px-3 font-medium">{{ c.label }}</td>
+          <td class="py-2.5 px-3 font-medium">{{ c.label }}<br><span class="text-[10px] text-gray-400 font-normal">{{ c.range }}</span></td>
           <td class="py-2.5 px-3 text-right font-mono">{{ c.total_sold|brl }}</td>
           <td class="py-2.5 px-3 text-right font-mono text-emerald-600">{{ c.total_comm|brl }}</td>
           <td class="py-2.5 px-3 text-center">

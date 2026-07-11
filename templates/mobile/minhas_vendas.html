@@ -102,6 +102,9 @@
                             class="inline-flex items-center px-1.5 py-0.5 rounded-full text-[9px] font-semibold bg-red-50 text-red-600">Estornada</span>
                       <span x-show="sale.change_log_count > 0"
                             class="inline-flex items-center px-1.5 py-0.5 rounded-full text-[9px] font-semibold bg-amber-50 text-amber-600">Ajustada pelo gestor</span>
+                      <span x-show="sale.competencia_label"
+                            class="inline-flex items-center px-1.5 py-0.5 rounded-full text-[9px] font-semibold bg-sky-50 text-sky-600"
+                            x-text="'Comp. ' + sale.competencia_label"></span>
                       <span x-show="sale.notes" class="text-[11px] text-gray-400 truncate" x-text="sale.notes"></span>
                     </div>
                   </div>

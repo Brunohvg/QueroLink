@@ -70,3 +70,49 @@ class GestorContabilidadeTest(TestCase):
         response = self.client.get(self.url)
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, 'Contabilidade')
+
+
+class ContabilidadeCompetenciaRangeTest(TestCase):
+    """PROMPT_42 LOTE 13 - contabilidade usa ranges reais, nao mes-calendario."""
+
+    def setUp(self):
+        self.tenant = Tenant.objects.create(
+            company_name='Loja Range', slug='loja-range', is_active=True,
+        )
+        self.admin = User.objects.create_user(
+            username='adminrange', password='Senha@12345678',
+            role=User.Role.ADMIN, tenant=self.tenant,
+        )
+        self.seller_user = User.objects.create_user(
+            username='vendrange', password='Senha@12345678',
+            role=User.Role.SELLER, tenant=self.tenant,
+        )
+        self.seller = Seller.objects.create(
+            tenant=self.tenant, user=self.seller_user, name='Vend Range',
+            phone='11999998888', is_active=True,
+        )
+        # Competencia 21/06 a 20/07
+        self.period = CommissionPeriod.objects.create(
+            tenant=self.tenant, month=7, year=2026,
+            start_date=date(2026, 6, 21), end_date=date(2026, 7, 20),
+            label='Julho/2026',
+        )
+        # venda 25/06 (dentro do range) e 21/07 (fora)
+        Sale.objects.create(
+            tenant=self.tenant, seller=self.seller, origin=Sale.Origin.MANUAL,
+            amount=500000, status='ATIVA', sale_date='2026-06-25',
+        )
+        Sale.objects.create(
+            tenant=self.tenant, seller=self.seller, origin=Sale.Origin.MANUAL,
+            amount=999999, status='ATIVA', sale_date='2026-07-21',
+        )
+
+    def test_contabilidade_totals_use_period_range(self):
+        self.client.force_login(self.admin)
+        resp = self.client.get('/dashboard/gestor/contabilidade/')
+        self.assertEqual(resp.status_code, 200)
+        comps = {c['label']: c for c in resp.context['competencias']}
+        self.assertIn('Julho/2026', comps)
+        # so a venda de 25/06 (dentro do range) entra; 21/07 fica de fora
+        self.assertEqual(comps['Julho/2026']['total_sold'], 500000)
+        self.assertEqual(comps['Julho/2026']['range'], '21/06/2026 a 20/07/2026')

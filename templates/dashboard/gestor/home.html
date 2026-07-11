@@ -92,23 +92,10 @@
 </div>
 
 <div class="bg-white rounded-2xl p-4 mb-6 shadow-sm flex items-center gap-4 flex-wrap" style="box-shadow: 0 1px 2px rgba(11,17,32,0.04), 0 2px 8px rgba(11,17,32,0.04);">
-    <div class="flex items-center gap-3">
-        <span class="text-[13px] text-gray-500 font-medium">Periodo</span>
-        <div class="flex items-center gap-2">
-            <select x-model="filterMonth" @change="loadSummary()" class="px-3 py-2.5 border border-gray-200 rounded-xl text-[14px] bg-gray-50/50 hover:border-brand-300 focus:border-brand-400 focus:outline-none focus:ring-2 focus:ring-brand-100 transition cursor-pointer appearance-none pr-8" style="background-image:url('data:image/svg+xml;utf8,<svg xmlns=%22http://www.w3.org/2000/svg%22 width=%2216%22 height=%2216%22 viewBox=%220 0 24 24%22 fill=%22none%22 stroke=%22%239ca3af%22 stroke-width=%222%22><path stroke-linecap=%22round%22 stroke-linejoin=%22round%22 d=%22M6 9l6 6 6-6%22/></svg>');background-repeat:no-repeat;background-position:right 8px center;">
-                <option value="">Mes atual</option>
-                <template x-for="m in 12" :key="m">
-                    <option :value="m" x-text="m < 10 ? '0' + m : m"></option>
-                </template>
-            </select>
-            <select x-model="filterYear" @change="loadSummary()" class="px-3 py-2.5 border border-gray-200 rounded-xl text-[14px] bg-gray-50/50 hover:border-brand-300 focus:border-brand-400 focus:outline-none focus:ring-2 focus:ring-brand-100 transition cursor-pointer appearance-none pr-8" style="background-image:url('data:image/svg+xml;utf8,<svg xmlns=%22http://www.w3.org/2000/svg%22 width=%2216%22 height=%2216%22 viewBox=%220 0 24 24%22 fill=%22none%22 stroke=%22%239ca3af%22 stroke-width=%222%22><path stroke-linecap=%22round%22 stroke-linejoin=%22round%22 d=%22M6 9l6 6 6-6%22/></svg>');background-repeat:no-repeat;background-position:right 8px center;">
-                <option value="">Ano atual</option>
-                <template x-for="y in [...Array(6)].map(function(_,i){return new Date().getFullYear()-2+i})" :key="y">
-                    <option :value="y" x-text="y"></option>
-                </template>
-            </select>
-        </div>
-    </div>
+    {% include 'components/_period_selector.html' with periods=periods selected_period_uuid=selected_period_uuid has_periods=has_periods %}
+    {% if selected_period %}
+    <span class="text-[12px] text-gray-500 font-medium">{{ selected_period.display_label }} · {{ selected_period.start_date|date:"d/m/Y" }} a {{ selected_period.end_date|date:"d/m/Y" }}</span>
+    {% endif %}
     <div class="h-5 w-px bg-gray-200 hidden md:block"></div>
     <span class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium"
           :class="{'bg-brand-50 text-brand-700': summary?.period_status === 'ABERTA',
@@ -146,12 +133,12 @@
     <div class="relative">
         <div class="flex items-start justify-between">
             <div>
-                <p class="text-[12px] font-semibold text-brand-600 uppercase tracking-wider mb-1">Vendas manuais — Total no mes</p>
+                <p class="text-[12px] font-semibold text-brand-600 uppercase tracking-wider mb-1">Vendas manuais — Total na competencia</p>
                 <p class="font-display text-[42px] font-bold text-brand-700 leading-none" x-text="formatMoneyBRL(summary?.total_vendido || 0)"></p>
                 <p class="text-[11px] text-gray-400 mt-1">Entram no calculo da comissao</p>
             </div>
             <div x-show="summary?.comparison_prev > 0" class="text-right">
-                <p class="text-[11px] text-gray-500 font-medium">vs mes anterior</p>
+                <p class="text-[11px] text-gray-500 font-medium">vs competencia anterior<span x-show="summary?.prev_period_label" x-text="' (' + summary?.prev_period_label + ')'"></span></p>
                 <p class="text-[15px] font-semibold"
                    :class="summary?.total_vendido >= summary?.comparison_prev ? 'text-success-600' : 'text-danger-600'"
                    x-text="((summary?.total_vendido || 0) / summary?.comparison_prev * 100 - 100).toFixed(1) + '%'"></p>
@@ -196,7 +183,7 @@
 <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
     <div class="lg:col-span-2 surface-card">
         <div class="flex items-center justify-between mb-4">
-            <h2 class="text-[13px] font-semibold text-gray-500 uppercase tracking-wider">Evolucao diaria</h2>
+            <h2 class="text-[13px] font-semibold text-gray-500 uppercase tracking-wider">Evolucao na competencia</h2>
             <div class="flex items-center gap-3 text-[11px] text-gray-400">
                 <span class="flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-full bg-brand-500"></span> Manual</span>
             </div>
@@ -210,7 +197,7 @@
     </div>
 
     <div class="surface-card">
-        <h2 class="text-[13px] font-semibold text-gray-500 uppercase tracking-wider mb-4">Ranking do mes</h2>
+        <h2 class="text-[13px] font-semibold text-gray-500 uppercase tracking-wider mb-4">Ranking da competencia</h2>
         <div x-show="summary?.top5_mes?.length">
             <template x-for="(s, idx) in summary?.top5_mes" :key="s.seller__uuid">
                 <a :href="'/dashboard/gestor/vendedores/' + s.seller__uuid + '/'"
@@ -248,7 +235,7 @@
                 <p class="text-[18px] font-bold text-gray-800 leading-tight" x-text="(summary?.vendedores_ativos || 0) + ' / ' + (summary?.vendedores_total || 0)"></p>
             </div>
         </div>
-        <p class="text-[11px] text-gray-400"><span class="font-medium" x-text="summary?.vendedores_com_venda || 0"></span> com venda no mes</p>
+        <p class="text-[11px] text-gray-400"><span class="font-medium" x-text="summary?.vendedores_com_venda || 0"></span> com venda na competencia</p>
     </div>
     <div class="surface-card">
         <div class="flex items-center gap-2 mb-2">
@@ -390,15 +377,14 @@
 function gestorHomePage() {
     return {
         summary: null,
-        filterMonth: '',
-        filterYear: '',
         chart: null,
 
         async loadSummary() {
             var url = '/api/manager/dashboard/summary/';
             var params = new URLSearchParams();
-            if (this.filterMonth) params.set('month', this.filterMonth);
-            if (this.filterYear) params.set('year', this.filterYear);
+            var pageParams = new URLSearchParams(window.location.search);
+            var period = pageParams.get('period');
+            if (period) params.set('period', period);
             var qs = params.toString();
             if (qs) url += '?' + qs;
             var r = await fetch(url);
@@ -413,15 +399,11 @@ function gestorHomePage() {
             var days = [];
             var values = [];
             var data = this.summary.evolution;
-            var totalDays = new Date(this.summary.period.year, this.summary.period.month, 0).getDate();
-            for (var d = 1; d <= totalDays; d++) {
-                var found = data.find(function(e) {
-                    var day = new Date(e.sale_date).getDate();
-                    return day === d;
-                });
-                days.push(String(d).padStart(2,'0'));
-                values.push(found ? found.total / 100 : null);
-            }
+            data.forEach(function(e) {
+                var dt = new Date(e.sale_date + 'T00:00:00');
+                days.push(String(dt.getDate()).padStart(2,'0') + '/' + String(dt.getMonth()+1).padStart(2,'0'));
+                values.push(e.total / 100);
+            });
             this.chart = new Chart(ctx, {
                 type: 'line',
                 data: {

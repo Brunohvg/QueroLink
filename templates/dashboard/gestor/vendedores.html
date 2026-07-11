@@ -14,6 +14,7 @@
         </p>
       </div>
       <div class="flex items-center gap-2">
+        {% include 'components/_period_selector.html' with periods=periods selected_period_uuid=selected_period_uuid has_periods=has_periods %}
         <button @click="showImportModal = true"
                 class="inline-flex items-center gap-2 bg-white border border-gray-200 hover:border-gray-300 text-gray-700 font-medium py-2.5 px-4 rounded-xl transition-all text-[14px] shadow-sm hover:shadow active:scale-[0.97]">
           <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5 5 5-5M12 15V3"></path></svg>
@@ -26,6 +27,9 @@
         </button>
       </div>
     </div>
+    {% if selected_period %}
+    <p class="text-[12px] text-gray-500 mt-2">Competencia <span class="font-semibold">{{ selected_period.display_label }}</span> · {{ selected_period.start_date|date:"d/m/Y" }} a {{ selected_period.end_date|date:"d/m/Y" }}</p>
+    {% endif %}
   </div>
 
     <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4 mb-8">
@@ -77,7 +81,7 @@
             <th class="px-4 py-3 text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Vendedor</th>
             <th class="px-4 py-3 text-[11px] font-semibold text-gray-500 uppercase tracking-wider hidden md:table-cell">Dias</th>
             <th class="px-4 py-3 text-[11px] font-semibold text-gray-500 uppercase tracking-wider hidden md:table-cell">Operac.</th>
-            <th class="px-4 py-3 text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Total mes</th>
+            <th class="px-4 py-3 text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Total competencia</th>
             <th class="px-4 py-3 text-[11px] font-semibold text-gray-500 uppercase tracking-wider hidden sm:table-cell">Comissao</th>
             <th class="px-4 py-3 text-[11px] font-semibold text-gray-500 uppercase tracking-wider hidden lg:table-cell">Status</th>
             <th class="px-4 py-3 text-[11px] font-semibold text-gray-500 uppercase tracking-wider hidden lg:table-cell">Ult. lanc.</th>
@@ -94,7 +98,7 @@
                     <span x-text="(s.name||'?')[0].toUpperCase()"></span>
                   </div>
                   <div>
-                    <a :href="'/dashboard/gestor/vendedores/' + s.uuid + '/'" class="text-[14px] font-semibold text-gray-900 hover:text-brand-600 transition-colors" x-text="s.name"></a>
+                    <a :href="detailUrl(s)" class="text-[14px] font-semibold text-gray-900 hover:text-brand-600 transition-colors" x-text="s.name"></a>
                     <p class="text-[11px] text-gray-400">
                       <span x-text="s.phone || 'Sem telefone'"></span>
                       <template x-if="s.cpf_formatted">
@@ -161,7 +165,7 @@
               </td>
               <td class="px-4 py-3.5 text-right">
                 <div class="flex justify-end gap-0.5">
-                  <a :href="'/dashboard/gestor/vendedores/' + s.uuid + '/'" class="p-2 text-gray-400 hover:text-brand-500 rounded-lg hover:bg-brand-50 transition-all" title="Ver detalhes">
+                  <a :href="detailUrl(s)" class="p-2 text-gray-400 hover:text-brand-500 rounded-lg hover:bg-brand-50 transition-all" title="Ver detalhes">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
                   </a>
                   <button @click="openEditModal(s)" class="p-2 text-gray-400 hover:text-brand-500 rounded-lg hover:bg-brand-50 transition-all" title="Editar">
@@ -381,21 +385,30 @@ function vendedoresPage() {
         async loadSellers() {
             var r = await fetch('/api/sellers/');
             var list = await r.json();
-            var hoje = new Date();
-            var mes = hoje.getMonth() + 1;
-            var ano = hoje.getFullYear();
+            var pageParams = new URLSearchParams(window.location.search);
+            var periodUuid = pageParams.get('period') || '';
             var enriched = await Promise.all(list.map(async (s) => {
                 var detail = { month_total: 0, commission_amount: 0, submitted_days: 0, expected_days: 22, operational_status: 'SEM_LANCAMENTO', financial_status: 'ABERTA', last_sale_date: null, has_sale_today: false };
                 try {
-                    var d = await fetch('/api/manager/seller/' + s.uuid + '/?month=' + mes + '&year=' + ano).then(r => r.json());
+                    var qs = periodUuid ? ('period=' + encodeURIComponent(periodUuid)) : '';
+                    var d = await fetch('/api/manager/seller/' + s.uuid + '/?' + qs).then(r => r.json());
                     detail.month_total = d.manual_total || 0;
-                    if (d.commissions && d.commissions.length) {
-                        var c = d.commissions[0];
-                        detail.commission_amount = c.commission_amount || 0;
-                        detail.financial_status = c.status || c.period_status || 'ABERTA';
-                        detail.submitted_days = c.submitted_days_count || 0;
-                        detail.expected_days = c.expected_working_days || 22;
-                        detail.operational_status = c.operational_status || 'SEM_LANCAMENTO';
+                    var spc = d.selected_period_commission;
+                    if (spc) {
+                        detail.commission_amount = spc.commission_amount || 0;
+                        detail.financial_status = spc.status || 'ABERTA';
+                    }
+                    var sc = null;
+                    if (d.selected_period && d.commissions && d.commissions.length) {
+                        sc = d.commissions.find(c => (String(c.period_month).padStart(2,'0')+'/'+c.period_year) === d.selected_period.display_label) || null;
+                        if (!sc) {
+                            sc = d.commissions.find(c => c.period_status === d.selected_period.status) || null;
+                        }
+                    }
+                    if (sc) {
+                        detail.submitted_days = sc.submitted_days_count || 0;
+                        detail.expected_days = sc.expected_working_days || 22;
+                        detail.operational_status = sc.operational_status || 'SEM_LANCAMENTO';
                     }
                     if (d.manual_sales && d.manual_sales.length) {
                         var last = d.manual_sales[0];
@@ -419,8 +432,11 @@ function vendedoresPage() {
             this.stats.comissaoFechada = enriched.reduce((a, s) => s.financial_status === 'FECHADA' || s.financial_status === 'PARCIALMENTE_FECHADA' ? a + (s.commission_amount || 0) : a, 0);
             this.stats.comissaoCancelada = enriched.reduce((a, s) => s.financial_status === 'CANCELADA' ? a + (s.commission_amount || 0) : a, 0);
         },
-        openCreateModal() { this.editing = false; this.form = { name: '', phone: '', cpf: '', commission_rate: '1.00' }; this.showModal = true; },
-        openEditModal(s) { this.editing = true; this.form = { uuid: s.uuid, name: s.name, phone: s.phone, cpf: s.cpf_formatted || s.cpf || '', commission_rate: String(parseFloat(s.commission_rate)*100) }; this.showModal = true; },
+        detailUrl(s) {
+            var p = new URLSearchParams(window.location.search).get('period');
+            return '/dashboard/gestor/vendedores/' + s.uuid + '/' + (p ? ('?period=' + encodeURIComponent(p)) : '');
+        },
+        openCreateModal() { this.editing = false; this.form = { name: '', phone: '', cpf: '', commission_rate: '1.00' }; this.showModal = true; },        openEditModal(s) { this.editing = true; this.form = { uuid: s.uuid, name: s.name, phone: s.phone, cpf: s.cpf_formatted || s.cpf || '', commission_rate: String(parseFloat(s.commission_rate)*100) }; this.showModal = true; },
         async createSeller() {
             var body = { name:this.form.name, phone:this.form.phone };
             if (this.form.cpf) body.cpf = this.form.cpf;
