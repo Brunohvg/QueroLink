@@ -5,8 +5,8 @@
 <div class="space-y-4 fade-up pb-20">
 
   <div class="mb-2">
-    <h1 class="font-display text-[22px] font-bold text-gray-900">Ranking</h1>
-    <p class="text-[13px] text-gray-500 mt-0.5">{{ current_month }}</p>
+    <h1 class="font-display text-[22px] font-bold text-gray-900">Ranking{% if current_month %} · {{ current_month }}{% endif %}</h1>
+    <p class="text-[13px] text-gray-500 mt-0.5">{% if periodo_range %}{{ periodo_range }}{% endif %}</p>
   </div>
 
   {% if no_current_period_message %}

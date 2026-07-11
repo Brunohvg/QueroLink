@@ -78,18 +78,19 @@
         {{ comissao_estimada|brl }}
       </p>
       {% if comissao_label %}<p class="text-[11px] text-gray-400 mt-1">{{ comissao_label }}</p>{% endif %}
-      <a href="{% url 'api-seller-statement' year=current_year month=current_month %}"
+      <a href="{% url 'api-seller-statement' year=current_year month=current_month %}{% if period_uuid %}?period={{ period_uuid }}{% endif %}"
          target="_blank" rel="noopener"
          class="inline-flex items-center gap-1 mt-2 text-[11px] font-medium text-brand-500 hover:text-brand-600 tap-target">
-        Ver extrato do mes
+        Ver extrato da competencia
         <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"/></svg>
       </a>
     </div>
     <div class="bg-white rounded-2xl p-5 card-shadow">
-      <p class="text-[11px] font-semibold text-gray-400 uppercase tracking-wider mb-1.5">Total do mes</p>
+      <p class="text-[11px] font-semibold text-gray-400 uppercase tracking-wider mb-1.5">Total da competencia</p>
       <p class="font-display text-[22px] font-bold text-gray-900 leading-tight">
         {{ month_total|brl }}
       </p>
+      {% if periodo_label %}<p class="text-[11px] text-gray-400 mt-1">{{ periodo_label }}{% if periodo_range %} · {{ periodo_range }}{% endif %}</p>{% endif %}
     </div>
   </div>
 

@@ -263,10 +263,8 @@ def mobile_home(request):
         missing_past_days = []
         has_missing_past_days = False
         if is_editable and period:
-            from app.apps.commissions.services import get_missing_days_before_today
-            missing_past_days = get_missing_days_before_today(
-                seller, today.month, today.year,
-            )
+            from app.apps.commissions.services import get_missing_days_for_period
+            missing_past_days = get_missing_days_for_period(seller, period)
             has_missing_past_days = len(missing_past_days) > 0
 
         from app.apps.accounts.models import is_working_day
@@ -295,8 +293,9 @@ def mobile_home(request):
             'goal_progress': goal_progress,
             'goal_remaining': goal_remaining,
             'combined_month_total': combined_month_total,
-            'current_year': today.year,
-            'current_month': today.month,
+            'current_year': period.year if period else today.year,
+            'current_month': period.month if period else today.month,
+            'period_uuid': str(period.uuid) if period else '',
             'is_working_day_today': is_working_day_today,
         })
     except Exception as e:
@@ -470,11 +469,28 @@ def mobile_minhas_vendas(request):
         ).select_related('period')
     )
 
+    from app.apps.commissions.models import CommissionPeriod
+    all_periods = list(
+        CommissionPeriod.objects.filter(tenant=seller.tenant)
+        .exclude(status=CommissionPeriod.Status.CANCELADA)
+        .order_by('start_date')
+    )
+
+    def _resolve_competencia(sale_date):
+        for p in all_periods:
+            if p.start_date <= sale_date <= p.end_date:
+                return p
+        return None
+
     today = timezone.localdate()
     sales_data = []
     for s in sales:
         is_locked = any(sc.period.contains(s.sale_date) for sc in locked_periods)
-        log_count = log_counts.get(str(s.uuid), 0)
+        log_count = log_counts.get(s.uuid, 0)
+        comp = _resolve_competencia(s.sale_date)
+        competencia_label = ''
+        if comp and comp.month != s.sale_date.month:
+            competencia_label = comp.display_label
         sales_data.append({
             'uuid': str(s.uuid),
             'amount': s.amount,
@@ -487,6 +503,7 @@ def mobile_minhas_vendas(request):
             'canDelete': s.origin == Sale.Origin.MANUAL and not is_locked,
             'canEdit': s.origin == Sale.Origin.MANUAL and not is_locked,
             'change_log_count': log_count,
+            'competencia_label': competencia_label,
         })
 
     return render(request, 'mobile/minhas_vendas.html', {
@@ -725,6 +742,9 @@ def mobile_ranking(request):
         'goal_remaining': goal_remaining,
         'combined_month_total': combined_month_total,
         'tips': tips,
+        'periodo_range': (
+            f'{current_period.start_date.strftime("%d/%m")} a {current_period.end_date.strftime("%d/%m")}'
+        ),
     })
 
 

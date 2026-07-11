@@ -4,7 +4,7 @@ import uuid
 from django.shortcuts import render, redirect, get_object_or_404
 
 logger = logging.getLogger(__name__)
-from django.http import JsonResponse, HttpResponseForbidden
+from django.http import JsonResponse, HttpResponseForbidden, Http404
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.utils import timezone
@@ -38,10 +38,17 @@ def gestor_home(request):
         ob.save()
         return redirect('dashboard:gestor_home')
 
-    from app.apps.commissions.services import get_dashboard_data
+    from app.apps.commissions.services import (
+        build_period_selector_context, get_dashboard_data, PeriodNotFound,
+    )
     from datetime import timedelta
+    try:
+        selector_ctx = build_period_selector_context(request, tenant)
+    except PeriodNotFound as exc:
+        raise Http404(str(exc)) from exc
+    selected_period = selector_ctx['selected_period']
 
-    data = get_dashboard_data(tenant)
+    data = get_dashboard_data(tenant, period=selected_period)
 
     hoje = timezone.localdate()
     config_ok = tenant.pagarme_configured and tenant.whatsapp_configured
@@ -51,8 +58,7 @@ def gestor_home(request):
         c = val % 100
         return f'{r:,}.{c:02d}'.replace(',', '.')
 
-    from app.apps.commissions.services import get_current_period
-    competencia = get_current_period(tenant)
+    competencia = selected_period
 
     public_url = f"https://{settings.SERVICE_FQDN_WEB}/loja/{tenant.slug}/"
 
@@ -117,6 +123,11 @@ def gestor_home(request):
         'vendas_semana_passada': vendas_semana_passada,
         'variacao_semanal': variacao_semanal,
         'onboarding': getattr(tenant, 'onboarding', None),
+        'period_selector': selector_ctx,
+        'periods': selector_ctx['periods'],
+        'has_periods': selector_ctx['has_periods'],
+        'selected_period': selector_ctx['selected_period'],
+        'selected_period_uuid': selector_ctx['selected_period_uuid'],
     })
 
 
@@ -593,7 +604,22 @@ def gestor_ranking(request):
 def gestor_vendedores(request):
     if not _check_role(request, User.Role.MANAGER, User.Role.ADMIN):
         return redirect('dashboard:home')
-    return render(request, 'dashboard/gestor/vendedores.html')
+    tenant = request.user.tenant
+    selector_ctx = {}
+    if tenant:
+        from app.apps.commissions.services import (
+            build_period_selector_context, PeriodNotFound,
+        )
+        try:
+            selector_ctx = build_period_selector_context(request, tenant)
+        except PeriodNotFound as exc:
+            raise Http404(str(exc)) from exc
+    return render(request, 'dashboard/gestor/vendedores.html', {
+        'periods': selector_ctx.get('periods', []),
+        'has_periods': selector_ctx.get('has_periods', False),
+        'selected_period': selector_ctx.get('selected_period'),
+        'selected_period_uuid': selector_ctx.get('selected_period_uuid', ''),
+    })
 
 
 @login_required
@@ -617,12 +643,24 @@ def gestor_vendedor_detalhe(request, seller_id):
     except Seller.DoesNotExist:
         return redirect('dashboard:gestor_vendedores')
 
+    from app.apps.commissions.services import (
+        build_period_selector_context, PeriodNotFound,
+    )
+    try:
+        selector_ctx = build_period_selector_context(request, tenant)
+    except PeriodNotFound as exc:
+        raise Http404(str(exc)) from exc
+
     return render(request, 'dashboard/gestor/vendedor_detalhe.html', {
         'seller': seller,
         'seller_json': {
             'uuid': str(seller.uuid),
             'name': seller.name,
         },
+        'periods': selector_ctx['periods'],
+        'has_periods': selector_ctx['has_periods'],
+        'selected_period': selector_ctx['selected_period'],
+        'selected_period_uuid': selector_ctx['selected_period_uuid'],
     })
 
 
@@ -1013,72 +1051,64 @@ def gestor_contabilidade(request):
     hoje = timezone.localdate()
 
     from decimal import Decimal, ROUND_HALF_UP
-    from datetime import date
     from app.apps.commissions.models import CommissionPeriod, SellerCommission
+    from app.apps.commissions.services import get_commission_rate
     from app.apps.sales.models import Sale as SModel
 
     sellers_qs = list(Seller.objects.filter(tenant=tenant, is_active=True))
-    seller_map = {s.pk: s for s in sellers_qs}
-
-    sales_start = date(hoje.year - 1, hoje.month, 1) if hoje.month > 1 else date(hoje.year - 2, 12, 1)
-    sales_agg = SModel.objects.filter(
-        tenant=tenant,
-        seller__in=sellers_qs,
-        origin=SModel.Origin.MANUAL,
-        status='ATIVA',
-        sale_date__gte=sales_start,
-        sale_date__lte=hoje,
-    ).values('seller_id', 'sale_date__year', 'sale_date__month').annotate(t=Sum('amount'))
-
-    sales_by_key = {}
-    for row in sales_agg:
-        key = (row['seller_id'], row['sale_date__year'], row['sale_date__month'])
-        sales_by_key[key] = row['t']
 
     periods_qs = CommissionPeriod.objects.filter(
         tenant=tenant,
-        year__gte=hoje.year - 1,
-    ).prefetch_related('seller_commissions')
-    period_map = {(p.year, p.month): p for p in periods_qs}
+    ).exclude(
+        status=CommissionPeriod.Status.CANCELADA,
+    ).prefetch_related('seller_commissions').order_by('-start_date')[:12]
 
     competencias = []
-    for i in range(12):
-        month = hoje.month - i
-        year = hoje.year
-        while month <= 0:
-            month += 12
-            year -= 1
-
+    for period in periods_qs:
         total_sold = SModel.objects.filter(
             tenant=tenant, status='ATIVA',
-            sale_date__month=month, sale_date__year=year,
+            origin__in=SModel.COMMISSION_ORIGINS,
+            sale_date__gte=period.start_date,
+            sale_date__lte=period.end_date,
         ).aggregate(t=Sum('amount'))['t'] or 0
 
         total_comm = 0
+        scs = list(period.seller_commissions.all())
+        sc_by_seller = {sc.seller_id: sc for sc in scs}
         for s in sellers_qs:
-            key = (s.pk, year, month)
-            seller_sales = sales_by_key.get(key, 0)
-            rate = Decimal(str(s.commission_rate or tenant.default_commission_rate or 0.01))
-            comm = int((Decimal(str(seller_sales)) * rate).quantize(Decimal('1'), rounding=ROUND_HALF_UP))
-            total_comm += comm
+            sc = sc_by_seller.get(s.pk)
+            if sc and period.status != CommissionPeriod.Status.ABERTA:
+                total_comm += sc.commission_amount
+            else:
+                seller_sales = SModel.objects.filter(
+                    tenant=tenant, seller=s, status='ATIVA',
+                    origin__in=SModel.COMMISSION_ORIGINS,
+                    sale_date__gte=period.start_date,
+                    sale_date__lte=period.end_date,
+                ).aggregate(t=Sum('amount'))['t'] or 0
+                rate = get_commission_rate(s)
+                total_comm += int(
+                    (Decimal(str(seller_sales)) * rate).quantize(
+                        Decimal('1'), rounding=ROUND_HALF_UP,
+                    )
+                )
 
-        period = period_map.get((year, month))
-        if period:
-            scs = period.seller_commissions.all()
-            all_paid = scs.exists() and not scs.exclude(
-                status__in=[SellerCommission.Status.PAGA, SellerCommission.Status.CANCELADA],
-            ).exists()
-            status = period.get_status_display()
-            sent_at = period.sent_to_accounting_at
-        else:
-            all_paid = False
-            status = 'Sem fechamento'
-            sent_at = None
+        all_paid = bool(scs) and not [
+            sc for sc in scs
+            if sc.status not in (
+                SellerCommission.Status.PAGA, SellerCommission.Status.CANCELADA,
+            )
+        ]
+        status = period.get_status_display()
+        sent_at = period.sent_to_accounting_at
 
         competencias.append({
-            'month': month,
-            'year': year,
-            'label': f'{month:02d}/{year}',
+            'month': period.month,
+            'year': period.year,
+            'label': period.display_label,
+            'start_date': period.start_date,
+            'end_date': period.end_date,
+            'range': f'{period.start_date.strftime("%d/%m/%Y")} a {period.end_date.strftime("%d/%m/%Y")}',
             'total_sold': total_sold,
             'total_comm': total_comm,
             'status': status,

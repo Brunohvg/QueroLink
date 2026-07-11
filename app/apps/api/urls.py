@@ -18,6 +18,7 @@ urlpatterns = [
     path('seller/sales/', views.SellerSalesListView.as_view(), name='api-seller-sales'),
     path('seller/links/', views.SellerLinkCreateView.as_view(), name='seller-link-create'),
     path('seller/change-password/', views.ChangePasswordView.as_view(), name='api-change-password'),
+    path('seller/statement/', views.SellerStatementView.as_view(), name='api-seller-statement-period'),
     path('seller/statement/<int:year>/<int:month>/', views.SellerStatementView.as_view(), name='api-seller-statement'),
     path('reports/monthly/<int:year>/<int:month>/', views.MonthlyReportView.as_view(), name='api-monthly-report'),
     path('reports/accounting/<int:year>/<int:month>/', views.AccountingExportView.as_view(), name='api-accounting-export'),

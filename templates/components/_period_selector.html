@@ -1,0 +1,25 @@
+{% comment %}
+Seletor de competencia (LOTE 2 - PROMPT_42).
+Contexto esperado:
+  - periods: lista de dicts [{uuid, label, display_label, start, end, status, status_display}]
+  - selected_period_uuid: uuid da competencia selecionada (str) ou vazio
+  - has_periods: bool
+Uso: navega com ?period=<uuid> preservando a rota atual (recarrega a pagina inteira,
+mantendo UMA TELA = UM REGIME). Sem competencias: estado vazio + CTA Criar competencia.
+{% endcomment %}
+{% if has_periods %}
+<div class="flex items-center gap-2">
+  <label class="text-[13px] font-medium text-gray-500">Competencia</label>
+  <select onchange="(function(sel){var u=new URL(window.location.href);if(sel.value){u.searchParams.set('period',sel.value);}else{u.searchParams.delete('period');}window.location.href=u.toString();})(this)"
+          class="px-3 py-2.5 border border-gray-200 rounded-xl text-[14px] bg-gray-50/50 hover:border-brand-300 focus:border-brand-400 focus:outline-none focus:ring-2 focus:ring-brand-100 transition cursor-pointer">
+    {% for p in periods %}
+    <option value="{{ p.uuid }}" {% if p.uuid == selected_period_uuid %}selected{% endif %}>{{ p.display_label }} · {{ p.start }}–{{ p.end }} · {{ p.status_display }}</option>
+    {% endfor %}
+  </select>
+</div>
+{% else %}
+<div class="flex items-center gap-3 bg-amber-50/70 border border-amber-100 rounded-xl px-4 py-2.5">
+  <span class="text-[13px] text-amber-700">Nenhuma competencia cadastrada.</span>
+  <a href="{% url 'dashboard:gestor_fechamento' %}" class="text-[13px] font-semibold text-amber-700 underline hover:text-amber-800">Criar competencia</a>
+</div>
+{% endif %}
