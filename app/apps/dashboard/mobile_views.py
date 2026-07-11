@@ -21,6 +21,11 @@ from django.core.exceptions import ValidationError
 
 logger = logging.getLogger(__name__)
 
+MONTH_NAMES_PT = [
+    '', 'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
+    'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro',
+]
+
 
 def mobile_login(request):
     if (
@@ -433,6 +438,27 @@ def mobile_lancar_venda(request):
 
 @login_required
 def mobile_minhas_vendas(request):
+    """Consulta cronologica de vendas do vendedor, por mes/ano (chave YYYY-MM).
+
+    Regras de edicao/exclusao (canEdit/canDelete refletem o backend):
+    Aplicadas pela regra CENTRAL em lote
+    `build_sale_change_permission_resolver` (mesma logica de
+    `validate_sale_can_be_changed`, sem query por venda), considerando:
+    - MANUAL + competencia editavel (ABERTA/REABERTA): pode editar/excluir.
+    - IMPORTADA: somente leitura.
+    - LINK: somente leitura.
+    - ESTORNADA: somente leitura.
+    - competencia FECHADA/PAGA/CANCELADA: bloqueia edicao/exclusao.
+    - SellerCommission FECHADA/PAGA/AJUSTADA/CANCELADA: bloqueia.
+    - Venda MANUAL sem competencia que a contenha: permanece editavel (mesma
+      regra do backend, que retorna True quando nao ha periodo). Exibimos o
+      rotulo "Sem competencia" apenas como contexto, sem inventar competencia
+      pelo mes calendario.
+
+    Para CLASSIFICAR o historico, competencias CANCELADAS tambem sao
+    carregadas: uma venda dentro de um range cancelado continua identificada
+    (com status CANCELADA), sem virar "Sem competencia".
+    """
     seller = _get_seller_profile(request)
     if hasattr(seller, 'status_code'):
         return seller
@@ -445,9 +471,11 @@ def mobile_minhas_vendas(request):
         '-sale_date', '-created_at',
     )
 
-    from app.apps.commissions.models import SellerCommission
     from app.apps.sales.models import SaleChangeLog
     from django.db.models import Count
+    from app.apps.commissions.services import (
+        build_sale_change_permission_resolver,
+    )
 
     log_counts = dict(
         SaleChangeLog.objects.filter(
@@ -457,23 +485,20 @@ def mobile_minhas_vendas(request):
         ).values_list('sale_id', 'count')
     )
 
-    locked_periods = list(
-        SellerCommission.objects.filter(
-            seller=seller,
-            status__in=[
-                SellerCommission.Status.FECHADA,
-                SellerCommission.Status.PAGA,
-                SellerCommission.Status.AJUSTADA,
-                SellerCommission.Status.CANCELADA,
-            ],
-        ).select_related('period')
-    )
-
+    # Regra central de edicao/exclusao em lote (sem query por venda).
     from app.apps.commissions.models import CommissionPeriod
+    # Para CLASSIFICAR vendas historicas carregamos TODAS as competencias,
+    # inclusive CANCELADAS (uma venda dentro de um range cancelado deve
+    # continuar identificada). Competencias canceladas nunca aparecem em
+    # seletores financeiros -- este uso e apenas de rotulagem/historico.
     all_periods = list(
         CommissionPeriod.objects.filter(tenant=seller.tenant)
-        .exclude(status=CommissionPeriod.Status.CANCELADA)
         .order_by('start_date')
+    )
+    # Reutiliza a MESMA lista de periodos (evita 2a query) e mantem a regra
+    # central de bloqueio.
+    can_change = build_sale_change_permission_resolver(
+        seller, periods=all_periods,
     )
 
     def _resolve_competencia(sale_date):
@@ -485,12 +510,26 @@ def mobile_minhas_vendas(request):
     today = timezone.localdate()
     sales_data = []
     for s in sales:
-        is_locked = any(sc.period.contains(s.sale_date) for sc in locked_periods)
+        allowed = can_change(s)
         log_count = log_counts.get(s.uuid, 0)
         comp = _resolve_competencia(s.sale_date)
-        competencia_label = ''
-        if comp and comp.month != s.sale_date.month:
-            competencia_label = comp.display_label
+        if comp:
+            competencia_uuid = str(comp.uuid)
+            competencia_label = comp.label
+            competencia_display_label = comp.display_label
+            competencia_range = (
+                f'{comp.start_date.strftime("%d/%m")} a '
+                f'{comp.end_date.strftime("%d/%m")}'
+            )
+            competencia_status = comp.status
+            competencia_status_display = comp.get_status_display()
+        else:
+            competencia_uuid = ''
+            competencia_label = ''
+            competencia_display_label = 'Sem competência'
+            competencia_range = ''
+            competencia_status = ''
+            competencia_status_display = ''
         sales_data.append({
             'uuid': str(s.uuid),
             'amount': s.amount,
@@ -500,21 +539,48 @@ def mobile_minhas_vendas(request):
             'status': s.status,
             'date': s.sale_date.strftime('%d/%m/%Y'),
             'date_iso': s.sale_date.isoformat(),
-            'canDelete': s.origin == Sale.Origin.MANUAL and not is_locked,
-            'canEdit': s.origin == Sale.Origin.MANUAL and not is_locked,
+            'month_key': s.sale_date.strftime('%Y-%m'),
+            'canDelete': allowed,
+            'canEdit': allowed,
             'change_log_count': log_count,
+            'competencia_uuid': competencia_uuid,
             'competencia_label': competencia_label,
+            'competencia_display_label': competencia_display_label,
+            'competencia_range': competencia_range,
+            'competencia_status': competencia_status,
+            'competencia_status_display': competencia_status_display,
         })
+
+    # Chaves cronologicas YYYY-MM que possuem vendas, mais recente primeiro.
+    month_options = []
+    seen_keys = set()
+    for item in sales_data:
+        key = item['month_key']
+        if key in seen_keys:
+            continue
+        seen_keys.add(key)
+        y, m = key.split('-')
+        month_options.append({
+            'key': key,
+            'label': f'{MONTH_NAMES_PT[int(m)]}/{y}',
+        })
+    month_options.sort(key=lambda o: o['key'], reverse=True)
+
+    # Default: mes/ano atual se houver vendas; senao o mais recente com vendas.
+    current_key = f'{today.year:04d}-{today.month:02d}'
+    if current_key in seen_keys:
+        default_month_key = current_key
+    elif month_options:
+        default_month_key = month_options[0]['key']
+    else:
+        default_month_key = ''
 
     return render(request, 'mobile/minhas_vendas.html', {
         'seller': seller,
         'sales': sales,
         'sales_json': sales_data,
-        'current_month': today.month,
-        'current_year': today.year,
-        'months': [
-            {'value': i, 'label': f'{i:02d}'} for i in range(1, 13)
-        ],
+        'month_options': month_options,
+        'default_month_key': default_month_key,
     })
 
 

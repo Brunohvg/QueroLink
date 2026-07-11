@@ -19,19 +19,31 @@
   </div>
   {% endif %}
 
-  <!-- Filtro de mês -->
+  <!-- Filtro de mês/ano (chave cronológica YYYY-MM) -->
   <div class="bg-white rounded-2xl p-3 card-shadow mb-3">
     <div class="flex items-center gap-2">
       <label class="text-[11px] font-semibold text-gray-500 uppercase tracking-wide flex-shrink-0">Mês:</label>
       <select x-model="filterMonth" @change="resetPagination()"
               class="flex-1 px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-[13px] font-medium outline-none transition-all focus:border-brand-400 focus:ring-2 focus:ring-brand-100 appearance-none"
               style="background-image:url('data:image/svg+xml;utf8,<svg xmlns=%22http://www.w3.org/2000/svg%22 width=%2216%22 height=%2216%22 viewBox=%220 0 24 24%22 fill=%22none%22 stroke=%22%239ca3af%22 stroke-width=%222%22><path stroke-linecap=%22round%22 stroke-linejoin=%22round%22 d=%22M6 9l6 6 6-6%22/></svg>');background-repeat:no-repeat;background-position:right 10px center;">
-        <option value="">Todos os meses</option>
-        {% for m in months %}
-        <option value="{{ m.value }}">{{ m.label }}</option>
+        {% for opt in month_options %}
+        <option value="{{ opt.key }}">{{ opt.label }}</option>
         {% endfor %}
       </select>
     </div>
+    <p class="text-[10px] text-gray-400 mt-2 leading-relaxed">Consulta cronológica. As vendas podem pertencer a competências diferentes.</p>
+    <template x-if="monthCompetencias.length === 1 && unassignedSalesCount === 0">
+      <p class="text-[11px] font-medium text-gray-600 mt-1.5" x-text="'Competência: ' + monthCompetencias[0].display_label + (monthCompetencias[0].range ? ' · ' + monthCompetencias[0].range : '')"></p>
+    </template>
+    <template x-if="monthCompetencias.length > 1">
+      <p class="text-[11px] font-medium text-amber-600 mt-1.5" x-text="'Este período contém vendas de ' + monthCompetencias.length + ' competências.'"></p>
+    </template>
+    <template x-if="monthCompetencias.length === 1 && unassignedSalesCount > 0">
+      <p class="text-[11px] font-medium text-amber-600 mt-1.5" x-text="'Este período contém vendas de 1 competência e ' + unassignedSalesCount + ' venda' + (unassignedSalesCount !== 1 ? 's' : '') + ' sem competência.'"></p>
+    </template>
+    <template x-if="monthCompetencias.length === 0 && unassignedSalesCount > 0">
+      <p class="text-[11px] font-medium text-amber-600 mt-1.5">Estas vendas ainda não pertencem a uma competência.</p>
+    </template>
   </div>
 
   {% if not sales %}
@@ -52,7 +64,7 @@
   <!-- Dica -->
   <div class="bg-brand-50/60 border border-brand-100 text-brand-800 px-3.5 py-2.5 rounded-2xl text-[12px] flex items-start gap-2 mb-3">
     <svg class="w-4 h-4 flex-shrink-0 mt-0.5 text-brand-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-    <p class="text-[11px] leading-relaxed">Você pode editar ou excluir lançamentos manuais enquanto a comissão estiver aberta.</p>
+    <p class="text-[11px] leading-relaxed">Vendas manuais podem ser editadas enquanto a competência estiver aberta. Vendas importadas e por link são somente leitura.</p>
   </div>
   {% endif %}
 
@@ -102,9 +114,13 @@
                             class="inline-flex items-center px-1.5 py-0.5 rounded-full text-[9px] font-semibold bg-red-50 text-red-600">Estornada</span>
                       <span x-show="sale.change_log_count > 0"
                             class="inline-flex items-center px-1.5 py-0.5 rounded-full text-[9px] font-semibold bg-amber-50 text-amber-600">Ajustada pelo gestor</span>
-                      <span x-show="sale.competencia_label"
-                            class="inline-flex items-center px-1.5 py-0.5 rounded-full text-[9px] font-semibold bg-sky-50 text-sky-600"
-                            x-text="'Comp. ' + sale.competencia_label"></span>
+                      <span x-show="sale.competencia_uuid"
+                            class="inline-flex items-center px-1.5 py-0.5 rounded-full text-[9px] font-semibold"
+                            :class="competenciaBadgeClass(sale.competencia_status)"
+                            :title="'Comp. ' + sale.competencia_display_label + ' · ' + sale.competencia_status_display"
+                            x-text="'Comp. ' + sale.competencia_display_label + ' · ' + sale.competencia_status_display"></span>
+                      <span x-show="!sale.competencia_uuid"
+                            class="inline-flex items-center px-1.5 py-0.5 rounded-full text-[9px] font-semibold bg-amber-50 text-amber-600">Sem competência</span>
                       <span x-show="sale.notes" class="text-[11px] text-gray-400 truncate" x-text="sale.notes"></span>
                     </div>
                   </div>
@@ -189,26 +205,31 @@
     </div>
   </div>
 
-  <!-- Fallback server-rendered (exibido se Alpine falhar) -->
-  {% if sales %}
+  <!-- Fallback server-rendered somente leitura (exibido se Alpine falhar) -->
+  {% if sales_json %}
   <div class="space-y-3" id="sales-fallback">
-    {% for s in sales|slice:":20" %}
-    <div class="bg-white rounded-2xl p-4 card-shadow flex items-center justify-between">
+    {% for s in sales_json|slice:":20" %}
+    <div class="bg-white rounded-2xl p-4 card-shadow">
       <div class="flex items-center gap-2.5 min-w-0">
         <span class="w-1.5 h-1.5 rounded-full flex-shrink-0 {% if s.status == 'ESTORNADA' %}bg-red-400{% elif s.origin == 'LINK' %}bg-brand-400{% else %}bg-emerald-400{% endif %}"></span>
-        <span class="text-[12px] font-medium text-gray-500 flex-shrink-0">{{ s.sale_date|date:"d/m" }}</span>
+        <span class="text-[12px] font-medium text-gray-500 flex-shrink-0">{{ s.date }}</span>
         <span class="font-semibold text-[14px] text-gray-900">{{ s.amount|brl }}</span>
         {% if s.notes %}<span class="text-[11px] text-gray-400 truncate">— {{ s.notes|truncatechars:20 }}</span>{% endif %}
       </div>
-      {% if s.origin == 'MANUAL' %}
-      <a href="{% url 'dashboard:mobile_lancar_venda' %}?date={{ s.sale_date|date:'Y-m-d' }}"
-         class="tap-target flex items-center justify-center w-9 h-9 text-gray-300 hover:text-brand-500 transition rounded-lg hover:bg-brand-50">
-        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
-      </a>
-      {% endif %}
+      <div class="flex flex-wrap items-center gap-1.5 mt-1.5">
+        <span class="inline-flex items-center px-1.5 py-0.5 rounded-full text-[9px] font-semibold bg-gray-100 text-gray-500">{{ s.origin_display }}</span>
+        {% if s.status == 'ESTORNADA' %}
+        <span class="inline-flex items-center px-1.5 py-0.5 rounded-full text-[9px] font-semibold bg-red-50 text-red-600">Estornada</span>
+        {% endif %}
+        {% if s.competencia_uuid %}
+        <span class="inline-flex items-center px-1.5 py-0.5 rounded-full text-[9px] font-semibold bg-sky-50 text-sky-600">Comp. {{ s.competencia_display_label }} · {{ s.competencia_status_display }}</span>
+        {% else %}
+        <span class="inline-flex items-center px-1.5 py-0.5 rounded-full text-[9px] font-semibold bg-amber-50 text-amber-600">Sem competência</span>
+        {% endif %}
+      </div>
     </div>
     {% endfor %}
-    {% if sales.count > 20 %}
+    {% if sales_json|length > 20 %}
     <p class="text-[11px] text-gray-400 text-center">Mostrando 20 vendas. Use os filtros acima.</p>
     {% endif %}
   </div>
@@ -250,8 +271,7 @@ function minhasVendas() {
 
     return {
         sales: Array.isArray(raw) ? raw : [],
-        currentMonth: {{ current_month }},
-        filterMonth: String({{ current_month }}),
+        filterMonth: '{{ default_month_key }}',
         visibleWeeksCount: 3,
         expandedWeeks: {},
         _confirmIds: {},
@@ -269,9 +289,50 @@ function minhasVendas() {
             var m = this.filterMonth;
             if (!m) return this.sales;
             return this.sales.filter(function(s) {
-                var parts = s.date.split('/');
-                return parseInt(parts[1], 10) === parseInt(m, 10);
+                return s.month_key === m;
             });
+        },
+
+        get monthCompetencias() {
+            // Somente competencias REAIS (com uuid). Vendas orfas ficam de fora.
+            var seen = {};
+            var result = [];
+            this.filteredSales.forEach(function(s) {
+                var key = s.competencia_uuid || '';
+                if (!key || seen[key]) return;
+                seen[key] = true;
+                result.push({
+                    uuid: key,
+                    display_label: s.competencia_display_label || '',
+                    range: s.competencia_range || '',
+                    status_display: s.competencia_status_display || '',
+                });
+            });
+            return result;
+        },
+
+        get unassignedSalesCount() {
+            return this.filteredSales.filter(function(s) {
+                return !s.competencia_uuid;
+            }).length;
+        },
+
+        competenciaBadgeClass(status) {
+            switch (status) {
+                case 'ABERTA':
+                case 'REABERTA':
+                case 'PARCIALMENTE_FECHADA':
+                    return 'bg-sky-50 text-sky-600';
+                case 'FECHADA':
+                    return 'bg-gray-100 text-gray-500';
+                case 'PAGA':
+                case 'PARCIALMENTE_PAGA':
+                    return 'bg-emerald-50 text-emerald-600';
+                case 'CANCELADA':
+                    return 'bg-red-50 text-red-600';
+                default:
+                    return 'bg-gray-100 text-gray-500';
+            }
         },
 
         get monthGroupedSales() {
@@ -286,7 +347,8 @@ function minhasVendas() {
                 var d = new Date(s.date_iso + 'T00:00:00');
                 s.weekday = WEEKDAYS[d.getDay()];
                 var wn = getWeekNumber(day);
-                var key = month + '-W' + wn;
+                // Chave inclui YYYY-MM para nunca misturar anos diferentes.
+                var key = s.month_key + '-W' + wn;
                 if (!groups[key]) groups[key] = { key: key, weekNum: wn, month: month, sales: [], total: 0 };
                 groups[key].sales.push(s);
                 if (s.status !== 'ESTORNADA') {
@@ -302,7 +364,6 @@ function minhasVendas() {
                 result.push(g);
             });
             result.sort(function(a, b) {
-                if (a.month !== b.month) return parseInt(b.month, 10) - parseInt(a.month, 10);
                 return b.weekNum - a.weekNum;
             });
             return result;
