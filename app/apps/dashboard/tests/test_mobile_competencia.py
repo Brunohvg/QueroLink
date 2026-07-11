@@ -102,10 +102,12 @@ class MobileCompetenciaFirstTest(TestCase):
         resp = self.client.get('/dashboard/mobile/vendas/')
         sales_json = resp.context['sales_json']
         by_date = {s['date']: s for s in sales_json}
-        # venda de 25/06 cai na competencia Julho/2026 (mes difere) => badge
-        self.assertEqual(by_date['25/06/2026']['competencia_label'], 'Julho/2026')
-        # venda de 05/07 - mesmo mes do periodo => sem badge
-        self.assertEqual(by_date['05/07/2026']['competencia_label'], '')
+        # venda de 25/06 cai na competencia Julho/2026 (mes difere)
+        self.assertEqual(by_date['25/06/2026']['competencia_display_label'], 'Julho/2026')
+        self.assertEqual(by_date['25/06/2026']['competencia_uuid'], str(self.period.uuid))
+        # venda de 05/07 - mesma competencia (mesmo range)
+        self.assertEqual(by_date['05/07/2026']['competencia_display_label'], 'Julho/2026')
+        self.assertEqual(by_date['05/07/2026']['competencia_uuid'], str(self.period.uuid))
 
     @patch('app.apps.dashboard.mobile_views.timezone')
     def test_minhas_vendas_no_nplus1_periods_loaded_once(self, mock_tz):
@@ -143,3 +145,177 @@ class MobileCompetenciaFirstTest(TestCase):
         response = self.client.get('/dashboard/mobile/vendas/')
         by_uuid = {item['uuid']: item for item in response.context['sales_json']}
         self.assertEqual(by_uuid[str(sale.uuid)]['change_log_count'], 1)
+
+
+class MinhasVendasCompetenciaContextTest(TestCase):
+    """PROMPT_42.2 - Minhas Vendas com contexto de competencia."""
+
+    def setUp(self):
+        self.tenant = Tenant.objects.create(
+            company_name='Ctx Co', slug='ctx-co',
+            default_commission_rate=Decimal('0.01'), is_active=True,
+            period_start_day=21,
+        )
+        self.seller_user = User.objects.create_user(
+            username='vendctx', password='test123',
+            role=User.Role.SELLER, tenant=self.tenant,
+        )
+        self.seller = Seller.objects.create(
+            tenant=self.tenant, user=self.seller_user, name='Vend Ctx',
+            phone='55999991111', commission_rate=Decimal('0.01'), is_active=True,
+        )
+        # Julho/2026: 21/06 a 20/07 ; Agosto/2026: 21/07 a 20/08
+        self.period_jul = CommissionPeriod.objects.create(
+            tenant=self.tenant, month=7, year=2026,
+            start_date=date(2026, 6, 21), end_date=date(2026, 7, 20),
+            label='Julho/2026',
+        )
+        self.period_ago = CommissionPeriod.objects.create(
+            tenant=self.tenant, month=8, year=2026,
+            start_date=date(2026, 7, 21), end_date=date(2026, 8, 20),
+            label='Agosto/2026',
+        )
+
+    def _sale(self, sale_date, origin=Sale.Origin.MANUAL, amount=100000):
+        return Sale.objects.create(
+            tenant=self.tenant, seller=self.seller, origin=origin,
+            amount=amount, sale_date=sale_date, created_by=self.seller_user,
+        )
+
+    def _fetch_by_date(self):
+        self.client.force_login(self.seller_user)
+        resp = self.client.get('/dashboard/mobile/vendas/')
+        self.assertEqual(resp.status_code, 200)
+        return {s['date']: s for s in resp.context['sales_json']}
+
+    # 1: venda de 25/06 mostra competencia Julho/2026
+    def test_sale_2506_shows_julho(self):
+        self._sale('2026-06-25')
+        row = self._fetch_by_date()['25/06/2026']
+        self.assertEqual(row['competencia_display_label'], 'Julho/2026')
+        self.assertEqual(row['competencia_uuid'], str(self.period_jul.uuid))
+
+    # 2: venda de 21/07 mostra competencia Agosto/2026
+    def test_sale_2107_shows_agosto(self):
+        self._sale('2026-07-21')
+        row = self._fetch_by_date()['21/07/2026']
+        self.assertEqual(row['competencia_display_label'], 'Agosto/2026')
+        self.assertEqual(row['competencia_uuid'], str(self.period_ago.uuid))
+
+    # 3: importada nao pode editar/excluir
+    def test_importada_read_only(self):
+        self._sale('2026-06-25', origin=Sale.Origin.IMPORTADA)
+        row = self._fetch_by_date()['25/06/2026']
+        self.assertFalse(row['canEdit'])
+        self.assertFalse(row['canDelete'])
+
+    # 3b: link nao pode editar/excluir
+    def test_link_read_only(self):
+        from app.apps.orders.models import Order
+        order = Order.objects.create(
+            tenant=self.tenant, seller=self.seller, total_amount=100000,
+            customer_name='Cliente Teste', status=Order.Status.COMPLETED,
+        )
+        Sale.objects.create(
+            tenant=self.tenant, seller=self.seller, origin=Sale.Origin.LINK,
+            amount=100000, sale_date='2026-06-25', order=order,
+        )
+        row = self._fetch_by_date()['25/06/2026']
+        self.assertFalse(row['canEdit'])
+        self.assertFalse(row['canDelete'])
+
+    # 4: manual em competencia aberta pode editar
+    def test_manual_open_can_edit(self):
+        self._sale('2026-06-25')
+        row = self._fetch_by_date()['25/06/2026']
+        self.assertTrue(row['canEdit'])
+        self.assertTrue(row['canDelete'])
+
+    # 5: manual em competencia fechada nao pode editar
+    def test_manual_closed_cannot_edit(self):
+        self._sale('2026-06-25')
+        self.period_jul.status = CommissionPeriod.Status.FECHADA
+        self.period_jul.save()
+        SellerCommission.objects.create(
+            period=self.period_jul, seller=self.seller,
+            commission_rate=Decimal('0.01'),
+            status=SellerCommission.Status.FECHADA,
+            total_sold_amount=100000, commission_amount=1000,
+        )
+        row = self._fetch_by_date()['25/06/2026']
+        self.assertFalse(row['canEdit'])
+        self.assertFalse(row['canDelete'])
+
+    # 6: mes com duas competencias e identificado
+    def test_month_with_two_competencias_identified(self):
+        # Julho calendario: 05/07 (comp Julho) e 25/07 (comp Agosto)
+        self._sale('2026-07-05')
+        self._sale('2026-07-25')
+        by_date = self._fetch_by_date()
+        self.assertEqual(by_date['05/07/2026']['competencia_display_label'], 'Julho/2026')
+        self.assertEqual(by_date['25/07/2026']['competencia_display_label'], 'Agosto/2026')
+        # duas competencias distintas dentro do mes 07
+        july_sales = [
+            s for s in [by_date['05/07/2026'], by_date['25/07/2026']]
+        ]
+        uuids = {s['competencia_uuid'] for s in july_sales}
+        self.assertEqual(len(uuids), 2)
+
+    # 7: venda sem competencia mostra "Sem competencia"
+    def test_sale_without_competencia(self):
+        # 2026-01-10 nao esta em nenhuma competencia cadastrada
+        self._sale('2026-01-10')
+        row = self._fetch_by_date()['10/01/2026']
+        self.assertEqual(row['competencia_display_label'], 'Sem competência')
+        self.assertEqual(row['competencia_uuid'], '')
+        self.assertEqual(row['competencia_label'], '')
+
+    # 8: nao existe N+1 (periodos carregados uma unica vez)
+    def test_no_nplus1_periods_loaded_once(self):
+        from django.db import connection
+        from django.test.utils import CaptureQueriesContext
+        for d in ['2026-06-22', '2026-06-25', '2026-07-05', '2026-07-25',
+                  '2026-08-01', '2026-01-10']:
+            self._sale(d)
+        self.client.force_login(self.seller_user)
+        with CaptureQueriesContext(connection) as ctx:
+            self.client.get('/dashboard/mobile/vendas/')
+        period_queries = [
+            q for q in ctx.captured_queries
+            if 'commissions_commissionperiod' in q['sql']
+            and 'sellercommission' not in q['sql'].lower()
+        ]
+        self.assertEqual(len(period_queries), 1)
+
+    # 9: total semanal nao muda (amounts intactos no JSON)
+    def test_weekly_total_unchanged(self):
+        self._sale('2026-07-05', amount=300000)
+        self._sale('2026-07-06', amount=200000)
+        by_date = self._fetch_by_date()
+        self.assertEqual(by_date['05/07/2026']['amount'], 300000)
+        self.assertEqual(by_date['06/07/2026']['amount'], 200000)
+        total = sum(
+            s['amount'] for s in [by_date['05/07/2026'], by_date['06/07/2026']]
+        )
+        self.assertEqual(total, 500000)
+
+    # 10: total mensal nao muda (soma dos amounts ATIVA do mes)
+    def test_monthly_total_unchanged(self):
+        self._sale('2026-07-05', amount=300000)
+        self._sale('2026-07-25', amount=250000)
+        by_date = self._fetch_by_date()
+        july = [
+            s for k, s in by_date.items()
+            if k.split('/')[1] == '07' and s['status'] == 'ATIVA'
+        ]
+        self.assertEqual(sum(s['amount'] for s in july), 550000)
+
+    # 11: status da competencia chega ao front
+    def test_competencia_status_reaches_front(self):
+        self._sale('2026-06-25')
+        self.period_jul.status = CommissionPeriod.Status.FECHADA
+        self.period_jul.save()
+        row = self._fetch_by_date()['25/06/2026']
+        self.assertEqual(row['competencia_status'], 'FECHADA')
+        self.assertEqual(row['competencia_status_display'], 'Fechada')
+        self.assertEqual(row['competencia_range'], '21/06 a 20/07')

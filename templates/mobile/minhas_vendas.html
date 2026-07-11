@@ -32,6 +32,13 @@
         {% endfor %}
       </select>
     </div>
+    <p class="text-[10px] text-gray-400 mt-2 leading-relaxed">Consulta cronológica. As vendas podem pertencer a competências diferentes.</p>
+    <template x-if="monthCompetencias.length === 1 && monthCompetencias[0].uuid">
+      <p class="text-[11px] font-medium text-gray-600 mt-1.5" x-text="'Competência: ' + monthCompetencias[0].display_label + (monthCompetencias[0].range ? ' · ' + monthCompetencias[0].range : '')"></p>
+    </template>
+    <template x-if="monthCompetencias.length > 1">
+      <p class="text-[11px] font-medium text-amber-600 mt-1.5" x-text="'Este mês contém vendas de ' + monthCompetencias.length + ' competências.'"></p>
+    </template>
   </div>
 
   {% if not sales %}
@@ -52,7 +59,7 @@
   <!-- Dica -->
   <div class="bg-brand-50/60 border border-brand-100 text-brand-800 px-3.5 py-2.5 rounded-2xl text-[12px] flex items-start gap-2 mb-3">
     <svg class="w-4 h-4 flex-shrink-0 mt-0.5 text-brand-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-    <p class="text-[11px] leading-relaxed">Você pode editar ou excluir lançamentos manuais enquanto a comissão estiver aberta.</p>
+    <p class="text-[11px] leading-relaxed">Vendas manuais podem ser editadas enquanto a competência estiver aberta. Vendas importadas e por link são somente leitura.</p>
   </div>
   {% endif %}
 
@@ -102,9 +109,11 @@
                             class="inline-flex items-center px-1.5 py-0.5 rounded-full text-[9px] font-semibold bg-red-50 text-red-600">Estornada</span>
                       <span x-show="sale.change_log_count > 0"
                             class="inline-flex items-center px-1.5 py-0.5 rounded-full text-[9px] font-semibold bg-amber-50 text-amber-600">Ajustada pelo gestor</span>
-                      <span x-show="sale.competencia_label"
+                      <span x-show="sale.competencia_display_label && sale.competencia_uuid"
                             class="inline-flex items-center px-1.5 py-0.5 rounded-full text-[9px] font-semibold bg-sky-50 text-sky-600"
-                            x-text="'Comp. ' + sale.competencia_label"></span>
+                            x-text="'Comp. ' + sale.competencia_display_label"></span>
+                      <span x-show="!sale.competencia_uuid"
+                            class="inline-flex items-center px-1.5 py-0.5 rounded-full text-[9px] font-semibold bg-gray-100 text-gray-500">Sem competência</span>
                       <span x-show="sale.notes" class="text-[11px] text-gray-400 truncate" x-text="sale.notes"></span>
                     </div>
                   </div>
@@ -272,6 +281,23 @@ function minhasVendas() {
                 var parts = s.date.split('/');
                 return parseInt(parts[1], 10) === parseInt(m, 10);
             });
+        },
+
+        get monthCompetencias() {
+            var seen = {};
+            var result = [];
+            this.filteredSales.forEach(function(s) {
+                var key = s.competencia_uuid || '';
+                if (seen[key]) return;
+                seen[key] = true;
+                result.push({
+                    uuid: s.competencia_uuid || '',
+                    display_label: s.competencia_display_label || '',
+                    range: s.competencia_range || '',
+                    status_display: s.competencia_status_display || '',
+                });
+            });
+            return result;
         },
 
         get monthGroupedSales() {

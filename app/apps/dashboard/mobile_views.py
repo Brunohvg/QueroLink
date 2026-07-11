@@ -433,6 +433,20 @@ def mobile_lancar_venda(request):
 
 @login_required
 def mobile_minhas_vendas(request):
+    """Consulta cronologica de vendas do vendedor, por mes calendario.
+
+    Regras de edicao/exclusao (canEdit/canDelete refletem o backend):
+    - MANUAL + competencia ABERTA/REABERTA: pode editar/excluir.
+    - IMPORTADA: somente leitura.
+    - LINK: somente leitura.
+    - competencia FECHADA/PAGA/AJUSTADA/CANCELADA: bloqueia edicao/exclusao
+      (a venda cai em um SellerCommission travado -> is_locked).
+    - Venda MANUAL sem competencia que a contenha: permanece editavel, pois
+      nao ha SellerCommission travando o range (mesma regra do backend em
+      validate_sale_can_be_changed, que retorna True quando nao ha periodo).
+      Exibimos o rotulo "Sem competencia" apenas como contexto informativo,
+      sem inventar competencia pelo mes calendario.
+    """
     seller = _get_seller_profile(request)
     if hasattr(seller, 'status_code'):
         return seller
@@ -488,9 +502,23 @@ def mobile_minhas_vendas(request):
         is_locked = any(sc.period.contains(s.sale_date) for sc in locked_periods)
         log_count = log_counts.get(s.uuid, 0)
         comp = _resolve_competencia(s.sale_date)
-        competencia_label = ''
-        if comp and comp.month != s.sale_date.month:
-            competencia_label = comp.display_label
+        if comp:
+            competencia_uuid = str(comp.uuid)
+            competencia_label = comp.label
+            competencia_display_label = comp.display_label
+            competencia_range = (
+                f'{comp.start_date.strftime("%d/%m")} a '
+                f'{comp.end_date.strftime("%d/%m")}'
+            )
+            competencia_status = comp.status
+            competencia_status_display = comp.get_status_display()
+        else:
+            competencia_uuid = ''
+            competencia_label = ''
+            competencia_display_label = 'Sem competência'
+            competencia_range = ''
+            competencia_status = ''
+            competencia_status_display = ''
         sales_data.append({
             'uuid': str(s.uuid),
             'amount': s.amount,
@@ -503,7 +531,12 @@ def mobile_minhas_vendas(request):
             'canDelete': s.origin == Sale.Origin.MANUAL and not is_locked,
             'canEdit': s.origin == Sale.Origin.MANUAL and not is_locked,
             'change_log_count': log_count,
+            'competencia_uuid': competencia_uuid,
             'competencia_label': competencia_label,
+            'competencia_display_label': competencia_display_label,
+            'competencia_range': competencia_range,
+            'competencia_status': competencia_status,
+            'competencia_status_display': competencia_status_display,
         })
 
     return render(request, 'mobile/minhas_vendas.html', {
