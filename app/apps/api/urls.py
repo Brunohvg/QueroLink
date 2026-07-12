@@ -9,6 +9,7 @@ router = DefaultRouter()
 router.register(r'sellers', views.SellerViewSet, basename='api-seller')
 router.register(r'sales', views.SaleViewSet, basename='api-sale')
 router.register(r'commissions/periods', views.CommissionPeriodViewSet, basename='api-commission-period')
+router.register(r'manager/day-justifications', views.SellerDayJustificationViewSet, basename='api-day-justification')
 
 urlpatterns = [
     path('auth/login/', views.JWTLoginView.as_view(), name='api-login'),
