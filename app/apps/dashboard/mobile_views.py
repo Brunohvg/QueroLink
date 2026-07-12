@@ -438,26 +438,31 @@ def mobile_lancar_venda(request):
 
 @login_required
 def mobile_minhas_vendas(request):
-    """Consulta cronologica de vendas do vendedor, por mes/ano (chave YYYY-MM).
+    """Vendas do vendedor navegadas por COMPETENCIA (competence-first).
 
-    Regras de edicao/exclusao (canEdit/canDelete refletem o backend):
-    Aplicadas pela regra CENTRAL em lote
-    `build_sale_change_permission_resolver` (mesma logica de
-    `validate_sale_can_be_changed`, sem query por venda), considerando:
+    A competencia (nao o mes-calendario) e a navegacao principal: a tela
+    responde "quais vendas pertencem a competencia que define meu pagamento?".
+
+    - Seletor principal: competencias do vendedor (com venda ou
+      SellerCommission), CANCELADAS excluidas. Default: competencia
+      operacional atual; senao a mais recente com vendas; senao vazio.
+    - Ao selecionar uma competencia o backend retorna APENAS as vendas do
+      range (period.start_date..period.end_date) -- nunca o historico completo.
+    - Semanas recalculadas a partir do inicio da competencia
+      (week_index = floor((sale_date - start)/7) + 1), datas civis sem fuso.
+    - Filtro secundario por mes (apenas meses que interceptam a competencia)
+      reduz visualmente, jamais carrega vendas de outra competencia.
+    - Vendas sem competencia ficam num estado separado (?period=sem-competencia)
+      e nunca entram no total da competencia.
+
+    Regras de edicao/exclusao (canEdit/canDelete) permanecem 100% delegadas a
+    regra CENTRAL `build_sale_change_permission_resolver` (mesma logica de
+    `validate_sale_can_be_changed`, sem query por venda):
     - MANUAL + competencia editavel (ABERTA/REABERTA): pode editar/excluir.
-    - IMPORTADA: somente leitura.
-    - LINK: somente leitura.
-    - ESTORNADA: somente leitura.
-    - competencia FECHADA/PAGA/CANCELADA: bloqueia edicao/exclusao.
-    - SellerCommission FECHADA/PAGA/AJUSTADA/CANCELADA: bloqueia.
-    - Venda MANUAL sem competencia que a contenha: permanece editavel (mesma
-      regra do backend, que retorna True quando nao ha periodo). Exibimos o
-      rotulo "Sem competencia" apenas como contexto, sem inventar competencia
-      pelo mes calendario.
-
-    Para CLASSIFICAR o historico, competencias CANCELADAS tambem sao
-    carregadas: uma venda dentro de um range cancelado continua identificada
-    (com status CANCELADA), sem virar "Sem competencia".
+    - IMPORTADA / LINK / ESTORNADA: somente leitura.
+    - competencia FECHADA/PAGA/CANCELADA bloqueia.
+    - SellerCommission FECHADA/PAGA/AJUSTADA/CANCELADA bloqueia.
+    - Venda MANUAL sem competencia que a contenha: permanece editavel.
     """
     seller = _get_seller_profile(request)
     if hasattr(seller, 'status_code'):
@@ -467,69 +472,183 @@ def mobile_minhas_vendas(request):
             'error': 'Perfil de vendedor nao encontrado.',
         })
 
-    sales = Sale.objects.filter(seller=seller).order_by(
-        '-sale_date', '-created_at',
-    )
-
     from app.apps.sales.models import SaleChangeLog
-    from django.db.models import Count
+    from django.db.models import Count, Q
     from app.apps.commissions.services import (
         build_sale_change_permission_resolver,
     )
 
+    tenant = seller.tenant
+
+    # Todas as competencias do tenant carregadas UMA vez. Inclui CANCELADAS
+    # apenas para deteccao de orfaos e permissao; o seletor as exclui.
+    all_periods = list(
+        CommissionPeriod.objects.filter(tenant=tenant).order_by('start_date')
+    )
+
+    def _resolve_competencia(sale_date, include_cancelled=True):
+        for p in all_periods:
+            if p.start_date <= sale_date <= p.end_date:
+                if (
+                    not include_cancelled
+                    and p.status == CommissionPeriod.Status.CANCELADA
+                ):
+                    continue
+                return p
+        return None
+
+    # Datas distintas com venda (1 query) -> deriva competencias com atividade
+    # e detecta vendas orfas, sem carregar todas as vendas historicas no JSON.
+    sale_days = list(
+        Sale.objects.filter(seller=seller).dates('sale_date', 'day')
+    )
+    active_period_ids = set()
+    has_orphan = False
+    for d in sale_days:
+        if _resolve_competencia(d, include_cancelled=True) is None:
+            has_orphan = True
+        p_active = _resolve_competencia(d, include_cancelled=False)
+        if p_active:
+            active_period_ids.add(p_active.uuid)
+
+    current_period = next(
+        (
+            p for p in all_periods
+            if p.start_date <= timezone.localdate() <= p.end_date
+            and p.status in (
+                CommissionPeriod.Status.ABERTA,
+                CommissionPeriod.Status.PARCIALMENTE_FECHADA,
+                CommissionPeriod.Status.PARCIALMENTE_PAGA,
+            )
+        ),
+        None,
+    )
+
+    # LOTE 1 - seletor principal: competencias do vendedor (com venda), nunca
+    # CANCELADAS. Inclui a competencia operacional atual mesmo sem venda, para
+    # permitir o default. Ordenado por start_date desc.
+    competence_periods = [
+        p for p in all_periods
+        if p.status != CommissionPeriod.Status.CANCELADA
+        and (
+            p.uuid in active_period_ids
+            or (current_period and p.uuid == current_period.uuid)
+        )
+    ]
+    competence_periods.sort(key=lambda p: p.start_date, reverse=True)
+
+    # LOTE 2/6 - resolucao da competencia selecionada (ou estado orfao).
+    period_param = (request.GET.get('period') or '').strip()
+    selected = None
+    show_unassigned = False
+
+    if period_param == 'sem-competencia':
+        show_unassigned = True
+    elif period_param:
+        selected = next(
+            (p for p in competence_periods if str(p.uuid) == period_param),
+            None,
+        )
+
+    if selected is None and not show_unassigned:
+        # Default 1: competencia operacional atual (se listada).
+        if current_period and any(
+            p.uuid == current_period.uuid for p in competence_periods
+        ):
+            selected = next(
+                p for p in competence_periods
+                if p.uuid == current_period.uuid
+            )
+        else:
+            # Default 2: competencia mais recente COM vendas.
+            selected = next(
+                (p for p in competence_periods if p.uuid in active_period_ids),
+                None,
+            )
+        # Default 3: estado vazio (selected permanece None).
+
+    competence_options = [
+        {
+            'uuid': str(p.uuid),
+            'label': p.display_label,
+            'range': (
+                f'{p.start_date.strftime("%d/%m")} a '
+                f'{p.end_date.strftime("%d/%m")}'
+            ),
+            'status_display': p.get_status_display(),
+            'is_current': bool(
+                current_period and p.uuid == current_period.uuid
+            ),
+        }
+        for p in competence_periods
+    ]
+
+    # Regra central de edicao/exclusao em lote (SellerCommission 1 query).
+    can_change = build_sale_change_permission_resolver(
+        seller, periods=all_periods,
+    )
+
+    # LOTE 8 - backend retorna APENAS as vendas do range selecionado (ou os
+    # orfaos), nunca o historico completo do vendedor.
+    if show_unassigned:
+        covered_any = Q()
+        for p in all_periods:
+            covered_any |= Q(
+                sale_date__gte=p.start_date, sale_date__lte=p.end_date,
+            )
+        sales_qs = Sale.objects.filter(seller=seller)
+        if covered_any:
+            sales_qs = sales_qs.exclude(covered_any)
+        sales_list = list(sales_qs.order_by('-sale_date', '-created_at'))
+    elif selected is not None:
+        sales_list = list(
+            Sale.objects.filter(
+                seller=seller,
+                sale_date__gte=selected.start_date,
+                sale_date__lte=selected.end_date,
+            ).order_by('-sale_date', '-created_at')
+        )
+    else:
+        sales_list = []
+
     log_counts = dict(
         SaleChangeLog.objects.filter(
-            sale__in=list(sales.values_list('pk', flat=True)),
+            sale__in=[s.pk for s in sales_list],
         ).values('sale_id').annotate(
             count=Count('uuid'),
         ).values_list('sale_id', 'count')
     )
 
-    # Regra central de edicao/exclusao em lote (sem query por venda).
-    from app.apps.commissions.models import CommissionPeriod
-    # Para CLASSIFICAR vendas historicas carregamos TODAS as competencias,
-    # inclusive CANCELADAS (uma venda dentro de um range cancelado deve
-    # continuar identificada). Competencias canceladas nunca aparecem em
-    # seletores financeiros -- este uso e apenas de rotulagem/historico.
-    all_periods = list(
-        CommissionPeriod.objects.filter(tenant=seller.tenant)
-        .order_by('start_date')
-    )
-    # Reutiliza a MESMA lista de periodos (evita 2a query) e mantem a regra
-    # central de bloqueio.
-    can_change = build_sale_change_permission_resolver(
-        seller, periods=all_periods,
-    )
-
-    def _resolve_competencia(sale_date):
-        for p in all_periods:
-            if p.start_date <= sale_date <= p.end_date:
-                return p
-        return None
-
-    today = timezone.localdate()
-    sales_data = []
-    for s in sales:
-        allowed = can_change(s)
-        log_count = log_counts.get(s.uuid, 0)
-        comp = _resolve_competencia(s.sale_date)
-        if comp:
-            competencia_uuid = str(comp.uuid)
-            competencia_label = comp.label
-            competencia_display_label = comp.display_label
-            competencia_range = (
-                f'{comp.start_date.strftime("%d/%m")} a '
-                f'{comp.end_date.strftime("%d/%m")}'
+    # LOTE 3 - semanas recalculadas a partir do INICIO da competencia.
+    weeks_meta = []
+    if selected is not None:
+        total_days = (selected.end_date - selected.start_date).days + 1
+        num_weeks = (total_days + 6) // 7
+        for i in range(num_weeks):
+            w_start = selected.start_date + timedelta(days=i * 7)
+            w_end = min(
+                selected.start_date + timedelta(days=i * 7 + 6),
+                selected.end_date,
             )
-            competencia_status = comp.status
-            competencia_status_display = comp.get_status_display()
+            weeks_meta.append({
+                'index': i + 1,
+                'label': f'Semana {i + 1}',
+                'range': (
+                    f'{w_start.strftime("%d/%m")} a '
+                    f'{w_end.strftime("%d/%m")}'
+                ),
+            })
+    elif show_unassigned:
+        weeks_meta = [{'index': 1, 'label': 'Sem competência', 'range': ''}]
+
+    competence_total = 0
+    sales_data = []
+    for s in sales_list:
+        allowed = can_change(s)
+        if selected is not None:
+            week_index = (s.sale_date - selected.start_date).days // 7 + 1
         else:
-            competencia_uuid = ''
-            competencia_label = ''
-            competencia_display_label = 'Sem competência'
-            competencia_range = ''
-            competencia_status = ''
-            competencia_status_display = ''
+            week_index = 1
         sales_data.append({
             'uuid': str(s.uuid),
             'amount': s.amount,
@@ -540,47 +659,77 @@ def mobile_minhas_vendas(request):
             'date': s.sale_date.strftime('%d/%m/%Y'),
             'date_iso': s.sale_date.isoformat(),
             'month_key': s.sale_date.strftime('%Y-%m'),
+            'week_index': week_index,
             'canDelete': allowed,
             'canEdit': allowed,
-            'change_log_count': log_count,
-            'competencia_uuid': competencia_uuid,
-            'competencia_label': competencia_label,
-            'competencia_display_label': competencia_display_label,
-            'competencia_range': competencia_range,
-            'competencia_status': competencia_status,
-            'competencia_status_display': competencia_status_display,
+            'change_log_count': log_counts.get(s.uuid, 0),
         })
+        if s.status == 'ATIVA':
+            competence_total += s.amount
 
-    # Chaves cronologicas YYYY-MM que possuem vendas, mais recente primeiro.
+    # LOTE 4 - filtro secundario: apenas meses que interceptam a competencia.
     month_options = []
-    seen_keys = set()
-    for item in sales_data:
-        key = item['month_key']
-        if key in seen_keys:
-            continue
-        seen_keys.add(key)
-        y, m = key.split('-')
-        month_options.append({
-            'key': key,
-            'label': f'{MONTH_NAMES_PT[int(m)]}/{y}',
-        })
-    month_options.sort(key=lambda o: o['key'], reverse=True)
+    if selected is not None:
+        y, m = selected.start_date.year, selected.start_date.month
+        ey, em = selected.end_date.year, selected.end_date.month
+        while (y, m) <= (ey, em):
+            month_options.append({
+                'key': f'{y:04d}-{m:02d}',
+                'label': f'{MONTH_NAMES_PT[m]}/{y}',
+            })
+            if m == 12:
+                y, m = y + 1, 1
+            else:
+                m += 1
 
-    # Default: mes/ano atual se houver vendas; senao o mais recente com vendas.
-    current_key = f'{today.year:04d}-{today.month:02d}'
-    if current_key in seen_keys:
-        default_month_key = current_key
-    elif month_options:
-        default_month_key = month_options[0]['key']
+    # LOTE 6 - contagem de vendas orfas (nunca somadas na competencia).
+    unassigned_count = 0
+    if has_orphan:
+        covered_any = Q()
+        for p in all_periods:
+            covered_any |= Q(
+                sale_date__gte=p.start_date, sale_date__lte=p.end_date,
+            )
+        orphan_qs = Sale.objects.filter(seller=seller)
+        if covered_any:
+            orphan_qs = orphan_qs.exclude(covered_any)
+        unassigned_count = orphan_qs.count()
+
+    if show_unassigned:
+        selected_period_uuid = 'sem-competencia'
+    elif selected is not None:
+        selected_period_uuid = str(selected.uuid)
     else:
-        default_month_key = ''
+        selected_period_uuid = ''
+
+    selected_competence = None
+    if selected is not None:
+        selected_competence = {
+            'uuid': str(selected.uuid),
+            'display_label': selected.display_label,
+            'start_iso': selected.start_date.isoformat(),
+            'end_iso': selected.end_date.isoformat(),
+            'range_full': (
+                f'{selected.start_date.strftime("%d/%m/%Y")} a '
+                f'{selected.end_date.strftime("%d/%m/%Y")}'
+            ),
+            'status': selected.status,
+            'status_display': selected.get_status_display(),
+        }
 
     return render(request, 'mobile/minhas_vendas.html', {
         'seller': seller,
-        'sales': sales,
-        'sales_json': sales_data,
+        'competence_options': competence_options,
+        'selected_competence': selected_competence,
+        'selected_period_uuid': selected_period_uuid,
+        'show_unassigned': show_unassigned,
+        'has_orphan': has_orphan,
+        'unassigned_count': unassigned_count,
         'month_options': month_options,
-        'default_month_key': default_month_key,
+        'weeks_json': weeks_meta,
+        'sales_json': sales_data,
+        'competence_total': competence_total,
+        'competence_count': len(sales_data),
     })
 
 
