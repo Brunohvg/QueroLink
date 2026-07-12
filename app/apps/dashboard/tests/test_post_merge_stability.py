@@ -48,7 +48,7 @@ class BaseSetup(TestCase):
             period_start_day=21,
         )
         self.seller_user = User.objects.create_user(
-            username='vendpm', password='test123',
+            username='vendpm',
             role=User.Role.SELLER, tenant=self.tenant,
         )
         self.seller = Seller.objects.create(
@@ -232,7 +232,7 @@ class Lote3CompleteSelector(BaseSetup):
     def test_other_seller_period_not_in_selector(self):
         # Outro vendedor tem venda/SC em Agosto; este vendedor nao.
         other_user = User.objects.create_user(
-            username='outro', password='x',
+            username='outro',
             role=User.Role.SELLER, tenant=self.tenant,
         )
         other_seller = Seller.objects.create(
