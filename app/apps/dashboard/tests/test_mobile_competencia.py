@@ -502,3 +502,158 @@ class MinhasVendasPermissionsTest(TestCase):
         ).content.decode('utf-8')
         fallback = html.split('id="sales-fallback"', 1)[1]
         self.assertNotIn('/dashboard/mobile/lancar/?date=', fallback)
+
+
+class MinhasVendasResponsiveWeeksTest(TestCase):
+    """PROMPT_46B - ordem cronologica das semanas e responsividade."""
+
+    def setUp(self):
+        self.tenant = Tenant.objects.create(
+            company_name='Resp Co', slug='resp-co',
+            default_commission_rate=Decimal('0.01'), is_active=True,
+            period_start_day=21,
+        )
+        self.seller_user = User.objects.create_user(
+            username='vendresp', role=User.Role.SELLER, tenant=self.tenant,
+        )
+        self.seller = Seller.objects.create(
+            tenant=self.tenant, user=self.seller_user, name='Vend Resp',
+            phone='55999996666', commission_rate=Decimal('0.01'),
+            is_active=True,
+        )
+        # Julho/2026: 21/06 a 20/07 (5 semanas)
+        self.period = CommissionPeriod.objects.create(
+            tenant=self.tenant, month=7, year=2026,
+            start_date=date(2026, 6, 21), end_date=date(2026, 7, 20),
+            label='Julho/2026',
+        )
+        self.client.force_login(self.seller_user)
+
+    def _sale(self, sale_date, origin=Sale.Origin.MANUAL, amount=100000,
+              status='ATIVA', notes=''):
+        return Sale.objects.create(
+            tenant=self.tenant, seller=self.seller, origin=origin,
+            amount=amount, sale_date=sale_date, status=status, notes=notes,
+            created_by=self.seller_user,
+        )
+
+    def _ctx(self):
+        resp = self.client.get(
+            '/dashboard/mobile/vendas/?period=' + str(self.period.uuid),
+        )
+        self.assertEqual(resp.status_code, 200)
+        return resp
+
+    # 1/4/5/6: weeks_json em ordem crescente com ranges corretos
+    def test_weeks_json_ascending_with_ranges(self):
+        self._sale('2026-06-25')
+        weeks = self._ctx().context['weeks_json']
+        indices = [w['index'] for w in weeks]
+        self.assertEqual(indices, sorted(indices))
+        self.assertEqual(indices[0], 1)
+        by_index = {w['index']: w['range'] for w in weeks}
+        self.assertEqual(by_index[1], '21/06 a 27/06')
+        self.assertEqual(by_index[2], '28/06 a 04/07')
+        self.assertEqual(by_index[3], '05/07 a 11/07')
+        self.assertEqual(by_index[5], '19/07 a 20/07')
+
+    # 1/2: o JS ordena as semanas de forma crescente (Semana 1 primeiro)
+    def test_js_sorts_weeks_ascending(self):
+        self._sale('2026-06-25')
+        html = self._ctx().content.decode('utf-8')
+        self.assertIn('return a.index - b.index;', html)
+        self.assertNotIn('return b.index - a.index;', html)
+
+    # 3: init expande o primeiro grupo (Semana 1 apos ordenacao crescente)
+    def test_init_opens_first_group(self):
+        self._sale('2026-06-25')
+        html = self._ctx().content.decode('utf-8')
+        self.assertIn('this.expandedWeeks[weeks[0].key] = true;', html)
+        # troca de filtro reabre a primeira semana visivel se nenhuma aberta
+        self.assertIn('onFilterChange()', html)
+
+    # 11: o valor monetario nao usa truncate e usa whitespace-nowrap
+    def test_value_nowrap_without_truncate(self):
+        self._sale('2026-06-25', amount=123456789)
+        html = self._ctx().content.decode('utf-8')
+        self.assertIn(
+            'font-semibold text-[14px] whitespace-nowrap', html,
+        )
+        # a antiga classe de truncar o valor nao deve existir
+        self.assertNotIn('text-[14px] truncate block', html)
+
+    # 10: regiao de badges usa flex-wrap; observacao em linha propria
+    def test_badges_region_flex_wrap(self):
+        self._sale('2026-06-25', notes='obs')
+        html = self._ctx().content.decode('utf-8')
+        self.assertIn('flex flex-wrap items-center gap-1.5 mt-1.5', html)
+        # observacao com acesso ao conteudo completo (title) e sem truncate
+        self.assertIn(':title="sale.notes"', html)
+        self.assertIn('basis-full text-[11px] text-gray-400 break-words', html)
+
+    # 12: resumo com regra responsiva
+    def test_summary_responsive_classes(self):
+        self._sale('2026-06-25')
+        html = self._ctx().content.decode('utf-8')
+        self.assertIn('grid grid-cols-2 sm:grid-cols-3', html)
+        self.assertIn('col-span-2 sm:col-span-1', html)
+
+    # 13: filtro por mes com regra responsiva
+    def test_month_filter_responsive_classes(self):
+        self._sale('2026-06-25')
+        self._sale('2026-07-05')
+        html = self._ctx().content.decode('utf-8')
+        self.assertIn('flex flex-col sm:flex-row sm:items-center gap-2', html)
+
+    # 7: total das semanas = total da competencia
+    def test_sum_of_weeks_equals_total(self):
+        self._sale('2026-06-23', amount=300000)   # S1
+        self._sale('2026-06-30', amount=200000)   # S2
+        self._sale('2026-07-05', amount=150000)   # S3
+        ctx = self._ctx().context
+        weeks_total = {}
+        for s in ctx['sales_json']:
+            if s['status'] != 'ESTORNADA':
+                weeks_total[s['week_index']] = (
+                    weeks_total.get(s['week_index'], 0) + s['amount']
+                )
+        self.assertEqual(sum(weeks_total.values()), ctx['competence_total'])
+        self.assertEqual(ctx['competence_total'], 650000)
+
+    # 16: estornada fora do total
+    def test_estornada_not_in_total(self):
+        self._sale('2026-06-25', amount=100000)
+        self._sale('2026-06-26', amount=500000, status='ESTORNADA')
+        self.assertEqual(self._ctx().context['competence_total'], 100000)
+
+    # 17: datas civis 23/06 e 30/06 nao deslocam
+    def test_civil_dates_not_shifted(self):
+        self._sale('2026-06-23')
+        self._sale('2026-06-30')
+        by_iso = {s['date_iso']: s for s in self._ctx().context['sales_json']}
+        self.assertEqual(by_iso['2026-06-23']['date'], '23/06/2026')
+        self.assertEqual(by_iso['2026-06-30']['date'], '30/06/2026')
+
+    # 14/15: acoes conforme canEdit/canDelete; importada somente leitura
+    def test_actions_respect_permissions(self):
+        self._sale('2026-06-24', origin=Sale.Origin.MANUAL)
+        self._sale('2026-06-25', origin=Sale.Origin.IMPORTADA)
+        by_date = {s['date']: s for s in self._ctx().context['sales_json']}
+        self.assertTrue(by_date['24/06/2026']['canEdit'])
+        self.assertTrue(by_date['24/06/2026']['canDelete'])
+        self.assertFalse(by_date['25/06/2026']['canEdit'])
+        self.assertFalse(by_date['25/06/2026']['canDelete'])
+
+    # 18: nenhuma migration pendente/criada
+    def test_no_pending_migrations(self):
+        from io import StringIO
+        from django.core.management import call_command
+        changed = False
+        try:
+            call_command(
+                'makemigrations', check=True, dry_run=True,
+                stdout=StringIO(), stderr=StringIO(), verbosity=0,
+            )
+        except SystemExit:
+            changed = True
+        self.assertFalse(changed, 'Migrations pendentes foram detectadas')
