@@ -2,6 +2,7 @@ import json
 import logging
 
 from django.shortcuts import render, redirect
+from django.http import Http404
 from django.contrib.auth import (
     authenticate, login as auth_login, logout as auth_logout,
 )
@@ -511,33 +512,64 @@ def mobile_minhas_vendas(request):
         if p_active:
             active_period_ids.add(p_active.uuid)
 
-    current_period = next(
-        (
-            p for p in all_periods
-            if p.start_date <= timezone.localdate() <= p.end_date
-            and p.status in (
-                CommissionPeriod.Status.ABERTA,
-                CommissionPeriod.Status.PARCIALMENTE_FECHADA,
-                CommissionPeriod.Status.PARCIALMENTE_PAGA,
-            )
-        ),
-        None,
+    # LOTE 3 - IDs de SellerCommission do vendedor em UMA unica query.
+    sc_period_ids = set(
+        SellerCommission.objects.filter(seller=seller)
+        .values_list('period_id', flat=True)
     )
 
-    # LOTE 1 - seletor principal: competencias do vendedor (com venda), nunca
-    # CANCELADAS. Inclui a competencia operacional atual mesmo sem venda, para
-    # permitir o default. Ordenado por start_date desc.
+    # LOTE 2 - competencia operacional atual com verificacao de sobreposicao
+    # (mesma regra central de get_default_period): 0 periodos nao cancelados
+    # cobrindo hoje -> None; 1 -> esse; >1 -> erro controlado (NUNCA escolher
+    # silenciosamente a primeira). Computado a partir de all_periods (sem
+    # query extra).
+    today = timezone.localdate()
+    covering_today = [
+        p for p in all_periods
+        if p.status != CommissionPeriod.Status.CANCELADA
+        and p.start_date <= today <= p.end_date
+    ]
+    if len(covering_today) > 1:
+        logger.error(
+            'Competencias sobrepostas cobrindo hoje para tenant %s: %s',
+            tenant.pk, [str(p.uuid) for p in covering_today],
+        )
+        return render(request, 'mobile/minhas_vendas.html', {
+            'error': (
+                'Ha competencias sobrepostas cobrindo a data atual. '
+                'Contate o gestor para corrigir os periodos.'
+            ),
+            'competence_options': [],
+            'selected_competence': None,
+            'selected_period_uuid': '',
+            'show_unassigned': False,
+            'has_orphan': False,
+            'unassigned_count': 0,
+            'month_options': [],
+            'weeks_json': [],
+            'sales_json': [],
+            'competence_total': 0,
+            'competence_count': 0,
+        })
+    current_period = covering_today[0] if covering_today else None
+
+    # LOTE 1/3 - seletor principal: competencias nao canceladas que tenham
+    # venda do vendedor OU SellerCommission do vendedor OU sejam a operacional
+    # atual. Ordenado por start_date desc.
     competence_periods = [
         p for p in all_periods
         if p.status != CommissionPeriod.Status.CANCELADA
         and (
             p.uuid in active_period_ids
+            or p.uuid in sc_period_ids
             or (current_period and p.uuid == current_period.uuid)
         )
     ]
     competence_periods.sort(key=lambda p: p.start_date, reverse=True)
 
-    # LOTE 2/6 - resolucao da competencia selecionada (ou estado orfao).
+    # LOTE 1 - resolucao da competencia selecionada.
+    # UUID explicito NUNCA cai em fallback: se nao existir / for invalido /
+    # de outro tenant / cancelado / inacessivel ao vendedor -> Http404.
     period_param = (request.GET.get('period') or '').strip()
     selected = None
     show_unassigned = False
@@ -549,9 +581,10 @@ def mobile_minhas_vendas(request):
             (p for p in competence_periods if str(p.uuid) == period_param),
             None,
         )
-
-    if selected is None and not show_unassigned:
-        # Default 1: competencia operacional atual (se listada).
+        if selected is None:
+            raise Http404('Competencia nao encontrada ou inacessivel.')
+    else:
+        # Default 1: operacional atual (se acessivel ao vendedor).
         if current_period and any(
             p.uuid == current_period.uuid for p in competence_periods
         ):
@@ -560,9 +593,12 @@ def mobile_minhas_vendas(request):
                 if p.uuid == current_period.uuid
             )
         else:
-            # Default 2: competencia mais recente COM vendas.
+            # Default 2: mais recente com atividade (venda ou SellerCommission).
             selected = next(
-                (p for p in competence_periods if p.uuid in active_period_ids),
+                (
+                    p for p in competence_periods
+                    if p.uuid in active_period_ids or p.uuid in sc_period_ids
+                ),
                 None,
             )
         # Default 3: estado vazio (selected permanece None).

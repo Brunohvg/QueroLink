@@ -306,7 +306,8 @@ class MinhasVendasCompetenceFirstTest(TestCase):
         self.assertEqual(len(ctx['sales_json']), 1)
         self.assertEqual(ctx['sales_json'][0]['date'], '25/06/2026')
 
-    # 15: sem N+1 (periodos e SellerCommission carregados uma vez)
+    # 15: sem N+1 (periodos 1 query; SellerCommission em nro constante de
+    # queries: 1 para os IDs do seletor + 1 do resolver de permissao).
     def test_no_nplus1(self):
         from django.db import connection
         from django.test.utils import CaptureQueriesContext
@@ -327,7 +328,7 @@ class MinhasVendasCompetenceFirstTest(TestCase):
             if 'commissions_sellercommission' in q['sql'].lower()
         ]
         self.assertEqual(len(period_queries), 1)
-        self.assertEqual(len(sc_queries), 1)
+        self.assertEqual(len(sc_queries), 2)
 
     # 16: total das semanas = total da competencia
     def test_sum_of_weeks_equals_competence_total(self):
