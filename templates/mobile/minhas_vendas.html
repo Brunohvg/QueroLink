@@ -344,7 +344,7 @@ function minhasVendas() {
                 var month = parts[1];
                 s.day = day;
                 s.month = month;
-                var d = new Date(s.date_iso + 'T00:00:00');
+                var d = parseCivilDate(s.date_iso);
                 s.weekday = WEEKDAYS[d.getDay()];
                 var wn = getWeekNumber(day);
                 // Chave inclui YYYY-MM para nunca misturar anos diferentes.
