@@ -11,7 +11,7 @@ from django.db import connection
 from rest_framework.test import APIClient
 
 from app.apps.accounts.models import Tenant, User
-from app.apps.sellers.models import Seller
+from app.apps.sellers.models import Seller, SellerDayJustification
 from app.apps.commissions.models import CommissionPeriod, SellerCommission
 from app.apps.sales.models import Sale, SaleChangeLog
 
@@ -215,6 +215,168 @@ class CompetenciaFirstTest(TestCase):
         self.assertEqual(sellers[0]['month_total'], 9951859)
         self.assertEqual(sellers[0]['commission_amount'], 99519)
         self.assertEqual(sellers[0]['last_sale_date'], '2026-07-05')
+        self.assertEqual(sellers[0]['financial_status'], 'SEM_COMISSAO')
+        self.assertFalse(sellers[0]['has_sale_today'])
+        self.assertFalse(sellers[0]['has_justification_today'])
+        self.assertFalse(sellers[0]['has_day_resolved_today'])
+
+    def test_summary_without_commission_is_informational_when_locked(self):
+        client = self._auth(self.manager, 'gestor123')
+        url = (
+            reverse('api-seller-dashboard-summary')
+            + f'?period={self.period.uuid}'
+        )
+        for period_status in (
+            CommissionPeriod.Status.FECHADA,
+            CommissionPeriod.Status.PAGA,
+        ):
+            self.period.status = period_status
+            self.period.save(update_fields=['status'])
+            seller = client.get(url).json()['sellers'][0]
+            self.assertEqual(seller['financial_status'], 'SEM_COMISSAO')
+            self.assertNotEqual(seller['financial_status'], 'ABERTA')
+            self.assertEqual(seller['commission_amount'], 99519)
+
+    def test_cancelled_period_is_not_exposed_as_open_commission(self):
+        self.period.status = CommissionPeriod.Status.CANCELADA
+        self.period.save(update_fields=['status'])
+        client = self._auth(self.manager, 'gestor123')
+        response = client.get(
+            reverse('api-seller-dashboard-summary')
+            + f'?period={self.period.uuid}',
+        )
+        self.assertEqual(response.status_code, 404)
+        self.assertNotContains(response, 'ABERTA', status_code=404)
+
+    def test_existing_seller_commission_keeps_its_status(self):
+        SellerCommission.objects.create(
+            period=self.period,
+            seller=self.seller,
+            status=SellerCommission.Status.FECHADA,
+            commission_rate=Decimal('0.01'),
+            total_sold_amount=9951859,
+            commission_amount=99519,
+        )
+        client = self._auth(self.manager, 'gestor123')
+        seller = client.get(
+            reverse('api-seller-dashboard-summary')
+            + f'?period={self.period.uuid}',
+        ).json()['sellers'][0]
+        self.assertEqual(seller['financial_status'], 'FECHADA')
+        self.assertEqual(seller['commission_amount'], 99519)
+
+    @patch('app.apps.api.views.timezone.localdate')
+    def test_active_manual_sale_resolves_today(self, localdate_mock):
+        localdate_mock.return_value = date(2026, 7, 10)
+        Sale.objects.create(
+            tenant=self.tenant,
+            seller=self.seller,
+            origin=Sale.Origin.MANUAL,
+            status='ATIVA',
+            amount=10000,
+            sale_date=date(2026, 7, 10),
+            created_by=self.seller_user,
+        )
+        client = self._auth(self.manager, 'gestor123')
+        seller = client.get(
+            reverse('api-seller-dashboard-summary')
+            + f'?period={self.period.uuid}',
+        ).json()['sellers'][0]
+        self.assertTrue(seller['has_sale_today'])
+        self.assertFalse(seller['has_justification_today'])
+        self.assertTrue(seller['has_day_resolved_today'])
+
+    @patch('app.apps.api.views.timezone.localdate')
+    def test_justification_resolves_today(self, localdate_mock):
+        localdate_mock.return_value = date(2026, 7, 10)
+        SellerDayJustification.objects.create(
+            tenant=self.tenant,
+            seller=self.seller,
+            date=date(2026, 7, 10),
+            reason=SellerDayJustification.Reason.FALTA,
+            created_by=self.manager,
+        )
+        client = self._auth(self.manager, 'gestor123')
+        seller = client.get(
+            reverse('api-seller-dashboard-summary')
+            + f'?period={self.period.uuid}',
+        ).json()['sellers'][0]
+        self.assertFalse(seller['has_sale_today'])
+        self.assertTrue(seller['has_justification_today'])
+        self.assertTrue(seller['has_day_resolved_today'])
+
+    @patch('app.apps.api.views.timezone.localdate')
+    def test_refunded_sale_does_not_resolve_today(self, localdate_mock):
+        localdate_mock.return_value = date(2026, 7, 10)
+        Sale.objects.create(
+            tenant=self.tenant,
+            seller=self.seller,
+            origin=Sale.Origin.MANUAL,
+            status='ESTORNADA',
+            amount=10000,
+            sale_date=date(2026, 7, 10),
+            created_by=self.seller_user,
+        )
+        client = self._auth(self.manager, 'gestor123')
+        seller = client.get(
+            reverse('api-seller-dashboard-summary')
+            + f'?period={self.period.uuid}',
+        ).json()['sellers'][0]
+        self.assertFalse(seller['has_sale_today'])
+        self.assertFalse(seller['has_justification_today'])
+        self.assertFalse(seller['has_day_resolved_today'])
+
+    @patch('app.apps.api.views.timezone.localdate')
+    def test_imported_sale_does_not_resolve_today(self, localdate_mock):
+        localdate_mock.return_value = date(2026, 7, 10)
+        Sale.objects.create(
+            tenant=self.tenant,
+            seller=self.seller,
+            origin=Sale.Origin.IMPORTADA,
+            status='ATIVA',
+            amount=10000,
+            sale_date=date(2026, 7, 10),
+            created_by=self.manager,
+        )
+        client = self._auth(self.manager, 'gestor123')
+        seller = client.get(
+            reverse('api-seller-dashboard-summary')
+            + f'?period={self.period.uuid}',
+        ).json()['sellers'][0]
+        self.assertFalse(seller['has_sale_today'])
+        self.assertFalse(seller['has_justification_today'])
+        self.assertFalse(seller['has_day_resolved_today'])
+
+    @patch('app.apps.api.views.timezone.localdate')
+    def test_other_tenant_justification_does_not_resolve_today(
+        self, localdate_mock,
+    ):
+        localdate_mock.return_value = date(2026, 7, 10)
+        other_user = User.objects.create_user(
+            username='seller-other', role=User.Role.SELLER,
+            tenant=self.tenant2,
+        )
+        other_seller = Seller.objects.create(
+            tenant=self.tenant2, user=other_user, name='Outro vendedor',
+            phone='11988887777', commission_rate=Decimal('0.01'),
+        )
+        SellerDayJustification.objects.create(
+            tenant=self.tenant2,
+            seller=other_seller,
+            date=date(2026, 7, 10),
+            reason=SellerDayJustification.Reason.FOLGA,
+            created_by=self.manager2,
+        )
+        client = self._auth(self.manager, 'gestor123')
+        sellers = client.get(
+            reverse('api-seller-dashboard-summary')
+            + f'?period={self.period.uuid}',
+        ).json()['sellers']
+        self.assertEqual([seller['uuid'] for seller in sellers], [
+            str(self.seller.uuid),
+        ])
+        self.assertFalse(sellers[0]['has_justification_today'])
+        self.assertFalse(sellers[0]['has_day_resolved_today'])
 
     def test_seller_dashboard_summary_queries_are_constant(self):
         client = self._auth(self.manager, 'gestor123')
@@ -237,12 +399,33 @@ class CompetenciaFirstTest(TestCase):
                 commission_rate=Decimal('0.01'),
             )
 
-        with CaptureQueriesContext(connection) as many_ctx:
+        with CaptureQueriesContext(connection) as thirteen_ctx:
             response = client.get(url)
         self.assertEqual(response.status_code, 200)
         self.assertEqual(len(response.json()['sellers']), 13)
-        self.assertLessEqual(
-            len(many_ctx.captured_queries), len(one_ctx.captured_queries) + 1,
+
+        for index in range(12, 49):
+            user = User.objects.create_user(
+                username=f'bulk-user-{index}', role=User.Role.SELLER,
+                tenant=self.tenant,
+            )
+            Seller.objects.create(
+                tenant=self.tenant, user=user, name=f'Bulk {index}',
+                phone=f'1188888{index:04d}',
+                commission_rate=Decimal('0.01'),
+            )
+
+        with CaptureQueriesContext(connection) as fifty_ctx:
+            response = client.get(url)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.json()['sellers']), 50)
+        self.assertEqual(
+            len(thirteen_ctx.captured_queries),
+            len(one_ctx.captured_queries),
+        )
+        self.assertEqual(
+            len(fifty_ctx.captured_queries),
+            len(one_ctx.captured_queries),
         )
 
     # helpers de selecao
