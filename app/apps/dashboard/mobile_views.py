@@ -197,10 +197,15 @@ def mobile_home(request):
 
         today = timezone.localdate()
         today_manual = Sale.objects.filter(
-            seller=seller, origin=Sale.Origin.MANUAL, sale_date=today,
+            seller=seller, origin=Sale.Origin.MANUAL, status='ATIVA',
+            sale_date=today,
         ).first()
         today_total = today_manual.amount if today_manual else 0
         has_entry_today = today_manual is not None
+        from app.apps.sellers.models import SellerDayJustification
+        has_justification_today = SellerDayJustification.objects.filter(
+            tenant=seller.tenant, seller=seller, date=today,
+        ).exists()
 
         from app.apps.commissions.services import (
             calculate_estimated_commission_for_period,
@@ -294,6 +299,10 @@ def mobile_home(request):
             'seller': seller,
             'today_total': today_total,
             'has_entry_today': has_entry_today,
+            'has_justification_today': has_justification_today,
+            'has_day_resolved_today': (
+                has_entry_today or has_justification_today
+            ),
             'month_total': month_total,
             'month_link_total': month_link_total,
             'comissao_estimada': comissao_valor,

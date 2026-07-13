@@ -1,4 +1,5 @@
 import glob
+from pathlib import Path
 
 from django.test import TestCase
 
@@ -40,3 +41,38 @@ class OrphanScreenTests(TestCase):
             missing, [],
             f'Telas sem nenhum link apontando para elas (orfas): {missing}',
         )
+
+
+class NavigationPerformanceRegressionTests(TestCase):
+    def test_desktop_layout_is_responsive(self):
+        base = Path('templates/dashboard/base_desktop.html').read_text()
+        sidebar = Path('templates/components/_sidebar.html').read_text()
+        self.assertIn('@click="sidebarOpen=true"', base)
+        self.assertIn('lg:hidden', base)
+        self.assertIn('lg:static', sidebar)
+        self.assertIn("sidebarOpen ? 'translate-x-0'", sidebar)
+
+    def test_chart_is_local_and_only_requested_by_chart_pages(self):
+        base = Path('templates/dashboard/base_desktop.html').read_text()
+        self.assertNotIn('cdn.jsdelivr.net', base)
+        self.assertIn('{% block chart_js %}', base)
+        for template in ('home.html', 'ranking.html', 'vendedor_detalhe.html'):
+            source = Path('templates/dashboard/gestor', template).read_text()
+            self.assertIn("static 'js/chart.umd.js'", source)
+
+    def test_no_external_font_cdn_in_templates(self):
+        for path in Path('templates').rglob('*.html'):
+            self.assertNotIn('fonts.googleapis.com', path.read_text())
+
+    def test_seller_page_uses_single_bulk_endpoint(self):
+        source = Path('templates/dashboard/gestor/vendedores.html').read_text()
+        self.assertIn('/api/sellers/dashboard-summary/', source)
+        self.assertNotIn('list.map(async', source)
+        self.assertNotIn("'/api/manager/seller/' + s.uuid", source)
+
+    def test_links_prefetches_payments(self):
+        source = Path('app/apps/dashboard/desktop_views.py').read_text()
+        links_view = source.split('def gestor_links', 1)[1].split(
+            'def gestor_link_detalhe', 1,
+        )[0]
+        self.assertIn("prefetch_related(\n        'payments'", links_view)

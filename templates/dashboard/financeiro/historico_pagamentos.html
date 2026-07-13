@@ -28,7 +28,7 @@
                             <td class="px-3 py-2 border-b font-medium" x-text="sc.seller_name"></td>
                             <td class="px-3 py-2 border-b" x-text="formatMoneyBRL(sc.total_sold_amount)"></td>
                             <td class="px-3 py-2 border-b font-semibold text-brand-500" x-text="formatMoneyBRL(sc.commission_amount)"></td>
-                            <td class="px-3 py-2 border-b text-gray-500" x-text="sc.payment_date ? new Date(sc.payment_date).toLocaleDateString('pt-BR') : (sc.paid_at ? new Date(sc.paid_at).toLocaleDateString('pt-BR') : '—')"></td>
+                            <td class="px-3 py-2 border-b text-gray-500" x-text="sc.payment_date ? formatCivilDate(sc.payment_date) : (sc.paid_at ? new Date(sc.paid_at).toLocaleDateString('pt-BR') : '—')"></td>
                             <td class="px-3 py-2 border-b text-gray-500" x-text="sc.payment_method || '—'"></td>
                             <td class="px-3 py-2 border-b">
                                 <span class="text-xs px-1.5 py-0.5 rounded-full" :class="{'bg-success-50 text-success-700': sc.status==='PAGA', 'bg-amber-50 text-amber-700': sc.status==='AJUSTADA'}" x-text="sc.status"></span>

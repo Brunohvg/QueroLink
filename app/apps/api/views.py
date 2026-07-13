@@ -8,7 +8,7 @@ from rest_framework.permissions import IsAuthenticated
 from django.core.exceptions import ObjectDoesNotExist, ValidationError
 from django.utils import timezone
 from django.db import transaction
-from django.db.models import Sum, Q
+from django.db.models import Max, Sum, Q
 from django.http import HttpResponse
 from django.conf import settings
 from django_ratelimit.decorators import ratelimit
@@ -64,6 +64,115 @@ class SellerViewSet(viewsets.ModelViewSet):
         return Seller.objects.filter(
             tenant=self.request.user.tenant,
         ).select_related('user')
+
+    @action(detail=False, methods=['get'], url_path='dashboard-summary')
+    def dashboard_summary(self, request):
+        """Dados da tabela de vendedores em lote, sem fan-out por vendedor."""
+        from decimal import Decimal, ROUND_HALF_UP
+
+        from app.apps.commissions.day_status import get_period_summary_bulk
+        from app.apps.commissions.services import (
+            PeriodIntegrityError,
+            PeriodNotFound,
+            get_commission_rate,
+            resolve_selected_period,
+        )
+
+        tenant = request.user.tenant
+        sellers = list(
+            Seller.objects.filter(tenant=tenant)
+            .select_related('tenant', 'user')
+            .order_by('name')
+        )
+
+        try:
+            period = resolve_selected_period(request, tenant)
+        except PeriodNotFound:
+            return Response({'error': 'Competencia nao encontrada.'}, status=404)
+        except PeriodIntegrityError as exc:
+            return Response({'error': str(exc)}, status=409)
+
+        sales_by_seller = {}
+        commissions_by_seller = {}
+        day_summaries = {}
+        if period:
+            sales_by_seller = {
+                row['seller_id']: row
+                for row in Sale.objects.filter(
+                    tenant=tenant,
+                    seller_id__in=[seller.pk for seller in sellers],
+                    origin__in=Sale.COMMISSION_ORIGINS,
+                    status='ATIVA',
+                    sale_date__gte=period.start_date,
+                    sale_date__lte=period.end_date,
+                ).values('seller_id').annotate(
+                    month_total=Sum('amount'),
+                    last_sale_date=Max('sale_date'),
+                )
+            }
+            commissions_by_seller = {
+                commission.seller_id: commission
+                for commission in SellerCommission.objects.filter(
+                    period=period,
+                    seller_id__in=[seller.pk for seller in sellers],
+                )
+            }
+            day_summaries = get_period_summary_bulk(
+                tenant, period, sellers, reference_date=timezone.localdate(),
+            )
+
+        today = timezone.localdate()
+        result = []
+        for seller in sellers:
+            sales = sales_by_seller.get(seller.pk, {})
+            month_total = sales.get('month_total') or 0
+            last_sale_date = sales.get('last_sale_date')
+            commission = commissions_by_seller.get(seller.pk)
+            summary = day_summaries.get(seller.pk, {})
+
+            if (
+                commission
+                and period.status != CommissionPeriod.Status.ABERTA
+            ):
+                commission_amount = commission.commission_amount
+            else:
+                rate = get_commission_rate(seller)
+                commission_amount = int(
+                    (Decimal(month_total) * rate).quantize(
+                        Decimal('1'), rounding=ROUND_HALF_UP,
+                    )
+                )
+
+            launched = summary.get('lancados', 0)
+            justified = summary.get('justificados', 0)
+            pending = summary.get('pendentes', 0)
+            if launched == 0 and justified == 0:
+                operational_status = 'SEM_LANCAMENTO'
+            else:
+                operational_status = summary.get(
+                    'operational_status', 'PENDENTE',
+                )
+
+            result.append({
+                **SellerSerializer(seller).data,
+                'month_total': month_total,
+                'commission_amount': commission_amount,
+                'submitted_days': launched + justified,
+                'expected_days': launched + justified + pending,
+                'operational_status': operational_status,
+                'financial_status': (
+                    commission.status if commission else 'ABERTA'
+                ),
+                'last_sale_date': (
+                    last_sale_date.isoformat() if last_sale_date else None
+                ),
+                'has_sale_today': last_sale_date == today,
+            })
+
+        return Response({
+            'period_uuid': str(period.uuid) if period else None,
+            'sellers': result,
+        })
 
     def create(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)

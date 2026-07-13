@@ -1,4 +1,6 @@
 {% extends 'dashboard/base_desktop.html' %}
+{% load static %}
+{% block chart_js %}<script src="{% static 'js/chart.umd.js' %}" defer></script>{% endblock %}
 {% load currency_filters %}
 {% block title %}Painel do Gestor — Mérito{% endblock %}
 {% block content %}

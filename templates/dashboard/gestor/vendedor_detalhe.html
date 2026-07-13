@@ -1,4 +1,6 @@
 {% extends 'dashboard/base_desktop.html' %}
+{% load static %}
+{% block chart_js %}<script src="{% static 'js/chart.umd.js' %}" defer></script>{% endblock %}
 {% block title %}{{ seller.name }} — Mérito{% endblock %}
 {% block content %}
 <div x-data="sellerDetailPage()" x-init="init('{{ seller.uuid }}')" class="max-w-7xl mx-auto">

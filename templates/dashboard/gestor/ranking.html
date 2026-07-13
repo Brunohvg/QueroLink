@@ -1,4 +1,6 @@
 {% extends 'dashboard/base_desktop.html' %}
+{% load static %}
+{% block chart_js %}<script src="{% static 'js/chart.umd.js' %}" defer></script>{% endblock %}
 {% block title %}Ranking — Mérito{% endblock %}
 {% block content %}
 <div x-data="rankingPage()" x-init="load()" class="max-w-7xl mx-auto">

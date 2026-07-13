@@ -157,7 +157,7 @@
                 </span>
               </td>
               <td class="px-4 py-3.5 text-[13px] text-gray-500 hidden lg:table-cell">
-                <span x-text="s.last_sale_date || '—'"></span>
+                <span x-text="s.last_sale_date ? formatCivilDate(s.last_sale_date) : '—'"></span>
                 <span x-show="s.has_sale_today" class="ml-1.5 inline-flex items-center gap-1 px-1.5 py-0.5 bg-emerald-50 text-emerald-600 rounded-full text-[10px] font-medium">
                   <span class="w-1 h-1 rounded-full bg-emerald-500"></span>
                   Hoje
@@ -184,7 +184,12 @@
               </td>
             </tr>
           </template>
-          <tr x-show="!filteredSellers.length">
+          <tr x-show="loading">
+            <td colspan="8" class="text-center py-12 text-[14px] text-gray-400">
+              Carregando vendedores...
+            </td>
+          </tr>
+          <tr x-show="!loading && !filteredSellers.length">
             <td colspan="8" class="text-center py-12">
               <div class="w-14 h-14 mx-auto mb-4 rounded-2xl bg-gray-50 flex items-center justify-center">
                 <svg class="w-7 h-7 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
@@ -354,7 +359,7 @@ function maskCpf(path) {
 
 function vendedoresPage() {
     return {
-        sellers: [], search: '', filterStatus: 'todos',
+        sellers: [], search: '', filterStatus: 'todos', loading: true,
         showModal: false, editing: false, showPasswordModal: false,
         showImportModal: false, importing: false, selectedFile: null, importResult: null,
         showDeleteModal: false, deletingSeller: null,
@@ -383,54 +388,33 @@ function vendedoresPage() {
             obj[keys[keys.length - 1]] = value;
         },
         async loadSellers() {
-            var r = await fetch('/api/sellers/');
-            var list = await r.json();
-            var pageParams = new URLSearchParams(window.location.search);
-            var periodUuid = pageParams.get('period') || '';
-            var enriched = await Promise.all(list.map(async (s) => {
-                var detail = { month_total: 0, commission_amount: 0, submitted_days: 0, expected_days: 22, operational_status: 'SEM_LANCAMENTO', financial_status: 'ABERTA', last_sale_date: null, has_sale_today: false };
-                try {
-                    var qs = periodUuid ? ('period=' + encodeURIComponent(periodUuid)) : '';
-                    var d = await fetch('/api/manager/seller/' + s.uuid + '/?' + qs).then(r => r.json());
-                    detail.month_total = d.manual_total || 0;
-                    var spc = d.selected_period_commission;
-                    if (spc) {
-                        detail.commission_amount = spc.commission_amount || 0;
-                        detail.financial_status = spc.status || 'ABERTA';
-                    }
-                    var sc = null;
-                    if (d.selected_period && d.commissions && d.commissions.length) {
-                        sc = d.commissions.find(c => (String(c.period_month).padStart(2,'0')+'/'+c.period_year) === d.selected_period.display_label) || null;
-                        if (!sc) {
-                            sc = d.commissions.find(c => c.period_status === d.selected_period.status) || null;
-                        }
-                    }
-                    if (sc) {
-                        detail.submitted_days = sc.submitted_days_count || 0;
-                        detail.expected_days = sc.expected_working_days || 22;
-                        detail.operational_status = sc.operational_status || 'SEM_LANCAMENTO';
-                    }
-                    if (d.manual_sales && d.manual_sales.length) {
-                        var last = d.manual_sales[0];
-                        detail.last_sale_date = new Date(last.sale_date).toLocaleDateString('pt-BR');
-                        detail.has_sale_today = last.sale_date === new Date().toISOString().split('T')[0];
-                    }
-                } catch(e) {}
-                return Object.assign({}, s, detail);
-            }));
-            this.sellers = enriched;
-            this.stats.total = enriched.length;
-            this.stats.ativos = enriched.filter(s => s.is_active).length;
-            this.stats.comVendaNoMes = enriched.filter(s => s.month_total > 0).length;
-            this.stats.prontos = enriched.filter(s => s.operational_status === 'PRONTO').length;
-            this.stats.pendentes = enriched.filter(s => s.operational_status === 'PENDENTE').length;
-            this.stats.semLancamento = enriched.filter(s => s.operational_status === 'SEM_LANCAMENTO').length;
-            this.stats.cancelados = enriched.filter(s => s.financial_status === 'CANCELADA').length;
-            this.stats.semLancamentoHoje = enriched.filter(s => s.is_active && !s.has_sale_today).length;
-            this.stats.comissaoAberta = enriched.reduce((a, s) => s.financial_status === 'ABERTA' ? a + (s.commission_amount || 0) : a, 0);
-            this.stats.comissaoPaga = enriched.reduce((a, s) => s.financial_status === 'PAGA' ? a + (s.commission_amount || 0) : a, 0);
-            this.stats.comissaoFechada = enriched.reduce((a, s) => s.financial_status === 'FECHADA' || s.financial_status === 'PARCIALMENTE_FECHADA' ? a + (s.commission_amount || 0) : a, 0);
-            this.stats.comissaoCancelada = enriched.reduce((a, s) => s.financial_status === 'CANCELADA' ? a + (s.commission_amount || 0) : a, 0);
+            this.loading = true;
+            try {
+                var pageParams = new URLSearchParams(window.location.search);
+                var periodUuid = pageParams.get('period') || '';
+                var qs = periodUuid ? ('?period=' + encodeURIComponent(periodUuid)) : '';
+                var r = await fetch('/api/sellers/dashboard-summary/' + qs);
+                if (!r.ok) throw new Error('HTTP ' + r.status);
+                var payload = await r.json();
+                var enriched = payload.sellers || [];
+                this.sellers = enriched;
+                this.stats.total = enriched.length;
+                this.stats.ativos = enriched.filter(s => s.is_active).length;
+                this.stats.comVendaNoMes = enriched.filter(s => s.month_total > 0).length;
+                this.stats.prontos = enriched.filter(s => s.operational_status === 'PRONTO').length;
+                this.stats.pendentes = enriched.filter(s => s.operational_status === 'PENDENTE').length;
+                this.stats.semLancamento = enriched.filter(s => s.operational_status === 'SEM_LANCAMENTO').length;
+                this.stats.cancelados = enriched.filter(s => s.financial_status === 'CANCELADA').length;
+                this.stats.semLancamentoHoje = enriched.filter(s => s.is_active && !s.has_sale_today).length;
+                this.stats.comissaoAberta = enriched.reduce((a, s) => s.financial_status === 'ABERTA' ? a + (s.commission_amount || 0) : a, 0);
+                this.stats.comissaoPaga = enriched.reduce((a, s) => s.financial_status === 'PAGA' ? a + (s.commission_amount || 0) : a, 0);
+                this.stats.comissaoFechada = enriched.reduce((a, s) => s.financial_status === 'FECHADA' || s.financial_status === 'PARCIALMENTE_FECHADA' ? a + (s.commission_amount || 0) : a, 0);
+                this.stats.comissaoCancelada = enriched.reduce((a, s) => s.financial_status === 'CANCELADA' ? a + (s.commission_amount || 0) : a, 0);
+            } catch (error) {
+                showToast('Nao foi possivel carregar os vendedores.', 'error');
+            } finally {
+                this.loading = false;
+            }
         },
         detailUrl(s) {
             var p = new URLSearchParams(window.location.search).get('period');

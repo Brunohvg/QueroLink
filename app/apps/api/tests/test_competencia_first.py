@@ -4,8 +4,10 @@ import io
 from unittest.mock import patch
 
 from django.test import TestCase
+from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
 from django.core.cache import cache
+from django.db import connection
 from rest_framework.test import APIClient
 
 from app.apps.accounts.models import Tenant, User
@@ -148,6 +150,12 @@ class CompetenciaFirstTest(TestCase):
         self.assertEqual(spc['commission_amount'], 88888)
         self.assertFalse(spc['is_estimated'])
 
+        summary = client.get(
+            reverse('api-seller-dashboard-summary')
+            + f'?period={self.period.uuid}',
+        ).json()['sellers'][0]
+        self.assertEqual(summary['commission_amount'], 88888)
+
     # 19: periodo customizado nao exibe comissao oficial
     def test_custom_range_no_selected_commission(self):
         client = self._auth(self.manager, 'gestor123')
@@ -194,6 +202,48 @@ class CompetenciaFirstTest(TestCase):
         total = data['manual_total']
         commission = data['selected_period_commission']['commission_amount']
         self.assertEqual(commission, round(total * 0.01))
+
+    def test_seller_dashboard_summary_aggregates_in_one_response(self):
+        client = self._auth(self.manager, 'gestor123')
+        response = client.get(
+            reverse('api-seller-dashboard-summary')
+            + f'?period={self.period.uuid}',
+        )
+        self.assertEqual(response.status_code, 200)
+        sellers = response.json()['sellers']
+        self.assertEqual(len(sellers), 1)
+        self.assertEqual(sellers[0]['month_total'], 9951859)
+        self.assertEqual(sellers[0]['commission_amount'], 99519)
+        self.assertEqual(sellers[0]['last_sale_date'], '2026-07-05')
+
+    def test_seller_dashboard_summary_queries_are_constant(self):
+        client = self._auth(self.manager, 'gestor123')
+        url = (
+            reverse('api-seller-dashboard-summary')
+            + f'?period={self.period.uuid}'
+        )
+        with CaptureQueriesContext(connection) as one_ctx:
+            response = client.get(url)
+        self.assertEqual(response.status_code, 200)
+
+        for index in range(12):
+            user = User.objects.create_user(
+                username=f'bulk-user-{index}', role=User.Role.SELLER,
+                tenant=self.tenant,
+            )
+            Seller.objects.create(
+                tenant=self.tenant, user=user, name=f'Bulk {index}',
+                phone=f'1198888{index:04d}',
+                commission_rate=Decimal('0.01'),
+            )
+
+        with CaptureQueriesContext(connection) as many_ctx:
+            response = client.get(url)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.json()['sellers']), 13)
+        self.assertLessEqual(
+            len(many_ctx.captured_queries), len(one_ctx.captured_queries) + 1,
+        )
 
     # helpers de selecao
     def test_resolve_selected_period_default_open(self):

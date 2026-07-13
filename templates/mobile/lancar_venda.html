@@ -110,9 +110,6 @@ function lancarVenda() {
             if (this.amountCents > 0) {
                 this.$refs.valorDisplay.value = Math.floor(this.amountCents/100) + ',' + String(this.amountCents%100).padStart(2,'0');
             }
-            if (!{{ existing_sale|yesno:"true,false" }}) {
-                this.$refs.saleDate.value = new Date().toISOString().split('T')[0];
-            }
         },
         formatInput() {
             var raw = this.$refs.valorDisplay.value.replace(/\D/g, '');
