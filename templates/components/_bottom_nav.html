@@ -1,5 +1,5 @@
-<nav class="fixed bottom-0 left-0 right-0 z-50 bg-white border-t border-gray-100 safe-bottom">
-  <div class="max-w-lg mx-auto grid grid-cols-5 items-center h-[72px] px-1">
+<nav class="fixed bottom-0 left-0 right-0 z-50 bg-white border-t border-gray-100 safe-bottom" style="height:calc(var(--bottom-nav-height) + max(env(safe-area-inset-bottom,0px),var(--page-bottom-gap)))">
+  <div class="max-w-lg mx-auto grid grid-cols-5 items-center px-1" style="height:var(--bottom-nav-height)">
     <a href="{% url 'dashboard:mobile_home' %}"
        class="flex flex-col items-center justify-center gap-0.5 h-full tap-target
               {% if request.resolver_match.url_name == 'mobile_home' %}text-brand-500{% else %}text-gray-400{% endif %}">
