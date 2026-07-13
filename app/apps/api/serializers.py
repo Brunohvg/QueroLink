@@ -6,7 +6,7 @@ from django.db import IntegrityError, transaction
 from django.utils import timezone
 
 from app.apps.sales.models import Sale, SaleChangeLog
-from app.apps.sellers.models import Seller
+from app.apps.sellers.models import Seller, SellerDayJustification
 from app.apps.sellers.capacity import SellerCapacityExceeded, ensure_seller_capacity
 from app.apps.commissions.models import (
     CommissionPeriod,
@@ -680,3 +680,93 @@ class ChangePasswordSerializer(serializers.Serializer):
 def slugify(value):
     from django.utils.text import slugify as _slugify
     return _slugify(value)
+
+
+class SellerDayJustificationSerializer(serializers.ModelSerializer):
+    """Leitura de justificativa de dia sem lancamento."""
+
+    seller_uuid = serializers.CharField(source='seller.uuid', read_only=True)
+    seller_name = serializers.CharField(source='seller.name', read_only=True)
+    reason_display = serializers.CharField(
+        source='get_reason_display', read_only=True,
+    )
+    created_by_name = serializers.SerializerMethodField()
+    updated_by_name = serializers.SerializerMethodField()
+
+    class Meta:
+        model = SellerDayJustification
+        fields = [
+            'uuid', 'seller_uuid', 'seller_name', 'date', 'reason',
+            'reason_display', 'notes', 'created_by_name', 'updated_by_name',
+            'created_at', 'updated_at',
+        ]
+        read_only_fields = fields
+
+    def get_created_by_name(self, obj):
+        return obj.created_by.username if obj.created_by else None
+
+    def get_updated_by_name(self, obj):
+        return obj.updated_by.username if obj.updated_by else None
+
+
+class SellerDayJustificationCreateSerializer(serializers.ModelSerializer):
+    """Criacao. tenant/created_by/updated_by sao controlados pelo servidor."""
+
+    class Meta:
+        model = SellerDayJustification
+        fields = ['seller', 'date', 'reason', 'notes']
+        extra_kwargs = {'notes': {'required': False}}
+
+    def validate_seller(self, seller):
+        user = self.context['request'].user
+        if seller.tenant_id != user.tenant_id:
+            raise serializers.ValidationError(
+                'O vendedor nao pertence ao tenant.'
+            )
+        return seller
+
+    def create(self, validated_data):
+        from app.apps.sellers.services import (
+            create_day_justification, JustificationError,
+        )
+        user = self.context['request'].user
+        try:
+            return create_day_justification(
+                tenant=user.tenant,
+                seller=validated_data['seller'],
+                date=validated_data['date'],
+                reason=validated_data['reason'],
+                notes=validated_data.get('notes', ''),
+                user=user,
+            )
+        except JustificationError as exc:
+            raise serializers.ValidationError({'detail': str(exc)})
+
+
+class SellerDayJustificationUpdateSerializer(serializers.ModelSerializer):
+    """Atualizacao de reason/notes/date. Nao permite trocar seller/tenant."""
+
+    class Meta:
+        model = SellerDayJustification
+        fields = ['reason', 'notes', 'date']
+        extra_kwargs = {
+            'reason': {'required': False},
+            'notes': {'required': False},
+            'date': {'required': False},
+        }
+
+    def update(self, instance, validated_data):
+        from app.apps.sellers.services import (
+            update_day_justification, JustificationError,
+        )
+        user = self.context['request'].user
+        try:
+            return update_day_justification(
+                justification=instance,
+                user=user,
+                reason=validated_data.get('reason'),
+                notes=validated_data.get('notes'),
+                date=validated_data.get('date'),
+            )
+        except JustificationError as exc:
+            raise serializers.ValidationError({'detail': str(exc)})

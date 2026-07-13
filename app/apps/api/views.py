@@ -41,6 +41,9 @@ from .serializers import (
     ChangePasswordSerializer,
     ManagerSaleUpdateSerializer,
     SaleChangeLogSerializer,
+    SellerDayJustificationSerializer,
+    SellerDayJustificationCreateSerializer,
+    SellerDayJustificationUpdateSerializer,
 )
 from .permissions import IsManagerOrAdmin, IsFinancialOrAdmin, IsSellerOwner
 from app.apps.audit.utils import log_action
@@ -2262,3 +2265,50 @@ class AccountingEmailView(generics.GenericAPIView):
             requested_by_user_id=str(request.user.pk),
         )
         return Response({'detail': f'Envio agendado para {tenant.accountant_email}.'}, status=202)
+
+
+class SellerDayJustificationViewSet(viewsets.ModelViewSet):
+    """CRUD de gestor para justificativas de dia sem lancamento (Prompt 47).
+
+    Fundacao de backend: NAO integra com fechamento/comissao/ranking/mobile.
+    Permissao: gestao operacional (MANAGER/ADMIN). SELLER e FINANCEIRO -> 403.
+    Todo queryset e limitado ao tenant do usuario (uuid de outro tenant -> 404).
+    """
+
+    permission_classes = [IsAuthenticated, IsManagerOrAdmin]
+
+    def get_serializer_class(self):
+        if self.action == 'create':
+            return SellerDayJustificationCreateSerializer
+        if self.action in ('update', 'partial_update'):
+            return SellerDayJustificationUpdateSerializer
+        return SellerDayJustificationSerializer
+
+    def get_queryset(self):
+        from app.apps.sellers.models import SellerDayJustification
+        user = self.request.user
+        qs = SellerDayJustification.objects.select_related(
+            'seller', 'created_by', 'updated_by',
+        ).filter(tenant=user.tenant)
+
+        params = self.request.query_params
+        seller = params.get('seller')
+        if seller:
+            qs = qs.filter(seller__uuid=seller)
+        single_date = params.get('date')
+        if single_date:
+            qs = qs.filter(date=single_date)
+        start_date = params.get('start_date')
+        if start_date:
+            qs = qs.filter(date__gte=start_date)
+        end_date = params.get('end_date')
+        if end_date:
+            qs = qs.filter(date__lte=end_date)
+        reason = params.get('reason')
+        if reason:
+            qs = qs.filter(reason=reason)
+        return qs.order_by('-date', '-created_at')
+
+    def perform_destroy(self, instance):
+        from app.apps.sellers.services import delete_day_justification
+        delete_day_justification(justification=instance, user=self.request.user)
