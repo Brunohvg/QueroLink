@@ -1,355 +1,215 @@
 {% extends 'dashboard/base_desktop.html' %}
-{% block title %}Importar Vendas — Mérito{% endblock %}
+{% block title %}Importar Vendas e Justificativas — Mérito{% endblock %}
 {% block content %}
 {% load static %}
-<div x-data="importPage()" class="max-w-4xl mx-auto">
-
+<div x-data="importPage()" class="max-w-5xl mx-auto">
   <div class="sticky top-0 z-10 -mx-6 px-6 py-4 bg-gray-50/90 backdrop-blur-lg border-b border-gray-200/60 mb-6">
     <div class="flex items-center gap-3">
-      <a href="{% url 'dashboard:gestor_home' %}" class="flex items-center justify-center w-9 h-9 rounded-xl hover:bg-gray-200/60 transition-all active:scale-[0.97]">
+      <a href="{% url 'dashboard:gestor_home' %}" class="flex items-center justify-center w-9 h-9 rounded-xl hover:bg-gray-200/60 transition-all active:scale-[0.97]" aria-label="Voltar">
         <svg class="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path></svg>
       </a>
       <div>
-        <h1 class="font-display text-[20px] font-bold text-gray-900 tracking-tight">Importar Vendas</h1>
-        <p class="text-[13px] text-gray-500">Planilha CSV ou XLSX com preview antes de gravar</p>
+        <h1 class="font-display text-[20px] font-bold text-gray-900 tracking-tight">Importar vendas e justificativas</h1>
+        <p class="text-[13px] text-gray-500">Revise cada classificação antes de confirmar</p>
       </div>
     </div>
   </div>
 
-  <!-- Stepper -->
-  <div class="flex items-center justify-center gap-2 mb-8">
-    <template x-for="(s, idx) in ['Arquivo', 'Preview', 'Confirmacao']" :key="s">
+  <div class="flex items-center justify-center gap-2 mb-8" aria-label="Etapas da importação">
+    <template x-for="(label, idx) in ['Arquivo', 'Preview', 'Confirmar', 'Resultado']" :key="label">
       <div class="flex items-center gap-2">
-        <div class="flex items-center gap-1.5" :class="step > idx ? 'text-brand-600' : step === idx+1 ? 'text-gray-900' : 'text-gray-300'">
+        <div class="flex items-center gap-1.5">
           <span class="w-7 h-7 rounded-full flex items-center justify-center text-[12px] font-bold border-2"
-                :class="step > idx ? 'bg-brand-600 text-white border-brand-600' : step === idx+1 ? 'border-gray-900 text-gray-900' : 'border-gray-200 text-gray-400'"
-                x-text="step > idx ? '\u2713' : idx+1"></span>
-          <span class="text-[13px] font-medium hidden sm:inline" x-text="s"></span>
+                :class="step > idx + 1 ? 'bg-brand-600 text-white border-brand-600' : step === idx + 1 ? 'border-gray-900 text-gray-900' : 'border-gray-200 text-gray-400'"
+                x-text="step > idx + 1 ? '✓' : idx + 1"></span>
+          <span class="text-[13px] font-medium hidden sm:inline" :class="step === idx + 1 ? 'text-gray-900' : 'text-gray-400'" x-text="label"></span>
         </div>
-        <span x-show="idx < 2" class="w-8 sm:w-12 h-0.5" :class="step > idx+1 ? 'bg-brand-600' : 'bg-gray-200'"></span>
+        <span x-show="idx < 3" class="w-5 sm:w-10 h-0.5" :class="step > idx + 1 ? 'bg-brand-600' : 'bg-gray-200'"></span>
       </div>
     </template>
   </div>
 
-  <!-- Step 1: Arquivo -->
-  <div x-show="step === 1" class="surface-card">
-    <p class="text-[13px] text-gray-600 mb-4">Importe vendas em lote via planilha CSV ou XLSX. Colunas esperadas: <strong>data</strong>, <strong>vendedor</strong>, <strong>valor</strong>, <strong>observacao</strong> (opcional).</p>
-    <p class="text-[12px] text-gray-400 mb-4">Formatos de data: DD/MM/YYYY ou YYYY-MM-DD. Valor: 1234,56 ou 1.234,56 ou 1234.56. Maximo 500 linhas.</p>
-
+  <section x-show="step === 1" class="surface-card">
+    <p class="text-[13px] text-gray-600 mb-2">Envie CSV UTF-8 ou XLSX com as colunas <strong>data</strong>, <strong>vendedor</strong> e <strong>valor ou ocorrência</strong>.</p>
+    <p class="text-[12px] text-gray-400 mb-4">Até 5 MB e 500 linhas. Ocorrências conhecidas serão apenas sugeridas como justificativas.</p>
     <div class="border-2 border-dashed rounded-2xl p-8 text-center transition-colors"
          :class="dragOver ? 'border-brand-400 bg-brand-50/30' : 'border-gray-200 hover:border-brand-300'"
-         x-on:dragover.prevent="dragOver=true" x-on:dragleave.prevent="dragOver=false" x-on:drop.prevent="handleDrop($event); dragOver=false">
+         @dragover.prevent="dragOver=true" @dragleave.prevent="dragOver=false" @drop.prevent="handleDrop($event); dragOver=false">
       <input type="file" id="import-file" accept=".csv,.xlsx" @change="handleFile($event)" class="hidden">
-      <label for="import-file" class="cursor-pointer">
+      <label for="import-file" class="cursor-pointer block">
         <div class="w-14 h-14 rounded-2xl bg-brand-50 flex items-center justify-center mx-auto mb-3">
-          <svg class="w-7 h-7 text-brand-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/></svg>
+          <svg class="w-7 h-7 text-brand-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path></svg>
         </div>
-        <p class="text-[14px] font-medium text-gray-700">Clique para selecionar ou arraste o arquivo</p>
-        <p class="text-[12px] text-gray-400 mt-1" x-show="!filename">CSV ou XLSX com ate 500 linhas</p>
-        <p class="text-[13px] font-medium text-brand-600 mt-1" x-show="filename" x-text="filename"></p>
+        <p class="text-[14px] font-medium text-gray-700">Clique ou arraste o arquivo</p>
+        <p class="text-[12px] text-gray-400 mt-1" x-text="filename || 'CSV ou XLSX'"></p>
       </label>
     </div>
+    <a href="{% static 'downloads/modelo_importacao_vendas.csv' %}" download class="inline-flex mt-4 text-[12px] px-3 py-1.5 rounded-lg bg-gray-100 text-gray-600 font-medium hover:text-brand-600">Baixar modelo CSV</a>
+    <div x-show="previewError" class="mt-4 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl text-[13px]" role="alert" x-text="previewError"></div>
+    <div x-show="loading" class="mt-4 text-center text-gray-500 text-[13px]">Analisando e classificando no servidor...</div>
+  </section>
 
-    <div class="mt-4 flex items-center gap-3">
-      <a href="{% static 'downloads/modelo_importacao_vendas.csv' %}" download
-         class="text-[12px] px-3 py-1.5 rounded-lg bg-gray-100 hover:bg-brand-50 hover:text-brand-600 text-gray-600 font-medium transition flex items-center gap-1.5">
-        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
-        Baixar modelo CSV
-      </a>
+  <section x-show="step === 2">
+    <div class="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2 mb-4">
+      <template x-for="card in summaryCards" :key="card.key">
+        <div class="surface-card !p-3">
+          <p class="text-[22px] font-bold" :class="card.color" x-text="count(card.key)"></p>
+          <p class="text-[10px] uppercase tracking-wide text-gray-500" x-text="card.label"></p>
+        </div>
+      </template>
     </div>
-
-    <div x-show="previewError" class="mt-4 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl text-[13px]" x-text="previewError"></div>
-    <div x-show="loading" class="mt-4 text-center text-gray-400 text-[13px]">Analisando arquivo...</div>
-  </div>
-
-  <!-- Step 2: Preview -->
-  <div x-show="step === 2">
     <div class="surface-card mb-4">
-      <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
-        <h2 class="text-[15px] font-bold text-gray-900">Preview</h2>
-        <div class="flex items-center gap-1 flex-wrap">
-          <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-medium bg-emerald-50 text-emerald-700">
-            <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
-            <span x-text="okCount + ' OK'"></span>
-          </span>
-          <span x-show="dupCount > 0" class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-medium bg-amber-50 text-amber-700">
-            <span class="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
-            <span x-text="dupCount + ' dup.'"></span>
-          </span>
-          <span x-show="errCount > 0" class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-medium bg-red-50 text-red-700">
-            <span class="w-1.5 h-1.5 rounded-full bg-red-500"></span>
-            <span x-text="errCount + ' erros'"></span>
-          </span>
-          <span x-show="selCount > 0" class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-medium bg-purple-50 text-purple-700">
-            <span class="w-1.5 h-1.5 rounded-full bg-purple-500"></span>
-            <span x-text="selCount + ' selecao'"></span>
-          </span>
+      <div class="flex flex-wrap justify-between gap-3 mb-4">
+        <div>
+          <h2 class="text-[15px] font-bold text-gray-900">Preview classificado</h2>
+          <p class="text-[12px] text-gray-500">Total financeiro válido: <strong x-text="formatMoney(totalSaleAmount)"></strong></p>
         </div>
+        <p class="text-[11px] text-gray-400">O preview não cria vendas nem justificativas.</p>
+      </div>
+      <div x-show="alreadyImported" class="bg-amber-50 border border-amber-200 text-amber-700 px-4 py-2.5 rounded-xl text-[13px] mb-4">
+        Este conteúdo já foi confirmado anteriormente. A reimportação exigirá autorização explícita.
       </div>
 
-      <div x-show="alreadyImported" class="bg-amber-50 border border-amber-200 text-amber-700 px-4 py-2.5 rounded-xl text-[13px] mb-3 flex items-center gap-2">
-        <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"/></svg>
-        Este arquivo ja foi importado anteriormente. A confirmacao exigira forcar a reimportacao.
-      </div>
-
-      <div class="overflow-x-auto max-h-[50vh] rounded-xl border border-gray-100">
-        <table class="w-full text-[13px]">
-          <thead>
-            <tr class="bg-gray-50/80 sticky top-0">
-              <th class="text-left py-2.5 px-3 text-[11px] font-semibold text-gray-500 uppercase">#</th>
-              <th class="text-left py-2.5 px-3 text-[11px] font-semibold text-gray-500 uppercase">Data</th>
-              <th class="text-left py-2.5 px-3 text-[11px] font-semibold text-gray-500 uppercase">Vendedor</th>
-              <th class="text-right py-2.5 px-3 text-[11px] font-semibold text-gray-500 uppercase">Valor</th>
-              <th class="text-left py-2.5 px-3 text-[11px] font-semibold text-gray-500 uppercase">Observacao</th>
-              <th class="text-left py-2.5 px-3 text-[11px] font-semibold text-gray-500 uppercase">Periodo</th>
-              <th class="text-left py-2.5 px-3 text-[11px] font-semibold text-gray-500 uppercase">Status</th>
-            </tr>
-          </thead>
-          <tbody>
-            <template x-for="(r, idx) in results.slice(0, 100)" :key="idx">
-              <tr :class="'border-b border-gray-50 ' + (r.status === 'error' ? 'bg-red-50/30' : r.status === 'duplicate' ? 'bg-amber-50/30' : r.status === 'needs_selection' ? 'bg-purple-50/30' : '')">
-                <td class="py-2 px-3 text-gray-400" x-text="r.row_number"></td>
-                <td class="py-2 px-3 font-medium text-gray-700" x-text="r.sale_date ? formatCivilDate(r.sale_date) : '—'"></td>
-                <td class="py-2 px-3">
-                  <span x-show="r.status !== 'needs_selection'" class="text-gray-800" x-text="r.resolved_seller_name || '—'"></span>
-                  <select x-show="r.status === 'needs_selection'" x-model="r._selected_seller" @change="onSellerSelected(r, idx)"
-                          class="px-2 py-1 bg-white border border-gray-200 rounded-lg text-[12px] outline-none">
-                    <option value="">Selecione...</option>
-                    <template x-for="sug in r.suggestions" :key="sug.uuid">
-                      <option :value="sug.uuid" x-text="sug.name"></option>
-                    </template>
-                  </select>
-                </td>
-                <td class="py-2 px-3 text-right font-mono text-gray-800" x-text="r.amount_cents ? 'R$ ' + (r.amount_cents/100).toFixed(2).replace('.',',') : '—'"></td>
-                <td class="py-2 px-3 text-gray-500 max-w-[120px] truncate" x-text="r.notes || '—'"></td>
-                <td class="py-2 px-3 text-[12px] text-gray-400" x-text="r.period_label || '—'"></td>
-                <td class="py-2 px-3">
-                  <span :class="'inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold ' +
-                    (r.status === 'ok' ? 'bg-emerald-50 text-emerald-700' :
-                     r.status === 'duplicate' ? 'bg-amber-50 text-amber-700' :
-                     r.status === 'needs_selection' ? 'bg-purple-50 text-purple-700' :
-                     'bg-red-50 text-red-700')"
-                    x-text="r.status === 'ok' ? 'OK' : r.status === 'duplicate' ? 'Duplicada' : r.status === 'needs_selection' ? 'Selecionar' : 'Erro'"></span>
-                  <span x-show="r.message" class="block text-[11px] text-gray-400 mt-0.5" x-text="r.message"></span>
-                </td>
-              </tr>
-            </template>
-          </tbody>
-        </table>
-      </div>
-      <p x-show="results.length > 100" class="text-[11px] text-gray-400 mt-2">Mostrando 100 de <span x-text="results.length"></span> linhas.</p>
+      <template x-for="group in visibleGroups" :key="group.key">
+        <div class="mb-5 last:mb-0">
+          <h3 class="text-[11px] font-bold uppercase tracking-wide mb-2" :class="group.color">
+            <span x-text="group.label"></span> · <span x-text="count(group.key)"></span>
+          </h3>
+          <div class="overflow-x-auto rounded-xl border border-gray-100">
+            <table class="w-full min-w-[760px] text-[12px]">
+              <thead><tr class="bg-gray-50 text-gray-500 uppercase text-[10px]">
+                <th class="text-left p-2">#</th><th class="text-left p-2">Data</th><th class="text-left p-2">Vendedor</th>
+                <th class="text-left p-2">Valor/ocorrência</th><th class="text-left p-2">Competência</th><th class="text-left p-2">Decisão</th><th class="text-left p-2">Mensagem</th>
+              </tr></thead>
+              <tbody>
+                <template x-for="r in rowsFor(group.key)" :key="r.row_number">
+                  <tr class="border-t border-gray-100 align-top">
+                    <td class="p-2 text-gray-400" x-text="r.row_number"></td>
+                    <td class="p-2 whitespace-nowrap" x-text="r.sale_date ? formatCivilDate(r.sale_date) : '—'"></td>
+                    <td class="p-2">
+                      <span x-text="r.seller_name || r.seller_identifier_original || '—'"></span>
+                      <select x-show="r.requires_manual_action" x-model="r._selected_seller" class="mt-1 block w-full px-2 py-1 border border-gray-200 rounded-lg bg-white">
+                        <option value="">Selecione manualmente</option>
+                        <template x-for="seller in r.suggestions" :key="seller.uuid"><option :value="seller.uuid" x-text="seller.name"></option></template>
+                      </select>
+                    </td>
+                    <td class="p-2 font-medium" x-text="r.normalized_amount ? formatMoney(r.normalized_amount) : (r.normalized_reason || r.raw_value || 'Vazia')"></td>
+                    <td class="p-2 text-gray-500" x-text="r.period_label || '—'"></td>
+                    <td class="p-2">
+                      <label x-show="r.classification === 'JUSTIFICATION_SUGGESTION'" class="inline-flex items-center gap-2 cursor-pointer">
+                        <input type="checkbox" x-model="r._confirm_justification" class="w-4 h-4 rounded border-gray-300 text-brand-600">
+                        <span>Confirmar justificativa</span>
+                      </label>
+                      <span x-show="r.classification === 'SALE'" class="text-emerald-700 font-medium">Importar venda</span>
+                      <span x-show="r.classification !== 'SALE' && r.classification !== 'JUSTIFICATION_SUGGESTION'" class="text-gray-400">Não processar</span>
+                    </td>
+                    <td class="p-2 text-gray-500" x-text="r.message || 'Pronta para importar.'"></td>
+                  </tr>
+                </template>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </template>
     </div>
-
-    <div class="flex justify-between">
-      <button @click="step=1; results=[]" class="px-5 py-2.5 bg-white border border-gray-200 text-gray-700 font-medium rounded-xl transition-all text-[14px] hover:bg-gray-50 active:scale-[0.97]">
-        Voltar
-      </button>
-      <button @click="goToConfirm()" :disabled="importableCount === 0"
-              class="px-5 py-2.5 bg-gray-900 hover:bg-gray-800 disabled:bg-gray-300 disabled:cursor-not-allowed text-white font-semibold rounded-xl transition-all text-[14px] shadow-sm active:scale-[0.97]">
-        Continuar: <span x-text="importableCount"></span> vendas
-      </button>
+    <div class="flex justify-between gap-3">
+      <button @click="reset()" class="px-5 py-2.5 bg-white border border-gray-200 text-gray-700 font-medium rounded-xl text-[14px]">Trocar arquivo</button>
+      <button @click="step=3" :disabled="processableCount === 0" class="px-5 py-2.5 bg-gray-900 disabled:bg-gray-300 text-white font-semibold rounded-xl text-[14px]">Revisar confirmação</button>
     </div>
-  </div>
+  </section>
 
-  <!-- Step 3: Confirmacao -->
-  <div x-show="step === 3" class="surface-card">
-    <h2 class="text-[15px] font-bold text-gray-900 mb-4">Confirmar Importacao</h2>
-
-    <div class="bg-brand-50 rounded-xl p-4 mb-4">
-      <p class="text-[14px] text-brand-800">
-        <strong x-text="importableCount"></strong> vendas de
-        <strong x-text="sellerCount"></strong> vendedor(es),
-        total <strong x-text="'R$ ' + (totalAmount/100).toFixed(2).replace('.',',')"></strong>
-      </p>
+  <section x-show="step === 3" class="surface-card">
+    <h2 class="text-[15px] font-bold text-gray-900 mb-4">Confirmar decisões</h2>
+    <div class="grid sm:grid-cols-3 gap-3 mb-4">
+      <div class="bg-emerald-50 rounded-xl p-4"><strong class="text-xl text-emerald-700" x-text="saleCount"></strong><p class="text-xs text-emerald-700">vendas válidas</p></div>
+      <div class="bg-blue-50 rounded-xl p-4"><strong class="text-xl text-blue-700" x-text="confirmedJustificationCount"></strong><p class="text-xs text-blue-700">justificativas selecionadas</p></div>
+      <div class="bg-gray-50 rounded-xl p-4"><strong class="text-xl text-gray-800" x-text="formatMoney(totalSaleAmount)"></strong><p class="text-xs text-gray-500">total somente de vendas</p></div>
     </div>
-
-    <div x-show="alreadyImported" class="bg-amber-50 border border-amber-200 text-amber-700 px-4 py-2.5 rounded-xl text-[13px] mb-4 flex items-center gap-2">
-      <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"/></svg>
-      Reimportacao: marque a caixa abaixo para confirmar.
-      <label class="flex items-center gap-1.5 ml-2 cursor-pointer">
-        <input type="checkbox" x-model="forceReimport" class="w-4 h-4 rounded border-gray-300 text-amber-500 focus:ring-amber-500">
-        <span class="text-[12px] font-medium">Forcar reimportacao</span>
-      </label>
-    </div>
-
+    <p class="text-[12px] text-gray-500 mb-4">O servidor repetirá vendedor, data, valor, motivo, competência, duplicidade e conflitos. Mudanças desde o preview serão bloqueadas ou ignoradas com resultado por linha.</p>
+    <label x-show="alreadyImported" class="flex items-start gap-2 bg-amber-50 border border-amber-200 rounded-xl p-3 mb-4 cursor-pointer">
+      <input type="checkbox" x-model="forceReimport" class="mt-0.5 w-4 h-4 rounded border-gray-300 text-amber-600">
+      <span class="text-[13px] text-amber-800">Confirmo conscientemente a reimportação do mesmo conteúdo.</span>
+    </label>
+    <div x-show="confirmError" class="mb-4 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl text-[13px]" role="alert" x-text="confirmError"></div>
     <div class="flex justify-end gap-3">
-      <button @click="step=2" class="px-5 py-2.5 bg-white border border-gray-200 text-gray-700 font-medium rounded-xl transition-all text-[14px] hover:bg-gray-50 active:scale-[0.97]" :disabled="importing">
-        Voltar
-      </button>
-      <button @click="doImport()" :disabled="importing || (alreadyImported && !forceReimport)"
-              class="inline-flex items-center gap-2 bg-gray-900 hover:bg-gray-800 disabled:bg-gray-300 disabled:cursor-not-allowed text-white font-semibold py-2.5 px-5 rounded-xl transition-all text-[14px] shadow-sm active:scale-[0.97]">
-        <span x-show="!importing">Confirmar importacao</span>
-        <span x-show="importing">Importando...</span>
+      <button @click="step=2" :disabled="importing" class="px-5 py-2.5 bg-white border border-gray-200 text-gray-700 font-medium rounded-xl text-[14px]">Voltar</button>
+      <button @click="doImport()" :disabled="importing || (alreadyImported && !forceReimport)" class="px-5 py-2.5 bg-gray-900 disabled:bg-gray-300 text-white font-semibold rounded-xl text-[14px]">
+        <span x-text="importing ? 'Revalidando...' : 'Confirmar importação'"></span>
       </button>
     </div>
+  </section>
 
-    <!-- Resultado -->
-    <div x-show="result" class="mt-6 pt-6 border-t border-gray-100" x-transition>
-      <h3 class="text-[15px] font-bold text-gray-900 mb-3">Resultado</h3>
-      <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <div class="bg-gray-50 rounded-xl p-3 text-center">
-          <p class="text-[24px] font-bold text-gray-900" x-text="result.created"></p>
-          <p class="text-[11px] text-gray-500">Importadas</p>
-        </div>
-        <div class="bg-amber-50 rounded-xl p-3 text-center">
-          <p class="text-[24px] font-bold text-amber-600" x-text="result.duplicates"></p>
-          <p class="text-[11px] text-amber-600">Duplicadas</p>
-        </div>
-        <div class="bg-red-50 rounded-xl p-3 text-center">
-          <p class="text-[24px] font-bold text-red-600" x-text="(result.errors || []).length"></p>
-          <p class="text-[11px] text-red-600">Erros</p>
-        </div>
-        <div class="bg-gray-50 rounded-xl p-3 text-center">
-          <p class="text-[24px] font-bold text-gray-900" x-text="result.total"></p>
-          <p class="text-[11px] text-gray-500">Total</p>
-        </div>
-      </div>
-      <div class="mt-4">
-        <a href="{% url 'dashboard:gestor_vendedores' %}" class="text-[13px] text-brand-600 hover:text-brand-700 font-medium">
-          Ver vendedores
-        </a>
-      </div>
+  <section x-show="step === 4 && result" class="surface-card">
+    <h2 class="text-[17px] font-bold text-gray-900 mb-4">Resultado da importação</h2>
+    <div class="grid grid-cols-2 sm:grid-cols-5 gap-3 mb-5">
+      <template x-for="card in resultCards" :key="card.label">
+        <div class="bg-gray-50 rounded-xl p-3"><p class="text-[22px] font-bold text-gray-900" x-text="card.value"></p><p class="text-[11px] text-gray-500" x-text="card.label"></p></div>
+      </template>
     </div>
-  </div>
-
+    <dl class="grid sm:grid-cols-2 gap-2 text-[12px] text-gray-600 mb-5">
+      <div><dt class="font-semibold">Batch</dt><dd class="break-all" x-text="result.batch_uuid"></dd></div>
+      <div><dt class="font-semibold">Hash</dt><dd class="break-all" x-text="result.file_hash"></dd></div>
+      <div><dt class="font-semibold">Usuário</dt><dd x-text="result.user"></dd></div>
+      <div><dt class="font-semibold">Horário</dt><dd x-text="new Date(result.confirmed_at).toLocaleString('pt-BR')"></dd></div>
+    </dl>
+    <button @click="reset()" class="px-5 py-2.5 bg-gray-900 text-white font-semibold rounded-xl text-[14px]">Nova importação</button>
+  </section>
 </div>
 
 <script>
 function importPage() {
-    return {
-        step: 1,
-        filename: '',
-        file: null,
-        fileHash: '',
-        dragOver: false,
-        loading: false,
-        previewError: '',
-        results: [],
-        alreadyImported: false,
-        forceReimport: false,
-        importing: false,
-        result: null,
-
-        get okCount() { return this.results.filter(function(r) { return r.status === 'ok'; }).length; },
-        get dupCount() { return this.results.filter(function(r) { return r.status === 'duplicate'; }).length; },
-        get errCount() { return this.results.filter(function(r) { return r.status === 'error'; }).length; },
-        get selCount() { return this.results.filter(function(r) { return r.status === 'needs_selection'; }).length; },
-        get importableCount() {
-            return this.results.filter(function(r) {
-                return r.status === 'ok' || (r.status === 'needs_selection' && r._selected_seller);
-            }).length;
-        },
-        get totalAmount() {
-            return this.results.filter(function(r) {
-                return r.status === 'ok' || (r.status === 'needs_selection' && r._selected_seller);
-            }).reduce(function(a, r) { return a + (r.amount_cents || 0); }, 0);
-        },
-        get sellerCount() {
-            var sellers = new Set();
-            this.results.forEach(function(r) {
-                var uid = r.resolved_seller_uuid || (r._selected_seller || r.resolved_seller);
-                if (uid && (r.status === 'ok' || r.status === 'needs_selection')) sellers.add(uid);
-            });
-            return sellers.size;
-        },
-
-        handleFile(e) { var f = e.target.files[0]; if (f) this.uploadFile(f); },
-        handleDrop(e) { var f = e.dataTransfer.files[0]; if (f) this.uploadFile(f); },
-
-        uploadFile(file) {
-            this.file = file;
-            this.filename = file.name;
-            this.previewError = '';
-            this.results = [];
-            this.result = null;
-            this.alreadyImported = false;
-            this.forceReimport = false;
-            this.loading = true;
-            this.step = 1;
-
-            var ext = file.name.split('.').pop().toLowerCase();
-            if (ext !== 'csv' && ext !== 'xlsx') {
-                this.previewError = 'Formato nao suportado. Envie CSV ou XLSX.';
-                this.loading = false;
-                return;
-            }
-            if (file.size > 5 * 1024 * 1024) {
-                this.previewError = 'Arquivo muito grande. Maximo 5MB.';
-                this.loading = false;
-                return;
-            }
-
-            var self = this;
-            var formData = new FormData();
-            formData.append('file', file);
-            fetch('/api/sales/import/preview/', {
-                method: 'POST',
-                headers: { 'X-CSRFToken': getCSRFToken() },
-                body: formData,
-            }).then(function(r) { return r.json(); }).then(function(data) {
-                if (data.error) { self.previewError = data.error; return; }
-                self.results = (data.results || []).map(function(r) { r._selected_seller = null; return r; });
-                self.fileHash = data.file_hash;
-                self.alreadyImported = data.already_imported;
-                self.step = 2;
-            }).catch(function() { self.previewError = 'Erro ao processar arquivo.'; })
-            .finally(function() { self.loading = false; });
-        },
-
-        onSellerSelected(r, idx) {
-            if (!r._selected_seller) return;
-            var sug = r.suggestions.find(function(s) { return s.uuid === r._selected_seller; });
-            if (sug) {
-                r.resolved_seller_uuid = sug.uuid;
-                r.resolved_seller_name = sug.name;
-                r.status = 'ok';
-            }
-        },
-
-        goToConfirm() {
-            if (this.alreadyImported && !this.forceReimport) {
-                this.forceReimport = false;
-            }
-            this.step = 3;
-        },
-
-        doImport() {
-            var self = this;
-            if (self.importing) return;
-            var rows = self.results.filter(function(r) {
-                return r.status === 'ok' || (r.status === 'needs_selection' && r._selected_seller);
-            }).map(function(r) {
-                return {
-                    row_number: r.row_number,
-                    resolved_seller_uuid: r.resolved_seller_uuid || (r._selected_seller || r.resolved_seller),
-                    amount_cents: r.amount_cents,
-                    sale_date: r.sale_date,
-                    notes: r.notes,
-                };
-            });
-            if (!rows.length) return;
-
-            self.importing = true;
-            fetch('/api/sales/import/confirm/', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCSRFToken() },
-                body: JSON.stringify({
-                    rows: rows,
-                    filename: self.filename,
-                    file_hash: self.fileHash,
-                    force_reimport: self.forceReimport,
-                }),
-            }).then(function(r) { return r.json(); }).then(function(data) {
-                self.result = data;
-                if (data.error) {
-                    showToast(data.error, 'error');
-                } else if (data.created > 0) {
-                    showToast(data.created + ' vendas importadas com sucesso.', 'success');
-                }
-            }).catch(function() { showToast('Erro ao importar.', 'error'); })
-            .finally(function() { self.importing = false; });
-        },
+  return {
+    step: 1, filename: '', file: null, batchUuid: '', fileHash: '', dragOver: false,
+    loading: false, importing: false, previewError: '', confirmError: '', results: [],
+    counts: {}, alreadyImported: false, forceReimport: false, result: null,
+    summaryCards: [
+      {key:'SALE',label:'Vendas',color:'text-emerald-700'}, {key:'JUSTIFICATION_SUGGESTION',label:'Justificativas',color:'text-blue-700'},
+      {key:'DUPLICATE',label:'Duplicadas',color:'text-amber-700'}, {key:'CONFLICT',label:'Conflitos',color:'text-purple-700'},
+      {key:'BLOCKED',label:'Bloqueadas',color:'text-red-700'}, {key:'INVALID',label:'Inválidas',color:'text-red-700'},
+      {key:'EMPTY',label:'Vazias',color:'text-gray-500'}
+    ],
+    get visibleGroups() { return this.summaryCards.filter((group) => this.count(group.key) > 0); },
+    get saleCount() { return this.count('SALE') + this.results.filter((row) => row.requires_manual_action && row._selected_seller && row.normalized_amount).length; },
+    get confirmedJustificationCount() { return this.results.filter((row) => row._confirm_justification).length; },
+    get processableCount() { return this.saleCount + this.confirmedJustificationCount; },
+    get totalSaleAmount() { return this.results.filter((row) => row.classification === 'SALE').reduce((total, row) => total + (row.normalized_amount || 0), 0); },
+    get resultCards() { if (!this.result) return []; return [
+      {label:'Vendas criadas',value:this.result.created}, {label:'Valor importado',value:this.formatMoney(this.result.total_amount)},
+      {label:'Justificativas',value:this.result.justifications_created}, {label:'Duplicidades',value:this.result.duplicates},
+      {label:'Conflitos/erros',value:(this.result.conflicts || 0) + (this.result.errors || []).length}
+    ]; },
+    count(key) { return this.results.filter((row) => row.classification === key).length; },
+    rowsFor(key) { return this.results.filter((row) => row.classification === key); },
+    formatMoney(cents) { return 'R$ ' + ((cents || 0) / 100).toLocaleString('pt-BR', {minimumFractionDigits:2, maximumFractionDigits:2}); },
+    formatCivilDate(value) { const parts=(value || '').split('-'); return parts.length===3 ? parts[2]+'/'+parts[1]+'/'+parts[0] : value; },
+    handleFile(event) { const file=event.target.files[0]; if (file) this.uploadFile(file); },
+    handleDrop(event) { const file=event.dataTransfer.files[0]; if (file) this.uploadFile(file); },
+    reset() { this.step=1; this.filename=''; this.file=null; this.batchUuid=''; this.fileHash=''; this.results=[]; this.result=null; this.previewError=''; this.confirmError=''; this.alreadyImported=false; this.forceReimport=false; },
+    uploadFile(file) {
+      this.reset(); this.file=file; this.filename=file.name; this.loading=true;
+      const extension=(file.name.split('.').pop() || '').toLowerCase();
+      if (!['csv','xlsx'].includes(extension)) { this.previewError='Formato não suportado. Envie CSV ou XLSX.'; this.loading=false; return; }
+      if (file.size > 5*1024*1024) { this.previewError='Arquivo muito grande. Máximo 5 MB.'; this.loading=false; return; }
+      const formData=new FormData(); formData.append('file',file);
+      fetch('/api/sales/import/preview/', {method:'POST',headers:{'X-CSRFToken':getCSRFToken()},body:formData})
+        .then(async (response) => ({ok:response.ok,data:await response.json()}))
+        .then(({ok,data}) => { if (!ok || data.error) throw new Error(data.error || 'Falha ao analisar o arquivo.');
+          this.results=(data.results || []).map((row) => ({...row,_selected_seller:'',_confirm_justification:false}));
+          this.counts=data.counts || {}; this.batchUuid=data.batch_uuid; this.fileHash=data.file_hash;
+          this.alreadyImported=Boolean(data.already_imported); this.step=2;
+        }).catch((error) => { this.previewError=error.message; }).finally(() => { this.loading=false; });
+    },
+    doImport() {
+      if (this.importing) return; this.importing=true; this.confirmError='';
+      const sellerChoices={}; const confirmedJustifications=[];
+      this.results.forEach((row) => { if (row._selected_seller) sellerChoices[String(row.row_number)]=row._selected_seller; if (row._confirm_justification) confirmedJustifications.push(row.row_number); });
+      fetch('/api/sales/import/confirm/', {method:'POST',headers:{'Content-Type':'application/json','X-CSRFToken':getCSRFToken()},
+        body:JSON.stringify({batch_uuid:this.batchUuid,force_reimport:this.forceReimport,decisions:{seller_choices:sellerChoices,confirmed_justifications:confirmedJustifications}})})
+        .then(async (response) => ({ok:response.ok,data:await response.json()}))
+        .then(({ok,data}) => { if (!ok || data.error) throw new Error(data.error || 'Falha ao confirmar.'); this.result=data; this.step=4; showToast('Importação concluída e revalidada.', 'success'); })
+        .catch((error) => { this.confirmError=error.message; showToast(error.message,'error'); }).finally(() => { this.importing=false; });
     }
+  };
 }
 </script>
 {% endblock %}
