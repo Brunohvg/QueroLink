@@ -952,6 +952,27 @@ _LOCKED_SC_STATUSES = (
 )
 
 
+def is_period_editable_for_seller(seller, period, sc=None):
+    """Regra central de editabilidade de uma competencia para um vendedor.
+
+    Reutilizada por vendas E por justificativas (nao duplicar logica por
+    month/year). Bloqueia se o periodo estiver FECHADA/PAGA/CANCELADA ou se a
+    SellerCommission do vendedor estiver em estado travado.
+    `sc` pode ser pre-carregada para evitar query.
+    """
+    if period is None:
+        return True
+    if period.status in _LOCKED_PERIOD_STATUSES:
+        return False
+    if sc is None:
+        sc = SellerCommission.objects.filter(
+            period=period, seller=seller,
+        ).first()
+    if sc and sc.status in _LOCKED_SC_STATUSES:
+        return False
+    return True
+
+
 def build_sale_change_permission_resolver(seller, periods=None):
     """Fabrica um resolvedor em lote da regra de edicao/exclusao de vendas.
 

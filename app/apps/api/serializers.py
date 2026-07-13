@@ -451,6 +451,22 @@ class SaleCreateSerializer(serializers.ModelSerializer):
             if not can_change:
                 raise serializers.ValidationError({'sale_date': error_msg})
 
+            # LOTE 2: dia justificado exige acao explicita (replace-with-sale),
+            # nao pode ser sobrescrito silenciosamente por uma venda.
+            if not self.instance:
+                from app.apps.sellers.models import SellerDayJustification
+                just = SellerDayJustification.objects.filter(
+                    tenant=user.tenant, seller=seller, date=sale_date,
+                ).first()
+                if just:
+                    raise serializers.ValidationError({
+                        'sale_date': (
+                            'Este dia possui justificativa '
+                            f'({just.get_reason_display()}). Use a acao '
+                            '"remover justificativa e registrar venda".'
+                        ),
+                    })
+
             existing = Sale.objects.filter(
                 seller=seller,
                 sale_date=sale_date,
@@ -726,21 +742,18 @@ class SellerDayJustificationCreateSerializer(serializers.ModelSerializer):
         return seller
 
     def create(self, validated_data):
-        from app.apps.sellers.services import (
-            create_day_justification, JustificationError,
-        )
+        from app.apps.sellers.services import create_day_justification
         user = self.context['request'].user
-        try:
-            return create_day_justification(
-                tenant=user.tenant,
-                seller=validated_data['seller'],
-                date=validated_data['date'],
-                reason=validated_data['reason'],
-                notes=validated_data.get('notes', ''),
-                user=user,
-            )
-        except JustificationError as exc:
-            raise serializers.ValidationError({'detail': str(exc)})
+        # Erros de dominio (conflito/lock/validacao) propagam para o ViewSet,
+        # que os mapeia para 409/400.
+        return create_day_justification(
+            tenant=user.tenant,
+            seller=validated_data['seller'],
+            date=validated_data['date'],
+            reason=validated_data['reason'],
+            notes=validated_data.get('notes', ''),
+            user=user,
+        )
 
 
 class SellerDayJustificationUpdateSerializer(serializers.ModelSerializer):
@@ -756,17 +769,12 @@ class SellerDayJustificationUpdateSerializer(serializers.ModelSerializer):
         }
 
     def update(self, instance, validated_data):
-        from app.apps.sellers.services import (
-            update_day_justification, JustificationError,
-        )
+        from app.apps.sellers.services import update_day_justification
         user = self.context['request'].user
-        try:
-            return update_day_justification(
-                justification=instance,
-                user=user,
-                reason=validated_data.get('reason'),
-                notes=validated_data.get('notes'),
-                date=validated_data.get('date'),
-            )
-        except JustificationError as exc:
-            raise serializers.ValidationError({'detail': str(exc)})
+        return update_day_justification(
+            justification=instance,
+            user=user,
+            reason=validated_data.get('reason'),
+            notes=validated_data.get('notes'),
+            date=validated_data.get('date'),
+        )

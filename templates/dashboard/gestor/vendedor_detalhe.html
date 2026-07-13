@@ -367,6 +367,69 @@
       </template>
     </div>
   </div>
+
+  <!-- LOTE 5 - Controle de dias (justificativas). NAO e financeiro. -->
+  <div class="bg-white rounded-2xl border border-gray-100 shadow-[0_1px_3px_-1px_rgba(0,0,0,0.04),0_4px_16px_-4px_rgba(67,97,238,0.06)] p-6"
+       x-show="sellerData?.day_status">
+    <div class="flex items-center justify-between mb-4">
+      <h3 class="text-[13px] font-semibold text-gray-400 uppercase tracking-wider">Controle de dias</h3>
+      <div class="flex items-center gap-2 text-[11px]">
+        <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700"><span x-text="sellerData?.day_status?.summary?.lancados||0"></span> lançados</span>
+        <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-sky-50 text-sky-700"><span x-text="sellerData?.day_status?.summary?.justificados||0"></span> justificados</span>
+        <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-50 text-amber-700"><span x-text="sellerData?.day_status?.summary?.pendentes||0"></span> pendentes</span>
+      </div>
+    </div>
+    <div class="space-y-1">
+      <template x-for="d in sellerData?.day_status?.days" :key="d.date">
+        <div class="flex items-center justify-between py-2 px-3 rounded-lg hover:bg-gray-50 transition text-[13px]"
+             x-show="d.status !== 'NAO_UTIL'">
+          <span class="font-medium text-gray-700 min-w-[92px]" x-text="formatCivilDate(d.date)"></span>
+          <span class="flex-1 text-gray-500">
+            <template x-if="d.status === 'LANCADO'"><span class="text-emerald-600 font-medium">Lançado · <span x-text="formatMoneyBRL(d.active_sales_total)"></span></span></template>
+            <template x-if="d.status === 'JUSTIFICADO'"><span class="text-sky-600 font-medium" x-text="d.justification_reason_display + (d.justification_notes ? ' — ' + d.justification_notes : '')"></span></template>
+            <template x-if="d.status === 'PENDENTE'"><span class="text-amber-600 font-medium">Pendente</span></template>
+          </span>
+          <span class="flex items-center gap-1">
+            <button x-show="d.status === 'PENDENTE' && d.can_manage_justification" @click="openJustify(d)"
+                    class="text-[12px] px-2 py-1 rounded-lg text-brand-600 hover:bg-brand-50">Justificar</button>
+            <button x-show="d.status === 'JUSTIFICADO' && d.can_manage_justification" @click="openJustify(d)"
+                    class="text-[12px] px-2 py-1 rounded-lg text-gray-500 hover:bg-gray-100">Editar</button>
+            <button x-show="d.status === 'JUSTIFICADO' && d.can_manage_justification" @click="removeJustify(d)"
+                    class="text-[12px] px-2 py-1 rounded-lg text-red-500 hover:bg-red-50">Remover</button>
+          </span>
+        </div>
+      </template>
+    </div>
+    <p class="text-[10px] text-gray-400 mt-3">Justificativas são operacionais e não têm valor financeiro.</p>
+  </div>
+
+  <!-- Modal de justificativa -->
+  <div x-show="justifyModalOpen" class="fixed inset-0 z-50 flex items-center justify-center p-4" style="display:none;">
+    <div class="fixed inset-0 bg-black/40" @click="justifyModalOpen=false"></div>
+    <div class="relative bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 z-10">
+      <h3 class="text-[16px] font-bold text-gray-900 mb-4">Justificativa do dia</h3>
+      <p class="text-[13px] text-gray-500 mb-3" x-text="formatCivilDate(justifyForm.date)"></p>
+      <label class="block text-[11px] font-semibold text-gray-400 uppercase mb-1">Motivo</label>
+      <select x-model="justifyForm.reason" class="w-full px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-[14px] mb-3">
+        <option value="ATESTADO">Atestado</option>
+        <option value="FALTA">Falta</option>
+        <option value="FERIAS">Férias</option>
+        <option value="FOLGA">Folga</option>
+        <option value="AFASTAMENTO">Afastamento</option>
+        <option value="FERIADO">Feriado</option>
+        <option value="SEM_EXPEDIENTE">Sem expediente</option>
+        <option value="OUTRO">Outro</option>
+      </select>
+      <label class="block text-[11px] font-semibold text-gray-400 uppercase mb-1">Observação (opcional)</label>
+      <textarea x-model="justifyForm.notes" maxlength="255" rows="2" class="w-full px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-[14px] mb-2"></textarea>
+      <p class="text-[12px] text-red-600 mb-2" x-show="justifyError" x-text="justifyError"></p>
+      <p class="text-[10px] text-gray-400 mb-4">Não anexar documentos médicos. Registre apenas o motivo operacional.</p>
+      <div class="flex justify-end gap-2">
+        <button @click="justifyModalOpen=false" class="px-4 py-2 rounded-xl text-gray-500 hover:bg-gray-100 text-[14px]">Cancelar</button>
+        <button @click="saveJustify()" :disabled="justifySaving" class="px-4 py-2 rounded-xl bg-brand-500 text-white font-semibold text-[14px] disabled:opacity-50">Salvar</button>
+      </div>
+    </div>
+  </div>
   {% endverbatim %}
 </div>
 
@@ -488,6 +551,70 @@ function sellerDetailPage() {
                 }
             } catch(e) {
                 console.error('Erro ao carregar historico:', e);
+            }
+        },
+        // LOTE 5 - justificativas (gestor)
+        justifyModalOpen: false,
+        justifySaving: false,
+        justifyError: '',
+        justifyForm: { uuid: '', date: '', reason: 'FALTA', notes: '' },
+        openJustify(d) {
+            this.justifyForm.uuid = d.justification_uuid || '';
+            this.justifyForm.date = d.date;
+            this.justifyForm.reason = d.justification_reason || 'FALTA';
+            this.justifyForm.notes = d.justification_notes || '';
+            this.justifyError = '';
+            this.justifyModalOpen = true;
+        },
+        async saveJustify() {
+            if (this.justifySaving) return;
+            this.justifySaving = true;
+            this.justifyError = '';
+            try {
+                var isEdit = !!this.justifyForm.uuid;
+                var url = isEdit
+                    ? '/api/manager/day-justifications/' + this.justifyForm.uuid + '/'
+                    : '/api/manager/day-justifications/';
+                var body = isEdit
+                    ? { reason: this.justifyForm.reason, notes: this.justifyForm.notes }
+                    : { seller: this.sellerId, date: this.justifyForm.date,
+                        reason: this.justifyForm.reason, notes: this.justifyForm.notes };
+                var r = await fetch(url, {
+                    method: isEdit ? 'PATCH' : 'POST',
+                    headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCSRFToken() },
+                    body: JSON.stringify(body),
+                });
+                if (r.ok) {
+                    this.justifyModalOpen = false;
+                    showToast('Justificativa salva.', 'success');
+                    this.load();
+                } else {
+                    var data = await r.json();
+                    this.justifyError = data.detail || 'Erro ao salvar justificativa.';
+                }
+            } catch(e) {
+                this.justifyError = 'Erro de conexao. Tente novamente.';
+            } finally {
+                this.justifySaving = false;
+            }
+        },
+        async removeJustify(d) {
+            if (!d.justification_uuid) return;
+            if (!confirm('Remover a justificativa de ' + formatCivilDate(d.date) + '?')) return;
+            try {
+                var r = await fetch('/api/manager/day-justifications/' + d.justification_uuid + '/', {
+                    method: 'DELETE',
+                    headers: { 'X-CSRFToken': getCSRFToken() },
+                });
+                if (r.ok || r.status === 204) {
+                    showToast('Justificativa removida.', 'success');
+                    this.load();
+                } else {
+                    var data = await r.json();
+                    showToast(data.detail || 'Erro ao remover.', 'error');
+                }
+            } catch(e) {
+                showToast('Erro de conexao.', 'error');
             }
         },
     }
