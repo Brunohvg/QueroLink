@@ -271,6 +271,20 @@ def mobile_home(request):
         if is_editable and period:
             from app.apps.commissions.services import get_missing_days_for_period
             missing_past_days = get_missing_days_for_period(seller, period)
+            # LOTE 6: dia com justificativa nao conta como pendente.
+            if missing_past_days:
+                from app.apps.sellers.models import SellerDayJustification
+                justified = set(
+                    SellerDayJustification.objects.filter(
+                        tenant=seller.tenant, seller=seller,
+                        date__gte=period.start_date,
+                        date__lte=period.end_date,
+                    ).values_list('date', flat=True)
+                )
+                if justified:
+                    missing_past_days = [
+                        d for d in missing_past_days if d not in justified
+                    ]
             has_missing_past_days = len(missing_past_days) > 0
 
         from app.apps.accounts.models import is_working_day
@@ -353,6 +367,15 @@ def mobile_lancar_venda(request):
             can_change, error_msg = validate_sale_can_be_changed(seller, sale_date, request.user)
             if not can_change:
                 raise ValueError(error_msg)
+
+            # LOTE 2/8: dia justificado nao pode receber venda silenciosamente.
+            # O vendedor nao gerencia justificativa: deve procurar o gestor.
+            from app.apps.sellers.services import has_active_justification
+            if has_active_justification(seller.tenant, seller, sale_date):
+                raise ValueError(
+                    'Este dia possui uma justificativa registrada pelo gestor. '
+                    'Procure o gestor para ajustar.'
+                )
 
             existing = Sale.objects.filter(
                 seller=seller,

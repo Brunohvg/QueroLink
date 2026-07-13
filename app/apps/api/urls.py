@@ -32,6 +32,7 @@ urlpatterns = [
     path('manager/dashboard/summary/', views.DashboardSummaryView.as_view(), name='api-dashboard-summary'),
     path('manager/webhook-status/', views.WebhookStatusView.as_view(), name='api-webhook-status'),
     path('manager/seller/<uuid:seller_id>/', views.SellerDetailView.as_view(), name='api-seller-detail'),
+    path('manager/seller/<uuid:seller_id>/day-status/', views.SellerDayStatusView.as_view(), name='api-seller-day-status'),
     path('manager/seller/<uuid:seller_id>/csv/', views.SellerReportCsvView.as_view(), name='api-seller-report-csv'),
     path('manager/seller/<uuid:seller_id>/xlsx/', views.SellerReportExcelView.as_view(), name='api-seller-report-xlsx'),
     path('manager/seller/<uuid:seller_id>/pdf/', views.SellerReportPdfView.as_view(), name='api-seller-report-pdf'),

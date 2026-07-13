@@ -5,7 +5,7 @@ from rest_framework import viewsets, status, generics, serializers as drf_serial
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
-from django.core.exceptions import ObjectDoesNotExist
+from django.core.exceptions import ObjectDoesNotExist, ValidationError
 from django.utils import timezone
 from django.db import transaction
 from django.db.models import Sum, Q
@@ -1271,6 +1271,31 @@ class SellerDetailView(generics.GenericAPIView):
                 'is_estimated': sp_is_estimated,
             }
 
+        # LOTE 5 - controle operacional de dias (justificativas), sem valor
+        # financeiro. Apenas quando ha uma competencia selecionada (nao custom).
+        day_status = None
+        if selected_period is not None:
+            from app.apps.commissions.day_status import get_period_day_statuses
+            ds = get_period_day_statuses(tenant, seller, selected_period)
+            day_status = {
+                'summary': ds['summary'],
+                'days': [
+                    {
+                        'date': d['date'].isoformat(),
+                        'is_expected_day': d['is_expected_day'],
+                        'status': d['status'],
+                        'active_sales_count': d['active_sales_count'],
+                        'active_sales_total': d['active_sales_total'],
+                        'justification_uuid': d['justification_uuid'],
+                        'justification_reason': d['justification_reason'],
+                        'justification_reason_display': d['justification_reason_display'],
+                        'justification_notes': d['justification_notes'],
+                        'can_manage_justification': d['can_manage_justification'],
+                    }
+                    for d in ds['days']
+                ],
+            }
+
         return Response({
             'seller': {
                 'uuid': str(seller.uuid),
@@ -1302,6 +1327,7 @@ class SellerDetailView(generics.GenericAPIView):
             'commissions': commissions_data,
             'evolution': evolution,
             'comparison': comp_data,
+            'day_status': day_status,
         })
 
 
@@ -2312,3 +2338,114 @@ class SellerDayJustificationViewSet(viewsets.ModelViewSet):
     def perform_destroy(self, instance):
         from app.apps.sellers.services import delete_day_justification
         delete_day_justification(justification=instance, user=self.request.user)
+
+    # --- Mapeamento de erros de dominio para status HTTP (LOTE 2/3) ---
+    def _map_justification_errors(self, func):
+        from app.apps.sellers.services import (
+            JustificationConflictError, JustificationLockedError,
+            JustificationError,
+        )
+        try:
+            return func()
+        except (JustificationConflictError, JustificationLockedError) as exc:
+            return Response({'detail': str(exc)}, status=409)
+        except JustificationError as exc:
+            return Response({'detail': str(exc)}, status=400)
+
+    def create(self, request, *args, **kwargs):
+        return self._map_justification_errors(
+            lambda: super(SellerDayJustificationViewSet, self).create(
+                request, *args, **kwargs,
+            )
+        )
+
+    def update(self, request, *args, **kwargs):
+        return self._map_justification_errors(
+            lambda: super(SellerDayJustificationViewSet, self).update(
+                request, *args, **kwargs,
+            )
+        )
+
+    def destroy(self, request, *args, **kwargs):
+        return self._map_justification_errors(
+            lambda: super(SellerDayJustificationViewSet, self).destroy(
+                request, *args, **kwargs,
+            )
+        )
+
+    @action(
+        detail=True, methods=['post'],
+        permission_classes=[IsAuthenticated, IsManagerOrAdmin],
+        url_path='replace-with-sale',
+    )
+    def replace_with_sale(self, request, pk=None):
+        """Substitui explicitamente a justificativa por uma venda (LOTE 2)."""
+        from app.apps.sellers.services import (
+            replace_justification_with_sale,
+            JustificationConflictError, JustificationLockedError,
+            JustificationError,
+        )
+        justification = self.get_object()
+        amount = request.data.get('amount')
+        notes = request.data.get('notes', '')
+        try:
+            sale = replace_justification_with_sale(
+                justification=justification, amount=amount,
+                user=request.user, notes=notes,
+            )
+        except (JustificationConflictError, JustificationLockedError) as exc:
+            return Response({'detail': str(exc)}, status=409)
+        except JustificationError as exc:
+            return Response({'detail': str(exc)}, status=400)
+        return Response(
+            {'sale_uuid': str(sale.uuid), 'amount': sale.amount,
+             'sale_date': sale.sale_date.isoformat()},
+            status=201,
+        )
+
+
+class SellerDayStatusView(generics.GenericAPIView):
+    """Estados operacionais dos dias de um vendedor numa competencia (LOTE 7).
+
+    Manager/Admin. Tenant-scoped: seller/period de outro tenant -> 404.
+    """
+
+    permission_classes = [IsAuthenticated, IsManagerOrAdmin]
+
+    def get(self, request, seller_id=None):
+        from app.apps.commissions.day_status import get_period_day_statuses
+        tenant = request.user.tenant
+        try:
+            seller = Seller.objects.get(uuid=seller_id, tenant=tenant)
+        except Seller.DoesNotExist:
+            from django.http import Http404
+            raise Http404('Vendedor nao encontrado.')
+
+        period_uuid = request.query_params.get('period')
+        if not period_uuid:
+            return Response({'detail': 'period e obrigatorio.'}, status=400)
+        try:
+            period = CommissionPeriod.objects.get(
+                uuid=period_uuid, tenant=tenant,
+            )
+        except (CommissionPeriod.DoesNotExist, ValueError, ValidationError):
+            from django.http import Http404
+            raise Http404('Competencia nao encontrada.')
+
+        result = get_period_day_statuses(tenant, seller, period)
+        days = [
+            {
+                'date': d['date'].isoformat(),
+                'is_expected_day': d['is_expected_day'],
+                'status': d['status'],
+                'active_sales_count': d['active_sales_count'],
+                'active_sales_total': d['active_sales_total'],
+                'justification_uuid': d['justification_uuid'],
+                'justification_reason': d['justification_reason'],
+                'justification_reason_display': d['justification_reason_display'],
+                'justification_notes': d['justification_notes'],
+                'can_manage_justification': d['can_manage_justification'],
+            }
+            for d in result['days']
+        ]
+        return Response({'summary': result['summary'], 'days': days})
