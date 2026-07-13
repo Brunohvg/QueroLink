@@ -8,7 +8,7 @@ from rest_framework.permissions import IsAuthenticated
 from django.core.exceptions import ObjectDoesNotExist, ValidationError
 from django.utils import timezone
 from django.db import transaction
-from django.db.models import Max, Sum, Q
+from django.db.models import CharField, Max, Sum, Q, Value
 from django.http import HttpResponse
 from django.conf import settings
 from django_ratelimit.decorators import ratelimit
@@ -84,6 +84,7 @@ class SellerViewSet(viewsets.ModelViewSet):
             .select_related('tenant', 'user')
             .order_by('name')
         )
+        seller_ids = [seller.pk for seller in sellers]
 
         try:
             period = resolve_selected_period(request, tenant)
@@ -92,6 +93,7 @@ class SellerViewSet(viewsets.ModelViewSet):
         except PeriodIntegrityError as exc:
             return Response({'error': str(exc)}, status=409)
 
+        today = timezone.localdate()
         sales_by_seller = {}
         commissions_by_seller = {}
         day_summaries = {}
@@ -100,7 +102,7 @@ class SellerViewSet(viewsets.ModelViewSet):
                 row['seller_id']: row
                 for row in Sale.objects.filter(
                     tenant=tenant,
-                    seller_id__in=[seller.pk for seller in sellers],
+                    seller_id__in=seller_ids,
                     origin__in=Sale.COMMISSION_ORIGINS,
                     status='ATIVA',
                     sale_date__gte=period.start_date,
@@ -114,14 +116,44 @@ class SellerViewSet(viewsets.ModelViewSet):
                 commission.seller_id: commission
                 for commission in SellerCommission.objects.filter(
                     period=period,
-                    seller_id__in=[seller.pk for seller in sellers],
+                    seller_id__in=seller_ids,
                 )
             }
             day_summaries = get_period_summary_bulk(
-                tenant, period, sellers, reference_date=timezone.localdate(),
+                tenant, period, sellers, reference_date=today,
             )
 
-        today = timezone.localdate()
+        from app.apps.sellers.models import SellerDayJustification
+
+        today_sales = Sale.objects.filter(
+            tenant=tenant,
+            seller_id__in=seller_ids,
+            origin=Sale.Origin.MANUAL,
+            status='ATIVA',
+            sale_date=today,
+        ).annotate(
+            resolution_type=Value('sale', output_field=CharField()),
+        ).values_list('seller_id', 'resolution_type')
+        today_justifications = SellerDayJustification.objects.filter(
+            tenant=tenant,
+            seller_id__in=seller_ids,
+            date=today,
+        ).annotate(
+            resolution_type=Value(
+                'justification', output_field=CharField(),
+            ),
+        ).values_list('seller_id', 'resolution_type')
+
+        today_sale_seller_ids = set()
+        today_justification_seller_ids = set()
+        for seller_id, resolution_type in today_sales.union(
+            today_justifications,
+        ):
+            if resolution_type == 'sale':
+                today_sale_seller_ids.add(seller_id)
+            else:
+                today_justification_seller_ids.add(seller_id)
+
         result = []
         for seller in sellers:
             sales = sales_by_seller.get(seller.pk, {})
@@ -161,12 +193,19 @@ class SellerViewSet(viewsets.ModelViewSet):
                 'expected_days': launched + justified + pending,
                 'operational_status': operational_status,
                 'financial_status': (
-                    commission.status if commission else 'ABERTA'
+                    commission.status if commission else 'SEM_COMISSAO'
                 ),
                 'last_sale_date': (
                     last_sale_date.isoformat() if last_sale_date else None
                 ),
-                'has_sale_today': last_sale_date == today,
+                'has_sale_today': seller.pk in today_sale_seller_ids,
+                'has_justification_today': (
+                    seller.pk in today_justification_seller_ids
+                ),
+                'has_day_resolved_today': (
+                    seller.pk in today_sale_seller_ids
+                    or seller.pk in today_justification_seller_ids
+                ),
             })
 
         return Response({

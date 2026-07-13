@@ -132,7 +132,8 @@
                         'bg-sky-50 text-sky-700': s.financial_status==='AJUSTADA',
                         'bg-purple-50 text-purple-700': s.financial_status==='REABERTA',
                         'bg-red-50 text-red-700': s.financial_status==='CANCELADA',
-                        'bg-gray-100 text-gray-600': s.financial_status==='ABERTA'
+                        'bg-gray-100 text-gray-600': s.financial_status==='ABERTA',
+                        'bg-slate-50 text-slate-600': s.financial_status==='SEM_COMISSAO'
                       }">
                   <span class="w-1.5 h-1.5 rounded-full"
                         :class="{
@@ -143,7 +144,8 @@
                           'bg-sky-500': s.financial_status==='AJUSTADA',
                           'bg-purple-500': s.financial_status==='REABERTA',
                           'bg-red-500': s.financial_status==='CANCELADA',
-                          'bg-gray-400': s.financial_status==='ABERTA'
+                          'bg-gray-400': s.financial_status==='ABERTA',
+                          'bg-slate-400': s.financial_status==='SEM_COMISSAO'
                         }"></span>
                   <span x-text="
                     s.financial_status==='PAGA' ? 'Paga' :
@@ -153,6 +155,7 @@
                     s.financial_status==='AJUSTADA' ? 'Ajustada' :
                     s.financial_status==='REABERTA' ? 'Reaberta' :
                     s.financial_status==='CANCELADA' ? 'Cancelada' :
+                    s.financial_status==='SEM_COMISSAO' ? 'Sem comissão' :
                     s.financial_status || 'Aberta'"></span>
                 </span>
               </td>
@@ -405,7 +408,7 @@ function vendedoresPage() {
                 this.stats.pendentes = enriched.filter(s => s.operational_status === 'PENDENTE').length;
                 this.stats.semLancamento = enriched.filter(s => s.operational_status === 'SEM_LANCAMENTO').length;
                 this.stats.cancelados = enriched.filter(s => s.financial_status === 'CANCELADA').length;
-                this.stats.semLancamentoHoje = enriched.filter(s => s.is_active && !s.has_sale_today).length;
+                this.stats.semLancamentoHoje = enriched.filter(s => s.is_active && !s.has_day_resolved_today).length;
                 this.stats.comissaoAberta = enriched.reduce((a, s) => s.financial_status === 'ABERTA' ? a + (s.commission_amount || 0) : a, 0);
                 this.stats.comissaoPaga = enriched.reduce((a, s) => s.financial_status === 'PAGA' ? a + (s.commission_amount || 0) : a, 0);
                 this.stats.comissaoFechada = enriched.reduce((a, s) => s.financial_status === 'FECHADA' || s.financial_status === 'PARCIALMENTE_FECHADA' ? a + (s.commission_amount || 0) : a, 0);

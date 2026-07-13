@@ -70,6 +70,28 @@ class NavigationPerformanceRegressionTests(TestCase):
         self.assertNotIn('list.map(async', source)
         self.assertNotIn("'/api/manager/seller/' + s.uuid", source)
 
+    def test_seller_page_supports_no_commission_status(self):
+        source = Path('templates/dashboard/gestor/vendedores.html').read_text()
+        self.assertIn(
+            "s.financial_status==='SEM_COMISSAO' ? 'Sem comissão'",
+            source,
+        )
+        self.assertIn(
+            "'bg-slate-50 text-slate-600': "
+            "s.financial_status==='SEM_COMISSAO'",
+            source,
+        )
+        self.assertIn(
+            "s.financial_status === 'ABERTA' ? a + "
+            "(s.commission_amount || 0) : a",
+            source,
+        )
+
+    def test_seller_page_counts_only_unresolved_today(self):
+        source = Path('templates/dashboard/gestor/vendedores.html').read_text()
+        self.assertIn('!s.has_day_resolved_today', source)
+        self.assertNotIn('!s.has_sale_today', source)
+
     def test_links_prefetches_payments(self):
         source = Path('app/apps/dashboard/desktop_views.py').read_text()
         links_view = source.split('def gestor_links', 1)[1].split(
