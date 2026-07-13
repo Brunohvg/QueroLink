@@ -1,12 +1,13 @@
 {% load static %}
 {% comment %}Usage: include components/_sidebar.html — desktop sidebar, role-aware{% endcomment %}
-<aside class="w-64 bg-white border-r border-gray-100 flex flex-col flex-shrink-0 h-screen">
+<aside class="fixed inset-y-0 left-0 z-50 w-64 bg-white border-r border-gray-100 flex flex-col flex-shrink-0 h-full transform transition-transform duration-200 -translate-x-full lg:translate-x-0 lg:static"
+       :class="sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'">
     <div class="p-5 border-b border-gray-100">
         <a href="{% url 'dashboard:gestor_home' %}" class="flex items-center gap-3">
             <img src="{% static 'img/vidalys-merito-logo.png' %}" alt="Vidalys" class="h-9 w-auto">
         </a>
     </div>
-    <nav class="flex-1 p-3 space-y-1 overflow-y-auto">
+    <nav class="flex-1 p-3 space-y-1 overflow-y-auto" @click="sidebarOpen=false">
         {% if request.user.role == 'MANAGER' or request.user.role == 'ADMIN' %}
         <p class="px-3 py-2 text-xs font-semibold text-gray-400 uppercase tracking-wider">Gestor</p>
         <a href="{% url 'dashboard:gestor_home' %}"

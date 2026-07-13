@@ -64,7 +64,7 @@
       <p class="text-[12px] font-semibold text-brand-100 uppercase tracking-wider mb-2">Total de hoje</p>
       <p class="font-display text-[36px] font-bold leading-none tracking-tight">{{ today_total|brl }}</p>
       <p class="text-[14px] text-brand-100 mt-3 flex items-center gap-1.5">
-        <span>{% if has_entry_today %}Registrado{% else %}Nenhum lancamento hoje{% endif %}</span>
+        <span>{% if has_entry_today %}Registrado{% elif has_justification_today %}Dia justificado{% else %}Nenhum lancamento hoje{% endif %}</span>
         <span class="opacity-30">•</span>
         <span>{% now "l, d/m/Y" %}</span>
       </p>
@@ -124,7 +124,7 @@
   </div>
   {% endif %}
 
-  {% if not has_entry_today and is_editable and is_working_day_today %}
+  {% if not has_day_resolved_today and is_editable and is_working_day_today %}
   <div class="bg-amber-50/80 border border-amber-100 text-amber-700 px-4 py-2.5 rounded-2xl text-[12px] flex items-center gap-2">
     <svg class="w-3.5 h-3.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"/></svg>
     <span>Voce ainda nao lancou o valor de hoje.</span>

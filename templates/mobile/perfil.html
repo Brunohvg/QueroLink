@@ -97,6 +97,20 @@
     </div>
   </div>
 
+  <button type="button" onclick="enableNotifications()"
+          class="w-full bg-white rounded-2xl p-4 card-shadow flex items-center justify-between tap-target active:scale-[0.99] transition-all">
+    <div class="flex items-center gap-3">
+      <div class="w-10 h-10 rounded-xl bg-amber-50 flex items-center justify-center">
+        <svg class="w-5 h-5 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/></svg>
+      </div>
+      <div class="text-left">
+        <span class="block font-semibold text-[15px] text-gray-700">Ativar notificacoes</span>
+        <span class="block text-[12px] text-gray-400">Receba avisos importantes no aparelho</span>
+      </div>
+    </div>
+    <svg class="w-5 h-5 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+  </button>
+
   <div x-data="{ showPasswordForm: false, currentPassword: '', newPassword: '', confirmPassword: '' }" class="space-y-2">
     <button @click="showPasswordForm = !showPasswordForm"
             class="w-full bg-white rounded-2xl p-4 card-shadow flex items-center justify-between tap-target active:scale-[0.99] transition-all">

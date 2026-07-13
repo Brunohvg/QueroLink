@@ -380,6 +380,16 @@ class CivilDateTemplateRegressionTest(TestCase):
         # DateTimeField de auditoria mantem conversao normal de timezone.
         self.assertIn('new Date(entry.changed_at)', html)
 
+    def test_seller_list_and_payment_history_use_civil_helper(self):
+        sellers = self._read('dashboard', 'gestor', 'vendedores.html')
+        history = self._read(
+            'dashboard', 'financeiro', 'historico_pagamentos.html',
+        )
+        self.assertNotIn('new Date(last.sale_date)', sellers)
+        self.assertNotIn("new Date().toISOString().split('T')[0]", sellers)
+        self.assertIn('formatCivilDate(s.last_sale_date)', sellers)
+        self.assertIn('formatCivilDate(sc.payment_date)', history)
+
     def test_importar_vendas_uses_civil_helper(self):
         html = self._read('dashboard', 'gestor', 'importar_vendas.html')
         self.assertNotIn("new Date(r.sale_date", html)

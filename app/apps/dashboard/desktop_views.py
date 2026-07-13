@@ -786,7 +786,9 @@ def gestor_links(request):
     seller_uuid = request.GET.get('seller')
     orders = Order.objects.filter(
         tenant=tenant,
-    ).select_related('seller', 'payment_link').order_by('-created_at')
+    ).select_related('seller', 'payment_link').prefetch_related(
+        'payments',
+    ).order_by('-created_at')
     if seller_uuid:
         orders = orders.filter(seller__uuid=seller_uuid)
     orders = orders[:100]

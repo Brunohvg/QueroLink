@@ -3,6 +3,7 @@
 from datetime import date
 from decimal import Decimal
 import re
+from unittest.mock import patch
 
 from django.test import TestCase, override_settings
 from django.test.utils import CaptureQueriesContext
@@ -83,11 +84,10 @@ class ViewportSafeAreaTest(_Base):
         self.assertIn('env(safe-area-inset-bottom', html)
 
     def test_system_font_family(self):
-        """Fonte padrao e system-ui; CDN e assincrono nao bloqueante."""
+        """Fonte padrao e system-ui; nenhuma fonte depende de CDN."""
         _, html = _render(self.client, '/dashboard/mobile/')
         self.assertIn("font-family: system-ui", html)
-        # CDN carregado com media=print (nao bloqueia render)
-        self.assertIn('media="print"', html)
+        self.assertNotIn('fonts.googleapis.com', html)
 
 
 class ServiceWorkerTest(_Base):
@@ -176,3 +176,47 @@ class LancarVendaKeyboardTest(_Base):
     def test_numeric_inputmode_preserved(self):
         _, html = _render(self.client, '/dashboard/mobile/lancar/')
         self.assertIn('inputmode="numeric"', html)
+
+    def test_date_default_does_not_use_utc_javascript(self):
+        _, html = _render(self.client, '/dashboard/mobile/lancar/')
+        self.assertNotIn("new Date().toISOString().split('T')[0]", html)
+
+
+class NotificationPermissionTest(_Base):
+    def test_permission_is_only_requested_by_explicit_action(self):
+        _, html = _render(self.client, '/dashboard/mobile/perfil/')
+        self.assertIn('onclick="enableNotifications()"', html)
+        self.assertNotIn('merito_visits', html)
+        permission_index = html.index('Notification.requestPermission()')
+        function_index = html.index('function enableNotifications()')
+        subscribe_index = html.index('function subscribeUserToPush()')
+        self.assertGreater(permission_index, function_index)
+        self.assertLess(permission_index, subscribe_index)
+
+
+class TodayOperationalStateTest(_Base):
+    @patch(
+        'app.apps.dashboard.mobile_views.timezone.localdate',
+        return_value=date(2026, 6, 25),
+    )
+    def test_today_justification_resolves_warning(self, _mock_localdate):
+        response = self.client.get('/dashboard/mobile/')
+        html = response.content.decode('utf-8')
+        self.assertTrue(response.context['has_justification_today'])
+        self.assertTrue(response.context['has_day_resolved_today'])
+        self.assertIn('Dia justificado', html)
+        self.assertNotIn('Voce ainda nao lancou o valor de hoje.', html)
+
+    @patch(
+        'app.apps.dashboard.mobile_views.timezone.localdate',
+        return_value=date(2026, 7, 3),
+    )
+    def test_refunded_sale_is_not_today_entry(self, _mock_localdate):
+        Sale.objects.create(
+            tenant=self.tenant, seller=self.seller,
+            origin=Sale.Origin.MANUAL, status='ESTORNADA',
+            amount=55500, sale_date=date(2026, 7, 3), created_by=self.su,
+        )
+        response = self.client.get('/dashboard/mobile/')
+        self.assertFalse(response.context['has_entry_today'])
+        self.assertEqual(response.context['today_total'], 0)
