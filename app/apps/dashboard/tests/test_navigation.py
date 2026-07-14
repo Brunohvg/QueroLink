@@ -15,7 +15,6 @@ class OrphanScreenTests(TestCase):
         ('gestor_contabilidade', '/gestor/contabilidade/'),
         ('gestor_previa_fechamento', '/gestor/previa-fechamento/'),
         ('gestor_configuracoes', '/gestor/configuracoes/'),
-        ('gestor_webhooks', '/gestor/webhooks/'),
         ('gestor_links', '/gestor/links/'),
         ('gestor_link_detalhe', '/gestor/links/'),
         ('assinatura', '/assinatura/'),

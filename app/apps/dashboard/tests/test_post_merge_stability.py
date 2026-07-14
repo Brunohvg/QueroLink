@@ -398,7 +398,7 @@ class Lote5Regression(BaseSetup):
             self._get(self.period_jul.uuid).context['competence_total'], 100000,
         )
 
-    def test_importada_link_estornada_read_only(self):
+    def test_importada_estornada_read_only_and_link_hidden(self):
         from app.apps.orders.models import Order
         self._sale('2026-06-22', origin=Sale.Origin.IMPORTADA)
         order = Order.objects.create(
@@ -411,7 +411,8 @@ class Lote5Regression(BaseSetup):
         )
         self._sale('2026-06-24', status='ESTORNADA')
         by_date = {s['date']: s for s in self._get(self.period_jul.uuid).context['sales_json']}
-        for d in ['22/06/2026', '23/06/2026', '24/06/2026']:
+        self.assertNotIn('23/06/2026', by_date)
+        for d in ['22/06/2026', '24/06/2026']:
             self.assertFalse(by_date[d]['canEdit'])
             self.assertFalse(by_date[d]['canDelete'])
 

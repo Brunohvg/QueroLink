@@ -27,6 +27,8 @@ urlpatterns = [
     path('gestor/links/', desktop_views.gestor_links, name='gestor_links'),
     path('gestor/links/<uuid:order_uuid>/', desktop_views.gestor_link_detalhe, name='gestor_link_detalhe'),
     path('gestor/links/<uuid:order_uuid>/cancelar/', desktop_views.gestor_link_cancelar, name='gestor_link_cancelar'),
+    path('gestor/links/<uuid:order_uuid>/verificar-pagamento/', desktop_views.gestor_link_verificar_pagamento, name='gestor_link_verificar_pagamento'),
+    path('gestor/links/<uuid:order_uuid>/reenviar-vendedor/', desktop_views.gestor_link_reenviar_vendedor, name='gestor_link_reenviar_vendedor'),
     path('gestor/links/<uuid:order_uuid>/estornar/', desktop_views.gestor_link_estornar, name='gestor_link_estornar'),
 
     path('financeiro/fila/', desktop_views.financeiro_fila, name='financeiro_fila'),

@@ -1183,11 +1183,7 @@ class SellerDetailView(generics.GenericAPIView):
                 sale_date__gte=start, sale_date__lte=end,
             ).order_by('-sale_date', '-created_at')
 
-            link_sales_qs = Sale.objects.filter(
-                tenant=tenant, seller=seller,
-                origin=Sale.Origin.LINK,
-                sale_date__gte=start, sale_date__lte=end,
-            ).order_by('-sale_date', '-created_at')
+            link_sales_qs = Sale.objects.none()
 
         manual_total = manual_sales_qs.filter(status='ATIVA').aggregate(
             t=Sum('amount'),
@@ -1884,7 +1880,7 @@ class SellerLinkCreateView(generics.GenericAPIView):
                 'customer_name': o.customer_name,
                 'total_amount': o.total_amount,
                 'status': o.status,
-                'status_display': o.get_status_display(),
+                'status_display': o.status_display_pt,
                 'link_url': link_url,
                 'refusal_reason': refusal,
                 'created_at': o.created_at.isoformat(),
@@ -1909,7 +1905,10 @@ class SellerLinkCreateView(generics.GenericAPIView):
 
         customer_name = request.data.get('customer_name', '').strip()
         amount_str = request.data.get('amount', '').strip()
-        installments = int(request.data.get('installments', 1))
+        try:
+            installments = int(request.data.get('installments', 1))
+        except (TypeError, ValueError):
+            return Response({'error': 'Numero de parcelas invalido (1-12).'}, status=400)
 
         if not customer_name:
             return Response(
@@ -1991,35 +1990,24 @@ class WebhookStatusView(generics.GenericAPIView):
     permission_classes = [IsAuthenticated, IsManagerOrAdmin]
 
     def get(self, request):
-        from django.conf import settings
         from app.apps.webhooks.models import WebhookEvent
 
         tenant = request.user.tenant
-        webhook_url = (
-            f"https://{settings.SERVICE_FQDN_WEB}"
-            f"/api/webhooks/pagarme/{tenant.slug}/"
-        )
-
-        last_event = (
-            WebhookEvent.objects.filter(
-                gateway='pagarme', tenant=tenant,
-            )
-            .order_by('-received_at')
-            .first()
-        )
+        requires_attention = WebhookEvent.objects.filter(
+            gateway='pagarme',
+            tenant=tenant,
+            processed=False,
+            received_at__lt=timezone.now() - timedelta(minutes=10),
+        ).exists()
 
         status_data = {
-            'webhook_url': webhook_url,
-            'tenant_slug': tenant.slug,
-            'last_event': None,
+            'status': 'requires_attention' if requires_attention else 'connected',
+            'label': (
+                'Integração Pagar.me: requer atenção'
+                if requires_attention else
+                'Integração Pagar.me: conectada'
+            ),
         }
-
-        if last_event:
-            status_data['last_event'] = {
-                'received_at': last_event.received_at.isoformat(),
-                'processed': last_event.processed,
-                'error': last_event.processing_error,
-            }
 
         return Response(status_data)
 

@@ -41,6 +41,16 @@ class Payment(models.Model):
     def __str__(self):
         return f"Payment {self.uuid} - {self.status}"
 
+    @property
+    def status_display_pt(self):
+        return {
+            self.Status.PENDING: 'Pendente',
+            self.Status.PAID: 'Pago',
+            self.Status.FAILED: 'Recusado',
+            self.Status.REFUNDED: 'Estornado',
+            self.Status.CHARGEBACK: 'Chargeback',
+        }.get(self.status, self.status)
+
     def save(self, *args, **kwargs):
         if self.raw_callback_payload and isinstance(self.raw_callback_payload, dict):
             self.raw_callback_payload = scrub_payment_payload(self.raw_callback_payload)
@@ -49,9 +59,15 @@ class Payment(models.Model):
     @property
     def refusal_reason(self):
         payload = self.raw_callback_payload or {}
-        last_transaction = (payload.get('last_transaction') or {})
+        data = payload.get('data') if isinstance(payload.get('data'), dict) else payload
+        last_transaction = (data.get('last_transaction') or {})
         if last_transaction:
             return (last_transaction.get('refuse_reason')
+                    or last_transaction.get('refusal_reason')
                     or last_transaction.get('acquirer_message')
+                    or last_transaction.get('acquirer_return_message')
                     or last_transaction.get('status_reason'))
-        return payload.get('refuse_reason') or payload.get('acquirer_message')
+        return (data.get('refuse_reason')
+                or data.get('refusal_reason')
+                or data.get('acquirer_message')
+                or data.get('status_reason'))

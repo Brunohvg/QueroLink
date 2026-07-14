@@ -46,7 +46,7 @@
             {% elif order.status == 'COMPLETED' %}bg-emerald-500
             {% elif order.status == 'CANCELED' or order.status == 'EXPIRED' %}bg-red-500
             {% elif order.status == 'SUSPENDED' %}bg-amber-500{% endif %}"></span>
-          {{ order.get_status_display }}
+          {{ order.status_display_pt }}
         </span>
       </div>
     </div>
@@ -113,7 +113,7 @@
             {% elif payment.status == 'REFUNDED' %}bg-amber-500
             {% elif payment.status == 'CHARGEBACK' %}bg-red-500
             {% else %}bg-gray-400{% endif %}"></span>
-          {{ payment.get_status_display }}
+          {{ payment.status_display_pt }}
         </span>
         {% endif %}
       </div>
@@ -266,6 +266,24 @@
   <div class="bg-white rounded-2xl border border-gray-100 shadow-[0_1px_3px_-1px_rgba(0,0,0,0.04),0_4px_16px_-4px_rgba(67,97,238,0.06)] p-6">
     <h3 class="text-[12px] font-bold text-gray-400 uppercase tracking-widest mb-4">Acoes</h3>
     <div class="flex gap-3 flex-wrap">
+      {% if order.status == 'PENDING' %}
+      <form method="post" action="{% url 'dashboard:gestor_link_verificar_pagamento' order_uuid=order.uuid %}">
+        {% csrf_token %}
+        <button type="submit" class="inline-flex items-center gap-2 px-5 py-2.5 bg-brand-50 hover:bg-brand-100 text-brand-600 border border-brand-200 font-semibold rounded-xl transition-all text-[14px] active:scale-[0.97]">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.5 1.5a8.5 8.5 0 11-17 0 8.5 8.5 0 0117 0z"/></svg>
+          Verificar pagamento
+        </button>
+      </form>
+      {% endif %}
+      {% if payment_link and payment_link.gateway_url and order.seller %}
+      <form method="post" action="{% url 'dashboard:gestor_link_reenviar_vendedor' order_uuid=order.uuid %}">
+        {% csrf_token %}
+        <button type="submit" class="inline-flex items-center gap-2 px-5 py-2.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-600 border border-emerald-200 font-semibold rounded-xl transition-all text-[14px] active:scale-[0.97]">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8m-18 8h18a2 2 0 002-2V8a2 2 0 00-2-2H3a2 2 0 00-2 2v6a2 2 0 002 2z"/></svg>
+          Reenviar link ao vendedor
+        </button>
+      </form>
+      {% endif %}
       {% if order.status == 'PENDING' %}
       <form method="post" action="{% url 'dashboard:gestor_link_cancelar' order_uuid=order.uuid %}">
         {% csrf_token %}

@@ -228,13 +228,7 @@ def mobile_home(request):
                 sale_date__lte=period.end_date,
             ).aggregate(total=Sum('amount'))['total'] or 0
 
-            month_link_total = Sale.objects.filter(
-                seller=seller,
-                origin=Sale.Origin.LINK,
-                status='ATIVA',
-                sale_date__gte=period.start_date,
-                sale_date__lte=period.end_date,
-            ).aggregate(total=Sum('amount'))['total'] or 0
+            month_link_total = 0
 
             sc = SellerCommission.objects.filter(
                 seller=seller,
@@ -266,7 +260,7 @@ def mobile_home(request):
 
         periodo_status = period.status if period else None
 
-        combined_month_total = month_total + month_link_total
+        combined_month_total = month_total
         goal, goal_progress, goal_remaining = get_seller_goal_context(
             seller, today, combined_month_total,
         )
@@ -492,7 +486,7 @@ def mobile_minhas_vendas(request):
     regra CENTRAL `build_sale_change_permission_resolver` (mesma logica de
     `validate_sale_can_be_changed`, sem query por venda):
     - MANUAL + competencia editavel (ABERTA/REABERTA): pode editar/excluir.
-    - IMPORTADA / LINK / ESTORNADA: somente leitura.
+    - IMPORTADA / ESTORNADA: somente leitura.
     - competencia FECHADA/PAGA/CANCELADA bloqueia.
     - SellerCommission FECHADA/PAGA/AJUSTADA/CANCELADA bloqueia.
     - Venda MANUAL sem competencia que a contenha: permanece editavel.
@@ -533,7 +527,10 @@ def mobile_minhas_vendas(request):
     # Datas distintas com venda (1 query) -> deriva competencias com atividade
     # e detecta vendas orfas, sem carregar todas as vendas historicas no JSON.
     sale_days = list(
-        Sale.objects.filter(seller=seller).dates('sale_date', 'day')
+        Sale.objects.filter(
+            seller=seller,
+            origin__in=Sale.COMMISSION_ORIGINS,
+        ).dates('sale_date', 'day')
     )
     active_period_ids = set()
     has_orphan = False
@@ -664,7 +661,10 @@ def mobile_minhas_vendas(request):
             covered_any |= Q(
                 sale_date__gte=p.start_date, sale_date__lte=p.end_date,
             )
-        sales_qs = Sale.objects.filter(seller=seller)
+        sales_qs = Sale.objects.filter(
+            seller=seller,
+            origin__in=Sale.COMMISSION_ORIGINS,
+        )
         if covered_any:
             sales_qs = sales_qs.exclude(covered_any)
         sales_list = list(sales_qs.order_by('-sale_date', '-created_at'))
@@ -672,6 +672,7 @@ def mobile_minhas_vendas(request):
         sales_list = list(
             Sale.objects.filter(
                 seller=seller,
+                origin__in=Sale.COMMISSION_ORIGINS,
                 sale_date__gte=selected.start_date,
                 sale_date__lte=selected.end_date,
             ).order_by('-sale_date', '-created_at')
@@ -758,7 +759,10 @@ def mobile_minhas_vendas(request):
             covered_any |= Q(
                 sale_date__gte=p.start_date, sale_date__lte=p.end_date,
             )
-        orphan_qs = Sale.objects.filter(seller=seller)
+        orphan_qs = Sale.objects.filter(
+            seller=seller,
+            origin__in=Sale.COMMISSION_ORIGINS,
+        )
         if covered_any:
             orphan_qs = orphan_qs.exclude(covered_any)
         unassigned_count = orphan_qs.count()
@@ -892,7 +896,10 @@ def get_seller_goal_context(seller, today, combined_month_total):
     ).first()
     if not goal:
         return None, None, None
-    return goal, goal.progress_percent, max(0, goal.target_amount - combined_month_total)
+    progress = 0
+    if goal.target_amount > 0:
+        progress = min(100, int(combined_month_total * 100 / goal.target_amount))
+    return goal, progress, max(0, goal.target_amount - combined_month_total)
 
 
 def _get_seller_profile(request):
@@ -946,6 +953,7 @@ def mobile_ranking(request):
 
     ranking_qs = Sale.objects.filter(
         tenant=seller.tenant,
+        origin__in=Sale.COMMISSION_ORIGINS,
         status='ATIVA',
         sale_date__gte=current_period.start_date,
         sale_date__lte=current_period.end_date,
@@ -993,14 +1001,8 @@ def mobile_ranking(request):
         sale_date__gte=current_period.start_date,
         sale_date__lte=current_period.end_date,
     ).aggregate(total=Sum('amount'))['total'] or 0
-    month_link_total = Sale.objects.filter(
-        seller=seller,
-        origin=Sale.Origin.LINK,
-        status='ATIVA',
-        sale_date__gte=current_period.start_date,
-        sale_date__lte=current_period.end_date,
-    ).aggregate(total=Sum('amount'))['total'] or 0
-    combined_month_total = month_total_manual + month_link_total
+    month_link_total = 0
+    combined_month_total = month_total_manual
 
     goal, goal_progress, goal_remaining = get_seller_goal_context(
         seller, today, combined_month_total,
@@ -1108,7 +1110,7 @@ def mobile_links(request):
             'customer_name': o.customer_name,
             'total_amount': o.total_amount,
             'status': o.status,
-            'status_display': o.get_status_display(),
+            'status_display': o.status_display_pt,
             'link_url': link_url,
             'refusal_reason': refusal,
             'created_at': o.created_at.isoformat(),
