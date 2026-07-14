@@ -16,7 +16,7 @@ from django.utils.decorators import method_decorator
 from rest_framework_simplejwt.views import TokenObtainPairView
 from drf_spectacular.utils import extend_schema, OpenApiParameter, OpenApiTypes
 
-from app.apps.sales.models import Sale, SaleChangeLog
+from app.apps.sales.models import Sale, SaleChangeLog, SaleImportBatch
 from app.apps.sellers.models import Seller
 from app.apps.commissions.models import (
     CommissionPeriod,
@@ -325,124 +325,60 @@ class SaleViewSet(viewsets.ModelViewSet):
     @action(detail=False, methods=['post'], permission_classes=[IsAuthenticated, IsManagerOrAdmin], url_path='import/preview')
     def import_preview(self, request):
         file_obj = request.FILES.get('file')
-        if not file_obj:
-            return Response({'error': 'Arquivo obrigatorio.'}, status=400)
+        from app.apps.sales.services import create_import_preview
 
-        if file_obj.size > 5 * 1024 * 1024:
-            return Response({'error': 'Arquivo muito grande. Maximo 5MB.'}, status=400)
-
-        name = file_obj.name.lower()
-        content_bytes = file_obj.read()
-
-        from app.apps.sales.services import (
-            _parse_csv, _parse_xlsx, normalize_headers, preview_import_rows,
-        )
-        from hashlib import sha256
-        from app.apps.sales.models import SaleImportBatch
-
-        file_hash = sha256(content_bytes).hexdigest()
-
-        if name.endswith('.csv'):
-            content = None
-            for _enc in ('utf-8-sig', 'cp1252', 'latin-1'):
-                try:
-                    content = content_bytes.decode(_enc)
-                    break
-                except UnicodeDecodeError:
-                    continue
-            if content is None:
-                content = content_bytes.decode('utf-8', errors='replace')
-            rows = _parse_csv(content)
-        elif name.endswith('.xlsx'):
-            import io
-            rows = _parse_xlsx(content_bytes)
-            if rows is None:
-                return Response({'error': 'Arquivo XLSX invalido.'}, status=400)
-        else:
-            return Response({'error': 'Formato nao suportado. Envie CSV ou XLSX.'}, status=400)
-
-        if not rows or len(rows) < 2:
-            return Response({'error': 'Arquivo vazio ou sem dados.'}, status=400)
-
-        headers = rows[0]
-        data_rows = rows[1:]
-        header_map = normalize_headers(headers)
-
-        if 'date' not in header_map or 'seller' not in header_map or 'amount' not in header_map:
-            missing = []
-            if 'date' not in header_map:
-                missing.append('data')
-            if 'seller' not in header_map:
-                missing.append('vendedor')
-            if 'amount' not in header_map:
-                missing.append('valor')
-            return Response({
-                'error': f'Cabecalhos obrigatorios nao encontrados: {", ".join(missing)}.',
-            }, status=400)
-
-        if len(data_rows) > 500:
-            return Response({'error': 'Maximo 500 linhas por importacao.'}, status=400)
-
-        tenant = request.user.tenant
-        results = preview_import_rows(tenant, data_rows, header_map)
-
-        dupe_batch = SaleImportBatch.objects.filter(
-            tenant=tenant, file_hash=file_hash,
-        ).first()
-        already_imported = dupe_batch is not None
-
-        return Response({
-            'filename': file_obj.name,
-            'file_hash': file_hash,
-            'total_rows': len(data_rows),
-            'headers': headers,
-            'results': results,
-            'already_imported': already_imported,
-            'ok_count': sum(1 for r in results if r['status'] == 'ok'),
-            'duplicate_count': sum(1 for r in results if r['status'] == 'duplicate'),
-            'error_count': sum(1 for r in results if r['status'] == 'error'),
-            'needs_selection_count': sum(1 for r in results if r['status'] == 'needs_selection'),
-        })
+        try:
+            result = create_import_preview(
+                tenant=request.user.tenant,
+                user=request.user,
+                file_obj=file_obj,
+            )
+        except ValueError as exc:
+            return Response({'error': str(exc)}, status=400)
+        return Response(result)
 
     @action(detail=False, methods=['post'], permission_classes=[IsAuthenticated, IsManagerOrAdmin], url_path='import/confirm')
     def import_confirm(self, request):
-        confirmed = request.data.get('rows', [])
-        filename = request.data.get('filename', '')
-        file_hash = request.data.get('file_hash', '')
+        batch_uuid = request.data.get('batch_uuid')
+        if not batch_uuid and request.data.get('file_hash'):
+            batch = SaleImportBatch.objects.filter(
+                tenant=request.user.tenant,
+                uploaded_by=request.user,
+                file_hash=request.data.get('file_hash'),
+                status='PENDING',
+            ).order_by('-uploaded_at').first()
+            batch_uuid = str(batch.uuid) if batch else None
+        decisions = request.data.get('decisions') or {}
         force = request.data.get('force_reimport', False)
-
-        if not confirmed:
-            return Response({'error': 'Nenhuma linha para importar.'}, status=400)
-        if not filename or not file_hash:
-            return Response({'error': 'filename e file_hash obrigatorios.'}, status=400)
-
-        tenant = request.user.tenant
-
-        from app.apps.sales.models import SaleImportBatch
-        existing = SaleImportBatch.objects.filter(
-            tenant=tenant, file_hash=file_hash,
-        ).first()
-        if existing and not force:
-            return Response({
-                'error': 'Este arquivo ja foi importado. Use force_reimport para confirmar.',
-                'existing_batch_uuid': str(existing.uuid),
-            }, status=409)
+        if not batch_uuid:
+            return Response({'error': 'batch_uuid obrigatorio.'}, status=400)
+        if not isinstance(decisions, dict):
+            return Response({'error': 'Decisoes invalidas.'}, status=400)
 
         from app.apps.sales.services import import_sales as do_import
 
         try:
             result = do_import(
-                tenant, request.user, confirmed, filename, file_hash,
+                request.user.tenant,
+                request.user,
+                batch_uuid,
+                decisions,
+                force_reimport=bool(force),
             )
-        except ValueError as e:
-            return Response({'error': str(e)}, status=400)
+        except (ValueError, TypeError) as exc:
+            message = str(exc)
+            response_status = 409 if 'ja foi importado' in message else 400
+            return Response({'error': message}, status=response_status)
+        except SaleImportBatch.DoesNotExist:
+            return Response({'error': 'Batch invalido ou sem permissao.'}, status=404)
 
         log_action(
             request, 'sales_import',
             changes={
-                'filename': filename,
-                'file_hash': file_hash,
+                'filename': result['filename'],
+                'file_hash': result['file_hash'],
                 'created': result['created'],
+                'justifications_created': result['justifications_created'],
                 'duplicates': result['duplicates'],
                 'errors_count': len(result['errors']),
             },
