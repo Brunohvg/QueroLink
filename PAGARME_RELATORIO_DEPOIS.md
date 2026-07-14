@@ -63,7 +63,7 @@ Criada `webhooks.0006_webhookevent_attempt_count_and_more` para status/tentativa
 - `manage.py test app.apps.webhooks app.apps.notifications -v 2`: OK, 85 testes.
 - Teste focado final: OK, 33 testes.
 - `manage.py test -v 2`: executou 759 testes; falhou somente por expectativa antiga ainda esperando `Sale LINK` no reconcile. Expectativa corrigida e validada no teste focado final.
-- `manage.py test --parallel 4 -v 1`: iniciado para validação final acelerada; ainda em andamento no momento do commit devido janela de desligamento.
+- `manage.py test --parallel 4 -v 1`: OK, 759 testes, 1 skip.
 - `check --deploy`: OK com warnings existentes do drf_spectacular e placeholders locais obrigatórios.
 - `npm ci`: OK.
 - `npm run build:css`: OK.
