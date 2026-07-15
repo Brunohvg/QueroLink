@@ -20,6 +20,8 @@ A task misturava persistência financeira (`Payment`, `Order`, `Sale`, `WebhookE
 - Link pago confirma `Order`/`Payment`, mas não cria `Sale LINK` nova.
 - `Sale LINK` legada não aparece/soma em Minhas vendas, ranking e meta do vendedor.
 - Painel técnico de webhook removido da navegação normal do gestor; health root-only fica para próximo PR.
+- Ajuste pós-CI: locks PostgreSQL limitados ao registro base (`of=('self',)`) em correlações Pagar.me com joins nullable.
+- Ajuste pós-CI: deduplicação de `WebhookEvent` com retry/backoff para corrida de dupla confirmação no SQLite.
 
 ## Arquivos alterados
 
@@ -70,6 +72,11 @@ Criada `webhooks.0006_webhookevent_attempt_count_and_more` para status/tentativa
 - `docker compose config`: OK com placeholders locais obrigatórios, warning existente de `version` obsoleto.
 - `git diff --check`: OK.
 - Grep AGENTS JSON: `grep -rn "json.dumps\|_json.dumps" app/apps/dashboard/*.py | grep -v test` sem saída.
+- Pós-CI PR #27 em 15/07:
+  - `manage.py test app.apps.webhooks -v 2`: OK, 29 testes.
+  - `manage.py check`: OK.
+  - `manage.py makemigrations --check --dry-run`: OK, sem alterações.
+  - `git diff --check`: OK.
 
 ## Observação de escopo
 

@@ -90,7 +90,7 @@ def _resolve_order_for_paid_event(event_type, data):
             try:
                 from uuid import UUID
                 UUID(code)
-                order = Order.objects.select_for_update().select_related(
+                order = Order.objects.select_for_update(of=('self',)).select_related(
                     'tenant', 'seller',
                 ).get(uuid=code)
                 logger.info("order.paid resolvido via code (uuid)")
@@ -105,7 +105,7 @@ def _resolve_order_for_paid_event(event_type, data):
                     try:
                         payment_link = PaymentLink.objects.select_related(
                             'order__tenant', 'order__seller',
-                        ).select_for_update().get(gateway_link_id=link_id)
+                        ).select_for_update(of=('self',)).get(gateway_link_id=link_id)
                         order = payment_link.order
                         logger.info("order.paid resolvido via charges[0].payment_link_id")
                     except PaymentLink.DoesNotExist:
@@ -117,7 +117,7 @@ def _resolve_order_for_paid_event(event_type, data):
                 try:
                     payment = Payment.objects.select_related(
                         'order__tenant', 'order__seller',
-                    ).select_for_update().get(gateway_order_id=gateway_order_id)
+                    ).select_for_update(of=('self',)).get(gateway_order_id=gateway_order_id)
                     order = payment.order
                     logger.info("order.paid resolvido via Payment.gateway_order_id")
                 except Payment.DoesNotExist:
@@ -128,7 +128,7 @@ def _resolve_order_for_paid_event(event_type, data):
         try:
             payment_link = PaymentLink.objects.select_related(
                 'order__tenant', 'order__seller',
-            ).select_for_update().get(gateway_link_id=link_id)
+            ).select_for_update(of=('self',)).get(gateway_link_id=link_id)
             order = payment_link.order
         except PaymentLink.DoesNotExist:
             pass
@@ -140,7 +140,7 @@ def _resolve_order_for_paid_event(event_type, data):
             try:
                 from uuid import UUID
                 UUID(order_code)
-                order = Order.objects.select_for_update().select_related(
+                order = Order.objects.select_for_update(of=('self',)).select_related(
                     'tenant', 'seller',
                 ).get(uuid=order_code)
                 logger.info("charge.paid resolvido via order.code")
@@ -158,7 +158,7 @@ def _resolve_order_for_paid_event(event_type, data):
                 try:
                     payment_link = PaymentLink.objects.select_related(
                         'order__tenant', 'order__seller',
-                    ).select_for_update().get(gateway_link_id=link_id)
+                    ).select_for_update(of=('self',)).get(gateway_link_id=link_id)
                     order = payment_link.order
                 except PaymentLink.DoesNotExist:
                     pass
@@ -169,7 +169,7 @@ def _resolve_order_for_paid_event(event_type, data):
                 try:
                     payment = Payment.objects.select_related(
                         'order__tenant', 'order__seller',
-                    ).select_for_update().get(gateway_transaction_id=gateway_txn_id)
+                    ).select_for_update(of=('self',)).get(gateway_transaction_id=gateway_txn_id)
                     order = payment.order
                 except Payment.DoesNotExist:
                     pass
@@ -255,6 +255,10 @@ def _process_paid_locked_event(event, *, dry_run):
             order_uuid=str(order.uuid),
             message=reason,
         )
+
+    order = Order.objects.select_for_update(of=('self',)).select_related(
+        'tenant', 'seller',
+    ).get(uuid=order.uuid)
 
     payment = Payment.objects.select_for_update().filter(order=order).order_by('created_at').first()
     if not payment:

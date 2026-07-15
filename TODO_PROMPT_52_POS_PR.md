@@ -10,9 +10,22 @@ Data: 14/07/2026
 - Base: `querolink-v2`
 - Suíte paralela final: `.venv/bin/python manage.py test --parallel 4 -v 1` passou com 759 testes e 1 skip.
 
-## Pendente para amanhã
+## Continuação em 15/07/2026
 
-1. Conferir CI do PR #27 no GitHub.
+- CI do PR #27 conferido: `backend-sqlite` e `backend-postgres` falhavam.
+- Causa `backend-postgres`: `select_for_update()` tentava aplicar lock também ao lado nullable do join com `seller`.
+- Correção: limitar locks críticos a `of=('self',)` nos pontos de correlação Pagar.me.
+- Causa `backend-sqlite`: corrida de dupla confirmação podia bater em lock temporário ao criar/deduplicar `WebhookEvent`.
+- Correção: criação idempotente com tentativas/backoff para `IntegrityError`/`OperationalError`.
+- Gates locais pós-correção:
+  - `manage.py test app.apps.webhooks -v 2`: OK, 29 testes.
+  - `manage.py check`: OK.
+  - `manage.py makemigrations --check --dry-run`: OK, sem alterações.
+  - `git diff --check`: OK.
+
+## Ainda pendente
+
+1. Conferir CI do PR #27 no GitHub após push do ajuste de 15/07.
 2. Rodar auditoria do Prompt 52 contra o PR #27 antes de mergear.
 3. Conferir manualmente no app:
    - link pago aparece como `Pago`;

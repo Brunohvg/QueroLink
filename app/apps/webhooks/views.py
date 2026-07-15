@@ -5,7 +5,7 @@ import logging
 import time
 from datetime import timedelta
 
-from django.db import IntegrityError, OperationalError, transaction
+from django.db import IntegrityError, OperationalError
 from django.http import JsonResponse
 from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
@@ -27,21 +27,35 @@ def _get_or_create_webhook_event(gateway, payload, gateway_event_id=None, tenant
             tenant=tenant,
         ), True
 
-    for attempt in range(3):
+    for attempt in range(6):
         try:
-            with transaction.atomic():
-                return WebhookEvent.objects.get_or_create(
-                    gateway=gateway,
-                    gateway_event_id=gateway_event_id,
-                    defaults={
-                        'payload': payload,
-                        'tenant': tenant,
-                    },
-                )
-        except (IntegrityError, OperationalError):
-            if attempt == 2:
+            event = WebhookEvent.objects.filter(
+                gateway=gateway,
+                gateway_event_id=gateway_event_id,
+            ).first()
+            if event:
+                return event, False
+
+            return WebhookEvent.objects.create(
+                gateway=gateway,
+                gateway_event_id=gateway_event_id,
+                payload=payload,
+                tenant=tenant,
+            ), True
+        except IntegrityError:
+            event = WebhookEvent.objects.filter(
+                gateway=gateway,
+                gateway_event_id=gateway_event_id,
+            ).first()
+            if event:
+                return event, False
+            if attempt == 5:
                 raise
-            time.sleep(0.05)
+            time.sleep(0.05 * (attempt + 1))
+        except OperationalError:
+            if attempt == 5:
+                raise
+            time.sleep(0.05 * (attempt + 1))
 
     return WebhookEvent.objects.get(
         gateway=gateway,
