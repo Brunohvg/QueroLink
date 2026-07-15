@@ -1042,8 +1042,16 @@ def gestor_link_estornar(request, order_uuid):
         body = json_module.loads(request.body) if request.body else {}
     except Exception:
         body = {}
-    amount = body.get('amount')
-    is_partial = bool(amount and amount > 0)
+    raw_amount = body.get('amount')
+    try:
+        amount = int(raw_amount) if raw_amount not in (None, '') else 0
+    except (TypeError, ValueError):
+        return JsonResponse({'error': 'Valor de estorno invalido.'}, status=400)
+    if amount < 0:
+        return JsonResponse({'error': 'Valor de estorno invalido.'}, status=400)
+    if amount > order.total_amount:
+        return JsonResponse({'error': 'Valor de estorno maior que o pagamento.'}, status=400)
+    is_partial = amount > 0
 
     from app.services.gateway.pagar_me import PagarMeGateway
     try:
