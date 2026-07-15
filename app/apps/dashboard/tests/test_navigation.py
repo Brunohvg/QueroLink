@@ -91,6 +91,13 @@ class NavigationPerformanceRegressionTests(TestCase):
         self.assertIn('!s.has_day_resolved_today', source)
         self.assertNotIn('!s.has_sale_today', source)
 
+    def test_pagarme_health_card_has_actionable_copy(self):
+        source = Path('templates/dashboard/gestor/home.html').read_text()
+        self.assertNotIn('Requer atenção</p>', source)
+        self.assertIn('Webhooks pendentes', source)
+        self.assertIn('Verificar eventos', source)
+        self.assertIn('Configurar Pagar.me', source)
+
     def test_links_prefetches_payments(self):
         source = Path('app/apps/dashboard/desktop_views.py').read_text()
         links_view = source.split('def gestor_links', 1)[1].split(

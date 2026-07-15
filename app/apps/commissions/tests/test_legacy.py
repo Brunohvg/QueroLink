@@ -1,5 +1,7 @@
 from datetime import date
 from decimal import Decimal
+from io import BytesIO
+from zipfile import ZipFile
 from unittest.mock import patch
 
 from django.test import TestCase
@@ -382,6 +384,49 @@ class TestAccountingExportPreviousPeriod(BaseTest):
 
         self.assertEqual(context['prev_total'], 0)
         self.assertIsNone(context['variacao'])
+
+    def test_accounting_export_excludes_link_sales(self):
+        period = CommissionPeriod.objects.create(
+            tenant=self.tenant,
+            month=7,
+            year=2026,
+            label='21/06 a 20/07',
+            start_date=date(2026, 6, 21),
+            end_date=date(2026, 7, 20),
+        )
+        Sale.objects.create(
+            tenant=self.tenant,
+            seller=self.seller,
+            origin=Sale.Origin.MANUAL,
+            status='ATIVA',
+            amount=10000,
+            sale_date=date(2026, 7, 10),
+            created_by=self.manager,
+        )
+        Sale.objects.create(
+            tenant=self.tenant,
+            seller=self.seller,
+            origin=Sale.Origin.LINK,
+            status='ATIVA',
+            amount=56160,
+            sale_date=date(2026, 7, 14),
+            created_by=self.manager,
+        )
+
+        with patch('app.apps.commissions.exports.HTML') as html_mock:
+            html_mock.return_value.write_pdf.return_value = b'%PDF'
+            zip_bytes = build_accounting_zip(self.tenant, period.month, period.year)
+
+        with ZipFile(BytesIO(zip_bytes)) as zf:
+            vendas = zf.read('vendas_07_2026.csv').decode('utf-8-sig')
+            resumo = zf.read('resumo_07_2026.csv').decode('utf-8-sig')
+
+        self.assertIn('10/07/2026;Bruno', vendas)
+        self.assertIn('100,00', vendas)
+        self.assertNotIn('14/07/2026', vendas)
+        self.assertNotIn('561,60', vendas)
+        self.assertNotIn(';Link;', vendas)
+        self.assertIn(';100,00;', resumo)
 
 
 class TestGetOrCreatePeriod(BaseTest):
