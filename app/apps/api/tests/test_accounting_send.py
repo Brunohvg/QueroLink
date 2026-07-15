@@ -182,6 +182,7 @@ class AccountingSendTest(TestCase):
             self.period.month,
             self.period.year,
             requested_by_user_id=str(self.admin.pk),
+            period_uuid=str(self.period.uuid),
         )
 
     def test_already_sent_without_force_returns_409(self):

@@ -75,13 +75,6 @@ class CommissionPeriod(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
-        constraints = [
-            models.UniqueConstraint(
-                fields=['tenant', 'month', 'year'],
-                condition=~models.Q(status='CANCELADA'),
-                name='unique_period_per_tenant',
-            ),
-        ]
         indexes = [
             models.Index(fields=['tenant', 'status']),
             models.Index(fields=['month', 'year']),
@@ -111,8 +104,6 @@ class CommissionPeriod(models.Model):
         if self.start_date and self.end_date:
             if self.end_date < self.start_date:
                 errors['end_date'] = 'Data final deve ser maior ou igual a data inicial.'
-            elif (self.end_date - self.start_date).days + 1 > 62:
-                errors['end_date'] = 'Competencia nao pode exceder 62 dias.'
             overlap = CommissionPeriod.objects.filter(
                 tenant=self.tenant,
                 start_date__lte=self.end_date,

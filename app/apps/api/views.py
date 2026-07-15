@@ -632,6 +632,7 @@ class CommissionPeriodViewSet(viewsets.ModelViewSet):
             period.month,
             period.year,
             requested_by_user_id=str(request.user.pk),
+            period_uuid=str(period.uuid),
         )
 
         log_action(

@@ -23,8 +23,8 @@ def _fmt_br(val):
     return f'{val/100:,.2f}'.replace(',', 'X').replace('.', ',').replace('X', '.')
 
 
-def build_accounting_zip(tenant, month_int, year_int):
-    period = get_period_by_legacy_label(tenant, month_int, year_int)
+def build_accounting_zip(tenant, month_int, year_int, period=None):
+    period = period or get_period_by_legacy_label(tenant, month_int, year_int)
     if period:
         start = period.start_date
         end = period.end_date
