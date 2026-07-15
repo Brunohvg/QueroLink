@@ -73,7 +73,18 @@ Depois de atualizar o `.env`, reinicie o worker e o beat:
 docker compose up -d --force-recreate celery_worker celery_beat
 ```
 
-Depois teste dentro do container do worker:
+Depois teste dentro do container do worker usando os comandos padrão:
+
+```bash
+python manage.py backup_check
+python manage.py backup_now
+```
+
+`backup_check` valida rclone/Google Drive sem gerar dump do banco.
+
+`backup_now` executa o backup manual chamando `/app/scripts/backup.sh`.
+
+Se precisar diagnosticar manualmente, use:
 
 ```bash
 rclone listremotes
