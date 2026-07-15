@@ -69,6 +69,16 @@ Toda entrega termina com (saídas coladas no relatório):
 
 Relatório final sempre no formato: problema → causa → arquivos alterados → migrations → evidências dos gates.
 
-## 9. QUANDO EM DÚVIDA
+## 9. RELEASES, TAGS E ROLLBACK
+
+- `main` preserva o estado funcional/produção quando explicitamente solicitado.
+- `querolink-v2` é a branch de integração ativa.
+- Antes de mudanças estruturais ou de maior risco, preservar o último estado funcional com uma tag `prod-*`.
+- Versões novas para teste/deploy devem ser marcadas com tag `rc-*`.
+- Tags são pontos fixos: branch anda, tag não anda.
+- Nunca mover, recriar ou apagar tag `prod-*` sem autorização explícita.
+- O fluxo operacional completo está em `docs/RELEASE_TAGS.md`.
+
+## 10. QUANDO EM DÚVIDA
 
 Pare e pergunte. Uma pergunta custa um turno; uma "decisão criativa" já custou deploys inteiros neste projeto.
