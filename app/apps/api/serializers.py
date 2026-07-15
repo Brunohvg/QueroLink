@@ -521,6 +521,11 @@ class SellerCommissionReadSerializer(serializers.ModelSerializer):
     )
     adjustments = CommissionAdjustmentSerializer(many=True, read_only=True)
     is_editable = serializers.BooleanField(read_only=True)
+    launched_days_count = serializers.SerializerMethodField()
+    justified_days_count = serializers.SerializerMethodField()
+    pending_days_count = serializers.SerializerMethodField()
+    non_working_days_count = serializers.SerializerMethodField()
+    resolved_days_count = serializers.SerializerMethodField()
 
     class Meta:
         model = SellerCommission
@@ -529,6 +534,9 @@ class SellerCommissionReadSerializer(serializers.ModelSerializer):
             'status', 'operational_status',
             'total_sold_amount', 'commission_rate', 'commission_amount',
             'expected_working_days', 'submitted_days_count', 'missing_days_count',
+            'launched_days_count', 'justified_days_count',
+            'pending_days_count', 'non_working_days_count',
+            'resolved_days_count',
             'frozen_total_sold_amount', 'frozen_commission_rate',
             'frozen_commission_amount',
             'period_status',
@@ -538,6 +546,32 @@ class SellerCommissionReadSerializer(serializers.ModelSerializer):
             'adjustments', 'is_editable',
         ]
         read_only_fields = fields
+
+    def _day_summary(self, obj):
+        summaries = self.context.get('day_summaries') or {}
+        return summaries.get(obj.seller_id) or {}
+
+    def get_launched_days_count(self, obj):
+        return self._day_summary(obj).get(
+            'launched_days_count', obj.submitted_days_count,
+        )
+
+    def get_justified_days_count(self, obj):
+        return self._day_summary(obj).get('justified_days_count', 0)
+
+    def get_pending_days_count(self, obj):
+        return self._day_summary(obj).get(
+            'pending_days_count', obj.missing_days_count,
+        )
+
+    def get_non_working_days_count(self, obj):
+        return self._day_summary(obj).get('non_working_days_count', 0)
+
+    def get_resolved_days_count(self, obj):
+        return self._day_summary(obj).get(
+            'resolved_days_count',
+            obj.submitted_days_count,
+        )
 
 
 class CommissionPeriodSerializer(serializers.ModelSerializer):
@@ -573,7 +607,12 @@ class CommissionPeriodSerializer(serializers.ModelSerializer):
                 result.append(temp)
             else:
                 result.append(sc)
-        return SellerCommissionReadSerializer(result, many=True).data
+        from app.apps.commissions.day_status import get_period_summary_bulk
+        sellers = [sc.seller for sc in result]
+        day_summaries = get_period_summary_bulk(obj.tenant, obj, sellers)
+        return SellerCommissionReadSerializer(
+            result, many=True, context={'day_summaries': day_summaries},
+        ).data
 
     def get_is_current_month(self, obj):
         hoje = timezone.localdate()

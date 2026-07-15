@@ -42,13 +42,34 @@ def _settled_range(period, reference_date=None):
 
 
 def _empty_summary(period_editable):
+    return _summary_from_counts(
+        {LANCADO: 0, JUSTIFICADO: 0, PENDENTE: 0, NAO_UTIL: 0},
+        period_editable,
+    )
+
+
+def _summary_from_counts(counts, period_editable):
+    launched = counts[LANCADO]
+    justified = counts[JUSTIFICADO]
+    pending = counts[PENDENTE]
+    non_working = counts[NAO_UTIL]
+    resolved = launched + justified
+    expected = launched + justified + pending
+    operational_status = 'PRONTO' if pending == 0 else 'PENDENTE'
     return {
-        'lancados': 0,
-        'justificados': 0,
-        'pendentes': 0,
-        'nao_util': 0,
-        'pending_days': 0,
-        'operational_status': 'PRONTO',
+        'launched_days_count': launched,
+        'justified_days_count': justified,
+        'pending_days_count': pending,
+        'non_working_days_count': non_working,
+        'expected_working_days': expected,
+        'resolved_days_count': resolved,
+        'operational_status': operational_status,
+        # Aliases legados mantidos para compatibilidade das telas/APIs atuais.
+        'lancados': launched,
+        'justificados': justified,
+        'pendentes': pending,
+        'nao_util': non_working,
+        'pending_days': pending,
         'period_editable': period_editable,
     }
 
@@ -120,18 +141,9 @@ def get_period_day_statuses(tenant, seller, period, reference_date=None, sc=None
         days.append(day)
         d += timedelta(days=1)
 
-    pending_days = counts[PENDENTE]
     return {
         'days': days,
-        'summary': {
-            'lancados': counts[LANCADO],
-            'justificados': counts[JUSTIFICADO],
-            'pendentes': pending_days,
-            'nao_util': counts[NAO_UTIL],
-            'pending_days': pending_days,
-            'operational_status': 'PRONTO' if pending_days == 0 else 'PENDENTE',
-            'period_editable': period_editable,
-        },
+        'summary': _summary_from_counts(counts, period_editable),
     }
 
 
@@ -207,14 +219,7 @@ def get_period_summary_bulk(tenant, period, sellers, reference_date=None):
                 counts[JUSTIFICADO] += 1
             else:
                 counts[PENDENTE] += 1
-        pending_days = counts[PENDENTE]
-        result[s.pk] = {
-            'lancados': counts[LANCADO],
-            'justificados': counts[JUSTIFICADO],
-            'pendentes': pending_days,
-            'nao_util': counts[NAO_UTIL],
-            'pending_days': pending_days,
-            'operational_status': 'PRONTO' if pending_days == 0 else 'PENDENTE',
-            'period_editable': _editable(sc_by_seller.get(s.pk)),
-        }
+        result[s.pk] = _summary_from_counts(
+            counts, _editable(sc_by_seller.get(s.pk)),
+        )
     return result

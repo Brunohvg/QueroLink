@@ -178,6 +178,7 @@ class SellerViewSet(viewsets.ModelViewSet):
             launched = summary.get('lancados', 0)
             justified = summary.get('justificados', 0)
             pending = summary.get('pendentes', 0)
+            resolved = launched + justified
             if launched == 0 and justified == 0:
                 operational_status = 'SEM_LANCAMENTO'
             else:
@@ -189,8 +190,15 @@ class SellerViewSet(viewsets.ModelViewSet):
                 **SellerSerializer(seller).data,
                 'month_total': month_total,
                 'commission_amount': commission_amount,
-                'submitted_days': launched + justified,
-                'expected_days': launched + justified + pending,
+                'submitted_days': launched,
+                'launched_days_count': launched,
+                'justified_days_count': justified,
+                'pending_days_count': pending,
+                'non_working_days_count': summary.get('nao_util', 0),
+                'resolved_days_count': resolved,
+                'expected_days': summary.get(
+                    'expected_working_days', resolved + pending,
+                ),
                 'operational_status': operational_status,
                 'financial_status': (
                     commission.status if commission else 'SEM_COMISSAO'

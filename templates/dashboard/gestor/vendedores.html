@@ -79,7 +79,7 @@
         <thead>
           <tr class="bg-gray-50/80">
             <th class="px-4 py-3 text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Vendedor</th>
-            <th class="px-4 py-3 text-[11px] font-semibold text-gray-500 uppercase tracking-wider hidden md:table-cell">Dias</th>
+            <th class="px-4 py-3 text-[11px] font-semibold text-gray-500 uppercase tracking-wider hidden md:table-cell" title="Lançados / Justificados / Pendentes">Dias</th>
             <th class="px-4 py-3 text-[11px] font-semibold text-gray-500 uppercase tracking-wider hidden md:table-cell">Operac.</th>
             <th class="px-4 py-3 text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Total competencia</th>
             <th class="px-4 py-3 text-[11px] font-semibold text-gray-500 uppercase tracking-wider hidden sm:table-cell">Comissao</th>
@@ -111,7 +111,9 @@
                   </div>
                 </div>
               </td>
-              <td class="px-4 py-3.5 text-[13px] text-gray-700 hidden md:table-cell" x-text="(s.submitted_days || 0) + '/' + (s.expected_days || 22)"></td>
+              <td class="px-4 py-3.5 text-[12px] text-gray-700 hidden md:table-cell"
+                  :title="'Lançados: '+(s.launched_days_count||0)+' • Justificados: '+(s.justified_days_count||0)+' • Pendentes: '+(s.pending_days_count||0)+' • Esperados: '+(s.expected_days||0)"
+                  x-text="'Lançados: '+(s.launched_days_count||0)+' • Justificados: '+(s.justified_days_count||0)+' • Pendentes: '+(s.pending_days_count||0)"></td>
               <td class="px-4 py-3.5 hidden md:table-cell">
                 <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-medium"
                       :class="{'bg-emerald-50 text-emerald-700': s.operational_status==='PRONTO', 'bg-amber-50 text-amber-700': s.operational_status==='PENDENTE', 'bg-gray-100 text-gray-600': s.operational_status==='SEM_LANCAMENTO'}">
