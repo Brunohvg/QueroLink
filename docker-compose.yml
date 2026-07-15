@@ -71,7 +71,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    command: celery -A app.config worker --loglevel=info --concurrency=2 --time-limit=600 --soft-time-limit=540
+    command: celery -A app.config worker --loglevel=info --concurrency=2 --time-limit=1200 --soft-time-limit=1080
     restart: always
     stop_grace_period: 5m
     env_file:

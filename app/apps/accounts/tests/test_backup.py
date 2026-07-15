@@ -10,6 +10,7 @@ from django.test import TestCase
 
 MOCK_RCLONE_SUCCESS = """#!/bin/bash
 case "$1" in
+    mkdir) exit 0 ;;
     copyto) exit 0 ;;
     listremotes) echo 'gdrive:' ;;
     lsf) echo "querolink_2026-01-01_000000.dump" ;;
@@ -44,7 +45,7 @@ class DailyBackupTaskTest(TestCase):
 
         mock_run.assert_called_once_with(
             ['/app/scripts/backup.sh'],
-            capture_output=True, text=True, timeout=300,
+            capture_output=True, text=True, timeout=900,
             check=True,
         )
 
@@ -185,6 +186,7 @@ class BackupScriptParsingTest(TestCase):
         pg = self._make_bin("mock_pg_dump", MOCK_PG_DUMP_SUCCESS)
         rc_fail = self._make_bin("mock_rclone_fail", """#!/bin/bash
 case "$1" in
+    mkdir) exit 0 ;;
     copyto) echo 'upload failed' >&2; exit 1 ;;
     listremotes) echo 'gdrive:' ;;
     *) exit 0 ;;
@@ -204,6 +206,7 @@ esac
         pg = self._make_bin("mock_pg_dump", MOCK_PG_DUMP_SUCCESS)
         rc_empty_lsf = self._make_bin("mock_rclone_empty", """#!/bin/bash
 case "$1" in
+    mkdir) exit 0 ;;
     copyto) exit 0 ;;
     listremotes) echo 'gdrive:' ;;
     lsf) echo "" ; exit 0 ;;
@@ -225,6 +228,7 @@ esac
         pg = self._make_bin("mock_pg_dump", MOCK_PG_DUMP_SUCCESS)
         rc_no_old = self._make_bin("mock_rclone_no_old", """#!/bin/bash
 case "$1" in
+    mkdir) exit 0 ;;
     copyto) exit 0 ;;
     listremotes) echo 'gdrive:' ;;
     lsf) echo "some_querolink_file.dump" ;;
