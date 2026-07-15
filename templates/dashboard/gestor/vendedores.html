@@ -14,6 +14,7 @@
         </p>
       </div>
       <div class="flex items-center gap-2">
+        {% include 'components/_period_selector.html' with periods=periods selected_period_uuid=selected_period_uuid has_periods=has_periods %}
         <button @click="showImportModal = true"
                 class="inline-flex items-center gap-2 bg-white border border-gray-200 hover:border-gray-300 text-gray-700 font-medium py-2.5 px-4 rounded-xl transition-all text-[14px] shadow-sm hover:shadow active:scale-[0.97]">
           <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5 5 5-5M12 15V3"></path></svg>
@@ -26,6 +27,9 @@
         </button>
       </div>
     </div>
+    {% if selected_period %}
+    <p class="text-[12px] text-gray-500 mt-2">Competencia <span class="font-semibold">{{ selected_period.display_label }}</span> · {{ selected_period.start_date|date:"d/m/Y" }} a {{ selected_period.end_date|date:"d/m/Y" }}</p>
+    {% endif %}
   </div>
 
     <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4 mb-8">
@@ -75,9 +79,9 @@
         <thead>
           <tr class="bg-gray-50/80">
             <th class="px-4 py-3 text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Vendedor</th>
-            <th class="px-4 py-3 text-[11px] font-semibold text-gray-500 uppercase tracking-wider hidden md:table-cell">Dias</th>
+            <th class="px-4 py-3 text-[11px] font-semibold text-gray-500 uppercase tracking-wider hidden md:table-cell" title="Lançados / Justificados / Pendentes">Dias</th>
             <th class="px-4 py-3 text-[11px] font-semibold text-gray-500 uppercase tracking-wider hidden md:table-cell">Operac.</th>
-            <th class="px-4 py-3 text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Total mes</th>
+            <th class="px-4 py-3 text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Total competencia</th>
             <th class="px-4 py-3 text-[11px] font-semibold text-gray-500 uppercase tracking-wider hidden sm:table-cell">Comissao</th>
             <th class="px-4 py-3 text-[11px] font-semibold text-gray-500 uppercase tracking-wider hidden lg:table-cell">Status</th>
             <th class="px-4 py-3 text-[11px] font-semibold text-gray-500 uppercase tracking-wider hidden lg:table-cell">Ult. lanc.</th>
@@ -94,7 +98,7 @@
                     <span x-text="(s.name||'?')[0].toUpperCase()"></span>
                   </div>
                   <div>
-                    <a :href="'/dashboard/gestor/vendedores/' + s.uuid + '/'" class="text-[14px] font-semibold text-gray-900 hover:text-brand-600 transition-colors" x-text="s.name"></a>
+                    <a :href="detailUrl(s)" class="text-[14px] font-semibold text-gray-900 hover:text-brand-600 transition-colors" x-text="s.name"></a>
                     <p class="text-[11px] text-gray-400">
                       <span x-text="s.phone || 'Sem telefone'"></span>
                       <template x-if="s.cpf_formatted">
@@ -107,7 +111,9 @@
                   </div>
                 </div>
               </td>
-              <td class="px-4 py-3.5 text-[13px] text-gray-700 hidden md:table-cell" x-text="(s.submitted_days || 0) + '/' + (s.expected_days || 22)"></td>
+              <td class="px-4 py-3.5 text-[12px] text-gray-700 hidden md:table-cell"
+                  :title="'Lançados: '+(s.launched_days_count||0)+' • Justificados: '+(s.justified_days_count||0)+' • Pendentes: '+(s.pending_days_count||0)+' • Esperados: '+(s.expected_days||0)"
+                  x-text="'Lançados: '+(s.launched_days_count||0)+' • Justificados: '+(s.justified_days_count||0)+' • Pendentes: '+(s.pending_days_count||0)"></td>
               <td class="px-4 py-3.5 hidden md:table-cell">
                 <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-medium"
                       :class="{'bg-emerald-50 text-emerald-700': s.operational_status==='PRONTO', 'bg-amber-50 text-amber-700': s.operational_status==='PENDENTE', 'bg-gray-100 text-gray-600': s.operational_status==='SEM_LANCAMENTO'}">
@@ -128,7 +134,8 @@
                         'bg-sky-50 text-sky-700': s.financial_status==='AJUSTADA',
                         'bg-purple-50 text-purple-700': s.financial_status==='REABERTA',
                         'bg-red-50 text-red-700': s.financial_status==='CANCELADA',
-                        'bg-gray-100 text-gray-600': s.financial_status==='ABERTA'
+                        'bg-gray-100 text-gray-600': s.financial_status==='ABERTA',
+                        'bg-slate-50 text-slate-600': s.financial_status==='SEM_COMISSAO'
                       }">
                   <span class="w-1.5 h-1.5 rounded-full"
                         :class="{
@@ -139,7 +146,8 @@
                           'bg-sky-500': s.financial_status==='AJUSTADA',
                           'bg-purple-500': s.financial_status==='REABERTA',
                           'bg-red-500': s.financial_status==='CANCELADA',
-                          'bg-gray-400': s.financial_status==='ABERTA'
+                          'bg-gray-400': s.financial_status==='ABERTA',
+                          'bg-slate-400': s.financial_status==='SEM_COMISSAO'
                         }"></span>
                   <span x-text="
                     s.financial_status==='PAGA' ? 'Paga' :
@@ -149,11 +157,12 @@
                     s.financial_status==='AJUSTADA' ? 'Ajustada' :
                     s.financial_status==='REABERTA' ? 'Reaberta' :
                     s.financial_status==='CANCELADA' ? 'Cancelada' :
+                    s.financial_status==='SEM_COMISSAO' ? 'Sem comissão' :
                     s.financial_status || 'Aberta'"></span>
                 </span>
               </td>
               <td class="px-4 py-3.5 text-[13px] text-gray-500 hidden lg:table-cell">
-                <span x-text="s.last_sale_date || '—'"></span>
+                <span x-text="s.last_sale_date ? formatCivilDate(s.last_sale_date) : '—'"></span>
                 <span x-show="s.has_sale_today" class="ml-1.5 inline-flex items-center gap-1 px-1.5 py-0.5 bg-emerald-50 text-emerald-600 rounded-full text-[10px] font-medium">
                   <span class="w-1 h-1 rounded-full bg-emerald-500"></span>
                   Hoje
@@ -161,7 +170,7 @@
               </td>
               <td class="px-4 py-3.5 text-right">
                 <div class="flex justify-end gap-0.5">
-                  <a :href="'/dashboard/gestor/vendedores/' + s.uuid + '/'" class="p-2 text-gray-400 hover:text-brand-500 rounded-lg hover:bg-brand-50 transition-all" title="Ver detalhes">
+                  <a :href="detailUrl(s)" class="p-2 text-gray-400 hover:text-brand-500 rounded-lg hover:bg-brand-50 transition-all" title="Ver detalhes">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
                   </a>
                   <button @click="openEditModal(s)" class="p-2 text-gray-400 hover:text-brand-500 rounded-lg hover:bg-brand-50 transition-all" title="Editar">
@@ -180,7 +189,12 @@
               </td>
             </tr>
           </template>
-          <tr x-show="!filteredSellers.length">
+          <tr x-show="loading">
+            <td colspan="8" class="text-center py-12 text-[14px] text-gray-400">
+              Carregando vendedores...
+            </td>
+          </tr>
+          <tr x-show="!loading && !filteredSellers.length">
             <td colspan="8" class="text-center py-12">
               <div class="w-14 h-14 mx-auto mb-4 rounded-2xl bg-gray-50 flex items-center justify-center">
                 <svg class="w-7 h-7 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
@@ -194,7 +208,7 @@
     </div>
   </div>
 
-  <div x-show="showModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm" @click.self="showModal=false">
+  <div x-show="showModal" x-cloak class="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm" @click.self="showModal=false">
     <div class="bg-white rounded-2xl shadow-xl p-6 w-full max-w-md mx-4" @click.stop>
       <div class="flex items-center gap-3 mb-5">
         <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-brand-400 to-brand-500 flex items-center justify-center shadow-sm">
@@ -237,7 +251,7 @@
     </div>
   </div>
 
-  <div x-show="showPasswordModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm" @click.self="showPasswordModal=false">
+  <div x-show="showPasswordModal" x-cloak class="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm" @click.self="showPasswordModal=false">
     <div class="bg-white rounded-2xl shadow-xl p-6 w-full max-w-sm mx-4 text-center">
       <div class="w-14 h-14 mx-auto mb-4 rounded-2xl bg-gradient-to-br from-emerald-400 to-emerald-500 flex items-center justify-center shadow-sm">
         <svg class="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
@@ -252,7 +266,7 @@
     </div>
   </div>
 
-  <div x-show="showImportModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm" @click.self="showImportModal=false">
+  <div x-show="showImportModal" x-cloak class="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm" @click.self="showImportModal=false">
     <div class="bg-white rounded-2xl shadow-xl p-6 w-full max-w-lg mx-4">
       <div class="flex items-center gap-3 mb-5">
         <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-400 to-emerald-500 flex items-center justify-center shadow-sm">
@@ -303,7 +317,7 @@
     </div>
   </div>
 
-  <div x-show="showDeleteModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm" @click.self="showDeleteModal=false">
+  <div x-show="showDeleteModal" x-cloak class="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm" @click.self="showDeleteModal=false">
     <div class="bg-white rounded-2xl shadow-xl p-6 w-full max-w-sm mx-4 text-center">
       <div class="w-14 h-14 mx-auto mb-4 rounded-2xl bg-red-50 flex items-center justify-center">
         <svg class="w-7 h-7 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"/></svg>
@@ -350,7 +364,7 @@ function maskCpf(path) {
 
 function vendedoresPage() {
     return {
-        sellers: [], search: '', filterStatus: 'todos',
+        sellers: [], search: '', filterStatus: 'todos', loading: true,
         showModal: false, editing: false, showPasswordModal: false,
         showImportModal: false, importing: false, selectedFile: null, importResult: null,
         showDeleteModal: false, deletingSeller: null,
@@ -379,48 +393,39 @@ function vendedoresPage() {
             obj[keys[keys.length - 1]] = value;
         },
         async loadSellers() {
-            var r = await fetch('/api/sellers/');
-            var list = await r.json();
-            var hoje = new Date();
-            var mes = hoje.getMonth() + 1;
-            var ano = hoje.getFullYear();
-            var enriched = await Promise.all(list.map(async (s) => {
-                var detail = { month_total: 0, commission_amount: 0, submitted_days: 0, expected_days: 22, operational_status: 'SEM_LANCAMENTO', financial_status: 'ABERTA', last_sale_date: null, has_sale_today: false };
-                try {
-                    var d = await fetch('/api/manager/seller/' + s.uuid + '/?month=' + mes + '&year=' + ano).then(r => r.json());
-                    detail.month_total = d.manual_total || 0;
-                    if (d.commissions && d.commissions.length) {
-                        var c = d.commissions[0];
-                        detail.commission_amount = c.commission_amount || 0;
-                        detail.financial_status = c.status || c.period_status || 'ABERTA';
-                        detail.submitted_days = c.submitted_days_count || 0;
-                        detail.expected_days = c.expected_working_days || 22;
-                        detail.operational_status = c.operational_status || 'SEM_LANCAMENTO';
-                    }
-                    if (d.manual_sales && d.manual_sales.length) {
-                        var last = d.manual_sales[0];
-                        detail.last_sale_date = new Date(last.sale_date).toLocaleDateString('pt-BR');
-                        detail.has_sale_today = last.sale_date === new Date().toISOString().split('T')[0];
-                    }
-                } catch(e) {}
-                return Object.assign({}, s, detail);
-            }));
-            this.sellers = enriched;
-            this.stats.total = enriched.length;
-            this.stats.ativos = enriched.filter(s => s.is_active).length;
-            this.stats.comVendaNoMes = enriched.filter(s => s.month_total > 0).length;
-            this.stats.prontos = enriched.filter(s => s.operational_status === 'PRONTO').length;
-            this.stats.pendentes = enriched.filter(s => s.operational_status === 'PENDENTE').length;
-            this.stats.semLancamento = enriched.filter(s => s.operational_status === 'SEM_LANCAMENTO').length;
-            this.stats.cancelados = enriched.filter(s => s.financial_status === 'CANCELADA').length;
-            this.stats.semLancamentoHoje = enriched.filter(s => s.is_active && !s.has_sale_today).length;
-            this.stats.comissaoAberta = enriched.reduce((a, s) => s.financial_status === 'ABERTA' ? a + (s.commission_amount || 0) : a, 0);
-            this.stats.comissaoPaga = enriched.reduce((a, s) => s.financial_status === 'PAGA' ? a + (s.commission_amount || 0) : a, 0);
-            this.stats.comissaoFechada = enriched.reduce((a, s) => s.financial_status === 'FECHADA' || s.financial_status === 'PARCIALMENTE_FECHADA' ? a + (s.commission_amount || 0) : a, 0);
-            this.stats.comissaoCancelada = enriched.reduce((a, s) => s.financial_status === 'CANCELADA' ? a + (s.commission_amount || 0) : a, 0);
+            this.loading = true;
+            try {
+                var pageParams = new URLSearchParams(window.location.search);
+                var periodUuid = pageParams.get('period') || '';
+                var qs = periodUuid ? ('?period=' + encodeURIComponent(periodUuid)) : '';
+                var r = await fetch('/api/sellers/dashboard-summary/' + qs);
+                if (!r.ok) throw new Error('HTTP ' + r.status);
+                var payload = await r.json();
+                var enriched = payload.sellers || [];
+                this.sellers = enriched;
+                this.stats.total = enriched.length;
+                this.stats.ativos = enriched.filter(s => s.is_active).length;
+                this.stats.comVendaNoMes = enriched.filter(s => s.month_total > 0).length;
+                this.stats.prontos = enriched.filter(s => s.operational_status === 'PRONTO').length;
+                this.stats.pendentes = enriched.filter(s => s.operational_status === 'PENDENTE').length;
+                this.stats.semLancamento = enriched.filter(s => s.operational_status === 'SEM_LANCAMENTO').length;
+                this.stats.cancelados = enriched.filter(s => s.financial_status === 'CANCELADA').length;
+                this.stats.semLancamentoHoje = enriched.filter(s => s.is_active && !s.has_day_resolved_today).length;
+                this.stats.comissaoAberta = enriched.reduce((a, s) => s.financial_status === 'ABERTA' ? a + (s.commission_amount || 0) : a, 0);
+                this.stats.comissaoPaga = enriched.reduce((a, s) => s.financial_status === 'PAGA' ? a + (s.commission_amount || 0) : a, 0);
+                this.stats.comissaoFechada = enriched.reduce((a, s) => s.financial_status === 'FECHADA' || s.financial_status === 'PARCIALMENTE_FECHADA' ? a + (s.commission_amount || 0) : a, 0);
+                this.stats.comissaoCancelada = enriched.reduce((a, s) => s.financial_status === 'CANCELADA' ? a + (s.commission_amount || 0) : a, 0);
+            } catch (error) {
+                showToast('Nao foi possivel carregar os vendedores.', 'error');
+            } finally {
+                this.loading = false;
+            }
         },
-        openCreateModal() { this.editing = false; this.form = { name: '', phone: '', cpf: '', commission_rate: '1.00' }; this.showModal = true; },
-        openEditModal(s) { this.editing = true; this.form = { uuid: s.uuid, name: s.name, phone: s.phone, cpf: s.cpf_formatted || s.cpf || '', commission_rate: String(parseFloat(s.commission_rate)*100) }; this.showModal = true; },
+        detailUrl(s) {
+            var p = new URLSearchParams(window.location.search).get('period');
+            return '/dashboard/gestor/vendedores/' + s.uuid + '/' + (p ? ('?period=' + encodeURIComponent(p)) : '');
+        },
+        openCreateModal() { this.editing = false; this.form = { name: '', phone: '', cpf: '', commission_rate: '1.00' }; this.showModal = true; },        openEditModal(s) { this.editing = true; this.form = { uuid: s.uuid, name: s.name, phone: s.phone, cpf: s.cpf_formatted || s.cpf || '', commission_rate: String(parseFloat(s.commission_rate)*100) }; this.showModal = true; },
         async createSeller() {
             var body = { name:this.form.name, phone:this.form.phone };
             if (this.form.cpf) body.cpf = this.form.cpf;

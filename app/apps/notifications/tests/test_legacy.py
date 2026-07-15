@@ -6,7 +6,9 @@ from django.utils import timezone
 
 from app.apps.accounts.models import Tenant, User
 from app.apps.sellers.models import Seller
+from app.apps.sellers.services import create_day_justification
 from app.apps.sales.models import Sale
+from app.apps.commissions.models import CommissionPeriod
 from app.apps.notifications.models import Notification, MessageTemplate
 
 
@@ -41,6 +43,15 @@ class BaseDailyReminderTest(TestCase):
             phone='55999999998',
             is_active=True,
         )
+        self.period = CommissionPeriod.objects.create(
+            tenant=self.tenant,
+            month=7,
+            year=2026,
+            start_date=date(2026, 7, 1),
+            end_date=date(2026, 7, 31),
+            expected_working_days=23,
+            status=CommissionPeriod.Status.ABERTA,
+        )
 
     def _set_time(self, hour, minute=0):
         return timezone.make_aware(
@@ -73,6 +84,73 @@ class TestDailyReminder(BaseDailyReminderTest):
         self.assertEqual(seller_notifications.count(), 0)
         mock_create.assert_called_once()
         self.assertEqual(mock_create.call_args.kwargs['seller'], self.seller2)
+
+    @patch('app.apps.notifications.tasks.send_whatsapp_notification')
+    @patch('app.apps.notifications.tasks.create_and_send_notification')
+    def test_does_not_send_to_seller_with_justification_today(
+        self, mock_create, mock_send,
+    ):
+        create_day_justification(
+            tenant=self.tenant,
+            seller=self.seller,
+            date=date(2026, 7, 3),
+            reason='FALTA',
+            user=self.seller_user,
+        )
+
+        mock_now = timezone.make_aware(
+            timezone.datetime(2026, 7, 3, 20, 5),
+        )
+        with patch('django.utils.timezone.localtime', return_value=mock_now):
+            from app.apps.notifications.tasks import send_daily_entry_reminders
+            send_daily_entry_reminders()
+
+        mock_create.assert_called_once()
+        self.assertEqual(mock_create.call_args.kwargs['seller'], self.seller2)
+
+    @patch('app.apps.notifications.tasks.send_whatsapp_notification')
+    @patch('app.apps.notifications.tasks.create_and_send_notification')
+    def test_imported_sale_counts_as_valid_daily_entry(
+        self, mock_create, mock_send,
+    ):
+        Sale.objects.create(
+            tenant=self.tenant, seller=self.seller,
+            origin=Sale.Origin.IMPORTADA, amount=10000,
+            sale_date=date(2026, 7, 3),
+            status='ATIVA',
+        )
+
+        mock_now = timezone.make_aware(
+            timezone.datetime(2026, 7, 3, 20, 5),
+        )
+        with patch('django.utils.timezone.localtime', return_value=mock_now):
+            from app.apps.notifications.tasks import send_daily_entry_reminders
+            send_daily_entry_reminders()
+
+        mock_create.assert_called_once()
+        self.assertEqual(mock_create.call_args.kwargs['seller'], self.seller2)
+
+    @patch('app.apps.notifications.tasks.send_whatsapp_notification')
+    @patch('app.apps.notifications.tasks.create_and_send_notification')
+    def test_does_not_send_when_period_is_locked(self, mock_create, mock_send):
+        from app.apps.notifications.tasks import send_daily_entry_reminders
+
+        for status in (
+            CommissionPeriod.Status.FECHADA,
+            CommissionPeriod.Status.PAGA,
+            CommissionPeriod.Status.CANCELADA,
+        ):
+            mock_create.reset_mock()
+            self.period.status = status
+            self.period.save()
+
+            mock_now = timezone.make_aware(
+                timezone.datetime(2026, 7, 3, 20, 5),
+            )
+            with patch('django.utils.timezone.localtime', return_value=mock_now):
+                send_daily_entry_reminders()
+
+            mock_create.assert_not_called()
 
     @patch('app.apps.notifications.tasks.send_whatsapp_notification')
     @patch('app.apps.notifications.tasks.create_and_send_notification')

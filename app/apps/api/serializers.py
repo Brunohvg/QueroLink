@@ -6,7 +6,7 @@ from django.db import IntegrityError, transaction
 from django.utils import timezone
 
 from app.apps.sales.models import Sale, SaleChangeLog
-from app.apps.sellers.models import Seller
+from app.apps.sellers.models import Seller, SellerDayJustification
 from app.apps.sellers.capacity import SellerCapacityExceeded, ensure_seller_capacity
 from app.apps.commissions.models import (
     CommissionPeriod,
@@ -451,6 +451,22 @@ class SaleCreateSerializer(serializers.ModelSerializer):
             if not can_change:
                 raise serializers.ValidationError({'sale_date': error_msg})
 
+            # LOTE 2: dia justificado exige acao explicita (replace-with-sale),
+            # nao pode ser sobrescrito silenciosamente por uma venda.
+            if not self.instance:
+                from app.apps.sellers.models import SellerDayJustification
+                just = SellerDayJustification.objects.filter(
+                    tenant=user.tenant, seller=seller, date=sale_date,
+                ).first()
+                if just:
+                    raise serializers.ValidationError({
+                        'sale_date': (
+                            'Este dia possui justificativa '
+                            f'({just.get_reason_display()}). Use a acao '
+                            '"remover justificativa e registrar venda".'
+                        ),
+                    })
+
             existing = Sale.objects.filter(
                 seller=seller,
                 sale_date=sale_date,
@@ -505,6 +521,11 @@ class SellerCommissionReadSerializer(serializers.ModelSerializer):
     )
     adjustments = CommissionAdjustmentSerializer(many=True, read_only=True)
     is_editable = serializers.BooleanField(read_only=True)
+    launched_days_count = serializers.SerializerMethodField()
+    justified_days_count = serializers.SerializerMethodField()
+    pending_days_count = serializers.SerializerMethodField()
+    non_working_days_count = serializers.SerializerMethodField()
+    resolved_days_count = serializers.SerializerMethodField()
 
     class Meta:
         model = SellerCommission
@@ -513,6 +534,9 @@ class SellerCommissionReadSerializer(serializers.ModelSerializer):
             'status', 'operational_status',
             'total_sold_amount', 'commission_rate', 'commission_amount',
             'expected_working_days', 'submitted_days_count', 'missing_days_count',
+            'launched_days_count', 'justified_days_count',
+            'pending_days_count', 'non_working_days_count',
+            'resolved_days_count',
             'frozen_total_sold_amount', 'frozen_commission_rate',
             'frozen_commission_amount',
             'period_status',
@@ -522,6 +546,32 @@ class SellerCommissionReadSerializer(serializers.ModelSerializer):
             'adjustments', 'is_editable',
         ]
         read_only_fields = fields
+
+    def _day_summary(self, obj):
+        summaries = self.context.get('day_summaries') or {}
+        return summaries.get(obj.seller_id) or {}
+
+    def get_launched_days_count(self, obj):
+        return self._day_summary(obj).get(
+            'launched_days_count', obj.submitted_days_count,
+        )
+
+    def get_justified_days_count(self, obj):
+        return self._day_summary(obj).get('justified_days_count', 0)
+
+    def get_pending_days_count(self, obj):
+        return self._day_summary(obj).get(
+            'pending_days_count', obj.missing_days_count,
+        )
+
+    def get_non_working_days_count(self, obj):
+        return self._day_summary(obj).get('non_working_days_count', 0)
+
+    def get_resolved_days_count(self, obj):
+        return self._day_summary(obj).get(
+            'resolved_days_count',
+            obj.submitted_days_count,
+        )
 
 
 class CommissionPeriodSerializer(serializers.ModelSerializer):
@@ -557,7 +607,12 @@ class CommissionPeriodSerializer(serializers.ModelSerializer):
                 result.append(temp)
             else:
                 result.append(sc)
-        return SellerCommissionReadSerializer(result, many=True).data
+        from app.apps.commissions.day_status import get_period_summary_bulk
+        sellers = [sc.seller for sc in result]
+        day_summaries = get_period_summary_bulk(obj.tenant, obj, sellers)
+        return SellerCommissionReadSerializer(
+            result, many=True, context={'day_summaries': day_summaries},
+        ).data
 
     def get_is_current_month(self, obj):
         hoje = timezone.localdate()
@@ -614,7 +669,7 @@ class CommissionPeriodCreateSerializer(serializers.ModelSerializer):
             attrs['year'] = year
         if CommissionPeriod.objects.filter(
             tenant=tenant, month=month, year=year,
-        ).exists():
+        ).exclude(status=CommissionPeriod.Status.CANCELADA).exists():
             raise serializers.ValidationError(
                 f'A competencia {month:02d}/{year} ja existe. '
                 'Use Atualizar valores para sincronizar os dados.'
@@ -680,3 +735,85 @@ class ChangePasswordSerializer(serializers.Serializer):
 def slugify(value):
     from django.utils.text import slugify as _slugify
     return _slugify(value)
+
+
+class SellerDayJustificationSerializer(serializers.ModelSerializer):
+    """Leitura de justificativa de dia sem lancamento."""
+
+    seller_uuid = serializers.CharField(source='seller.uuid', read_only=True)
+    seller_name = serializers.CharField(source='seller.name', read_only=True)
+    reason_display = serializers.CharField(
+        source='get_reason_display', read_only=True,
+    )
+    created_by_name = serializers.SerializerMethodField()
+    updated_by_name = serializers.SerializerMethodField()
+
+    class Meta:
+        model = SellerDayJustification
+        fields = [
+            'uuid', 'seller_uuid', 'seller_name', 'date', 'reason',
+            'reason_display', 'notes', 'created_by_name', 'updated_by_name',
+            'created_at', 'updated_at',
+        ]
+        read_only_fields = fields
+
+    def get_created_by_name(self, obj):
+        return obj.created_by.username if obj.created_by else None
+
+    def get_updated_by_name(self, obj):
+        return obj.updated_by.username if obj.updated_by else None
+
+
+class SellerDayJustificationCreateSerializer(serializers.ModelSerializer):
+    """Criacao. tenant/created_by/updated_by sao controlados pelo servidor."""
+
+    class Meta:
+        model = SellerDayJustification
+        fields = ['seller', 'date', 'reason', 'notes']
+        extra_kwargs = {'notes': {'required': False}}
+
+    def validate_seller(self, seller):
+        user = self.context['request'].user
+        if seller.tenant_id != user.tenant_id:
+            raise serializers.ValidationError(
+                'O vendedor nao pertence ao tenant.'
+            )
+        return seller
+
+    def create(self, validated_data):
+        from app.apps.sellers.services import create_day_justification
+        user = self.context['request'].user
+        # Erros de dominio (conflito/lock/validacao) propagam para o ViewSet,
+        # que os mapeia para 409/400.
+        return create_day_justification(
+            tenant=user.tenant,
+            seller=validated_data['seller'],
+            date=validated_data['date'],
+            reason=validated_data['reason'],
+            notes=validated_data.get('notes', ''),
+            user=user,
+        )
+
+
+class SellerDayJustificationUpdateSerializer(serializers.ModelSerializer):
+    """Atualizacao de reason/notes/date. Nao permite trocar seller/tenant."""
+
+    class Meta:
+        model = SellerDayJustification
+        fields = ['reason', 'notes', 'date']
+        extra_kwargs = {
+            'reason': {'required': False},
+            'notes': {'required': False},
+            'date': {'required': False},
+        }
+
+    def update(self, instance, validated_data):
+        from app.apps.sellers.services import update_day_justification
+        user = self.context['request'].user
+        return update_day_justification(
+            justification=instance,
+            user=user,
+            reason=validated_data.get('reason'),
+            notes=validated_data.get('notes'),
+            date=validated_data.get('date'),
+        )

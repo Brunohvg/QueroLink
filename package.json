@@ -4,13 +4,14 @@
   "private": true,
   "scripts": {
     "build:css": "tailwindcss -i ./static/css/input.css -o ./static/css/tailwind.css --minify",
-    "build:js": "node -e \"require('fs').copyFileSync('node_modules/alpinejs/dist/cdn.min.js','static/js/alpine.min.js')\"",
+    "build:js": "node -e \"const fs=require('fs');fs.copyFileSync('node_modules/alpinejs/dist/cdn.min.js','static/js/alpine.min.js');fs.copyFileSync('node_modules/chart.js/dist/chart.umd.js','static/js/chart.umd.js')\"",
     "build": "npm run build:css && npm run build:js"
   },
   "devDependencies": {
     "tailwindcss": "^3.4.0"
   },
   "dependencies": {
-    "alpinejs": "3.14.9"
+    "alpinejs": "3.14.9",
+    "chart.js": "4.4.0"
   }
 }

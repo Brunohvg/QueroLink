@@ -1,53 +1,62 @@
+import io
 from datetime import date
 from decimal import Decimal
-from unittest.mock import patch
-import io
 
-from django.test import TestCase
-from django.urls import reverse
 from django.core.cache import cache
+from django.db import connection
+from django.db.models import Sum
+from django.test import TestCase
+from django.test.utils import CaptureQueriesContext
+from django.urls import reverse
 from rest_framework.test import APIClient
 
 from app.apps.accounts.models import Tenant, User
-from app.apps.sellers.models import Seller
-from app.apps.sales.models import Sale, SaleChangeLog, SaleImportBatch
+from app.apps.audit.models import AuditLog
+from app.apps.commissions.day_status import get_period_day_statuses
 from app.apps.commissions.models import CommissionPeriod, SellerCommission
+from app.apps.sales.models import Sale, SaleChangeLog, SaleImportBatch
+from app.apps.sales.services import (
+    _preview_cache_key,
+    classify_import_rows,
+    normalize_headers,
+)
+from app.apps.sellers.models import Seller, SellerDayJustification
 
 
 class SalesImportTest(TestCase):
     def setUp(self):
         cache.clear()
         self.tenant = Tenant.objects.create(
-            company_name='Empresa SI', slug='empresa-si',
+            company_name='Empresa Import', slug='empresa-import',
             default_commission_rate=Decimal('0.05'),
         )
-        self.tenant2 = Tenant.objects.create(
-            company_name='Outra SI', slug='outra-si',
+        self.other_tenant = Tenant.objects.create(
+            company_name='Outra Import', slug='outra-import',
             default_commission_rate=Decimal('0.05'),
         )
         self.manager = User.objects.create_user(
-            username='manager_si', password='pass123',
+            username='manager_import', password='pass123',
             role=User.Role.MANAGER, tenant=self.tenant,
         )
         self.seller_user = User.objects.create_user(
-            username='seller_si', password='pass123',
-            role=User.Role.SELLER, tenant=self.tenant,
-        )
-        self.seller_user2 = User.objects.create_user(
-            username='seller2_si', password='pass123',
+            username='carlos_id', password='pass123',
             role=User.Role.SELLER, tenant=self.tenant,
         )
         self.seller = Seller.objects.create(
             tenant=self.tenant, name='Carlos Silva', phone='11911111111',
             user=self.seller_user,
         )
-        self.seller2 = Seller.objects.create(
-            tenant=self.tenant, name='Ana Souza', phone='11922222222',
-            user=self.seller_user2,
+        self.other_seller_user = User.objects.create_user(
+            username='outsider_id', password='pass123',
+            role=User.Role.SELLER, tenant=self.other_tenant,
+        )
+        self.other_seller = Seller.objects.create(
+            tenant=self.other_tenant, name='Carlos Silva', phone='11922222222',
+            user=self.other_seller_user,
         )
         self.period = CommissionPeriod.objects.create(
             tenant=self.tenant, month=6, year=2026,
-            start_date='2026-06-01', end_date='2026-06-30',
+            start_date=date(2026, 6, 1), end_date=date(2026, 6, 30),
             status=CommissionPeriod.Status.ABERTA,
         )
         self.sc = SellerCommission.objects.create(
@@ -56,261 +65,439 @@ class SalesImportTest(TestCase):
             status=SellerCommission.Status.ABERTA,
         )
 
-    def _auth(self, user):
+    def _client(self, user=None):
         client = APIClient()
-        resp = client.post(reverse('api-login'), {
-            'username': user.username, 'password': 'pass123',
-        }, format='json')
-        self.assertIn('access', resp.data)
-        client.credentials(HTTP_AUTHORIZATION=f'Bearer {resp.data["access"]}')
+        client.force_authenticate(user=user or self.manager)
         return client
 
-    def _csv_content(self, lines):
-        return '\n'.join(lines)
-
-    def _upload_preview(self, client, filename, content):
-        file_obj = io.BytesIO(content.encode('utf-8') if isinstance(content, str) else content)
+    def _upload(self, content, filename='import.csv', user=None):
+        payload = content.encode('utf-8') if isinstance(content, str) else content
+        file_obj = io.BytesIO(payload)
         file_obj.name = filename
-        return client.post(
-            reverse('api-sale-import-preview'),
-            {'file': file_obj},
+        return self._client(user).post(
+            reverse('api-sale-import-preview'), {'file': file_obj},
             format='multipart',
         )
 
-    def _confirm(self, client, rows, filename, file_hash, force=False):
-        return client.post(reverse('api-sale-import-confirm'), {
-            'rows': rows, 'filename': filename,
-            'file_hash': file_hash,
+    def _csv(self, value='500,00', seller='Carlos Silva', day='15/06/2026'):
+        return f'data;vendedor;valor\n{day};{seller};{value}'
+
+    def _confirm(self, preview, *, justifications=None, sellers=None, force=False,
+                 user=None):
+        return self._client(user).post(reverse('api-sale-import-confirm'), {
+            'batch_uuid': preview.data['batch_uuid'],
             'force_reimport': force,
+            'decisions': {
+                'confirmed_justifications': justifications or [],
+                'seller_choices': sellers or {},
+            },
         }, format='json')
 
-    def test_preview_csv_valid(self):
-        csv = self._csv_content([
-            'data;vendedor;valor;observacao',
-            '15/06/2026;Carlos Silva;1500,00;Venda teste',
-            '16/06/2026;Ana Souza;2300.50;Outra venda',
-        ])
-        client = self._auth(self.manager)
-        resp = self._upload_preview(client, 'test.csv', csv)
-        self.assertEqual(resp.status_code, 200)
-        self.assertEqual(resp.data['total_rows'], 2)
-        self.assertEqual(resp.data['ok_count'], 2)
-        self.assertFalse(resp.data['already_imported'])
+    def _preview_row(self, value='500,00', seller='Carlos Silva', day='15/06/2026'):
+        response = self._upload(self._csv(value, seller, day))
+        self.assertEqual(response.status_code, 200, response.data)
+        return response, response.data['results'][0]
 
-    def test_preview_br_date_accepted(self):
-        csv = self._csv_content([
-            'data;vendedor;valor',
-            '20/06/2026;Carlos Silva;500,00',
-        ])
-        client = self._auth(self.manager)
-        resp = self._upload_preview(client, 'test.csv', csv)
-        self.assertEqual(resp.status_code, 200)
-        self.assertEqual(resp.data['results'][0]['sale_date'], '2026-06-20')
+    def _xlsx(self, rows):
+        import openpyxl
+        workbook = openpyxl.Workbook()
+        sheet = workbook.active
+        for row in rows:
+            sheet.append(row)
+        output = io.BytesIO()
+        workbook.save(output)
+        return output.getvalue()
 
-    def test_preview_comma_value_accepted(self):
-        csv = self._csv_content([
-            'data;vendedor;valor',
-            '10/06/2026;Carlos Silva;1.234,56',
-        ])
-        client = self._auth(self.manager)
-        resp = self._upload_preview(client, 'test.csv', csv)
-        self.assertEqual(resp.status_code, 200)
-        self.assertEqual(resp.data['results'][0]['amount_cents'], 123456)
+    # 1-9: formatos e valores monetarios.
+    def test_01_csv_com_venda_valida(self):
+        _, row = self._preview_row()
+        self.assertEqual(row['classification'], 'SALE')
 
-    def test_seller_by_exact_name(self):
-        csv = self._csv_content([
-            'data;vendedor;valor',
-            '10/06/2026;Carlos Silva;500,00',
-        ])
-        client = self._auth(self.manager)
-        resp = self._upload_preview(client, 'test.csv', csv)
-        self.assertEqual(resp.data['results'][0]['status'], 'ok')
-        self.assertEqual(resp.data['results'][0]['resolved_seller_name'], 'Carlos Silva')
+    def test_02_xlsx_com_venda_valida(self):
+        response = self._upload(self._xlsx([
+            ['data', 'vendedor', 'valor'],
+            ['15/06/2026', 'Carlos Silva', '500,00'],
+        ]), 'import.xlsx')
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data['results'][0]['classification'], 'SALE')
 
-    def test_seller_not_found_with_suggestions(self):
-        csv = self._csv_content([
-            'data;vendedor;valor',
-            '10/06/2026;Pedro Alves;500,00',
-        ])
-        client = self._auth(self.manager)
-        resp = self._upload_preview(client, 'test.csv', csv)
-        self.assertEqual(resp.data['results'][0]['status'], 'error')
-        self.assertIn('nao encontrado', resp.data['results'][0]['message'].lower())
+    def test_03_csv_utf8_com_bom(self):
+        response = self._upload(('\ufeff' + self._csv()).encode('utf-8'))
+        self.assertEqual(response.status_code, 200)
 
-    def test_seller_ambiguous_requires_selection(self):
+    def test_04_valor_real_com_milhar(self):
+        _, row = self._preview_row('R$ 9.436,72')
+        self.assertEqual(row['normalized_amount'], 943672)
+
+    def test_05_valor_com_virgula(self):
+        _, row = self._preview_row('9436,72')
+        self.assertEqual(row['normalized_amount'], 943672)
+
+    def test_06_valor_com_ponto(self):
+        _, row = self._preview_row('9436.72')
+        self.assertEqual(row['normalized_amount'], 943672)
+
+    def test_07_valor_zero_rejeitado(self):
+        _, row = self._preview_row('0')
+        self.assertEqual(row['classification'], 'INVALID')
+
+    def test_08_valor_negativo_rejeitado(self):
+        _, row = self._preview_row('-10,00')
+        self.assertEqual(row['classification'], 'INVALID')
+
+    def test_09_teto_financeiro_preservado(self):
+        _, valid = self._preview_row('100000,00')
+        _, invalid = self._preview_row('100000,01')
+        self.assertEqual(valid['classification'], 'SALE')
+        self.assertEqual(invalid['classification'], 'INVALID')
+
+    # 10-19: motivos, vazio e texto desconhecido.
+    def _assert_reason(self, raw, expected):
+        _, row = self._preview_row(raw)
+        self.assertEqual(row['classification'], 'JUSTIFICATION_SUGGESTION')
+        self.assertEqual(row['normalized_reason'], expected)
+
+    def test_10_falta(self): self._assert_reason('FALTA', 'FALTA')
+    def test_11_atestado(self): self._assert_reason('ATESTADO', 'ATESTADO')
+    def test_12_ferias(self): self._assert_reason('FERIAS', 'FERIAS')
+    def test_13_ferias_com_acento(self): self._assert_reason('FÉRIAS', 'FERIAS')
+    def test_14_folga(self): self._assert_reason('FOLGA', 'FOLGA')
+    def test_15_afastamento(self): self._assert_reason('AFASTAMENTO', 'AFASTAMENTO')
+    def test_16_feriado(self): self._assert_reason('FERIADO', 'FERIADO')
+    def test_17_sem_expediente(self): self._assert_reason('SEM_EXPEDIENTE', 'SEM_EXPEDIENTE')
+
+    def test_18_celula_vazia(self):
+        _, row = self._preview_row('   ')
+        self.assertEqual(row['classification'], 'EMPTY')
+
+    def test_19_texto_desconhecido(self):
+        _, row = self._preview_row('não veio')
+        self.assertEqual(row['classification'], 'INVALID')
+
+    # 20-30: somente leitura, criacao e efeitos operacionais/financeiros.
+    def test_20_preview_nao_cria_sale(self):
+        before = Sale.objects.count()
+        self._preview_row()
+        self.assertEqual(Sale.objects.count(), before)
+
+    def test_21_preview_nao_cria_justificativa(self):
+        before = SellerDayJustification.objects.count()
+        self._preview_row('FALTA')
+        self.assertEqual(SellerDayJustification.objects.count(), before)
+
+    def test_22_preview_nao_cria_auditlog_de_dominio(self):
+        before = AuditLog.objects.count()
+        self._preview_row('FALTA')
+        self.assertEqual(AuditLog.objects.count(), before)
+
+    def test_23_confirmacao_cria_venda(self):
+        preview, _ = self._preview_row()
+        response = self._confirm(preview)
+        self.assertEqual(response.status_code, 200, response.data)
+        self.assertEqual(Sale.objects.filter(origin=Sale.Origin.IMPORTADA).count(), 1)
+
+    def test_24_confirmacao_cria_justificativa(self):
+        preview, row = self._preview_row('FALTA')
+        response = self._confirm(preview, justifications=[row['row_number']])
+        self.assertEqual(response.status_code, 200, response.data)
+        self.assertEqual(SellerDayJustification.objects.count(), 1)
+
+    def test_25_justificativa_nao_altera_comissao(self):
+        before = (self.sc.status, self.sc.commission_rate)
+        preview, row = self._preview_row('FALTA')
+        self._confirm(preview, justifications=[row['row_number']])
+        self.sc.refresh_from_db()
+        self.assertEqual((self.sc.status, self.sc.commission_rate), before)
+
+    def test_26_justificativa_nao_altera_ranking_financeiro(self):
+        before = Sale.objects.filter(tenant=self.tenant).aggregate(total=Sum('amount'))['total']
+        preview, row = self._preview_row('FALTA')
+        self._confirm(preview, justifications=[row['row_number']])
+        after = Sale.objects.filter(tenant=self.tenant).aggregate(total=Sum('amount'))['total']
+        self.assertEqual(after, before)
+
+    def test_27_justificativa_reduz_pendencia(self):
+        before = get_period_day_statuses(
+            self.tenant, self.seller, self.period, reference_date=date(2026, 6, 16),
+            sc=self.sc,
+        )['summary']
+        preview, row = self._preview_row('FALTA')
+        self._confirm(preview, justifications=[row['row_number']])
+        after = get_period_day_statuses(
+            self.tenant, self.seller, self.period, reference_date=date(2026, 6, 16),
+            sc=self.sc,
+        )['summary']
+        self.assertEqual(after['justificados'], before['justificados'] + 1)
+        self.assertEqual(after['pendentes'], before['pendentes'] - 1)
+
+    def test_28_venda_aumenta_total_financeiro(self):
+        preview, _ = self._preview_row('500,00')
+        response = self._confirm(preview)
+        self.assertEqual(response.data['total_amount'], 50000)
+        self.assertEqual(Sale.objects.aggregate(total=Sum('amount'))['total'], 50000)
+
+    def test_29_venda_cria_changelog(self):
+        preview, _ = self._preview_row()
+        self._confirm(preview)
+        self.assertEqual(SaleChangeLog.objects.filter(
+            action=SaleChangeLog.Action.CREATE_IMPORT,
+        ).count(), 1)
+
+    def test_30_justificativa_cria_auditlog(self):
+        preview, row = self._preview_row('ATESTADO')
+        self._confirm(preview, justifications=[row['row_number']])
+        self.assertTrue(AuditLog.objects.filter(action='day_justification.created').exists())
+
+    # 31-36: competencia por range e integridade.
+    def _set_period_status(self, status):
+        self.period.status = status
+        self.period.save(update_fields=['status'])
+
+    def test_31_competencia_fechada_bloqueia(self):
+        self._set_period_status(CommissionPeriod.Status.FECHADA)
+        _, row = self._preview_row()
+        self.assertEqual(row['classification'], 'BLOCKED')
+
+    def test_32_competencia_paga_bloqueia(self):
+        self._set_period_status(CommissionPeriod.Status.PAGA)
+        _, row = self._preview_row()
+        self.assertEqual(row['classification'], 'BLOCKED')
+
+    def test_33_competencia_cancelada_bloqueia(self):
+        self._set_period_status(CommissionPeriod.Status.CANCELADA)
+        _, row = self._preview_row()
+        self.assertEqual(row['classification'], 'BLOCKED')
+
+    def test_34_competencia_reaberta_permite(self):
+        self._set_period_status(CommissionPeriod.Status.FECHADA)
+        self._set_period_status(CommissionPeriod.Status.ABERTA)
+        self.sc.status = SellerCommission.Status.ABERTA
+        self.sc.save(update_fields=['status'])
+        _, row = self._preview_row()
+        self.assertEqual(row['classification'], 'SALE')
+
+    def test_35_ausencia_de_competencia(self):
+        _, row = self._preview_row(day='15/08/2026')
+        self.assertEqual(row['classification'], 'BLOCKED')
+
+    def test_36_sobreposicao_de_competencia(self):
+        CommissionPeriod.objects.create(
+            tenant=self.tenant, month=7, year=2026,
+            start_date=date(2026, 6, 10), end_date=date(2026, 7, 10),
+            status=CommissionPeriod.Status.ABERTA,
+        )
+        _, row = self._preview_row()
+        self.assertEqual(row['classification'], 'CONFLICT')
+
+    # 37-42: resolucao de vendedor limitada ao tenant.
+    def test_37_vendedor_por_uuid(self):
+        csv = (
+            'data;vendedor;seller_uuid;valor\n'
+            f'15/06/2026;;{self.seller.uuid};500,00'
+        )
+        response = self._upload(csv)
+        self.assertEqual(response.data['results'][0]['seller_uuid'], str(self.seller.uuid))
+
+    def test_38_vendedor_por_identificador(self):
+        _, row = self._preview_row(seller='carlos_id')
+        self.assertEqual(row['match_type'], 'username')
+
+    def test_39_vendedor_por_nome_exato(self):
+        _, row = self._preview_row(seller='cArLoS sIlVa')
+        self.assertEqual(row['seller_uuid'], str(self.seller.uuid))
+
+    def test_40_vendedor_ambiguo(self):
+        second_user = User.objects.create_user(
+            username='carlos_second', role=User.Role.SELLER, tenant=self.tenant,
+        )
         Seller.objects.create(
-            tenant=self.tenant, name='Carlos Almeida', phone='11933333333',
-            user=User.objects.create_user(
-                username='carlos_a', password='x',
-                role=User.Role.SELLER, tenant=self.tenant,
-            ),
+            tenant=self.tenant, name='Carlos Souza', phone='11933333333',
+            user=second_user,
         )
-        csv = self._csv_content([
-            'data;vendedor;valor',
-            '10/06/2026;Carlos;500,00',
-        ])
-        client = self._auth(self.manager)
-        resp = self._upload_preview(client, 'test.csv', csv)
-        self.assertEqual(resp.data['results'][0]['status'], 'needs_selection')
-        self.assertTrue(len(resp.data['results'][0]['suggestions']) == 2)
+        _, row = self._preview_row(seller='Carlos')
+        self.assertEqual(row['classification'], 'CONFLICT')
+        self.assertTrue(row['requires_manual_action'])
 
-    def test_duplicate_reported(self):
-        csv = self._csv_content([
-            'data;vendedor;valor',
-            '10/06/2026;Carlos Silva;500,00',
-        ])
-        client = self._auth(self.manager)
-        resp = self._upload_preview(client, 'test.csv', csv)
-        # Create the sale directly
+    def test_41_vendedor_inexistente(self):
+        _, row = self._preview_row(seller='Inexistente')
+        self.assertEqual(row['classification'], 'INVALID')
+
+    def test_42_vendedor_de_outro_tenant(self):
+        csv = (
+            'data;vendedor;seller_uuid;valor\n'
+            f'15/06/2026;;{self.other_seller.uuid};500,00'
+        )
+        response = self._upload(csv)
+        self.assertIsNone(response.data['results'][0]['seller_uuid'])
+        self.assertEqual(response.data['results'][0]['classification'], 'INVALID')
+
+    # 43-49: conflitos, duplicidade e hash.
+    def test_43_justificativa_com_venda_existente(self):
         Sale.objects.create(
-            tenant=self.tenant, seller=self.seller,
-            origin=Sale.Origin.IMPORTADA, amount=50000,
-            sale_date='2026-06-10', created_by=self.manager,
+            tenant=self.tenant, seller=self.seller, origin=Sale.Origin.MANUAL,
+            amount=10000, sale_date=date(2026, 6, 15), created_by=self.manager,
         )
-        resp = self._upload_preview(client, 'test.csv', csv)
-        self.assertEqual(resp.data['results'][0]['status'], 'duplicate')
+        _, row = self._preview_row('FALTA')
+        self.assertEqual(row['classification'], 'CONFLICT')
 
-    def test_closed_period_returns_error(self):
-        self.sc.status = SellerCommission.Status.FECHADA
-        self.sc.save()
-        csv = self._csv_content([
-            'data;vendedor;valor',
-            '10/06/2026;Carlos Silva;500,00',
-        ])
-        client = self._auth(self.manager)
-        resp = self._upload_preview(client, 'test.csv', csv)
-        self.assertEqual(resp.data['results'][0]['status'], 'error')
+    def test_44_venda_com_justificativa_existente(self):
+        SellerDayJustification.objects.create(
+            tenant=self.tenant, seller=self.seller, date=date(2026, 6, 15),
+            reason='FALTA', created_by=self.manager,
+        )
+        _, row = self._preview_row('500,00')
+        self.assertEqual(row['classification'], 'CONFLICT')
 
-    def test_confirm_creates_sales_with_import_origin(self):
-        csv = self._csv_content([
-            'data;vendedor;valor;observacao',
-            '10/06/2026;Carlos Silva;500,00;Venda 1',
-            '11/06/2026;Carlos Silva;600,00;Venda 2',
-        ])
-        client = self._auth(self.manager)
-        preview = self._upload_preview(client, 'test.csv', csv)
-        file_hash = preview.data['file_hash']
+    def test_45_justificativa_duplicada(self):
+        SellerDayJustification.objects.create(
+            tenant=self.tenant, seller=self.seller, date=date(2026, 6, 15),
+            reason='FALTA', created_by=self.manager,
+        )
+        _, row = self._preview_row('FALTA')
+        self.assertEqual(row['classification'], 'DUPLICATE')
 
-        rows = [
-            {
-                'row_number': r['row_number'],
-                'resolved_seller_uuid': r['resolved_seller_uuid'],
-                'amount_cents': r['amount_cents'],
-                'sale_date': r['sale_date'],
-                'notes': r['notes'],
-            }
-            for r in preview.data['results'] if r['status'] == 'ok'
+    def test_46_justificativa_com_motivo_diferente(self):
+        SellerDayJustification.objects.create(
+            tenant=self.tenant, seller=self.seller, date=date(2026, 6, 15),
+            reason='ATESTADO', created_by=self.manager,
+        )
+        _, row = self._preview_row('FALTA')
+        self.assertEqual(row['classification'], 'CONFLICT')
+
+    def test_47_venda_duplicada(self):
+        Sale.objects.create(
+            tenant=self.tenant, seller=self.seller, origin=Sale.Origin.IMPORTADA,
+            amount=50000, sale_date=date(2026, 6, 15), created_by=self.manager,
+        )
+        _, row = self._preview_row()
+        self.assertEqual(row['classification'], 'DUPLICATE')
+
+    def test_48_reimportacao_do_mesmo_hash(self):
+        first, _ = self._preview_row()
+        self.assertEqual(self._confirm(first).status_code, 200)
+        second, _ = self._preview_row()
+        self.assertTrue(second.data['already_imported'])
+        self.assertEqual(self._confirm(second).status_code, 409)
+
+    def test_49_reimportacao_confirmada_nao_duplica_linha(self):
+        first, _ = self._preview_row()
+        self._confirm(first)
+        second, _ = self._preview_row()
+        response = self._confirm(second, force=True)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data['created'], 0)
+        self.assertEqual(response.data['duplicates'], 1)
+
+    # 50-58: arquivos, fatal, isolamento e permissao.
+    def test_50_arquivo_vazio(self):
+        self.assertEqual(self._upload(b'').status_code, 400)
+
+    def test_51_arquivo_maior_que_limite(self):
+        self.assertEqual(self._upload(b'x' * (5 * 1024 * 1024 + 1)).status_code, 400)
+
+    def test_52_mais_de_500_linhas(self):
+        lines = ['data;vendedor;valor'] + [
+            f'15/06/2026;Carlos Silva;{index},00' for index in range(1, 502)
         ]
-        resp = self._confirm(client, rows, 'test.csv', file_hash)
-        self.assertEqual(resp.status_code, 200)
-        self.assertEqual(resp.data['created'], 2)
+        self.assertEqual(self._upload('\n'.join(lines)).status_code, 400)
 
-        sales = Sale.objects.filter(origin=Sale.Origin.IMPORTADA)
-        self.assertEqual(sales.count(), 2)
+    def test_53_csv_invalido(self):
+        response = self._upload('data;vendedor;valor\n"15/06/2026;Carlos Silva;500,00')
+        self.assertEqual(response.status_code, 400)
 
-    def test_confirm_creates_sale_change_logs(self):
-        csv = self._csv_content([
-            'data;vendedor;valor',
-            '10/06/2026;Carlos Silva;500,00',
-        ])
-        client = self._auth(self.manager)
-        preview = self._upload_preview(client, 'test2.csv', csv)
+    def test_54_xlsx_invalido(self):
+        self.assertEqual(self._upload(b'not-xlsx', 'bad.xlsx').status_code, 400)
 
-        rows = [{
-            'row_number': preview.data['results'][0]['row_number'],
-            'resolved_seller_uuid': preview.data['results'][0]['resolved_seller_uuid'],
-            'amount_cents': preview.data['results'][0]['amount_cents'],
-            'sale_date': preview.data['results'][0]['sale_date'],
-            'notes': '',
-        }]
-        self._confirm(client, rows, 'test2.csv', preview.data['file_hash'])
+    def test_55_extensao_invalida(self):
+        self.assertEqual(self._upload(self._csv(), 'import.xlsm').status_code, 400)
 
-        logs = SaleChangeLog.objects.filter(action=SaleChangeLog.Action.CREATE_IMPORT)
-        self.assertEqual(logs.count(), 1)
+    def test_56_rollback_em_erro_fatal(self):
+        preview, _ = self._preview_row()
+        key = _preview_cache_key(preview.data['batch_uuid'])
+        payload = cache.get(key)
+        payload['file_hash'] = '0' * 64
+        cache.set(key, payload, 1800)
+        response = self._confirm(preview)
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(Sale.objects.count(), 0)
+        self.assertEqual(SellerDayJustification.objects.count(), 0)
 
-    def test_confirm_created_by_is_manager(self):
-        csv = self._csv_content([
-            'data;vendedor;valor',
-            '10/06/2026;Carlos Silva;500,00',
-        ])
-        client = self._auth(self.manager)
-        preview = self._upload_preview(client, 'test3.csv', csv)
-
-        rows = [{
-            'row_number': preview.data['results'][0]['row_number'],
-            'resolved_seller_uuid': preview.data['results'][0]['resolved_seller_uuid'],
-            'amount_cents': 50000,
-            'sale_date': '2026-06-10',
-            'notes': '',
-        }]
-        self._confirm(client, rows, 'test3.csv', preview.data['file_hash'])
-
-        sale = Sale.objects.filter(origin=Sale.Origin.IMPORTADA).first()
-        self.assertEqual(sale.created_by, self.manager)
-
-    def test_501_rows_returns_400(self):
-        lines = ['data;vendedor;valor']
-        for i in range(501):
-            lines.append(f'01/06/2026;Carlos Silva;{i+1},00')
-        content = '\n'.join(lines)
-        client = self._auth(self.manager)
-        resp = self._upload_preview(client, 'huge.csv', content)
-        self.assertEqual(resp.status_code, 400)
-
-    def test_seller_receives_403(self):
-        client = self._auth(self.seller_user)
-        resp = client.post(reverse('api-sale-import-preview'), {}, format='multipart')
-        self.assertEqual(resp.status_code, 403)
-
-    def test_same_file_reimport_requires_force(self):
-        csv = self._csv_content([
-            'data;vendedor;valor',
-            '10/06/2026;Carlos Silva;500,00',
-        ])
-        client = self._auth(self.manager)
-        preview = self._upload_preview(client, 'dup.csv', csv)
-        self.assertFalse(preview.data['already_imported'])
-
-        rows = [{
-            'row_number': 1,
-            'resolved_seller_uuid': str(self.seller.uuid),
-            'amount_cents': 50000,
-            'sale_date': '2026-06-10',
-            'notes': '',
-        }]
-        self._confirm(client, rows, 'dup.csv', preview.data['file_hash'])
-
-        preview2 = self._upload_preview(client, 'dup.csv', csv)
-        self.assertTrue(preview2.data['already_imported'])
-
-        resp = self._confirm(client, rows, 'dup.csv', preview.data['file_hash'])
-        self.assertEqual(resp.status_code, 409)
-
-        resp_force = self._confirm(
-            client, rows, 'dup.csv', preview.data['file_hash'], force=True,
+    def test_57_isolamento_multi_tenant_na_confirmacao(self):
+        preview, _ = self._preview_row()
+        other_manager = User.objects.create_user(
+            username='other_manager', role=User.Role.MANAGER,
+            tenant=self.other_tenant,
         )
-        self.assertEqual(resp_force.status_code, 200)
+        response = self._confirm(preview, user=other_manager)
+        self.assertEqual(response.status_code, 404)
+        self.assertEqual(Sale.objects.count(), 0)
 
-    def test_import_batch_created(self):
-        csv = self._csv_content([
-            'data;vendedor;valor',
-            '10/06/2026;Carlos Silva;500,00',
-        ])
-        client = self._auth(self.manager)
-        preview = self._upload_preview(client, 'batch.csv', csv)
+    def test_58_seller_recebe_403(self):
+        response = self._upload(self._csv(), user=self.seller_user)
+        self.assertEqual(response.status_code, 403)
 
-        rows = [{
-            'row_number': 1,
-            'resolved_seller_uuid': str(self.seller.uuid),
-            'amount_cents': 50000,
-            'sale_date': '2026-06-10',
-            'notes': '',
-        }]
-        self._confirm(client, rows, 'batch.csv', preview.data['file_hash'])
+    # 59-65: datas, revalidacao, invariantes, migrations e queries.
+    def test_59_datas_29_e_30_nao_se_deslocam(self):
+        response = self._upload(
+            'data;vendedor;valor\n29/06/2026;Carlos Silva;500,00\n30/06/2026;Carlos Silva;600,00'
+        )
+        self.assertEqual(
+            [row['date'] for row in response.data['results']],
+            ['2026-06-29', '2026-06-30'],
+        )
 
-        batch = SaleImportBatch.objects.first()
-        self.assertIsNotNone(batch)
-        self.assertEqual(batch.tenant, self.tenant)
-        self.assertEqual(batch.filename, 'batch.csv')
-        self.assertEqual(batch.status, 'IMPORTED')
-        self.assertEqual(batch.created_count, 1)
+    def test_60_falta_nao_recebe_valor_da_linha_seguinte(self):
+        response = self._upload(
+            'data;vendedor;valor\n29/06/2026;Carlos Silva;FALTA\n30/06/2026;Carlos Silva;9436,72'
+        )
+        first, second = response.data['results']
+        self.assertIsNone(first['normalized_amount'])
+        self.assertEqual(first['normalized_reason'], 'FALTA')
+        self.assertEqual(second['normalized_amount'], 943672)
+
+    def test_61_confirmacao_revalida_competencia(self):
+        preview, _ = self._preview_row()
+        self._set_period_status(CommissionPeriod.Status.FECHADA)
+        response = self._confirm(preview)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data['created'], 0)
+        self.assertEqual(response.data['conflicts'], 1)
+
+    def test_62_mudanca_entre_preview_e_confirmacao_detectada(self):
+        preview, _ = self._preview_row()
+        SellerDayJustification.objects.create(
+            tenant=self.tenant, seller=self.seller, date=date(2026, 6, 15),
+            reason='FALTA', created_by=self.manager,
+        )
+        response = self._confirm(preview)
+        self.assertEqual(response.data['created'], 0)
+        self.assertEqual(response.data['conflicts'], 1)
+
+    def test_63_nenhuma_sale_de_zero(self):
+        preview, _ = self._preview_row('0,00')
+        response = self._confirm(preview)
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(Sale.objects.filter(amount=0).exists())
+
+    def test_64_batch_existente_sem_migration_nova(self):
+        preview, _ = self._preview_row()
+        batch = SaleImportBatch.objects.get(uuid=preview.data['batch_uuid'])
+        self.assertEqual(batch.status, 'PENDING')
+        self.assertEqual(batch.file_hash, preview.data['file_hash'])
+
+    def _query_count(self, size):
+        rows = [
+            ['15/06/2026', 'Carlos Silva', f'{index + 1},00']
+            for index in range(size)
+        ]
+        headers = normalize_headers(['data', 'vendedor', 'valor'])
+        with CaptureQueriesContext(connection) as queries:
+            results = classify_import_rows(self.tenant, rows, headers)
+        self.assertEqual(len(results), size)
+        return len(queries)
+
+    def test_65_nenhuma_query_n_mais_um_por_linha(self):
+        counts = [self._query_count(size) for size in (10, 100, 500)]
+        self.assertEqual(counts[0], counts[1])
+        self.assertEqual(counts[1], counts[2])
+        self.assertLessEqual(counts[2], 5)

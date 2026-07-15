@@ -2,7 +2,7 @@
 {% load currency_filters %}
 {% block title %}Minhas Vendas — Mérito{% endblock %}
 {% block content %}
-<div class="min-h-[80vh]" x-data="minhasVendas()">
+<div class="min-h-[80vh] overflow-x-hidden" x-data="minhasVendas()">
 
   <!-- Header -->
   <div class="flex items-center gap-3 mb-4">
@@ -19,49 +19,88 @@
   </div>
   {% endif %}
 
-  <!-- Filtro de mês -->
-  <div class="bg-white rounded-2xl p-3 card-shadow mb-3">
-    <div class="flex items-center gap-2">
-      <label class="text-[11px] font-semibold text-gray-500 uppercase tracking-wide flex-shrink-0">Mês:</label>
-      <select x-model="filterMonth" @change="resetPagination()"
-              class="flex-1 px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-[13px] font-medium outline-none transition-all focus:border-brand-400 focus:ring-2 focus:ring-brand-100 appearance-none"
-              style="background-image:url('data:image/svg+xml;utf8,<svg xmlns=%22http://www.w3.org/2000/svg%22 width=%2216%22 height=%2216%22 viewBox=%220 0 24 24%22 fill=%22none%22 stroke=%22%239ca3af%22 stroke-width=%222%22><path stroke-linecap=%22round%22 stroke-linejoin=%22round%22 d=%22M6 9l6 6 6-6%22/></svg>');background-repeat:no-repeat;background-position:right 10px center;">
-        <option value="">Todos os meses</option>
-        {% for m in months %}
-        <option value="{{ m.value }}">{{ m.label }}</option>
-        {% endfor %}
-      </select>
-    </div>
-  </div>
-
-  {% if not sales %}
-  <!-- Estado vazio -->
+  {% if not competence_options and not has_orphan %}
+  <!-- LOTE 9 - sem competencias -->
   <div class="text-center pt-16">
     <div class="w-16 h-16 rounded-2xl bg-gray-100 flex items-center justify-center mx-auto mb-4">
       <svg class="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
     </div>
-    <p class="text-gray-500 font-medium text-[15px]">Nenhuma venda registrada.</p>
-    <p class="text-gray-400 text-[13px] mt-1 mb-5">Lance sua primeira venda para começar.</p>
-    <a href="{% url 'dashboard:mobile_lancar_venda' %}"
-       class="inline-block btn-primary shadow-lg shadow-brand-100">
-      Lançar primeira venda
-    </a>
+    <p class="text-gray-500 font-medium text-[15px]">Nenhuma competência disponível.</p>
+    <a href="{% url 'dashboard:mobile_lancar_venda' %}" class="inline-block btn-primary shadow-lg shadow-brand-100 mt-5">Lançar primeira venda</a>
   </div>
   {% else %}
 
-  <!-- Dica -->
-  <div class="bg-brand-50/60 border border-brand-100 text-brand-800 px-3.5 py-2.5 rounded-2xl text-[12px] flex items-start gap-2 mb-3">
-    <svg class="w-4 h-4 flex-shrink-0 mt-0.5 text-brand-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-    <p class="text-[11px] leading-relaxed">Você pode editar ou excluir lançamentos manuais enquanto a comissão estiver aberta.</p>
+  <!-- LOTE 1 - seletor PRINCIPAL de competencia (server-rendered) -->
+  <div class="bg-white rounded-2xl p-3 card-shadow mb-3">
+    <label class="text-[11px] font-semibold text-gray-500 uppercase tracking-wide block mb-1.5">Competência</label>
+    <select onchange="if(this.value){window.location.search='?period='+encodeURIComponent(this.value)}"
+            class="w-full px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-[13px] font-medium outline-none transition-all focus:border-brand-400 focus:ring-2 focus:ring-brand-100 appearance-none"
+            style="background-image:url('data:image/svg+xml;utf8,<svg xmlns=%22http://www.w3.org/2000/svg%22 width=%2216%22 height=%2216%22 viewBox=%220 0 24 24%22 fill=%22none%22 stroke=%22%239ca3af%22 stroke-width=%222%22><path stroke-linecap=%22round%22 stroke-linejoin=%22round%22 d=%22M6 9l6 6 6-6%22/></svg>');background-repeat:no-repeat;background-position:right 10px center;">
+      {% for opt in competence_options %}
+      <option value="{{ opt.uuid }}" {% if opt.uuid == selected_period_uuid %}selected{% endif %}>{{ opt.label }} · {{ opt.range }} · {{ opt.status_display }}</option>
+      {% endfor %}
+      {% if has_orphan %}
+      <option value="sem-competencia" {% if show_unassigned %}selected{% endif %}>Sem competência ({{ unassigned_count }})</option>
+      {% endif %}
+    </select>
+
+    {% if selected_competence %}
+    <div class="mt-3">
+      <p class="text-[15px] font-bold text-gray-900">Competência {{ selected_competence.display_label }}</p>
+      <p class="text-[12px] text-gray-500">{{ selected_competence.range_full }}</p>
+    </div>
+    <!-- LOTE 2 - resumo (sem comissao) -->
+    <div class="grid grid-cols-2 sm:grid-cols-3 gap-2 mt-3">
+      <div class="col-span-2 sm:col-span-1 bg-gray-50 rounded-xl px-2.5 py-2 text-center">
+        <p class="text-[9px] text-gray-400 uppercase tracking-wide">Total</p>
+        <p class="text-[13px] font-bold text-gray-800 whitespace-nowrap">{{ competence_total|brl }}</p>
+      </div>
+      <div class="bg-gray-50 rounded-xl px-2.5 py-2 text-center">
+        <p class="text-[9px] text-gray-400 uppercase tracking-wide">Lançamentos</p>
+        <p class="text-[13px] font-bold text-gray-800">{{ competence_count }}</p>
+      </div>
+      <div class="bg-gray-50 rounded-xl px-2.5 py-2 text-center min-w-0">
+        <p class="text-[9px] text-gray-400 uppercase tracking-wide">Status</p>
+        <p class="text-[13px] font-bold text-gray-800 break-words">{{ selected_competence.status_display }}</p>
+      </div>
+    </div>
+    <p class="text-[11px] text-gray-500 mt-2.5">Estas são as vendas consideradas nesta competência.</p>
+    {% elif show_unassigned %}
+    <div class="mt-3">
+      <p class="text-[15px] font-bold text-gray-900">Vendas sem competência</p>
+      <p class="text-[11px] text-amber-600 mt-0.5">Estas vendas não pertencem a nenhuma competência e não entram em nenhum total.</p>
+    </div>
+    {% endif %}
+  </div>
+
+  <!-- LOTE 4 - filtro SECUNDARIO por mes (opcional, reduz visualmente) -->
+  {% if month_options %}
+  <div class="bg-white rounded-2xl p-3 card-shadow mb-3">
+    <div class="flex flex-col sm:flex-row sm:items-center gap-2">
+      <label class="text-[11px] font-semibold text-gray-500 uppercase tracking-wide flex-shrink-0">Filtrar por mês:</label>
+      <select x-model="filterMonth" @change="onFilterChange()"
+              class="w-full sm:flex-1 px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-[13px] font-medium outline-none transition-all focus:border-brand-400 focus:ring-2 focus:ring-brand-100 appearance-none"
+              style="background-image:url('data:image/svg+xml;utf8,<svg xmlns=%22http://www.w3.org/2000/svg%22 width=%2216%22 height=%2216%22 viewBox=%220 0 24 24%22 fill=%22none%22 stroke=%22%239ca3af%22 stroke-width=%222%22><path stroke-linecap=%22round%22 stroke-linejoin=%22round%22 d=%22M6 9l6 6 6-6%22/></svg>');background-repeat:no-repeat;background-position:right 10px center;">
+        <option value="">Todos</option>
+        {% for opt in month_options %}
+        <option value="{{ opt.key }}">{{ opt.label }}</option>
+        {% endfor %}
+      </select>
+    </div>
   </div>
   {% endif %}
 
-  <!-- Lista de vendas agrupadas por semana (Alpine) -->
-  <div id="sales-list" class="space-y-3">
-    <template x-for="(week, wIdx) in visibleWeeks" :key="week.key">
-      <div class="bg-white rounded-2xl card-shadow overflow-hidden">
+  <!-- LOTE 9 - competencia selecionada sem vendas -->
+  {% if selected_competence and not sales_json %}
+  <div class="text-center py-12 bg-white rounded-2xl card-shadow">
+    <p class="text-gray-400 text-[13px] font-medium">Nenhuma venda registrada nesta competência.</p>
+  </div>
+  {% endif %}
 
-        <!-- Header da semana -->
+  <!-- Lista de vendas agrupadas por semana da competencia (Alpine) -->
+  <div id="sales-list" class="space-y-3">
+    <template x-for="week in groupedWeeks" :key="week.key">
+      <div class="bg-white rounded-2xl card-shadow overflow-hidden">
         <button @click="toggleWeek(week.key)"
                 class="w-full text-left flex items-center justify-between px-4 py-3 cursor-pointer hover:bg-gray-50/50 transition-colors active:bg-gray-50">
           <div class="flex items-center gap-2.5 min-w-0">
@@ -70,59 +109,66 @@
                  fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
             <div class="min-w-0">
               <p class="text-[13px] font-semibold text-gray-700 truncate" x-text="week.label"></p>
-              <p class="text-[11px] text-gray-400" x-text="week.range + ' · ' + week.sales.length + ' venda' + (week.sales.length !== 1 ? 's' : '')"></p>
+              <p class="text-[11px] text-gray-400 truncate"
+                 :title="(week.range ? week.range + ' · ' : '') + week.sales.length + ' venda' + (week.sales.length !== 1 ? 's' : '')"
+                 x-text="(week.range ? week.range + ' · ' : '') + week.sales.length + ' venda' + (week.sales.length !== 1 ? 's' : '')"></p>
             </div>
           </div>
           <div class="text-right flex-shrink-0 ml-3">
-            <p class="text-[14px] font-bold text-gray-800" x-text="formatMoneyBRL(week.total)"></p>
+            <p class="text-[14px] font-bold text-gray-800 whitespace-nowrap" x-text="formatMoneyBRL(week.total)"></p>
           </div>
         </button>
 
-        <!-- Vendas da semana (expansível) -->
         <div x-show="expandedWeeks[week.key]" x-transition:enter="transition ease-out duration-150" x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100">
           <div class="border-t border-gray-50">
             <template x-for="sale in week.sales" :key="sale.uuid">
-              <div class="flex items-center justify-between px-4 py-2.5 border-b border-gray-50 last:border-0 hover:bg-gray-50/30 transition-colors"
+              <div class="px-4 py-2.5 border-b border-gray-50 last:border-0 hover:bg-gray-50/30 transition-colors"
                    x-show="!sale._deleted">
-                <div class="flex items-center gap-2.5 min-w-0 flex-1">
-                  <div class="flex flex-col items-center w-8 flex-shrink-0">
-                    <span class="text-[12px] font-medium text-gray-500" x-text="String(sale.day).padStart(2, '0')"></span>
-                    <span class="text-[10px] text-gray-400" x-text="sale.weekday"></span>
-                  </div>
-                  <span class="w-1.5 h-1.5 rounded-full flex-shrink-0"
-                        :class="sale.status === 'ESTORNADA' ? 'bg-red-400' : (sale.origin === 'LINK' ? 'bg-brand-400' : 'bg-emerald-400')"></span>
-                    <div class="min-w-0 flex-1">
-                    <span class="font-semibold text-[14px] truncate block"
+                <!-- Linha principal: dia + valor (completo) + acoes (podem ir p/ 2a linha) -->
+                <div class="flex flex-wrap items-center gap-x-2 gap-y-1">
+                  <div class="flex items-center gap-2.5 min-w-0">
+                    <div class="flex flex-col items-center w-8 flex-shrink-0">
+                      <span class="text-[12px] font-medium text-gray-500" x-text="String(sale.day).padStart(2, '0')"></span>
+                      <span class="text-[10px] text-gray-400" x-text="sale.weekday"></span>
+                    </div>
+                    <span class="w-1.5 h-1.5 rounded-full flex-shrink-0"
+                          :class="sale.status === 'ESTORNADA' ? 'bg-red-400' : (sale.origin === 'LINK' ? 'bg-brand-400' : 'bg-emerald-400')"></span>
+                    <span class="font-semibold text-[14px] whitespace-nowrap"
                           :class="sale.status === 'ESTORNADA' ? 'text-gray-400 line-through' : 'text-gray-800'"
                           x-text="formatMoneyBRL(sale.amount)"></span>
-                    <div class="flex items-center gap-1.5 mt-0.5">
-                      <span x-show="sale.origin === 'LINK'"
-                            class="inline-flex items-center px-1.5 py-0.5 rounded-full text-[9px] font-semibold bg-brand-50 text-brand-600">Link</span>
-                      <span x-show="sale.status === 'ESTORNADA'"
-                            class="inline-flex items-center px-1.5 py-0.5 rounded-full text-[9px] font-semibold bg-red-50 text-red-600">Estornada</span>
-                      <span x-show="sale.change_log_count > 0"
-                            class="inline-flex items-center px-1.5 py-0.5 rounded-full text-[9px] font-semibold bg-amber-50 text-amber-600">Ajustada pelo gestor</span>
-                      <span x-show="sale.notes" class="text-[11px] text-gray-400 truncate" x-text="sale.notes"></span>
-                    </div>
+                  </div>
+                  <div class="flex items-center gap-1 ml-auto flex-shrink-0">
+                    <a :href="'/dashboard/mobile/lancar/?date=' + sale.date_iso"
+                       x-show="sale.canEdit"
+                       class="tap-target flex items-center justify-center w-9 h-9 text-gray-300 hover:text-brand-500 transition rounded-lg hover:bg-brand-50 active:scale-[0.95]">
+                      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
+                    </a>
+                    <button @click="deleteSale(sale)"
+                            x-show="sale.canDelete"
+                            class="tap-target flex items-center justify-center w-9 h-9 text-gray-300 hover:text-red-500 transition rounded-lg hover:bg-red-50 active:scale-[0.95]">
+                      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+                    </button>
+                    <button @click="openHistory(sale)"
+                            x-show="sale.change_log_count > 0"
+                            class="tap-target flex items-center justify-center w-9 h-9 text-gray-300 hover:text-amber-500 transition rounded-lg hover:bg-amber-50 active:scale-[0.95]"
+                            title="Ver histórico">
+                      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                    </button>
                   </div>
                 </div>
-                <div class="flex items-center gap-0.5 flex-shrink-0 ml-2">
-                  <a :href="'/dashboard/mobile/lancar/?date=' + sale.date_iso"
-                     x-show="sale.canEdit"
-                     class="tap-target flex items-center justify-center w-9 h-9 text-gray-300 hover:text-brand-500 transition rounded-lg hover:bg-brand-50 active:scale-[0.95]">
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
-                  </a>
-                  <button @click="deleteSale(sale)"
-                          x-show="sale.canDelete"
-                          class="tap-target flex items-center justify-center w-9 h-9 text-gray-300 hover:text-red-500 transition rounded-lg hover:bg-red-50 active:scale-[0.95]">
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
-                  </button>
-                  <button @click="openHistory(sale)"
-                          x-show="sale.change_log_count > 0"
-                          class="tap-target flex items-center justify-center w-9 h-9 text-gray-300 hover:text-amber-500 transition rounded-lg hover:bg-amber-50 active:scale-[0.95]"
-                          title="Ver historico">
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-                  </button>
+                <!-- Linha secundaria: badges (flex-wrap) + observacao (linha propria) -->
+                <div class="flex flex-wrap items-center gap-1.5 mt-1.5 pl-[42px]"
+                     x-show="sale.origin === 'LINK' || sale.origin === 'IMPORTADA' || sale.status === 'ESTORNADA' || sale.change_log_count > 0 || sale.notes">
+                  <span x-show="sale.origin === 'LINK'"
+                        class="inline-flex items-center px-1.5 py-0.5 rounded-full text-[9px] font-semibold bg-brand-50 text-brand-600">Link</span>
+                  <span x-show="sale.origin === 'IMPORTADA'"
+                        class="inline-flex items-center px-1.5 py-0.5 rounded-full text-[9px] font-semibold bg-indigo-50 text-indigo-600">Importada</span>
+                  <span x-show="sale.status === 'ESTORNADA'"
+                        class="inline-flex items-center px-1.5 py-0.5 rounded-full text-[9px] font-semibold bg-red-50 text-red-600">Estornada</span>
+                  <span x-show="sale.change_log_count > 0"
+                        class="inline-flex items-center px-1.5 py-0.5 rounded-full text-[9px] font-semibold bg-amber-50 text-amber-600">Ajustada pelo gestor</span>
+                  <span x-show="sale.notes" class="basis-full text-[11px] text-gray-400 break-words"
+                        :title="sale.notes" x-text="sale.notes"></span>
                 </div>
               </div>
             </template>
@@ -131,22 +177,25 @@
       </div>
     </template>
 
-    <!-- Botão mostrar mais -->
-    <button @click="showMore()"
-            x-show="hasMore"
-            class="w-full py-3 bg-white rounded-2xl card-shadow text-[13px] font-medium text-brand-600 hover:text-brand-700 hover:bg-brand-50/50 transition tap-target active:scale-[0.98]">
-      <span x-text="'Mostrar mais ' + hiddenWeeksCount + ' semana' + (hiddenWeeksCount !== 1 ? 's' : '')"></span>
-    </button>
-
-    <!-- Nenhuma venda neste período -->
-    <template x-if="filteredSales.length === 0 && sales.length > 0">
+    <!-- LOTE 9 - filtro mensal secundario sem vendas -->
+    <template x-if="sales.length > 0 && filteredSales.length === 0">
       <div class="text-center py-10">
-        <p class="text-gray-400 text-[13px] font-medium">Nenhuma venda neste período.</p>
+        <p class="text-gray-400 text-[13px] font-medium">Nenhuma venda neste mês dentro da competência selecionada.</p>
       </div>
     </template>
 
     <p class="text-[10px] text-gray-400 text-center mt-2" x-show="sales.some(s => s.status === 'ESTORNADA')">Vendas estornadas não entram nos totais.</p>
   </div>
+
+  <!-- LOTE 6 - alerta de vendas sem competencia -->
+  {% if has_orphan and not show_unassigned %}
+  <a href="?period=sem-competencia"
+     class="mt-3 flex items-center justify-between bg-amber-50 border border-amber-200 text-amber-800 px-3.5 py-2.5 rounded-2xl text-[12px] font-medium">
+    <span>{{ unassigned_count }} venda{{ unassigned_count|pluralize }} sem competência</span>
+    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+  </a>
+  {% endif %}
+  {% endif %}
 
   <!-- Modal de historico (mobile) -->
   <div x-show="historyModalOpen" class="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4"
@@ -156,13 +205,13 @@
     <div class="relative bg-white rounded-t-2xl sm:rounded-2xl shadow-2xl w-full sm:max-w-lg p-5 z-10 max-h-[75vh] overflow-y-auto"
          @click.outside="historyModalOpen = false">
       <div class="flex items-center justify-between mb-4">
-        <h3 class="text-[16px] font-bold text-gray-900">Historico de Alteracoes</h3>
+        <h3 class="text-[16px] font-bold text-gray-900">Histórico de Alterações</h3>
         <button @click="historyModalOpen = false" class="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-gray-100 transition text-gray-400">
           <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
         </button>
       </div>
       <template x-if="historyData.length === 0">
-        <p class="text-center text-gray-400 py-8 text-[13px]">Nenhuma alteracao registrada.</p>
+        <p class="text-center text-gray-400 py-8 text-[13px]">Nenhuma alteração registrada.</p>
       </template>
       <template x-for="(entry, idx) in historyData" :key="entry.uuid">
         <div class="relative pb-5 pl-7" :class="idx < historyData.length - 1 ? 'border-l-2 border-gray-100' : ''">
@@ -186,156 +235,124 @@
     </div>
   </div>
 
-  <!-- Fallback server-rendered (exibido se Alpine falhar) -->
-  {% if sales %}
-  <div class="space-y-3" id="sales-fallback">
-    {% for s in sales|slice:":20" %}
-    <div class="bg-white rounded-2xl p-4 card-shadow flex items-center justify-between">
+  <!-- Fallback server-rendered somente leitura (exibido se Alpine falhar) -->
+  {% if sales_json %}
+  <div class="space-y-3 mt-3" id="sales-fallback">
+    {% for s in sales_json|slice:":30" %}
+    <div class="bg-white rounded-2xl p-4 card-shadow">
       <div class="flex items-center gap-2.5 min-w-0">
         <span class="w-1.5 h-1.5 rounded-full flex-shrink-0 {% if s.status == 'ESTORNADA' %}bg-red-400{% elif s.origin == 'LINK' %}bg-brand-400{% else %}bg-emerald-400{% endif %}"></span>
-        <span class="text-[12px] font-medium text-gray-500 flex-shrink-0">{{ s.sale_date|date:"d/m" }}</span>
+        <span class="text-[12px] font-medium text-gray-500 flex-shrink-0">{{ s.date }}</span>
         <span class="font-semibold text-[14px] text-gray-900">{{ s.amount|brl }}</span>
         {% if s.notes %}<span class="text-[11px] text-gray-400 truncate">— {{ s.notes|truncatechars:20 }}</span>{% endif %}
       </div>
-      {% if s.origin == 'MANUAL' %}
-      <a href="{% url 'dashboard:mobile_lancar_venda' %}?date={{ s.sale_date|date:'Y-m-d' }}"
-         class="tap-target flex items-center justify-center w-9 h-9 text-gray-300 hover:text-brand-500 transition rounded-lg hover:bg-brand-50">
-        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
-      </a>
-      {% endif %}
+      <div class="flex flex-wrap items-center gap-1.5 mt-1.5">
+        <span class="inline-flex items-center px-1.5 py-0.5 rounded-full text-[9px] font-semibold bg-gray-100 text-gray-500">{{ s.origin_display }}</span>
+        {% if s.status == 'ESTORNADA' %}
+        <span class="inline-flex items-center px-1.5 py-0.5 rounded-full text-[9px] font-semibold bg-red-50 text-red-600">Estornada</span>
+        {% endif %}
+      </div>
     </div>
     {% endfor %}
-    {% if sales.count > 20 %}
-    <p class="text-[11px] text-gray-400 text-center">Mostrando 20 vendas. Use os filtros acima.</p>
-    {% endif %}
   </div>
   {% endif %}
 </div>
 
 {{ sales_json|json_script:"sales-data" }}
+{{ weeks_json|json_script:"weeks-data" }}
 <script>
 var WEEKDAYS = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sab'];
 
-function getWeekNumber(day) {
-    return Math.ceil(day / 7);
-}
-
-function getWeekRange(weekNum, monthSales) {
-    if (!monthSales.length) return '';
-    var days = monthSales.map(function(s) { return parseInt(s.day, 10); });
-    var filtered = days.filter(function(d) { return getWeekNumber(d) === weekNum; });
-    if (!filtered.length) return '';
-    var minDay = Math.min.apply(null, filtered);
-    var maxDay = Math.max.apply(null, filtered);
-    var month = monthSales[0].month;
-    return String(minDay).padStart(2,'0') + '/' + month + ' - ' + String(maxDay).padStart(2,'0') + '/' + month;
+function _parseJsonScript(id) {
+    try {
+        var el = document.getElementById(id);
+        if (!el || !el.textContent) return [];
+        var parsed = JSON.parse(el.textContent);
+        if (typeof parsed === 'string') parsed = JSON.parse(parsed);
+        return Array.isArray(parsed) ? parsed : [];
+    } catch (e) {
+        console.error('Erro ao parsear ' + id + ':', e);
+        return [];
+    }
 }
 
 function minhasVendas() {
-    // Parse seguro — trata caso de dupla serialização como fallback
-    var raw = [];
-    try {
-        var el = document.getElementById('sales-data');
-        if (el && el.textContent) {
-            var parsed = JSON.parse(el.textContent);
-            // Se veio como string (dupla serialização legada), parse de novo
-            raw = typeof parsed === 'string' ? JSON.parse(parsed) : parsed;
-        }
-    } catch (e) {
-        console.error('Erro ao parsear sales-data:', e);
-    }
-
     return {
-        sales: Array.isArray(raw) ? raw : [],
-        currentMonth: {{ current_month }},
-        filterMonth: String({{ current_month }}),
-        visibleWeeksCount: 3,
+        sales: _parseJsonScript('sales-data'),
+        weeksMeta: _parseJsonScript('weeks-data'),
+        filterMonth: '',
         expandedWeeks: {},
         _confirmIds: {},
 
         init() {
-            // Esconder fallback se Alpine renderizou com sucesso
             var fb = document.getElementById('sales-fallback');
             if (fb && this.sales.length > 0) {
                 fb.style.display = 'none';
             }
-            this.filterSales();
-        },
-
-        get filteredSales() {
-            var m = this.filterMonth;
-            if (!m) return this.sales;
-            return this.sales.filter(function(s) {
-                var parts = s.date.split('/');
-                return parseInt(parts[1], 10) === parseInt(m, 10);
-            });
-        },
-
-        get monthGroupedSales() {
-            var sales = this.filteredSales;
-            var groups = {};
-            sales.forEach(function(s) {
-                var parts = s.date.split('/');
-                var day = parseInt(parts[0], 10);
-                var month = parts[1];
-                s.day = day;
-                s.month = month;
-                var d = new Date(s.date_iso + 'T00:00:00');
-                s.weekday = WEEKDAYS[d.getDay()];
-                var wn = getWeekNumber(day);
-                var key = month + '-W' + wn;
-                if (!groups[key]) groups[key] = { key: key, weekNum: wn, month: month, sales: [], total: 0 };
-                groups[key].sales.push(s);
-                if (s.status !== 'ESTORNADA') {
-                    groups[key].total += s.amount;
-                }
-            });
-            var result = [];
-            Object.keys(groups).forEach(function(k) {
-                var g = groups[k];
-                g.range = getWeekRange(g.weekNum, g.sales);
-                g.label = 'Semana ' + g.weekNum;
-                g.sales.sort(function(a, b) { return parseInt(b.day, 10) - parseInt(a.day, 10); });
-                result.push(g);
-            });
-            result.sort(function(a, b) {
-                if (a.month !== b.month) return parseInt(b.month, 10) - parseInt(a.month, 10);
-                return b.weekNum - a.weekNum;
-            });
-            return result;
-        },
-
-        get visibleWeeks() {
-            return this.monthGroupedSales.slice(0, this.visibleWeeksCount);
-        },
-
-        get hiddenWeeksCount() {
-            return Math.max(0, this.monthGroupedSales.length - this.visibleWeeksCount);
-        },
-
-        get hasMore() {
-            return this.hiddenWeeksCount > 0;
-        },
-
-        filterSales() {
-            this.visibleWeeksCount = 3;
-            var weeks = this.monthGroupedSales;
+            // Ordem crescente: groupedWeeks[0] e a Semana 1 (menor indice).
+            var weeks = this.groupedWeeks;
             this.expandedWeeks = {};
             if (weeks.length > 0) {
                 this.expandedWeeks[weeks[0].key] = true;
             }
         },
 
-        resetPagination() {
-            this.filterSales();
+        // LOTE 2 - ao trocar o filtro de mes, recalcula as semanas visiveis,
+        // descarta chaves abertas de semanas ocultas e garante a primeira
+        // semana visivel aberta se nenhuma estiver.
+        onFilterChange() {
+            var weeks = this.groupedWeeks;
+            var next = {};
+            var anyOpen = false;
+            weeks.forEach(function(w) {
+                if (this.expandedWeeks[w.key]) { next[w.key] = true; anyOpen = true; }
+            }, this);
+            if (!anyOpen && weeks.length > 0) {
+                next[weeks[0].key] = true;
+            }
+            this.expandedWeeks = next;
+        },
+
+        get filteredSales() {
+            var m = this.filterMonth;
+            if (!m) return this.sales;
+            return this.sales.filter(function(s) {
+                return s.month_key === m;
+            });
+        },
+
+        // LOTE 3 - agrupa por week_index (calculado no backend a partir do
+        // inicio da competencia). Datas civis via parseCivilDate (sem fuso).
+        get groupedWeeks() {
+            var groups = {};
+            this.filteredSales.forEach(function(s) {
+                var wi = s.week_index || 1;
+                var d = parseCivilDate(s.date_iso);
+                s.weekday = d ? WEEKDAYS[d.getDay()] : '';
+                s.day = parseInt(s.date.split('/')[0], 10);
+                if (!groups[wi]) groups[wi] = { index: wi, sales: [], total: 0 };
+                groups[wi].sales.push(s);
+                if (s.status !== 'ESTORNADA') {
+                    groups[wi].total += s.amount;
+                }
+            });
+            var metaByIndex = {};
+            this.weeksMeta.forEach(function(w) { metaByIndex[w.index] = w; });
+            var result = Object.keys(groups).map(function(k) {
+                var g = groups[k];
+                var meta = metaByIndex[g.index] || {};
+                g.key = 'w' + g.index;
+                g.label = meta.label || ('Semana ' + g.index);
+                g.range = meta.range || '';
+                g.sales.sort(function(a, b) { return b.day - a.day; });
+                return g;
+            });
+            result.sort(function(a, b) { return a.index - b.index; });
+            return result;
         },
 
         toggleWeek(key) {
             this.expandedWeeks[key] = !this.expandedWeeks[key];
-        },
-
-        showMore() {
-            this.visibleWeeksCount += 3;
         },
 
         deleteSale(sale) {
@@ -347,7 +364,6 @@ function minhasVendas() {
                 setTimeout(function() { delete self._confirmIds[sale.uuid]; }, 3000);
                 return;
             }
-            var self = this;
             fetch('/api/sales/' + sale.uuid + '/', {
                 method: 'DELETE',
                 headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCSRFToken() }
@@ -360,7 +376,7 @@ function minhasVendas() {
                 }
             }).catch(function() { showToast('Erro de conexão.', 'error'); });
         },
-        // Historico de alteracoes
+
         historyModalOpen: false,
         historyData: [],
         async openHistory(sale) {

@@ -36,14 +36,15 @@ def build_accounting_zip(tenant, month_int, year_int):
     buf = BytesIO()
     with ZipFile(buf, 'w') as zf:
         sales = SModel.objects.filter(
-            tenant=tenant, sale_date__gte=start, sale_date__lte=end,
+            tenant=tenant, origin__in=SModel.COMMISSION_ORIGINS,
+            sale_date__gte=start, sale_date__lte=end,
         ).select_related('seller').order_by('sale_date', 'seller__name')
 
         csv1_lines = ['Data;Vendedor;CPF Vendedor;Valor (R$);Origem;Status;Observacao']
         for s in sales:
             cpf = s.seller.cpf_formatted or 'Nao informado'
             valor = f'{s.amount/100:,.2f}'.replace(',', 'X').replace('.', ',').replace('X', '.')
-            origin = 'Link' if s.origin == SModel.Origin.LINK else 'Manual'
+            origin = 'Importação' if s.origin == SModel.Origin.IMPORTADA else 'Manual'
             status = 'Estornada' if s.status == 'ESTORNADA' else 'Ativa'
             csv1_lines.append(f'{s.sale_date.strftime("%d/%m/%Y")};{s.seller.name};{cpf};{valor};{origin};{status};{s.notes or ""}')
         zf.writestr(f'vendas_{month_int:02d}_{year_int}.csv', '\n'.join(csv1_lines).encode('utf-8-sig'))
@@ -132,6 +133,7 @@ def build_accounting_zip(tenant, month_int, year_int):
         if prev_period:
             prev_total = SModel.objects.filter(
                 tenant=tenant,
+                origin__in=SModel.COMMISSION_ORIGINS,
                 status='ATIVA',
                 sale_date__gte=prev_period.start_date,
                 sale_date__lte=prev_period.end_date,

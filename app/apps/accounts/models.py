@@ -35,9 +35,9 @@ class Tenant(models.Model):
         help_text='Cartao de postagem (opcional)')
     default_commission_rate = models.DecimalField(max_digits=5, decimal_places=4, default=0.01)
     period_start_day = models.PositiveSmallIntegerField(
-        default=1,
+        default=21,
         validators=[MinValueValidator(1), MaxValueValidator(28)],
-        help_text='Dia de inicio do periodo de comissao (1 = mes-calendario).',
+        help_text='Dia de inicio do ciclo de comissao (ex.: 21 sugere periodos de 21 a 20).',
     )
     link_expires_in = models.PositiveIntegerField(
         default=1200,

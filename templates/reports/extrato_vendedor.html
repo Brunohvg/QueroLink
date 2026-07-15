@@ -42,10 +42,11 @@
     <div class="info">
         <strong>Vendedor:</strong> {{ seller.name }} &nbsp;&nbsp;
         <strong>Competencia:</strong> {{ competencia }} &nbsp;&nbsp;
+        {% if periodo_range %}<strong>Periodo:</strong> {{ periodo_range }} &nbsp;&nbsp;{% endif %}
         <strong>Gerado em:</strong> {{ data_geracao }}
     </div>
 
-    <h2>Vendas do Mes</h2>
+    <h2>Vendas da Competencia</h2>
 
     {% if sales_data %}
     <table>

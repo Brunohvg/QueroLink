@@ -5,7 +5,7 @@ from celery import shared_task
 from django.conf import settings
 from django.utils import timezone
 from django.core.mail import send_mail, EmailMessage
-from django.db.models import Sum as DSum, Q
+from django.db.models import Sum as DSum
 from app.apps.notifications.models import Notification, MessageTemplate, LifecycleEmail
 from app.services.messaging.whatsapp import WhatsappClient, InvalidNumberError
 
@@ -190,7 +190,10 @@ def notify_seller_link_status(seller, order, event_type, motivo=''):
         logger.warning("Seller %s has no phone, skipping link notification", seller.id if seller else '?')
         return None
     valor = format_brl_cents(order.total_amount)
-    create_and_send_notification(
+    payment = order.payments.order_by('created_at').first()
+    installments = payment.installments if payment else 1
+    parcelas = f"até {installments}x"
+    return create_and_send_notification(
         tenant=seller.tenant,
         event_type=event_type,
         channel=MessageTemplate.Channel.WHATSAPP,
@@ -201,6 +204,7 @@ def notify_seller_link_status(seller, order, event_type, motivo=''):
             "vendedor": seller.name,
             "cliente": order.customer_name or 'cliente',
             "valor": valor,
+            "parcelas": parcelas,
             "link": order.payment_link.gateway_url if hasattr(order, 'payment_link') and order.payment_link else '',
             "motivo": motivo,
         },
@@ -254,10 +258,11 @@ def notify_commission_adjusted(seller_commission, adjustment):
 @shared_task(soft_time_limit=300, time_limit=360)
 def send_daily_entry_reminders():
     from datetime import time, timedelta
-    from django.db.models import Q
     from app.apps.accounts.models import Tenant
+    from app.apps.commissions.models import CommissionPeriod
+    from app.apps.commissions.services import resolve_period_for_date
     from app.apps.sales.models import Sale
-    from app.apps.sellers.models import Seller
+    from app.apps.sellers.models import Seller, SellerDayJustification
 
     now = timezone.localtime(timezone.now())
     current_time = now.time()
@@ -280,29 +285,47 @@ def send_daily_entry_reminders():
             continue
         if not is_working_day(tenant, current_date):
             continue
+        period = resolve_period_for_date(tenant, current_date)
+        if not period or period.status not in (
+            CommissionPeriod.Status.ABERTA,
+            CommissionPeriod.Status.PARCIALMENTE_FECHADA,
+            CommissionPeriod.Status.PARCIALMENTE_PAGA,
+        ):
+            continue
 
-        sellers_with_sale_today = Sale.objects.filter(
+        seller_ids_with_sale_today = set(Sale.objects.filter(
             tenant=tenant,
-            origin=Sale.Origin.MANUAL,
+            origin__in=Sale.COMMISSION_ORIGINS,
             status='ATIVA',
             sale_date=current_date,
-        ).values_list('seller_id', flat=True).distinct()
+        ).values_list('seller_id', flat=True).distinct())
+
+        seller_ids_with_justification_today = set(
+            SellerDayJustification.objects.filter(
+                tenant=tenant,
+                date=current_date,
+            ).values_list('seller_id', flat=True).distinct()
+        )
+
+        already_sent_seller_ids = set(Notification.objects.filter(
+            tenant=tenant,
+            event_type=MessageTemplate.EventType.DAILY_REMINDER,
+            created_at__date=current_date,
+        ).values_list('seller_id', flat=True))
 
         sellers_to_remind = Seller.objects.filter(
             tenant=tenant, is_active=True,
-        ).exclude(uuid__in=sellers_with_sale_today).select_related('user')
+        ).exclude(
+            pk__in=seller_ids_with_sale_today,
+        ).exclude(
+            pk__in=seller_ids_with_justification_today,
+        ).exclude(
+            pk__in=already_sent_seller_ids,
+        ).select_related('user')
 
         for seller in sellers_to_remind:
             if not seller.phone:
                 skipped_no_phone += 1
-                continue
-
-            already_sent = Notification.objects.filter(
-                seller=seller,
-                event_type=MessageTemplate.EventType.DAILY_REMINDER,
-                created_at__date=current_date,
-            ).exists()
-            if already_sent:
                 continue
 
             create_and_send_notification(
@@ -395,7 +418,16 @@ def _fallback_body(event_type, context):
             f"Lance agora pelo app para manter sua comissao em dia."
         )
     if event_type in (MessageTemplate.EventType.LINK_CREATED,):
-        return f"Ola {v}! Seu link de {val} para {cli} foi gerado com sucesso."
+        parcelas = context.get('parcelas', '')
+        return (
+            "Link de pagamento criado\n"
+            f"Cliente: {cli}\n"
+            f"Valor: {val}\n"
+            f"Pagamento: {parcelas}\n"
+            "Link:\n"
+            f"{link}\n"
+            "Encaminhe este link ao cliente."
+        )
     if event_type in (MessageTemplate.EventType.PAYMENT_PAID,):
         return f"Ola {v}! O link de {val} do(a) {cli} foi pago!"
     if event_type in (MessageTemplate.EventType.LINK_CANCELED,):

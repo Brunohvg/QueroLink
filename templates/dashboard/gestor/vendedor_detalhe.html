@@ -1,4 +1,6 @@
 {% extends 'dashboard/base_desktop.html' %}
+{% load static %}
+{% block chart_js %}<script src="{% static 'js/chart.umd.js' %}" defer></script>{% endblock %}
 {% block title %}{{ seller.name }} — Mérito{% endblock %}
 {% block content %}
 <div x-data="sellerDetailPage()" x-init="init('{{ seller.uuid }}')" class="max-w-7xl mx-auto">
@@ -50,16 +52,16 @@
   <div class="bg-white rounded-2xl border border-gray-100 shadow-[0_1px_3px_-1px_rgba(0,0,0,0.04),0_4px_16px_-4px_rgba(67,97,238,0.06)] p-5 mb-6">
     <div class="flex flex-col sm:flex-row flex-wrap items-start sm:items-center gap-3">
       <div class="flex items-center gap-2">
-        <label class="text-[13px] font-medium text-gray-500">Mes:</label>
-        <select x-model="month" @change="load()" class="px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-[13px] outline-none transition-all focus:border-brand-400 focus:ring-2 focus:ring-brand-100">
-          <template x-for="m in 12" :key="m"><option :value="m" x-text="String(m).padStart(2,'0')"></option></template>
-        </select>
-        <select x-model="year" @change="load()" class="px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-[13px] outline-none transition-all focus:border-brand-400 focus:ring-2 focus:ring-brand-100">
-          <option value="2024">2024</option><option value="2025">2025</option><option value="2026">2026</option><option value="2027">2027</option><option value="2028">2028</option>
+        <label class="text-[13px] font-medium text-gray-500">Modo:</label>
+        <select x-model="mode" @change="onModeChange()" class="px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-[13px] outline-none transition-all focus:border-brand-400 focus:ring-2 focus:ring-brand-100">
+          <option value="period">Competencia</option>
+          <option value="custom">Periodo personalizado</option>
         </select>
       </div>
-      <span class="text-[13px] text-gray-300 hidden sm:inline">|</span>
-      <div class="flex items-center gap-2">
+      <div class="flex items-center gap-2" x-show="mode === 'period'">
+        {% include 'components/_period_selector.html' with periods=periods selected_period_uuid=selected_period_uuid has_periods=has_periods %}
+      </div>
+      <div class="flex items-center gap-2" x-show="mode === 'custom'">
         <label class="text-[13px] font-medium text-gray-500">De:</label>
         <input type="date" x-model="startDate" @change="load()" class="px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-[13px] outline-none transition-all focus:border-brand-400 focus:ring-2 focus:ring-brand-100">
         <label class="text-[13px] font-medium text-gray-500">ate:</label>
@@ -81,6 +83,15 @@
         </button>
       </div>
     </div>
+    {% verbatim %}
+    <p class="text-[12px] text-gray-500 mt-3" x-show="mode === 'period' && sellerData?.selected_period">
+      Competencia <span class="font-semibold" x-text="sellerData?.selected_period?.display_label"></span> ·
+      <span x-text="sellerData?.selected_period ? formatCivilDate(sellerData.selected_period.start_date) + ' a ' + formatCivilDate(sellerData.selected_period.end_date) : ''"></span>
+    </p>
+    <p class="text-[12px] text-amber-600 mt-3" x-show="mode === 'custom'">
+      Periodo customizado <span class="font-semibold" x-text="startDate && endDate ? (formatCivilDate(startDate) + ' a ' + formatCivilDate(endDate)) : ''"></span> — a comissao oficial e calculada por competencia.
+    </p>
+    {% endverbatim %}
   </div>
 
   {% verbatim %}
@@ -97,8 +108,12 @@
       <div class="absolute top-0 right-0 w-32 h-32 bg-gradient-to-bl from-emerald-50/60 to-transparent rounded-full -mr-8 -mt-8"></div>
       <div class="relative">
         <p class="text-[11px] font-semibold text-gray-400 uppercase tracking-[0.08em] mb-2">Comissao</p>
-        <p class="font-display text-[28px] font-bold text-emerald-600 leading-none" x-text="formatMoneyBRL(sellerData?.commissions?.[0]?.commission_amount || 0)"></p>
-        <p class="text-[13px] text-gray-500 mt-2">Taxa: <span class="font-medium text-emerald-600" x-text="sellerData?.seller?.commission_rate ? (sellerData.seller.commission_rate*100).toFixed(2)+'%' : '-'"></span></p>
+        <p class="font-display text-[28px] font-bold text-emerald-600 leading-none" x-text="mode === 'custom' ? '—' : formatMoneyBRL(sellerData?.selected_period_commission?.commission_amount || 0)"></p>
+        <p class="text-[13px] text-gray-500 mt-2" x-show="mode !== 'custom'">Taxa: <span class="font-medium text-emerald-600" x-text="sellerData?.selected_period_commission ? (sellerData.selected_period_commission.commission_rate*100).toFixed(2)+'%' : '-'"></span>
+          <span x-show="sellerData?.selected_period_commission?.is_estimated" class="text-[11px] text-gray-400">· estimativa</span>
+          <span x-show="sellerData?.selected_period_commission && !sellerData?.selected_period_commission?.is_estimated" class="text-[11px] text-gray-400">· congelada</span>
+        </p>
+        <p class="text-[12px] text-amber-600 mt-2" x-show="mode === 'custom'" title="A comissao oficial e calculada por competencia">A comissao oficial e calculada por competencia.</p>
       </div>
     </div>
     <div class="relative overflow-hidden bg-white rounded-2xl p-5 border border-gray-100 shadow-[0_1px_3px_-1px_rgba(0,0,0,0.04),0_4px_16px_-4px_rgba(67,97,238,0.06)]">
@@ -117,12 +132,12 @@
       <div class="h-64"><canvas id="evolutionChart"></canvas></div>
     </div>
     <div class="bg-white rounded-2xl border border-gray-100 shadow-[0_1px_3px_-1px_rgba(0,0,0,0.04),0_4px_16px_-4px_rgba(67,97,238,0.06)] p-6" x-show="sellerData?.comparison?.length">
-      <h3 class="text-[13px] font-semibold text-gray-400 uppercase tracking-wider mb-4">Comparacao mensal</h3>
+      <h3 class="text-[13px] font-semibold text-gray-400 uppercase tracking-wider mb-4">Comparacao entre competencias</h3>
       <div class="overflow-x-auto">
         <table class="w-full text-left text-[13px]">
           <thead>
             <tr class="bg-gray-50/80">
-              <th class="px-4 py-3 text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Mes</th>
+              <th class="px-4 py-3 text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Competencia</th>
               <th class="px-4 py-3 text-[11px] font-semibold text-gray-500 uppercase tracking-wider text-right">Vendas</th>
               <th class="px-4 py-3 text-[11px] font-semibold text-gray-500 uppercase tracking-wider text-right">Total</th>
               <th class="px-4 py-3 text-[11px] font-semibold text-gray-500 uppercase tracking-wider text-right">Comissao</th>
@@ -160,7 +175,7 @@
         <tbody>
           <template x-for="s in sellerData?.manual_sales" :key="s.uuid">
             <tr class="border-b border-gray-50 hover:bg-gray-50/50 transition-colors">
-              <td class="px-4 py-3.5 text-[13px] text-gray-500" x-text="new Date(s.sale_date).toLocaleDateString('pt-BR')"></td>
+              <td class="px-4 py-3.5 text-[13px] text-gray-500" x-text="formatCivilDate(s.sale_date)"></td>
               <td class="px-4 py-3.5 font-semibold text-[14px]" :class="s.status === 'ESTORNADA' ? 'text-gray-400 line-through opacity-60' : 'text-gray-900'" x-text="formatMoneyBRL(s.amount)"></td>
               <td class="px-4 py-3.5 text-[13px] text-gray-500">
                 <span x-text="s.notes || '—'"></span>
@@ -191,7 +206,7 @@
     <p class="px-6 pb-3 text-[10px] text-gray-400">Vendas estornadas nao entram nos totais.</p>
 
     <!-- Modal de edicao -->
-    <div x-show="editModalOpen" class="fixed inset-0 z-50 flex items-center justify-center p-4"
+    <div x-show="editModalOpen" x-cloak class="fixed inset-0 z-50 flex items-center justify-center p-4"
          x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100"
          x-transition:leave="transition ease-in duration-150" x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0"
          @keydown.escape.window="editModalOpen = false">
@@ -245,7 +260,7 @@
     </div>
 
     <!-- Modal de historico -->
-    <div x-show="historyModalOpen" class="fixed inset-0 z-50 flex items-center justify-center p-4"
+    <div x-show="historyModalOpen" x-cloak class="fixed inset-0 z-50 flex items-center justify-center p-4"
          x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100"
          x-transition:leave="transition ease-in duration-150" x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0"
          @keydown.escape.window="historyModalOpen = false">
@@ -302,7 +317,7 @@
         <tbody>
           <template x-for="s in sellerData?.link_sales" :key="s.uuid">
             <tr class="border-b border-gray-50 hover:bg-gray-50/50 transition-colors">
-              <td class="px-4 py-3.5 text-[13px] text-gray-500" x-text="new Date(s.sale_date).toLocaleDateString('pt-BR')"></td>
+              <td class="px-4 py-3.5 text-[13px] text-gray-500" x-text="formatCivilDate(s.sale_date)"></td>
               <td class="px-4 py-3.5 font-semibold text-[14px]" :class="s.status === 'ESTORNADA' ? 'text-gray-400 line-through opacity-60' : 'text-gray-900'" x-text="formatMoneyBRL(s.amount)"></td>
               <td class="px-4 py-3.5 text-[13px] text-gray-500">
                 <span x-text="s.notes || '—'"></span>
@@ -354,6 +369,69 @@
       </template>
     </div>
   </div>
+
+  <!-- LOTE 5 - Controle de dias (justificativas). NAO e financeiro. -->
+  <div class="bg-white rounded-2xl border border-gray-100 shadow-[0_1px_3px_-1px_rgba(0,0,0,0.04),0_4px_16px_-4px_rgba(67,97,238,0.06)] p-6"
+       x-show="sellerData?.day_status">
+    <div class="flex items-center justify-between mb-4">
+      <h3 class="text-[13px] font-semibold text-gray-400 uppercase tracking-wider">Controle de dias</h3>
+      <div class="flex items-center gap-2 text-[11px]">
+        <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700"><span x-text="sellerData?.day_status?.summary?.lancados||0"></span> lançados</span>
+        <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-sky-50 text-sky-700"><span x-text="sellerData?.day_status?.summary?.justificados||0"></span> justificados</span>
+        <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-50 text-amber-700"><span x-text="sellerData?.day_status?.summary?.pendentes||0"></span> pendentes</span>
+      </div>
+    </div>
+    <div class="space-y-1">
+      <template x-for="d in sellerData?.day_status?.days" :key="d.date">
+        <div class="flex items-center justify-between py-2 px-3 rounded-lg hover:bg-gray-50 transition text-[13px]"
+             x-show="d.status !== 'NAO_UTIL'">
+          <span class="font-medium text-gray-700 min-w-[92px]" x-text="formatCivilDate(d.date)"></span>
+          <span class="flex-1 text-gray-500">
+            <template x-if="d.status === 'LANCADO'"><span class="text-emerald-600 font-medium">Lançado · <span x-text="formatMoneyBRL(d.active_sales_total)"></span></span></template>
+            <template x-if="d.status === 'JUSTIFICADO'"><span class="text-sky-600 font-medium" x-text="d.justification_reason_display + (d.justification_notes ? ' — ' + d.justification_notes : '')"></span></template>
+            <template x-if="d.status === 'PENDENTE'"><span class="text-amber-600 font-medium">Pendente</span></template>
+          </span>
+          <span class="flex items-center gap-1">
+            <button x-show="d.status === 'PENDENTE' && d.can_manage_justification" @click="openJustify(d)"
+                    class="text-[12px] px-2 py-1 rounded-lg text-brand-600 hover:bg-brand-50">Justificar</button>
+            <button x-show="d.status === 'JUSTIFICADO' && d.can_manage_justification" @click="openJustify(d)"
+                    class="text-[12px] px-2 py-1 rounded-lg text-gray-500 hover:bg-gray-100">Editar</button>
+            <button x-show="d.status === 'JUSTIFICADO' && d.can_manage_justification" @click="removeJustify(d)"
+                    class="text-[12px] px-2 py-1 rounded-lg text-red-500 hover:bg-red-50">Remover</button>
+          </span>
+        </div>
+      </template>
+    </div>
+    <p class="text-[10px] text-gray-400 mt-3">Justificativas são operacionais e não têm valor financeiro.</p>
+  </div>
+
+  <!-- Modal de justificativa -->
+  <div x-show="justifyModalOpen" class="fixed inset-0 z-50 flex items-center justify-center p-4" style="display:none;">
+    <div class="fixed inset-0 bg-black/40" @click="justifyModalOpen=false"></div>
+    <div class="relative bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 z-10">
+      <h3 class="text-[16px] font-bold text-gray-900 mb-4">Justificativa do dia</h3>
+      <p class="text-[13px] text-gray-500 mb-3" x-text="formatCivilDate(justifyForm.date)"></p>
+      <label class="block text-[11px] font-semibold text-gray-400 uppercase mb-1">Motivo</label>
+      <select x-model="justifyForm.reason" class="w-full px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-[14px] mb-3">
+        <option value="ATESTADO">Atestado</option>
+        <option value="FALTA">Falta</option>
+        <option value="FERIAS">Férias</option>
+        <option value="FOLGA">Folga</option>
+        <option value="AFASTAMENTO">Afastamento</option>
+        <option value="FERIADO">Feriado</option>
+        <option value="SEM_EXPEDIENTE">Sem expediente</option>
+        <option value="OUTRO">Outro</option>
+      </select>
+      <label class="block text-[11px] font-semibold text-gray-400 uppercase mb-1">Observação (opcional)</label>
+      <textarea x-model="justifyForm.notes" maxlength="255" rows="2" class="w-full px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-[14px] mb-2"></textarea>
+      <p class="text-[12px] text-red-600 mb-2" x-show="justifyError" x-text="justifyError"></p>
+      <p class="text-[10px] text-gray-400 mb-4">Não anexar documentos médicos. Registre apenas o motivo operacional.</p>
+      <div class="flex justify-end gap-2">
+        <button @click="justifyModalOpen=false" class="px-4 py-2 rounded-xl text-gray-500 hover:bg-gray-100 text-[14px]">Cancelar</button>
+        <button @click="saveJustify()" :disabled="justifySaving" class="px-4 py-2 rounded-xl bg-brand-500 text-white font-semibold text-[14px] disabled:opacity-50">Salvar</button>
+      </div>
+    </div>
+  </div>
   {% endverbatim %}
 </div>
 
@@ -362,8 +440,8 @@
 function sellerDetailPage() {
     return {
         sellerData: null,
-        month: new Date().getMonth() + 1,
-        year: new Date().getFullYear(),
+        mode: 'period',
+        periodUuid: '',
         startDate: '',
         endDate: '',
         sellerId: '',
@@ -374,13 +452,18 @@ function sellerDetailPage() {
         editError: '',
         historyModalOpen: false,
         historyData: [],
-        init(sellerId) { this.sellerId = sellerId; this.load(); },
+        init(sellerId) {
+            this.sellerId = sellerId;
+            var pageParams = new URLSearchParams(window.location.search);
+            this.periodUuid = pageParams.get('period') || '';
+            this.load();
+        },
+        onModeChange() {
+            if (this.mode === 'period') { this.startDate = ''; this.endDate = ''; this.load(); }
+        },
         async load() {
             var apiUrl = '/api/manager/seller/' + this.sellerId + '/';
-            var params = new URLSearchParams();
-            if (this.startDate && this.endDate) { params.set('start', this.startDate); params.set('end', this.endDate); }
-            else { params.set('month', this.month); params.set('year', this.year); }
-            var r = await fetch(apiUrl + '?' + params.toString());
+            var r = await fetch(apiUrl + '?' + this.buildParams());
             this.sellerData = await r.json();
             this.$nextTick(() => this.drawChart());
         },
@@ -391,7 +474,7 @@ function sellerDetailPage() {
             this.chart = new Chart(ctx, {
                 type: 'line',
                 data: {
-                    labels: this.sellerData.evolution.map(e => new Date(e.date).toLocaleDateString('pt-BR', {day: '2-digit', month: '2-digit'})),
+                    labels: this.sellerData.evolution.map(e => formatCivilDate(e.date, {day: '2-digit', month: '2-digit'})),
                     datasets: [{
                         label: 'Total (R$)',
                         data: this.sellerData.evolution.map(e => e.total / 100),
@@ -409,8 +492,11 @@ function sellerDetailPage() {
         },
         buildParams() {
             var p = new URLSearchParams();
-            if (this.startDate && this.endDate) { p.set('start', this.startDate); p.set('end', this.endDate); }
-            else { p.set('month', this.month); p.set('year', this.year); }
+            if (this.mode === 'custom' && this.startDate && this.endDate) {
+                p.set('start', this.startDate); p.set('end', this.endDate);
+            } else if (this.periodUuid) {
+                p.set('period', this.periodUuid);
+            }
             return p.toString();
         },
         exportCsv() { window.open('/api/manager/seller/' + this.sellerId + '/csv/?' + this.buildParams()); },
@@ -467,6 +553,70 @@ function sellerDetailPage() {
                 }
             } catch(e) {
                 console.error('Erro ao carregar historico:', e);
+            }
+        },
+        // LOTE 5 - justificativas (gestor)
+        justifyModalOpen: false,
+        justifySaving: false,
+        justifyError: '',
+        justifyForm: { uuid: '', date: '', reason: 'FALTA', notes: '' },
+        openJustify(d) {
+            this.justifyForm.uuid = d.justification_uuid || '';
+            this.justifyForm.date = d.date;
+            this.justifyForm.reason = d.justification_reason || 'FALTA';
+            this.justifyForm.notes = d.justification_notes || '';
+            this.justifyError = '';
+            this.justifyModalOpen = true;
+        },
+        async saveJustify() {
+            if (this.justifySaving) return;
+            this.justifySaving = true;
+            this.justifyError = '';
+            try {
+                var isEdit = !!this.justifyForm.uuid;
+                var url = isEdit
+                    ? '/api/manager/day-justifications/' + this.justifyForm.uuid + '/'
+                    : '/api/manager/day-justifications/';
+                var body = isEdit
+                    ? { reason: this.justifyForm.reason, notes: this.justifyForm.notes }
+                    : { seller: this.sellerId, date: this.justifyForm.date,
+                        reason: this.justifyForm.reason, notes: this.justifyForm.notes };
+                var r = await fetch(url, {
+                    method: isEdit ? 'PATCH' : 'POST',
+                    headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCSRFToken() },
+                    body: JSON.stringify(body),
+                });
+                if (r.ok) {
+                    this.justifyModalOpen = false;
+                    showToast('Justificativa salva.', 'success');
+                    this.load();
+                } else {
+                    var data = await r.json();
+                    this.justifyError = data.detail || 'Erro ao salvar justificativa.';
+                }
+            } catch(e) {
+                this.justifyError = 'Erro de conexao. Tente novamente.';
+            } finally {
+                this.justifySaving = false;
+            }
+        },
+        async removeJustify(d) {
+            if (!d.justification_uuid) return;
+            if (!confirm('Remover a justificativa de ' + formatCivilDate(d.date) + '?')) return;
+            try {
+                var r = await fetch('/api/manager/day-justifications/' + d.justification_uuid + '/', {
+                    method: 'DELETE',
+                    headers: { 'X-CSRFToken': getCSRFToken() },
+                });
+                if (r.ok || r.status === 204) {
+                    showToast('Justificativa removida.', 'success');
+                    this.load();
+                } else {
+                    var data = await r.json();
+                    showToast(data.detail || 'Erro ao remover.', 'error');
+                }
+            } catch(e) {
+                showToast('Erro de conexao.', 'error');
             }
         },
     }

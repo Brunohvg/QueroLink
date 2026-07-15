@@ -6,6 +6,12 @@ from django.db import transaction, IntegrityError
 from django.utils import timezone
 
 from app.apps.webhooks.models import WebhookEvent
+from app.apps.webhooks.services import (
+    mark_event_skipped,
+    normalize_payment_method,
+    populate_payment_from_webhook,
+    process_paid_pagarme_event,
+)
 from app.apps.payments.models import Payment
 from app.apps.orders.models import Order, PaymentLink
 from app.apps.sales.models import Sale
@@ -15,52 +21,32 @@ logger = logging.getLogger(__name__)
 
 def _skip_foreign_event(event, reason):
     """Marca evento como processado sem erro - evita retry de webhooks de outras plataformas."""
-    logger.warning("Webhook %s ignorado: %s", event.id, reason)
-    event.processed = True
-    event.skip_reason = reason
-    event.save(update_fields=['processed', 'skip_reason'])
+    mark_event_skipped(event, reason)
 
 
 VALID_PAYMENT_METHODS = {'credit_card', 'pix', 'boleto', 'unknown'}
 
 
 def _normalize_payment_method(raw_method: str) -> str:
-    method = (raw_method or '').strip().lower()
-    if method in VALID_PAYMENT_METHODS:
-        return method
-    method_map = {
-        'debit_card': 'unknown',
-        'voucher': 'unknown',
-        'cash': 'unknown',
-    }
-    return method_map.get(method, 'unknown')
+    return normalize_payment_method(raw_method)
 
 
 def _populate_payment_from_webhook(payment, data, event_type):
-    """Extrai dados do payload do webhook antes do PII scrub no save()."""
-    charge = data
-    if event_type == 'order.paid':
-        charges = data.get('charges', [])
-        charge = charges[0] if charges else {}
+    populate_payment_from_webhook(payment, data, event_type)
 
-    txn = charge.get('last_transaction') or {}
-    card = txn.get('card') or {}
 
-    raw_method = charge.get('payment_method', '')
-    payment.payment_method = _normalize_payment_method(raw_method) or payment.payment_method
-    payment.installments = txn.get('installments') or payment.installments
+def _notify_link_status_after_commit(order, event_type, motivo=''):
+    def callback():
+        try:
+            from app.apps.notifications.tasks import notify_seller_link_status
+            notify_seller_link_status(order.seller, order, event_type, motivo=motivo)
+        except Exception:
+            logger.exception(
+                "Falha ao enfileirar notificacao %s para order %s",
+                event_type, order.uuid,
+            )
 
-    paid_at = charge.get('paid_at')
-    if paid_at:
-        payment.paid_at = paid_at
-
-    brand = card.get('brand', '')
-    if brand:
-        payment.card_brand = brand
-
-    last4 = card.get('last_four_digits', '')
-    if last4:
-        payment.card_last4 = str(last4)
+    transaction.on_commit(callback, robust=True)
 
 
 @shared_task(
@@ -104,167 +90,18 @@ def process_pagarme_webhook(event_id):
         logger.info("Processing webhook event %s type=%s", event_id, event_type)
 
         if event_type in ('order.paid', 'charge.paid', 'payment-link.finished'):
-            order = None
-
-            if event_type == 'order.paid':
-                code = data.get('code', '')
-                if code:
-                    try:
-                        from uuid import UUID
-                        UUID(code)
-                        try:
-                            order = Order.objects.select_related('tenant', 'seller').get(uuid=code)
-                            logger.info("order.paid resolvido via code (uuid)")
-                        except Order.DoesNotExist:
-                            pass
-                    except ValueError:
-                        pass
-
-                if not order:
-                    charges = data.get('charges', [])
-                    if charges:
-                        link_id = charges[0].get('payment_link_id', '')
-                        if link_id:
-                            try:
-                                payment_link = PaymentLink.objects.select_related('order').get(
-                                    gateway_link_id=link_id
-                                )
-                                order = payment_link.order
-                                logger.info("order.paid resolvido via charges[0].payment_link_id")
-                            except PaymentLink.DoesNotExist:
-                                pass
-
-                if not order:
-                    gateway_order_id = data.get('id', '')
-                    if gateway_order_id:
-                        try:
-                            payment = Payment.objects.select_related('order').get(
-                                gateway_order_id=gateway_order_id
-                            )
-                            order = payment.order
-                            logger.info("order.paid resolvido via Payment.gateway_order_id")
-                        except Payment.DoesNotExist:
-                            pass
-
-                if not order:
-                    _skip_foreign_event(
-                        event,
-                        f"Order nao encontrada para order.paid "
-                        f"(code={data.get('code')}, id={data.get('id')}, plataforma externa)",
-                    )
-                    return
-
-            elif event_type == 'payment-link.finished':
-                link_id = data.get('id')
-                try:
-                    payment_link = PaymentLink.objects.select_related('order').get(
-                        gateway_link_id=link_id
-                    )
-                    order = payment_link.order
-                except PaymentLink.DoesNotExist:
-                    _skip_foreign_event(
-                        event,
-                        f"PaymentLink nao encontrado (gateway_link_id={link_id}, plataforma externa)",
-                    )
-                    return
-
-            elif event_type == 'charge.paid':
-                order_data = data.get('order', {})
-                order_code = order_data.get('code', '')
-                if order_code:
-                    try:
-                        from uuid import UUID
-                        UUID(order_code)
-                        try:
-                            order = Order.objects.select_related('tenant', 'seller').get(uuid=order_code)
-                            logger.info("charge.paid resolvido via order.code")
-                        except Order.DoesNotExist:
-                            pass
-                    except ValueError:
-                        pass
-
-                if not order:
-                    link_id = order_data.get('payment_link', {}).get('id') or data.get('payment_link_id')
-                    if link_id:
-                        try:
-                            payment_link = PaymentLink.objects.select_related('order').get(
-                                gateway_link_id=link_id
-                            )
-                            order = payment_link.order
-                        except PaymentLink.DoesNotExist:
-                            pass
-
-                if not order:
-                    gateway_txn_id = data.get('id')
-                    try:
-                        payment = Payment.objects.select_related('order').get(
-                            gateway_transaction_id=gateway_txn_id
-                        )
-                        order = payment.order
-                    except Payment.DoesNotExist:
-                        _skip_foreign_event(
-                            event,
-                            f"Payment nao encontrado para charge.paid "
-                            f"(gateway_transaction_id={gateway_txn_id}, plataforma externa)",
-                        )
-                        return
-
-            if not order:
-                _skip_foreign_event(event, "Order nao encontrada (plataforma externa)")
-                return
-
-            payment = order.payments.order_by('created_at').first()
-            if not payment:
-                _skip_foreign_event(event, f"Payment ausente na Order {order.uuid}")
-                return
-
-            if event_type == 'order.paid':
-                payment.gateway_order_id = data.get('id')
-                charges = data.get('charges', [])
-                if charges and isinstance(charges, list):
-                    payment.gateway_transaction_id = charges[0].get('id')
-            elif event_type == 'charge.paid':
-                payment.gateway_transaction_id = data.get('id')
-                payment.gateway_order_id = data.get('order', {}).get('id')
-
-            if payment.status == Payment.Status.PAID:
-                logger.info(
-                    "Payment %s already PAID, skipping duplicate webhook",
-                    payment.uuid,
-                )
-            else:
-                if event_type == 'payment-link.finished':
-                    if not payment.paid_at:
-                        payment.paid_at = timezone.now()
-                else:
-                    _populate_payment_from_webhook(payment, data, event_type)
-                payment.status = Payment.Status.PAID
-                payment.raw_callback_payload = payload
-                payment.save()
-
-                order.status = Order.Status.COMPLETED
-                order.save()
-
-                try:
-                    Sale.objects.get_or_create(
-                        order=order,
-                        defaults={
-                            'tenant': order.tenant,
-                            'seller': order.seller,
-                            'origin': Sale.Origin.LINK,
-                            'amount': order.total_amount,
-                            'sale_date': timezone.localdate(),
-                        },
-                    )
-                except IntegrityError:
-                    logger.info(
-                        "Sale for order %s already exists (concurrent webhook), skipping",
-                        order.uuid,
-                    )
-
+            # O servico faz apenas persistencia financeira dentro da transacao.
+            # Notificacoes ficam fora do commit para nao desfazer pagamento real.
+            result = process_paid_pagarme_event(event_id)
+            if result.notify_event_type and result.order_uuid:
+                order = Order.objects.select_related('seller').get(uuid=result.order_uuid)
                 if order.seller:
-                    from app.apps.notifications.tasks import notify_seller_link_status
-                    notify_seller_link_status(order.seller, order, 'payment_paid')
+                    _notify_link_status_after_commit(order, result.notify_event_type)
+            logger.info(
+                "Pagar.me paid event %s result=%s order=%s",
+                event_id, result.status, result.order_uuid,
+            )
+            return
 
         elif event_type in ('charge.payment_failed', 'order.payment_failed'):
             order = None
@@ -278,7 +115,13 @@ def process_pagarme_webhook(event_id):
                 except Payment.DoesNotExist:
                     pass
             if not order:
-                link_id = data.get('order', {}).get('payment_link', {}).get('id')
+                order_data = data.get('order', {})
+                link_id = (
+                    order_data.get('payment_link', {}).get('id')
+                    or data.get('payment_link_id')
+                    or (data.get('metadata') or {}).get('payment_link_id')
+                    or (order_data.get('metadata') or {}).get('payment_link_id')
+                )
                 if link_id:
                     try:
                         payment_link = PaymentLink.objects.select_related('order').get(
@@ -309,15 +152,22 @@ def process_pagarme_webhook(event_id):
             payment.raw_callback_payload = payload
             payment.save()
             if order.seller:
-                last_txn = data.get('last_transaction') or {}
+                charge = data
+                if event_type == 'order.payment_failed':
+                    charges = data.get('charges', [])
+                    charge = charges[0] if charges else {}
+                last_txn = charge.get('last_transaction') or {}
                 motivo = (
                     last_txn.get('acquirer_message')
                     or last_txn.get('refusal_reason')
+                    or last_txn.get('refuse_reason')
+                    or last_txn.get('status_reason')
+                    or data.get('refusal_reason')
+                    or data.get('status_reason')
                     or ''
                 )
-                from app.apps.notifications.tasks import notify_seller_link_status
-                notify_seller_link_status(
-                    order.seller, order, 'payment_failed', motivo=motivo,
+                _notify_link_status_after_commit(
+                    order, 'payment_failed', motivo=motivo,
                 )
 
         elif event_type == 'charge.refunded':
@@ -344,8 +194,7 @@ def process_pagarme_webhook(event_id):
             payment.save()
             Sale.objects.filter(order=order).update(status='ESTORNADA')
             if order.seller:
-                from app.apps.notifications.tasks import notify_seller_link_status
-                notify_seller_link_status(order.seller, order, 'payment_refunded')
+                _notify_link_status_after_commit(order, 'payment_refunded')
 
         elif event_type in ('payment-link.expired', 'payment-link.cancelled'):
             link_id = data.get('id')
@@ -374,8 +223,7 @@ def process_pagarme_webhook(event_id):
                     order.status = Order.Status.EXPIRED
                     order.save(update_fields=['status', 'updated_at'])
                     if order.seller:
-                        from app.apps.notifications.tasks import notify_seller_link_status
-                        notify_seller_link_status(order.seller, order, 'payment_expired')
+                        _notify_link_status_after_commit(order, 'payment_expired')
 
             elif event_type == 'payment-link.cancelled':
                 if order.status == Order.Status.CANCELED:
@@ -384,8 +232,7 @@ def process_pagarme_webhook(event_id):
                     order.status = Order.Status.CANCELED
                     order.save(update_fields=['status', 'updated_at'])
                     if order.seller:
-                        from app.apps.notifications.tasks import notify_seller_link_status
-                        notify_seller_link_status(order.seller, order, 'link_canceled')
+                        _notify_link_status_after_commit(order, 'link_canceled')
 
         elif event_type == 'charge.chargedback':
             gateway_txn_id = data.get('id')
@@ -415,8 +262,7 @@ def process_pagarme_webhook(event_id):
                 payment.save(update_fields=['status', 'raw_callback_payload', 'updated_at'])
                 Sale.objects.filter(order=order).update(status='ESTORNADA')
                 if order.seller:
-                    from app.apps.notifications.tasks import notify_seller_link_status
-                    notify_seller_link_status(order.seller, order, 'payment_chargeback')
+                    _notify_link_status_after_commit(order, 'payment_chargeback')
 
         elif event_type in ('charge.antifraud_approved', 'charge.antifraud_reproved',
                             'charge.antifraud_manual', 'charge.antifraud_pending'):
@@ -447,13 +293,14 @@ def process_pagarme_webhook(event_id):
                 payment.save(update_fields=['status', 'raw_callback_payload', 'updated_at'])
                 if order.seller:
                     motivo = f"Antifraude: {antifraud_status} (score: {antifraud_score})"
-                    from app.apps.notifications.tasks import notify_seller_link_status
-                    notify_seller_link_status(
-                        order.seller, order, 'payment_failed', motivo=motivo,
+                    _notify_link_status_after_commit(
+                        order, 'payment_failed', motivo=motivo,
                     )
 
         event.processed = True
-        event.save(update_fields=['processed'])
+        event.status = WebhookEvent.Status.PROCESSED
+        event.processed_at = timezone.now()
+        event.save(update_fields=['processed', 'status', 'processed_at'])
 
 
 def _safe_gateway_skip_reason(error):
@@ -719,17 +566,20 @@ def process_billing_webhook(event_id):
 @shared_task(soft_time_limit=300, time_limit=360)
 def reconcile_pending_orders():
     from datetime import timedelta
+    from django.conf import settings
     from app.services.gateway.pagar_me import PagarMeGateway, PagarMeError
 
     cutoff_start = timezone.now() - timedelta(days=7)
-    cutoff_min_age = timezone.now() - timedelta(hours=2)
+    min_age_minutes = getattr(settings, 'PAGARME_RECONCILE_MIN_AGE_MINUTES', 10)
+    batch_limit = getattr(settings, 'PAGARME_RECONCILE_BATCH_LIMIT', 200)
+    cutoff_min_age = timezone.now() - timedelta(minutes=min_age_minutes)
 
     orders = Order.objects.filter(
         status=Order.Status.PENDING,
         created_at__gte=cutoff_start,
         created_at__lte=cutoff_min_age,
         payment_link__gateway_link_id__isnull=False,
-    ).select_related('tenant', 'payment_link').order_by('created_at')[:200]
+    ).select_related('tenant', 'payment_link').order_by('created_at')[:batch_limit]
 
     counted = 0
     paid_count = 0
@@ -805,8 +655,29 @@ def reconcile_pending_orders():
                             "(skip_reason=%s) - investigar correlacao",
                             event_id_str, order.uuid, event.skip_reason,
                         )
+                    elif event.status in (
+                        WebhookEvent.Status.RECEIVED,
+                        WebhookEvent.Status.FAILED,
+                    ):
+                        result = process_paid_pagarme_event(event.id)
+                        if result.notify_event_type and result.order_uuid:
+                            refreshed = Order.objects.select_related('seller').get(
+                                uuid=result.order_uuid,
+                            )
+                            if refreshed.seller:
+                                _notify_link_status_after_commit(
+                                    refreshed, result.notify_event_type,
+                                )
                     continue
-                process_pagarme_webhook.delay(event.id)
+                result = process_paid_pagarme_event(event.id)
+                if result.notify_event_type and result.order_uuid:
+                    refreshed = Order.objects.select_related('seller').get(
+                        uuid=result.order_uuid,
+                    )
+                    if refreshed.seller:
+                        _notify_link_status_after_commit(
+                            refreshed, result.notify_event_type,
+                        )
                 paid_count += 1
 
             elif remote_status in ('failed', 'canceled'):

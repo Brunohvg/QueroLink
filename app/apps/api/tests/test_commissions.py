@@ -357,6 +357,34 @@ class CommissionPeriodCustomDateFlowTest(TestCase):
         self.assertEqual(response.status_code, 400)
         self.assertIn('sobrepoe', str(response.data))
 
+    def test_manager_can_recreate_period_after_cancellation(self):
+        cancelled = CommissionPeriod.objects.create(
+            tenant=self.tenant,
+            month=8,
+            year=2026,
+            label='Agosto/2026',
+            start_date=date(2026, 7, 21),
+            end_date=date(2026, 8, 20),
+            status=CommissionPeriod.Status.CANCELADA,
+        )
+        client = self._auth_manager()
+
+        response = client.post(reverse('api-commission-period-list'), {
+            'label': 'Agosto/2026',
+            'start_date': '2026-07-21',
+            'end_date': '2026-08-20',
+            'expected_working_days': 22,
+        }, format='json')
+
+        self.assertEqual(response.status_code, 201, response.data)
+        novo = CommissionPeriod.objects.filter(
+            tenant=self.tenant, month=8, year=2026,
+        ).exclude(status=CommissionPeriod.Status.CANCELADA).get()
+        self.assertNotEqual(novo.uuid, cancelled.uuid)
+        self.assertEqual(novo.status, CommissionPeriod.Status.ABERTA)
+        self.assertEqual(novo.start_date, date(2026, 7, 21))
+        self.assertEqual(novo.end_date, date(2026, 8, 20))
+
     def test_manager_edits_label_and_safe_range_with_date_fields(self):
         period = CommissionPeriod.objects.create(
             tenant=self.tenant,

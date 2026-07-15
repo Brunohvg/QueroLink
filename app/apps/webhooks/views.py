@@ -3,15 +3,19 @@ import hmac
 import hashlib
 import logging
 import time
+from datetime import timedelta
 
-from django.db import IntegrityError, OperationalError, transaction
+from django.db import IntegrityError, OperationalError
 from django.http import JsonResponse
+from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
 
 from app.apps.webhooks.models import WebhookEvent
 from app.apps.accounts.fields import scrub_payment_payload
 
 logger = logging.getLogger(__name__)
+
+PROCESSING_TIMEOUT_MINUTES = 10
 
 
 def _get_or_create_webhook_event(gateway, payload, gateway_event_id=None, tenant=None):
@@ -23,26 +27,61 @@ def _get_or_create_webhook_event(gateway, payload, gateway_event_id=None, tenant
             tenant=tenant,
         ), True
 
-    for attempt in range(3):
+    for attempt in range(6):
         try:
-            with transaction.atomic():
-                return WebhookEvent.objects.get_or_create(
-                    gateway=gateway,
-                    gateway_event_id=gateway_event_id,
-                    defaults={
-                        'payload': payload,
-                        'tenant': tenant,
-                    },
-                )
-        except (IntegrityError, OperationalError):
-            if attempt == 2:
+            event = WebhookEvent.objects.filter(
+                gateway=gateway,
+                gateway_event_id=gateway_event_id,
+            ).first()
+            if event:
+                return event, False
+
+            return WebhookEvent.objects.create(
+                gateway=gateway,
+                gateway_event_id=gateway_event_id,
+                payload=payload,
+                tenant=tenant,
+            ), True
+        except IntegrityError:
+            event = WebhookEvent.objects.filter(
+                gateway=gateway,
+                gateway_event_id=gateway_event_id,
+            ).first()
+            if event:
+                return event, False
+            if attempt == 5:
                 raise
-            time.sleep(0.05)
+            time.sleep(0.05 * (attempt + 1))
+        except OperationalError:
+            if attempt == 5:
+                raise
+            time.sleep(0.05 * (attempt + 1))
 
     return WebhookEvent.objects.get(
         gateway=gateway,
         gateway_event_id=gateway_event_id,
     ), False
+
+
+def _pagarme_existing_event_action(event):
+    if event.processed or event.status in (
+        WebhookEvent.Status.PROCESSED,
+        WebhookEvent.Status.SKIPPED,
+    ):
+        return 'duplicate'
+
+    if event.status in (WebhookEvent.Status.RECEIVED, WebhookEvent.Status.FAILED):
+        return 'reenqueue'
+
+    if event.status == WebhookEvent.Status.PROCESSING:
+        started_at = event.processing_started_at or event.last_attempt_at or event.received_at
+        if started_at and started_at >= timezone.now() - timedelta(
+            minutes=PROCESSING_TIMEOUT_MINUTES,
+        ):
+            return 'processing'
+        return 'recover'
+
+    return 'reenqueue'
 
 
 def _verify_webhook_token(tenant_uuid, token):
@@ -54,6 +93,105 @@ def _verify_webhook_token(tenant_uuid, token):
         hashlib.sha256,
     ).hexdigest()[:16]
     return hmac.compare_digest(expected, token)
+
+
+def _add_if_present(target, value):
+    if isinstance(value, str) and value.strip():
+        target.add(value.strip())
+
+
+def _pagarme_business_payload_belongs_to_tenant(payload, tenant):
+    """Retorna False para eventos Pagar.me de pagamento que nao sao do Merito."""
+    if not isinstance(payload, dict):
+        return False
+
+    event_type = payload.get('type') or ''
+    if not (
+        event_type.startswith('charge.')
+        or event_type.startswith('order.')
+        or event_type.startswith('payment-link.')
+    ):
+        return True
+
+    data = payload.get('data') or {}
+    if not isinstance(data, dict):
+        return False
+
+    order_codes = set()
+    link_ids = set()
+    charge_ids = set()
+    gateway_order_ids = set()
+
+    order_data = data.get('order') or {}
+    if not isinstance(order_data, dict):
+        order_data = {}
+
+    metadata = data.get('metadata') or {}
+    if not isinstance(metadata, dict):
+        metadata = {}
+    order_metadata = order_data.get('metadata') or {}
+    if not isinstance(order_metadata, dict):
+        order_metadata = {}
+
+    _add_if_present(order_codes, data.get('code'))
+    _add_if_present(order_codes, order_data.get('code'))
+    _add_if_present(gateway_order_ids, order_data.get('id'))
+    if event_type.startswith('order.'):
+        _add_if_present(gateway_order_ids, data.get('id'))
+
+    payment_link = order_data.get('payment_link') or {}
+    if isinstance(payment_link, dict):
+        _add_if_present(link_ids, payment_link.get('id'))
+    _add_if_present(link_ids, data.get('payment_link_id'))
+    _add_if_present(link_ids, metadata.get('payment_link_id'))
+    _add_if_present(link_ids, order_metadata.get('payment_link_id'))
+    if event_type.startswith('payment-link.'):
+        _add_if_present(link_ids, data.get('id'))
+    if event_type.startswith('charge.'):
+        _add_if_present(charge_ids, data.get('id'))
+
+    charges = data.get('charges') or []
+    if isinstance(charges, list):
+        for charge in charges:
+            if not isinstance(charge, dict):
+                continue
+            _add_if_present(charge_ids, charge.get('id'))
+            _add_if_present(link_ids, charge.get('payment_link_id'))
+            charge_metadata = charge.get('metadata') or {}
+            if isinstance(charge_metadata, dict):
+                _add_if_present(link_ids, charge_metadata.get('payment_link_id'))
+
+    from app.apps.orders.models import Order, PaymentLink
+    from app.apps.payments.models import Payment
+    from uuid import UUID
+
+    valid_order_uuids = []
+    for code in order_codes:
+        try:
+            valid_order_uuids.append(UUID(code))
+        except (TypeError, ValueError):
+            continue
+    if valid_order_uuids and Order.objects.filter(
+        tenant=tenant, uuid__in=valid_order_uuids,
+    ).exists():
+        return True
+
+    if link_ids and PaymentLink.objects.filter(
+        order__tenant=tenant, gateway_link_id__in=link_ids,
+    ).exists():
+        return True
+
+    if charge_ids and Payment.objects.filter(
+        order__tenant=tenant, gateway_transaction_id__in=charge_ids,
+    ).exists():
+        return True
+
+    if gateway_order_ids and Payment.objects.filter(
+        order__tenant=tenant, gateway_order_id__in=gateway_order_ids,
+    ).exists():
+        return True
+
+    return False
 
 
 @csrf_exempt
@@ -105,6 +243,13 @@ def pagarme_webhook(request, tenant_slug):
     except json.JSONDecodeError:
         return JsonResponse({"error": "Invalid JSON"}, status=400)
 
+    if not _pagarme_business_payload_belongs_to_tenant(payload, tenant):
+        logger.info(
+            "Webhook Pagar.me externo ignorado sem persistir: tenant=%s type=%s",
+            tenant_slug, payload.get('type') if isinstance(payload, dict) else '?',
+        )
+        return JsonResponse({"status": "ignored_foreign"}, status=200)
+
     sanitized = scrub_payment_payload(payload)
     gateway_event_id = payload.get('id') or ''
     event, created = _get_or_create_webhook_event(
@@ -114,8 +259,24 @@ def pagarme_webhook(request, tenant_slug):
         tenant=tenant,
     )
     if not created:
-        logger.info("Webhook duplicado ignorado: gateway_event_id=%s", gateway_event_id)
-        return JsonResponse({"status": "duplicate"}, status=200)
+        action = _pagarme_existing_event_action(event)
+        if action == 'duplicate':
+            logger.info("Webhook duplicado ignorado: gateway_event_id=%s", gateway_event_id)
+            return JsonResponse({"status": "duplicate"}, status=200)
+        if action == 'processing':
+            logger.info("Webhook ja em processamento: gateway_event_id=%s", gateway_event_id)
+            return JsonResponse({"status": "processing"}, status=200)
+
+        if action == 'recover':
+            event.status = WebhookEvent.Status.RECEIVED
+            event.processing_error = ''
+            event.processing_started_at = None
+            event.save(update_fields=[
+                'status', 'processing_error', 'processing_started_at',
+            ])
+        from app.apps.webhooks.tasks import process_pagarme_webhook
+        process_pagarme_webhook.delay(event.id)
+        return JsonResponse({"status": "received"}, status=200)
 
     from app.apps.webhooks.tasks import process_pagarme_webhook
     process_pagarme_webhook.delay(event.id)

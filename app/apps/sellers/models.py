@@ -115,3 +115,68 @@ class SellerGoal(models.Model):
         if self.target_amount <= 0:
             return 0
         return min(100, int(total * 100 / self.target_amount))
+
+
+class SellerDayJustification(models.Model):
+    """Justificativa operacional de um dia sem lancamento de venda.
+
+    NAO e uma venda: nunca cria/soma Sale, nao possui valor financeiro e nao
+    entra em comissao/ranking. A vinculacao a competencia sera feita em PR
+    posterior (Prompt 48) -- aqui `date` e apenas uma data civil.
+    """
+
+    class Reason(models.TextChoices):
+        ATESTADO = 'ATESTADO', 'Atestado'
+        FALTA = 'FALTA', 'Falta'
+        FERIAS = 'FERIAS', 'Férias'
+        FOLGA = 'FOLGA', 'Folga'
+        AFASTAMENTO = 'AFASTAMENTO', 'Afastamento'
+        FERIADO = 'FERIADO', 'Feriado'
+        SEM_EXPEDIENTE = 'SEM_EXPEDIENTE', 'Sem expediente'
+        OUTRO = 'OUTRO', 'Outro'
+
+    uuid = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    tenant = models.ForeignKey(
+        Tenant, on_delete=models.CASCADE, related_name='day_justifications',
+    )
+    seller = models.ForeignKey(
+        Seller, on_delete=models.CASCADE, related_name='day_justifications',
+    )
+    date = models.DateField()
+    reason = models.CharField(max_length=20, choices=Reason.choices)
+    notes = models.CharField(max_length=255, blank=True, default='')
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL,
+        null=True, blank=True, related_name='day_justifications_created',
+    )
+    updated_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL,
+        null=True, blank=True, related_name='day_justifications_updated',
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=['tenant', 'seller', 'date'],
+                name='unique_day_justification_per_seller_date',
+            ),
+        ]
+        indexes = [
+            models.Index(fields=['tenant', 'seller', 'date']),
+            models.Index(fields=['tenant', 'date']),
+        ]
+
+    def __str__(self):
+        return f"{self.seller.name} - {self.date} - {self.get_reason_display()}"
+
+    def clean(self):
+        super().clean()
+        if (
+            self.seller_id and self.tenant_id
+            and self.seller.tenant_id != self.tenant_id
+        ):
+            raise ValidationError(
+                'O vendedor nao pertence ao tenant da justificativa.'
+            )

@@ -5,12 +5,12 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}Mérito{% endblock %}</title>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
     <link href="{% static 'css/tailwind.css' %}" rel="stylesheet">
+    {% block chart_js %}{% endblock %}
     <script src="{% static 'js/alpine.min.js' %}" defer></script>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js" integrity="sha384-e6nUZLBkQ86NJ6TVVKAeSaK8jWa3NhkYWZFomE39AvDbQWeie9PlQqM3pmYW5d1g" crossorigin="anonymous"></script>
     <script src="{% static 'js/format.js' %}"></script>
     <style>
+        [x-cloak] { display: none !important; }
         body { font-family: 'Inter', system-ui, sans-serif; }
 
         .surface-hero {
@@ -72,7 +72,7 @@
         }
     </script>
 </head>
-<body class="text-gray-900" style="background: #F5F7FA;">
+<body class="text-gray-900 h-screen overflow-hidden flex flex-col" style="background: #F5F7FA; height:100dvh;" x-data="{ sidebarOpen: false }">
     <div id="toast-container" class="fixed top-4 right-4 z-[9999] flex flex-col gap-2 pointer-events-none max-w-sm w-full"></div>
 
     {% if show_trial_banner %}
@@ -86,18 +86,28 @@
     </div>
     {% endif %}
 
-    <div class="flex h-screen overflow-hidden">
+    <div class="flex flex-1 min-h-0 overflow-hidden">
+        <div x-show="sidebarOpen" x-cloak @click="sidebarOpen=false"
+             class="fixed inset-0 z-40 bg-black/30 lg:hidden"></div>
         {% include 'components/_sidebar.html' %}
-        <main class="flex-1 overflow-y-auto">
-            <div class="p-6 max-w-7xl mx-auto">
-                {% block content %}{% endblock %}
-            </div>
-        </main>
+        <div class="flex-1 min-w-0 flex flex-col">
+            <header class="lg:hidden flex items-center gap-3 bg-white border-b border-gray-100 px-4 py-3 flex-shrink-0">
+                <button type="button" @click="sidebarOpen=true" aria-label="Abrir menu"
+                        class="w-11 h-11 rounded-xl flex items-center justify-center text-gray-600 hover:bg-gray-50">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/></svg>
+                </button>
+                <img src="{% static 'img/vidalys-merito-logo.png' %}" alt="Mérito" class="h-8 w-auto">
+            </header>
+            <main class="flex-1 min-h-0 overflow-y-auto">
+                <div class="p-4 sm:p-6 max-w-7xl mx-auto">
+                    {% block content %}{% endblock %}
+                </div>
+            </main>
+            <footer class="border-t border-gray-100 bg-white px-4 sm:px-6 py-3 flex items-center justify-between text-[11px] text-gray-400 flex-shrink-0">
+                <span>Mérito by Vidalys</span>
+                <a href="mailto:contato@vidalys.com.br" class="hover:text-gray-600 transition">contato@vidalys.com.br</a>
+            </footer>
+        </div>
     </div>
-
-    <footer class="border-t border-gray-100 bg-white px-6 py-3 flex items-center justify-between text-[11px] text-gray-400">
-        <span>Mérito by Vidalys</span>
-        <a href="mailto:contato@vidalys.com.br" class="hover:text-gray-600 transition">contato@vidalys.com.br</a>
-    </footer>
 </body>
 </html>

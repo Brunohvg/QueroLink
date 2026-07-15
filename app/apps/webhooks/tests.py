@@ -102,10 +102,7 @@ class TestOrderPaidCorrelation(BaseWebhookTest):
         self.order.refresh_from_db()
         self.assertEqual(self.order.status, Order.Status.COMPLETED)
 
-        sale = Sale.objects.filter(order=self.order).first()
-        self.assertIsNotNone(sale)
-        self.assertEqual(sale.origin, Sale.Origin.LINK)
-        self.assertEqual(sale.amount, 15000)
+        self.assertEqual(Sale.objects.filter(order=self.order).count(), 0)
 
     def test_order_paid_unknown_code_skips(self):
         payload = {
@@ -241,6 +238,34 @@ class TestWebhookIdempotency(TransactionTestCase):
             slug='idempotency-test',
             is_active=True,
         )
+        self.seller_user = User.objects.create_user(
+            username='idempotency_seller',
+            role=User.Role.SELLER,
+            tenant=self.tenant,
+        )
+        self.seller = Seller.objects.create(
+            tenant=self.tenant,
+            user=self.seller_user,
+            name='Idempotency Seller',
+            is_active=True,
+        )
+        self.order = Order.objects.create(
+            tenant=self.tenant,
+            seller=self.seller,
+            customer_name='Cliente Idempotency',
+            total_amount=15000,
+            status=Order.Status.PENDING,
+        )
+        self.payment = Payment.objects.create(
+            order=self.order,
+            gateway_name='pagarme',
+            status=Payment.Status.PENDING,
+        )
+        self.payment_link = PaymentLink.objects.create(
+            order=self.order,
+            gateway_url='https://pagar.me/link/idempotency',
+            gateway_link_id='pl_idempotency',
+        )
         self.url = f'/api/webhooks/pagarme/{self.tenant.slug}/'
 
     def _post(self, payload):
@@ -274,8 +299,16 @@ class TestWebhookIdempotency(TransactionTestCase):
     @override_settings(WEBHOOK_AUTH_REQUIRED=False)
     @patch('app.apps.webhooks.tasks.process_pagarme_webhook.delay')
     def test_duplicate_event_keeps_original_payload(self, mock_process):
-        first_payload = {'id': 'evt_duplicate', 'type': 'order.paid', 'data': {'id': 'or_1'}}
-        second_payload = {'id': 'evt_duplicate', 'type': 'order.paid', 'data': {'id': 'or_2'}}
+        first_payload = {
+            'id': 'evt_duplicate',
+            'type': 'order.paid',
+            'data': {'id': 'or_1', 'code': str(self.order.uuid)},
+        }
+        second_payload = {
+            'id': 'evt_duplicate',
+            'type': 'order.paid',
+            'data': {'id': 'or_2', 'code': str(self.order.uuid)},
+        }
 
         first = self._post(first_payload)
         second = self._post(second_payload)
@@ -283,7 +316,7 @@ class TestWebhookIdempotency(TransactionTestCase):
         self.assertEqual(first.status_code, 200)
         self.assertEqual(first.json()['status'], 'received')
         self.assertEqual(second.status_code, 200)
-        self.assertEqual(second.json()['status'], 'duplicate')
+        self.assertEqual(second.json()['status'], 'received')
         self.assertEqual(
             WebhookEvent.objects.filter(
                 gateway='pagarme',
@@ -296,7 +329,7 @@ class TestWebhookIdempotency(TransactionTestCase):
             gateway_event_id='evt_duplicate',
         )
         self.assertEqual(event.payload['data']['id'], 'or_1')
-        self.assertEqual(mock_process.call_count, 1)
+        self.assertEqual(mock_process.call_count, 2)
 
     @override_settings(WEBHOOK_AUTH_REQUIRED=False, MP_WEBHOOK_SECRET='test_secret_key')
     @patch('app.apps.webhooks.tasks.process_billing_webhook.delay')
@@ -305,7 +338,7 @@ class TestWebhookIdempotency(TransactionTestCase):
         pagarme_response = self._post({
             'id': 'evt_same',
             'type': 'order.paid',
-            'data': {'id': 'or_same'},
+            'data': {'id': 'or_same', 'code': str(self.order.uuid)},
         })
         billing_response = self._post_billing({
             'id': 'evt_same',
@@ -360,7 +393,11 @@ class TestWebhookIdempotency(TransactionTestCase):
     @override_settings(WEBHOOK_AUTH_REQUIRED=False)
     @patch('app.apps.webhooks.tasks.process_pagarme_webhook.delay')
     def test_concurrent_duplicate_requests_create_one_event(self, mock_process):
-        payload = {'id': 'evt_concurrent', 'type': 'order.paid', 'data': {'id': 'or_1'}}
+        payload = {
+            'id': 'evt_concurrent',
+            'type': 'order.paid',
+            'data': {'id': 'or_1', 'code': str(self.order.uuid)},
+        }
 
         def post_and_close(_i):
             try:
@@ -380,7 +417,7 @@ class TestWebhookIdempotency(TransactionTestCase):
             ).count(),
             1,
         )
-        self.assertEqual(mock_process.call_count, 1)
+        self.assertEqual(mock_process.call_count, 2)
 
     @override_settings(WEBHOOK_AUTH_REQUIRED=False)
     @patch('app.apps.webhooks.tasks.process_pagarme_webhook.delay')
@@ -402,12 +439,73 @@ class TestWebhookIdempotency(TransactionTestCase):
         )
         self.assertEqual(mock_process.call_count, 2)
 
+    @override_settings(WEBHOOK_AUTH_REQUIRED=False)
+    @patch('app.apps.webhooks.tasks.process_pagarme_webhook.delay')
+    def test_foreign_charge_paid_is_ignored_without_persisting(self, mock_process):
+        payload = {
+            'id': 'evt_foreign_charge',
+            'type': 'charge.paid',
+            'data': {
+                'id': 'ch_foreign',
+                'code': 'external-code',
+                'order': {'id': 'or_foreign', 'code': 'external-order'},
+            },
+        }
+
+        response = self._post(payload)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()['status'], 'ignored_foreign')
+        self.assertFalse(WebhookEvent.objects.filter(
+            gateway='pagarme',
+            gateway_event_id='evt_foreign_charge',
+        ).exists())
+        mock_process.assert_not_called()
+
+    @override_settings(WEBHOOK_AUTH_REQUIRED=False)
+    @patch('app.apps.webhooks.tasks.process_pagarme_webhook.delay')
+    def test_foreign_payment_link_expired_is_ignored_without_persisting(self, mock_process):
+        payload = {
+            'id': 'evt_foreign_expired',
+            'type': 'payment-link.expired',
+            'data': {'id': 'pl_foreign'},
+        }
+
+        response = self._post(payload)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()['status'], 'ignored_foreign')
+        self.assertFalse(WebhookEvent.objects.filter(
+            gateway='pagarme',
+            gateway_event_id='evt_foreign_expired',
+        ).exists())
+        mock_process.assert_not_called()
+
+    @override_settings(WEBHOOK_AUTH_REQUIRED=False)
+    @patch('app.apps.webhooks.tasks.process_pagarme_webhook.delay')
+    def test_known_payment_link_event_is_accepted(self, mock_process):
+        payload = {
+            'id': 'evt_known_expired',
+            'type': 'payment-link.expired',
+            'data': {'id': self.payment_link.gateway_link_id},
+        }
+
+        response = self._post(payload)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()['status'], 'received')
+        self.assertTrue(WebhookEvent.objects.filter(
+            gateway='pagarme',
+            gateway_event_id='evt_known_expired',
+        ).exists())
+        mock_process.assert_called_once()
+
 
 class TestReconcilePendingOrders(BaseWebhookTest):
     def setUp(self):
         super().setUp()
         Tenant.objects.filter(pk=self.tenant.pk).update(
-            pagarme_api_key='sk_test_fakekey123456',
+            pagarme_api_key='test-api-key',
         )
         self.tenant.refresh_from_db()
         self.old_order = Order.objects.create(
@@ -494,16 +592,27 @@ class TestReconcilePendingOrders(BaseWebhookTest):
             'id': 'or_recon123',
             'code': str(self.old_order.uuid),
             'status': 'paid',
+            'charges': [{
+                'id': 'ch_recon_idempotent',
+                'payment_method': 'credit_card',
+                'paid_at': '2026-07-03T12:00:00Z',
+                'last_transaction': {'installments': 1},
+            }],
         }
-        self.payment.status = Payment.Status.PAID
-        self.payment.save()
 
         from app.apps.webhooks.tasks import reconcile_pending_orders
         with patch('app.apps.notifications.tasks.create_and_send_notification', return_value=None):
             reconcile_pending_orders()
+            reconcile_pending_orders()
 
         sale_count = Sale.objects.filter(order=self.old_order).count()
         self.assertEqual(sale_count, 0)
+        self.assertEqual(
+            WebhookEvent.objects.filter(
+                gateway_event_id=f'reconcile_{self.old_order.uuid}',
+            ).count(),
+            1,
+        )
 
 
 class TestChargeRefunded(BaseWebhookTest):
@@ -539,7 +648,7 @@ class TestReconcileDedup(TestCase):
     def setUp(self):
         self.tenant = Tenant.objects.create(
             company_name='Dedup Test', slug='dedup-test',
-            is_active=True, pagarme_api_key='sk_test_fakekey123456',
+            is_active=True, pagarme_api_key='test-api-key',
         )
         self.seller_user = User.objects.create_user(
             username='dedup_seller', password='test123',
@@ -653,3 +762,449 @@ class TestReconcileDedup(TestCase):
         ).first()
         self.assertIsNotNone(event)
         self.assertEqual(event.payload['type'], 'order.paid')
+
+
+class TestPagarmeReliability(BaseWebhookTest):
+    def test_charge_paid_accepts_real_payload_code_and_metadata_link_id(self):
+        payload = {
+            'type': 'charge.paid',
+            'data': {
+                'id': 'ch_real_shape',
+                'code': str(self.order.uuid),
+                'payment_method': 'credit_card',
+                'paid_at': '2026-07-14T17:20:16Z',
+                'last_transaction': {'installments': 3},
+                'metadata': {'payment_link_id': 'pl_test123'},
+            },
+        }
+        event = self._create_event(payload)
+
+        self._run_task(event)
+
+        self.payment.refresh_from_db()
+        self.order.refresh_from_db()
+        self.assertEqual(self.payment.status, Payment.Status.PAID)
+        self.assertEqual(self.payment.installments, 3)
+        self.assertEqual(self.order.status, Order.Status.COMPLETED)
+        self.assertEqual(self.order.status_display_pt, 'Pago')
+        self.assertEqual(self.payment.status_display_pt, 'Pago')
+
+    def test_charge_paid_notification_failure_does_not_rollback_financial_state(self):
+        payload = {
+            'type': 'charge.paid',
+            'data': {
+                'id': 'ch_no_rollback',
+                'payment_method': 'credit_card',
+                'paid_at': '2026-07-03T12:00:00Z',
+                'last_transaction': {'installments': 2},
+                'order': {
+                    'id': 'or_no_rollback',
+                    'code': str(self.order.uuid),
+                    'payment_link': {'id': 'pl_test123'},
+                },
+            },
+        }
+        event = self._create_event(payload)
+
+        from app.apps.webhooks.tasks import process_pagarme_webhook
+        with patch(
+            'app.apps.notifications.tasks.create_and_send_notification',
+            side_effect=RuntimeError('WHATSAPP_FAILURE'),
+        ):
+            process_pagarme_webhook(event.id)
+
+        event.refresh_from_db()
+        self.payment.refresh_from_db()
+        self.order.refresh_from_db()
+
+        self.assertTrue(event.processed)
+        self.assertEqual(event.status, WebhookEvent.Status.PROCESSED)
+        self.assertEqual(self.payment.status, Payment.Status.PAID)
+        self.assertEqual(self.order.status, Order.Status.COMPLETED)
+        self.assertEqual(Sale.objects.filter(order=self.order).count(), 0)
+
+    def test_payment_failed_reason_visible_and_sent_to_notification(self):
+        payload = {
+            'type': 'charge.payment_failed',
+            'data': {
+                'id': 'ch_failed_reason',
+                'payment_method': 'credit_card',
+                'last_transaction': {
+                    'installments': 2,
+                    'refusal_reason': 'Cartao recusado',
+                },
+                'order': {
+                    'payment_link': {'id': 'pl_test123'},
+                },
+            },
+        }
+        event = self._create_event(payload)
+
+        with patch('app.apps.notifications.tasks.create_and_send_notification') as mock_notify:
+            from app.apps.webhooks.tasks import process_pagarme_webhook
+            with self.captureOnCommitCallbacks(execute=True):
+                process_pagarme_webhook(event.id)
+
+        self.payment.refresh_from_db()
+        self.assertEqual(self.payment.status, Payment.Status.FAILED)
+        self.assertEqual(self.payment.refusal_reason, 'Cartao recusado')
+        self.assertEqual(self.payment.status_display_pt, 'Recusado')
+        context = mock_notify.call_args.kwargs['context']
+        self.assertEqual(context['motivo'], 'Cartao recusado')
+
+    def test_charge_paid_and_order_paid_do_not_create_sale(self):
+        charge_payload = {
+            'type': 'charge.paid',
+            'data': {
+                'id': 'ch_same_order',
+                'payment_method': 'credit_card',
+                'paid_at': '2026-07-03T12:00:00Z',
+                'last_transaction': {'installments': 3},
+                'order': {
+                    'id': 'or_same_order',
+                    'code': str(self.order.uuid),
+                    'payment_link': {'id': 'pl_test123'},
+                },
+            },
+        }
+        order_payload = {
+            'type': 'order.paid',
+            'data': {
+                'id': 'or_same_order',
+                'code': str(self.order.uuid),
+                'charges': [{
+                    'id': 'ch_same_order',
+                    'payment_method': 'credit_card',
+                    'paid_at': '2026-07-03T12:00:00Z',
+                    'last_transaction': {'installments': 3},
+                }],
+            },
+        }
+
+        self._run_task(self._create_event(charge_payload))
+        self._run_task(self._create_event(order_payload))
+
+        self.assertEqual(Sale.objects.filter(order=self.order).count(), 0)
+        self.payment.refresh_from_db()
+        self.order.refresh_from_db()
+        self.assertEqual(self.payment.status, Payment.Status.PAID)
+        self.assertEqual(self.order.status, Order.Status.COMPLETED)
+
+    def test_processing_failure_persists_failed_status_after_rollback(self):
+        payload = {
+            'type': 'charge.paid',
+            'data': {
+                'id': 'ch_failure_status',
+                'payment_method': 'credit_card',
+                'order': {
+                    'id': 'or_failure_status',
+                    'code': str(self.order.uuid),
+                    'payment_link': {'id': 'pl_test123'},
+                },
+            },
+        }
+        event = self._create_event(payload)
+
+        from app.apps.webhooks.services import process_paid_pagarme_event
+        with patch(
+            'app.apps.webhooks.services.populate_payment_from_webhook',
+            side_effect=RuntimeError('SANITIZED_PROCESSING_FAILURE'),
+        ):
+            with self.assertRaises(RuntimeError):
+                process_paid_pagarme_event(event.id)
+
+        event.refresh_from_db()
+        self.payment.refresh_from_db()
+        self.order.refresh_from_db()
+        self.assertFalse(event.processed)
+        self.assertEqual(event.status, WebhookEvent.Status.FAILED)
+        self.assertIn('SANITIZED_PROCESSING_FAILURE', event.processing_error)
+        self.assertEqual(self.payment.status, Payment.Status.PENDING)
+        self.assertEqual(self.order.status, Order.Status.PENDING)
+
+    def test_reprocess_command_dry_run_does_not_change_status(self):
+        from io import StringIO
+        from django.core.management import call_command
+
+        payload = {
+            'type': 'charge.paid',
+            'data': {
+                'id': 'ch_dry_run',
+                'payment_method': 'credit_card',
+                'order': {
+                    'id': 'or_dry_run',
+                    'code': str(self.order.uuid),
+                    'payment_link': {'id': 'pl_test123'},
+                },
+            },
+        }
+        event = self._create_event(payload)
+
+        out = StringIO()
+        call_command(
+            'reprocess_pagarme_webhook',
+            '--event-id', str(event.id),
+            '--dry-run',
+            stdout=out,
+        )
+
+        event.refresh_from_db()
+        self.payment.refresh_from_db()
+        self.order.refresh_from_db()
+
+        self.assertFalse(event.processed)
+        self.assertEqual(event.status, WebhookEvent.Status.RECEIVED)
+        self.assertEqual(self.payment.status, Payment.Status.PENDING)
+        self.assertEqual(self.order.status, Order.Status.PENDING)
+        self.assertIn('dry_run', out.getvalue())
+
+    def test_reprocess_command_uses_idempotent_service(self):
+        from io import StringIO
+        from django.core.management import call_command
+
+        payload = {
+            'type': 'charge.paid',
+            'data': {
+                'id': 'ch_reprocess',
+                'payment_method': 'credit_card',
+                'order': {
+                    'id': 'or_reprocess',
+                    'code': str(self.order.uuid),
+                    'payment_link': {'id': 'pl_test123'},
+                },
+            },
+        }
+        event = self._create_event(payload)
+
+        out = StringIO()
+        with patch('app.apps.notifications.tasks.create_and_send_notification', return_value=None):
+            call_command(
+                'reprocess_pagarme_webhook',
+                '--event-id', str(event.id),
+                '--operator', 'test',
+                stdout=out,
+            )
+            call_command(
+                'reprocess_pagarme_webhook',
+                '--event-id', str(event.id),
+                '--operator', 'test',
+                stdout=out,
+            )
+
+        event.refresh_from_db()
+        self.payment.refresh_from_db()
+        self.order.refresh_from_db()
+        self.assertTrue(event.processed)
+        self.assertEqual(self.payment.status, Payment.Status.PAID)
+        self.assertEqual(self.order.status, Order.Status.COMPLETED)
+        self.assertEqual(Sale.objects.filter(order=self.order).count(), 0)
+
+
+class TestPagarmeManualVerification(TestCase):
+    def setUp(self):
+        self.tenant = Tenant.objects.create(
+            company_name='Manual Verify',
+            slug='manual-verify',
+            is_active=True,
+            pagarme_api_key='test-api-key',
+        )
+        self.manager = User.objects.create_user(
+            username='manager_verify', password='test123',
+            role=User.Role.MANAGER, tenant=self.tenant,
+        )
+        self.seller_user = User.objects.create_user(
+            username='seller_verify', password='test123',
+            role=User.Role.SELLER, tenant=self.tenant,
+        )
+        self.seller = Seller.objects.create(
+            tenant=self.tenant,
+            user=self.seller_user,
+            name='Seller Verify',
+            phone='55999999999',
+            is_active=True,
+        )
+        self.order = Order.objects.create(
+            tenant=self.tenant,
+            seller=self.seller,
+            customer_name='Cliente Verify',
+            total_amount=12345,
+            status=Order.Status.PENDING,
+        )
+        self.payment = Payment.objects.create(
+            order=self.order,
+            gateway_name='pagarme',
+            status=Payment.Status.PENDING,
+            installments=4,
+        )
+        PaymentLink.objects.create(
+            order=self.order,
+            gateway_url='https://pagar.me/link/verify',
+            gateway_link_id='pl_verify',
+        )
+
+    @patch('app.apps.notifications.tasks.create_and_send_notification', return_value=None)
+    @patch('app.services.gateway.pagar_me.PagarMeGateway.find_order_by_code')
+    def test_manual_verification_only_marks_paid_when_remote_paid(self, mock_find, _mock_notify):
+        self.client.force_login(self.manager)
+        mock_find.return_value = {
+            'id': 'or_verify',
+            'code': str(self.order.uuid),
+            'status': 'paid',
+            'charges': [{
+                'id': 'ch_verify',
+                'payment_method': 'credit_card',
+                'paid_at': '2026-07-03T12:00:00Z',
+                'last_transaction': {'installments': 4},
+            }],
+        }
+
+        response = self.client.post(
+            f'/dashboard/gestor/links/{self.order.uuid}/verificar-pagamento/',
+        )
+
+        self.assertEqual(response.status_code, 302)
+        self.payment.refresh_from_db()
+        self.order.refresh_from_db()
+        self.assertEqual(self.payment.status, Payment.Status.PAID)
+        self.assertEqual(self.order.status, Order.Status.COMPLETED)
+        self.assertEqual(Sale.objects.filter(order=self.order).count(), 0)
+
+    @patch('app.services.gateway.pagar_me.PagarMeGateway.find_order_by_code')
+    def test_manual_verification_does_not_mark_paid_when_remote_pending(self, mock_find):
+        self.client.force_login(self.manager)
+        mock_find.return_value = {
+            'id': 'or_verify_pending',
+            'code': str(self.order.uuid),
+            'status': 'pending',
+        }
+
+        response = self.client.post(
+            f'/dashboard/gestor/links/{self.order.uuid}/verificar-pagamento/',
+        )
+
+        self.assertEqual(response.status_code, 302)
+        self.payment.refresh_from_db()
+        self.order.refresh_from_db()
+        self.assertEqual(self.payment.status, Payment.Status.PENDING)
+        self.assertEqual(self.order.status, Order.Status.PENDING)
+        self.assertEqual(Sale.objects.filter(order=self.order).count(), 0)
+
+    def test_manager_webhook_status_hides_technical_details(self):
+        self.client.force_login(self.manager)
+        response = self.client.get('/api/manager/webhook-status/')
+
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertIn(data['status'], ['connected', 'requires_attention'])
+        self.assertNotIn('webhook_url', data)
+        self.assertNotIn('last_event', data)
+        self.assertNotIn('error', data)
+
+
+class TestPagarmeRefundRequests(TestCase):
+    def test_partial_cancel_charge_uses_cancel_endpoint_with_amount(self):
+        from app.services.gateway.pagar_me import PagarMeGateway
+
+        gateway = PagarMeGateway(api_key='test-api-key')
+        with patch('app.services.gateway.pagar_me.requests.request') as mock_request:
+            mock_response = mock_request.return_value
+            mock_response.status_code = 200
+            mock_response.json.return_value = {'id': 'ch_refund'}
+
+            gateway.partial_cancel_charge('ch_refund', 56160)
+
+        args, kwargs = mock_request.call_args
+        self.assertEqual(args[0], 'POST')
+        self.assertEqual(
+            args[1],
+            'https://api.pagar.me/core/v5/charges/ch_refund/cancel',
+        )
+        self.assertEqual(kwargs['json'], {'amount': 56160})
+
+    def test_full_cancel_charge_uses_cancel_endpoint_without_amount(self):
+        from app.services.gateway.pagar_me import PagarMeGateway
+
+        gateway = PagarMeGateway(api_key='test-api-key')
+        with patch('app.services.gateway.pagar_me.requests.request') as mock_request:
+            mock_response = mock_request.return_value
+            mock_response.status_code = 200
+            mock_response.json.return_value = {'id': 'ch_refund'}
+
+            gateway.cancel_charge('ch_refund')
+
+        args, kwargs = mock_request.call_args
+        self.assertEqual(args[0], 'POST')
+        self.assertEqual(
+            args[1],
+            'https://api.pagar.me/core/v5/charges/ch_refund/cancel',
+        )
+        self.assertNotIn('json', kwargs)
+
+
+class TestGestorLinkRefundView(TestCase):
+    def setUp(self):
+        self.tenant = Tenant.objects.create(
+            company_name='Refund View',
+            slug='refund-view',
+            is_active=True,
+            pagarme_api_key='test-api-key',
+        )
+        self.manager = User.objects.create_user(
+            username='manager_refund',
+            password='test123',
+            role=User.Role.MANAGER,
+            tenant=self.tenant,
+        )
+        self.seller_user = User.objects.create_user(
+            username='seller_refund',
+            password='test123',
+            role=User.Role.SELLER,
+            tenant=self.tenant,
+        )
+        self.seller = Seller.objects.create(
+            tenant=self.tenant,
+            user=self.seller_user,
+            name='Seller Refund',
+            is_active=True,
+        )
+        self.order = Order.objects.create(
+            tenant=self.tenant,
+            seller=self.seller,
+            customer_name='Cliente Refund',
+            total_amount=56160,
+            status=Order.Status.COMPLETED,
+        )
+        self.payment = Payment.objects.create(
+            order=self.order,
+            gateway_name='pagarme',
+            status=Payment.Status.PAID,
+            gateway_transaction_id='ch_refund_view',
+        )
+        self.url = f'/dashboard/gestor/links/{self.order.uuid}/estornar/'
+
+    @patch('app.services.gateway.pagar_me.PagarMeGateway.partial_cancel_charge')
+    def test_partial_refund_accepts_numeric_string_amount(self, mock_partial):
+        self.client.force_login(self.manager)
+
+        response = self.client.post(
+            self.url,
+            data=json.dumps({'amount': '56160'}),
+            content_type='application/json',
+        )
+
+        self.assertEqual(response.status_code, 200)
+        mock_partial.assert_called_once_with('ch_refund_view', 56160)
+
+    @patch('app.services.gateway.pagar_me.PagarMeGateway.partial_cancel_charge')
+    def test_partial_refund_rejects_amount_greater_than_payment(self, mock_partial):
+        self.client.force_login(self.manager)
+
+        response = self.client.post(
+            self.url,
+            data=json.dumps({'amount': 56161}),
+            content_type='application/json',
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertIn('maior que o pagamento', response.json()['error'])
+        mock_partial.assert_not_called()

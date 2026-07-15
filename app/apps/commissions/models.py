@@ -78,6 +78,7 @@ class CommissionPeriod(models.Model):
         constraints = [
             models.UniqueConstraint(
                 fields=['tenant', 'month', 'year'],
+                condition=~models.Q(status='CANCELADA'),
                 name='unique_period_per_tenant',
             ),
         ]
@@ -264,28 +265,23 @@ class SellerCommission(models.Model):
         return f"{self.seller.name} - {self.period} ({self.status})"
 
     def _compute_working_days(self):
-        from app.apps.sales.models import Sale
-        sales_dates = Sale.objects.filter(
-            tenant=self.period.tenant,
-            seller=self.seller,
-            origin__in=Sale.COMMISSION_ORIGINS,
-            status='ATIVA',
-            sale_date__gte=self.period.start_date,
-            sale_date__lte=self.period.end_date,
-        ).dates('sale_date', 'day')
-        count = sales_dates.count()
+        from app.apps.commissions.day_status import get_period_day_statuses
+        day_status = get_period_day_statuses(
+            self.period.tenant, self.seller, self.period, sc=self,
+        )
+        summary = day_status['summary']
+        count = summary['launched_days_count']
         expected = self.expected_working_days or self.period.expected_working_days or 22
-        missing = max(0, expected - count)
-        return count, expected, missing
+        return count, expected, summary['pending_days_count'], summary
 
     def update_operational_status(self, commit=True):
-        count, expected, missing = self._compute_working_days()
+        count, expected, missing, summary = self._compute_working_days()
         self.submitted_days_count = count
         self.expected_working_days = expected
         self.missing_days_count = missing
-        if count == 0:
+        if count == 0 and summary['justified_days_count'] == 0:
             self.operational_status = self.OperationalStatus.SEM_LANCAMENTO
-        elif count >= expected:
+        elif missing == 0:
             self.operational_status = self.OperationalStatus.PRONTO
         else:
             self.operational_status = self.OperationalStatus.PENDENTE

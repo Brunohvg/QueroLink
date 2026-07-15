@@ -9,7 +9,7 @@ from django.db import transaction
 from django.db.models import Sum
 
 from app.apps.sales.models import Sale
-from app.apps.sellers.models import Seller
+from app.apps.sellers.models import Seller, SellerDayJustification
 from app.apps.commissions.models import (
     CommissionPeriod,
     SellerCommission,
@@ -41,6 +41,16 @@ def legacy_month_range(month, year):
     return start, date(year, month, last_day)
 
 
+MESES = [
+    'Janeiro', 'Fevereiro', 'Marco', 'Abril', 'Maio', 'Junho',
+    'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro',
+]
+
+
+def suggest_label(end_date):
+    return f'{MESES[end_date.month - 1]}/{end_date.year}'
+
+
 def suggest_period_range(tenant, month, year):
     day = getattr(tenant, 'period_start_day', 1) or 1
     if day <= 1:
@@ -51,6 +61,22 @@ def suggest_period_range(tenant, month, year):
         start = date(year - 1, 12, day)
     end = date(year, month, day - 1)
     return start, end
+
+
+def suggest_next_open_month(tenant, max_lookahead=24):
+    hoje = timezone.localdate()
+    month, year = hoje.month, hoje.year
+    for _ in range(max_lookahead):
+        exists = CommissionPeriod.objects.filter(
+            tenant=tenant, month=month, year=year,
+        ).exclude(status=CommissionPeriod.Status.CANCELADA).exists()
+        if not exists:
+            return month, year
+        if month == 12:
+            month, year = 1, year + 1
+        else:
+            month += 1
+    return month, year
 
 
 def get_period_by_legacy_label(tenant, month, year):
@@ -81,6 +107,111 @@ def get_current_period(tenant):
             CommissionPeriod.Status.PARCIALMENTE_PAGA,
         ],
     ).first()
+
+
+class PeriodIntegrityError(Exception):
+    pass
+
+
+class PeriodNotFound(Exception):
+    pass
+
+
+def get_default_period(tenant):
+    today = timezone.localdate()
+    covering = list(
+        CommissionPeriod.objects.filter(
+            tenant=tenant,
+            start_date__lte=today,
+            end_date__gte=today,
+        ).exclude(status=CommissionPeriod.Status.CANCELADA)
+    )
+    if len(covering) > 1:
+        logger.error(
+            'Multiplas competencias cobrem a data atual para tenant %s: %s',
+            tenant.pk, [str(p.uuid) for p in covering],
+        )
+        raise PeriodIntegrityError(
+            'Existem competencias sobrepostas cobrindo a data atual.'
+        )
+    if covering:
+        return covering[0]
+    return CommissionPeriod.objects.filter(
+        tenant=tenant,
+    ).exclude(
+        status=CommissionPeriod.Status.CANCELADA,
+    ).order_by('-start_date').first()
+
+
+def resolve_selected_period(request, tenant):
+    period_param = request.GET.get('period') if hasattr(request, 'GET') else None
+    if not period_param:
+        period_param = request.query_params.get('period') if hasattr(request, 'query_params') else None
+
+    if period_param:
+        try:
+            period = CommissionPeriod.objects.filter(
+                uuid=period_param,
+                tenant=tenant,
+            ).exclude(status=CommissionPeriod.Status.CANCELADA).first()
+        except (ValidationError, ValueError):
+            period = None
+        if not period:
+            raise PeriodNotFound('Competencia nao encontrada.')
+        return period
+
+    return get_default_period(tenant)
+
+
+def get_previous_period(tenant, selected_period):
+    if not selected_period:
+        return None
+    return CommissionPeriod.objects.filter(
+        tenant=tenant,
+        end_date__lt=selected_period.start_date,
+    ).exclude(
+        status=CommissionPeriod.Status.CANCELADA,
+    ).order_by('-end_date').first()
+
+
+def get_selectable_periods(tenant):
+    return CommissionPeriod.objects.filter(
+        tenant=tenant,
+    ).exclude(
+        status=CommissionPeriod.Status.CANCELADA,
+    ).order_by('-start_date')
+
+
+def build_period_selector_context(request, tenant):
+    periods = get_selectable_periods(tenant)
+    try:
+        selected = resolve_selected_period(request, tenant)
+        integrity_error = None
+    except PeriodIntegrityError as exc:
+        selected = None
+        integrity_error = str(exc)
+
+    periods_data = [
+        {
+            'uuid': str(p.uuid),
+            'label': p.label,
+            'display_label': p.display_label,
+            'start': p.start_date.strftime('%d/%m'),
+            'end': p.end_date.strftime('%d/%m'),
+            'start_full': p.start_date.strftime('%d/%m/%Y'),
+            'end_full': p.end_date.strftime('%d/%m/%Y'),
+            'status': p.status,
+            'status_display': p.get_status_display(),
+        }
+        for p in periods
+    ]
+    return {
+        'periods': periods_data,
+        'has_periods': bool(periods_data),
+        'selected_period': selected,
+        'selected_period_uuid': str(selected.uuid) if selected else '',
+        'period_integrity_error': integrity_error,
+    }
 
 
 def get_period_sales_queryset(period):
@@ -125,61 +256,26 @@ def calculate_estimated_commission(seller, month, year):
     return commission, total
 
 
-def get_or_create_period(tenant, month, year, expected_working_days=None,
-                         start_date=None, end_date=None):
-    if start_date is None or end_date is None:
-        suggested_start, suggested_end = suggest_period_range(tenant, month, year)
-        if start_date is None:
-            start_date = suggested_start
-        if end_date is None:
-            end_date = suggested_end
+def get_or_create_period(tenant, month, year, expected_working_days=None):
+    start, end = legacy_month_range(month, year)
     period, created = CommissionPeriod.objects.get_or_create(
         tenant=tenant,
         month=month,
         year=year,
         defaults={
-            'label': f'{month:02d}/{year}',
-            'start_date': start_date,
-            'end_date': end_date,
+            'label': suggest_label(end),
+            'start_date': start,
+            'end_date': end,
             'expected_working_days': expected_working_days or 22,
             'status': CommissionPeriod.Status.ABERTA,
         },
     )
-    if created:
-        logger.warning(
-            'periodo %s auto-criado com range sugerido %s–%s',
-            period.display_label, start_date, end_date,
-        )
     if created and expected_working_days:
         period.expected_working_days = expected_working_days
         period.save(update_fields=['expected_working_days'])
     if created:
         sync_period_seller_commissions(period)
     return period, created
-
-
-def get_sales_outside_periods_queryset(tenant):
-    from django.db.models import Q
-
-    hoje = timezone.localdate()
-    qs = Sale.objects.filter(
-        tenant=tenant,
-        status='ATIVA',
-        sale_date__lt=hoje,
-    )
-    ranges = CommissionPeriod.objects.filter(tenant=tenant).exclude(
-        status=CommissionPeriod.Status.CANCELADA,
-    ).values_list('start_date', 'end_date')
-    covered = Q()
-    for start, end in ranges:
-        covered |= Q(sale_date__gte=start, sale_date__lte=end)
-    if covered:
-        qs = qs.exclude(covered)
-    return qs
-
-
-def count_sales_outside_periods(tenant):
-    return get_sales_outside_periods_queryset(tenant).count()
 
 
 def sync_period_seller_commissions(period):
@@ -516,18 +612,52 @@ def get_links_data(tenant, month=None, year=None):
     }
 
 
-def get_dashboard_data(tenant, month=None, year=None):
+def get_dashboard_data(tenant, month=None, year=None, period=None):
     hoje = timezone.localdate()
 
-    period = None
-    if month is None and year is None:
-        period = get_current_period(tenant)
-    else:
-        if month is None:
-            month = hoje.month
-        if year is None:
-            year = hoje.year
-        period = get_period_by_legacy_label(tenant, month, year)
+    if period is None:
+        if month is None and year is None:
+            period = get_default_period(tenant)
+            if period is None:
+                vendedores_ativos = Seller.objects.filter(
+                    tenant=tenant, is_active=True,
+                ).count()
+                return {
+                    'period': None,
+                    'prev_period_label': None,
+                    'total_vendido': 0,
+                    'commission_aberta': 0,
+                    'commission_fechada': 0,
+                    'commission_paga': 0,
+                    'period_status': None,
+                    'has_inconsistency': False,
+                    'vendedores_ativos': vendedores_ativos,
+                    'vendedores_total': Seller.objects.filter(tenant=tenant).count(),
+                    'vendedores_com_venda': 0,
+                    'vendedores_sem_lancamento_hoje': vendedores_ativos,
+                    'vendedores_abertos': 0,
+                    'vendedores_fechados': 0,
+                    'vendedores_pagos': 0,
+                    'vendedores_prontos': 0,
+                    'vendedores_pendentes': 0,
+                    'vendedores_sem_lancamento_periodo': vendedores_ativos,
+                    'links_gerados': 0,
+                    'links_pagos': 0,
+                    'links_pendentes': 0,
+                    'links_recusados': 0,
+                    'valor_gerado_links': 0,
+                    'valor_pago_links': 0,
+                    'top5_mes': [],
+                    'sellers_inativos': [],
+                    'evolution': [],
+                    'comparison_prev': 0,
+                }
+        else:
+            if month is None:
+                month = hoje.month
+            if year is None:
+                year = hoje.year
+            period = get_period_by_legacy_label(tenant, month, year)
 
     if period:
         start = period.start_date
@@ -640,14 +770,17 @@ def get_dashboard_data(tenant, month=None, year=None):
         total=Sum('amount'),
     ).order_by('sale_date'))
 
-    prev_month = month - 1 if month > 1 else 12
-    prev_year = year if month > 1 else year - 1
-    prev_last_day = calendar.monthrange(prev_year, prev_month)[1]
-    prev_total = Sale.objects.filter(
-        tenant=tenant, origin__in=Sale.COMMISSION_ORIGINS, status='ATIVA',
-        sale_date__gte=date(prev_year, prev_month, 1),
-        sale_date__lte=date(prev_year, prev_month, prev_last_day),
-    ).aggregate(t=Sum('amount'))['t'] or 0
+    prev_period = get_previous_period(tenant, period) if period else None
+    if prev_period:
+        prev_total = Sale.objects.filter(
+            tenant=tenant, origin__in=Sale.COMMISSION_ORIGINS, status='ATIVA',
+            sale_date__gte=prev_period.start_date,
+            sale_date__lte=prev_period.end_date,
+        ).aggregate(t=Sum('amount'))['t'] or 0
+        prev_label = prev_period.display_label
+    else:
+        prev_total = 0
+        prev_label = None
 
     return {
         'period': {
@@ -655,8 +788,13 @@ def get_dashboard_data(tenant, month=None, year=None):
             'end': end.isoformat(),
             'month': month,
             'year': year,
+            'uuid': str(period.uuid) if period else None,
             'label': period.display_label if period else f'{month:02d}/{year}',
+            'range': (
+                f'{start.strftime("%d/%m/%Y")} a {end.strftime("%d/%m/%Y")}'
+            ),
         },
+        'prev_period_label': prev_label,
         'total_vendido': total_vendido,
         'commission_aberta': summary['commission_aberta'],
         'commission_fechada': summary['commission_fechada'],
@@ -711,12 +849,60 @@ def get_missing_days_before_today(seller, month, year):
             sale_date__lte=end,
         ).values_list('sale_date', flat=True).distinct()
     )
+    justified_dates = set(
+        SellerDayJustification.objects.filter(
+            tenant=seller.tenant,
+            seller=seller,
+            date__gte=start,
+            date__lte=end,
+        ).values_list('date', flat=True)
+    )
 
     missing = []
     current = start
     from app.apps.accounts.models import is_working_day
     while current <= end:
-        if current not in submitted_dates:
+        if current not in submitted_dates and current not in justified_dates:
+            if is_working_day(seller.tenant, current):
+                missing.append(current)
+        current += timedelta(days=1)
+    return missing
+
+
+def get_missing_days_for_period(seller, period):
+    if not period:
+        return []
+    today = timezone.localdate()
+    from datetime import timedelta
+    start = period.start_date
+    end = min(today - timedelta(days=1), period.end_date)
+    if start > end:
+        return []
+
+    submitted_dates = set(
+        Sale.objects.filter(
+            tenant=seller.tenant,
+            seller=seller,
+            origin__in=Sale.COMMISSION_ORIGINS,
+            status='ATIVA',
+            sale_date__gte=start,
+            sale_date__lte=end,
+        ).values_list('sale_date', flat=True).distinct()
+    )
+    justified_dates = set(
+        SellerDayJustification.objects.filter(
+            tenant=seller.tenant,
+            seller=seller,
+            date__gte=start,
+            date__lte=end,
+        ).values_list('date', flat=True)
+    )
+
+    missing = []
+    current = start
+    from app.apps.accounts.models import is_working_day
+    while current <= end:
+        if current not in submitted_dates and current not in justified_dates:
             if is_working_day(seller.tenant, current):
                 missing.append(current)
         current += timedelta(days=1)
@@ -765,6 +951,100 @@ def validate_sale_can_be_changed(seller, sale_date, user):
             f'ou paga nesta competencia.'
         )
     return True, None
+
+
+# Estados de periodo que bloqueiam edicao/exclusao (regra central).
+_LOCKED_PERIOD_STATUSES = (
+    CommissionPeriod.Status.FECHADA,
+    CommissionPeriod.Status.PAGA,
+    CommissionPeriod.Status.CANCELADA,
+)
+# Estados de SellerCommission que bloqueiam edicao/exclusao (regra central).
+_LOCKED_SC_STATUSES = (
+    SellerCommission.Status.FECHADA,
+    SellerCommission.Status.PAGA,
+    SellerCommission.Status.AJUSTADA,
+    SellerCommission.Status.CANCELADA,
+)
+
+
+def is_period_editable_for_seller(seller, period, sc=None):
+    """Regra central de editabilidade de uma competencia para um vendedor.
+
+    Reutilizada por vendas E por justificativas (nao duplicar logica por
+    month/year). Bloqueia se o periodo estiver FECHADA/PAGA/CANCELADA ou se a
+    SellerCommission do vendedor estiver em estado travado.
+    `sc` pode ser pre-carregada para evitar query.
+    """
+    if period is None:
+        return True
+    if period.status in _LOCKED_PERIOD_STATUSES:
+        return False
+    if sc is None:
+        sc = SellerCommission.objects.filter(
+            period=period, seller=seller,
+        ).first()
+    if sc and sc.status in _LOCKED_SC_STATUSES:
+        return False
+    return True
+
+
+def build_sale_change_permission_resolver(seller, periods=None):
+    """Fabrica um resolvedor em lote da regra de edicao/exclusao de vendas.
+
+    Reproduz EXATAMENTE a regra central `validate_sale_can_be_changed`
+    (competencia inexistente => liberado; SellerCommission editavel => liberado;
+    caso contrario bloqueado), adicionando as travas de origem e status da
+    venda. Carrega periodos e comissoes do vendedor UMA vez (sem query por
+    venda), retornando `can_change(sale) -> bool`.
+
+    Fatores considerados:
+    - Sale.origin (apenas MANUAL pode ser alterada; IMPORTADA/LINK sao RO);
+    - Sale.status (ESTORNADA e somente leitura);
+    - CommissionPeriod.status (FECHADA/PAGA/CANCELADA bloqueia);
+    - SellerCommission.status (FECHADA/PAGA/AJUSTADA/CANCELADA bloqueia);
+    - competencia inexistente (liberado, como na regra central).
+
+    Observacao: periodos CANCELADOS sao considerados aqui (uma venda dentro de
+    um range cancelado deve ficar bloqueada), diferentemente de
+    `resolve_period_for_date`, que os ignora para fins de selecao financeira.
+
+    `periods` pode ser passado ja carregado (todos os periodos do tenant,
+    inclusive CANCELADOS) para evitar uma segunda query quando o chamador ja
+    possui a lista.
+    """
+    tenant = seller.tenant
+    if periods is None:
+        periods = list(
+            CommissionPeriod.objects.filter(tenant=tenant).order_by('start_date')
+        )
+    sc_by_period = {
+        sc.period_id: sc
+        for sc in SellerCommission.objects.filter(seller=seller)
+    }
+
+    def _resolve_period(sale_date):
+        for p in periods:
+            if p.start_date <= sale_date <= p.end_date:
+                return p
+        return None
+
+    def can_change(sale):
+        if sale.origin != Sale.Origin.MANUAL:
+            return False
+        if sale.status != 'ATIVA':
+            return False
+        period = _resolve_period(sale.sale_date)
+        if not period:
+            return True
+        if period.status in _LOCKED_PERIOD_STATUSES:
+            return False
+        sc = sc_by_period.get(period.uuid)
+        if not sc:
+            return True
+        return sc.status not in _LOCKED_SC_STATUSES
+
+    return can_change
 
 
 def has_paid_commission(period):
