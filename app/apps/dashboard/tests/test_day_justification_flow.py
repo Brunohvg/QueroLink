@@ -104,6 +104,8 @@ class DayStatusHelperTest(_Base):
         self.assertEqual(row['active_sales_count'], 2)
         # conta como 1 dia lancado
         self.assertEqual(summary['lancados'], 1)
+        self.assertEqual(summary['launched_days_count'], 1)
+        self.assertEqual(summary['resolved_days_count'], 1)
 
     def test_justification_reduces_pending(self):  # 9
         _, s0 = self._statuses()
@@ -112,6 +114,14 @@ class DayStatusHelperTest(_Base):
         _, s1 = self._statuses()
         self.assertEqual(s1['pending_days'], before - 1)
         self.assertEqual(s1['justificados'], 1)
+        self.assertEqual(s1['justified_days_count'], 1)
+        self.assertEqual(s1['resolved_days_count'], 1)
+        self.assertEqual(
+            s1['expected_working_days'],
+            s1['launched_days_count']
+            + s1['justified_days_count']
+            + s1['pending_days_count'],
+        )
 
     def test_pronto_when_zero_pending(self):  # 21
         # justifica/lanca todos os dias uteis do range
@@ -124,12 +134,36 @@ class DayStatusHelperTest(_Base):
         _, s = self._statuses()
         self.assertEqual(s['pending_days'], 0)
         self.assertEqual(s['operational_status'], 'PRONTO')
+        self.assertEqual(
+            s['resolved_days_count'],
+            s['launched_days_count'] + s['justified_days_count'],
+        )
 
     def test_pendente_status(self):  # 22
         self._sale(date(2026, 6, 23))
         _, s = self._statuses()
         self.assertGreater(s['pending_days'], 0)
         self.assertEqual(s['operational_status'], 'PENDENTE')
+
+    def test_seller_commission_justification_resolves_without_finance(self):
+        self.period.start_date = date(2026, 6, 23)
+        self.period.end_date = date(2026, 6, 24)
+        self.period.expected_working_days = 2
+        self.period.save()
+        self._sale(date(2026, 6, 23), amount=100000)
+        self._just(date(2026, 6, 24))
+        sc = SellerCommission.objects.create(
+            period=self.period, seller=self.seller,
+            commission_rate=Decimal('0.01'), expected_working_days=2,
+        )
+        sc.recalculate()
+        self.assertEqual(sc.total_sold_amount, 100000)
+        self.assertEqual(sc.commission_amount, 1000)
+        self.assertEqual(sc.submitted_days_count, 1)
+        self.assertEqual(sc.missing_days_count, 0)
+        self.assertEqual(
+            sc.operational_status, SellerCommission.OperationalStatus.PRONTO,
+        )
 
     def test_civil_dates_not_shifted(self):  # 25
         self._sale(date(2026, 6, 30))

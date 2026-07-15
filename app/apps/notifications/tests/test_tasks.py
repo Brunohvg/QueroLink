@@ -322,6 +322,15 @@ class SendWhatsappNotificationTaskTest(TestCase):
         self.tenant.daily_reminder_enabled = True
         self.tenant.daily_reminder_time = time(12, 0)
         self.tenant.save()
+        CommissionPeriod.objects.create(
+            tenant=self.tenant,
+            month=7,
+            year=2026,
+            start_date=dtz.datetime(2026, 7, 1).date(),
+            end_date=dtz.datetime(2026, 7, 31).date(),
+            expected_working_days=23,
+            status=CommissionPeriod.Status.ABERTA,
+        )
 
         fake_now = dtz.make_aware(
             dtz.datetime(2026, 7, 3, 12, 5, 0)

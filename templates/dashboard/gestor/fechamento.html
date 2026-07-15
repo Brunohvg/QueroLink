@@ -121,7 +121,7 @@
           </div>
           <div class="bg-gray-50/70 rounded-xl px-3 py-2.5">
             <p class="text-[11px] font-medium text-gray-400 uppercase tracking-wider mb-0.5">Dias úteis</p>
-            <p class="text-[16px] font-bold text-gray-900" x-text="(p.expected_working_days||22)"></p>
+            <p class="text-[16px] font-bold text-gray-900" x-text="(p.expected_working_days||0)"></p>
           </div>
         </div>
 
@@ -227,8 +227,8 @@
               <tr class="bg-gray-50/80">
                 <th class="px-4 py-3 text-[11px] font-semibold text-gray-500 uppercase tracking-wider w-10"></th>
                 <th class="px-4 py-3 text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Vendedor</th>
-                <th class="px-4 py-3 text-[11px] font-semibold text-gray-500 uppercase tracking-wider hidden sm:table-cell" title="Dias com lançamento / dias do período">Dias lanç.</th>
-                <th x-show="daysUntilEnd(p) !== null && daysUntilEnd(p) <= 5" class="px-4 py-3 text-[11px] font-semibold text-amber-600 uppercase tracking-wider hidden sm:table-cell">Faltam</th>
+                <th class="px-4 py-3 text-[11px] font-semibold text-gray-500 uppercase tracking-wider hidden sm:table-cell" title="Lançados / Justificados / Pendentes / Esperados">Dias</th>
+                <th x-show="daysUntilEnd(p) !== null && daysUntilEnd(p) <= 5" class="px-4 py-3 text-[11px] font-semibold text-amber-600 uppercase tracking-wider hidden sm:table-cell">Pend.</th>
                 <th class="px-4 py-3 text-[11px] font-semibold text-gray-500 uppercase tracking-wider hidden md:table-cell">Operacional</th>
                 <th class="px-4 py-3 text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Total</th>
                 <th class="px-4 py-3 text-[11px] font-semibold text-gray-500 uppercase tracking-wider hidden sm:table-cell">Taxa</th>
@@ -248,8 +248,10 @@
                   <td class="px-4 py-3.5">
                     <a :href="'/dashboard/gestor/vendedores/' + sc.seller_uuid + '/'" class="text-[14px] font-semibold text-gray-900 hover:text-brand-600 transition-colors" x-text="sc.seller_name"></a>
                   </td>
-                  <td class="px-4 py-3.5 text-[13px] text-gray-700 hidden sm:table-cell" :title="'Dias com lançamento / dias do período: '+(sc.submitted_days_count||0)+' de '+(sc.expected_working_days||22)" x-text="(sc.submitted_days_count||0)+'/'+(sc.expected_working_days||22)"></td>
-                  <td x-show="daysUntilEnd(p) !== null && daysUntilEnd(p) <= 5" class="px-4 py-3.5 text-[13px] text-amber-600 font-medium hidden sm:table-cell" x-text="sc.missing_days_count||0"></td>
+                  <td class="px-4 py-3.5 text-[12px] text-gray-700 hidden sm:table-cell"
+                      :title="'Lançados: '+(sc.launched_days_count||0)+' • Justificados: '+(sc.justified_days_count||0)+' • Pendentes: '+(sc.pending_days_count||0)+' • Esperados: '+(sc.expected_working_days||0)"
+                      x-text="'Lançados: '+(sc.launched_days_count||0)+' • Justificados: '+(sc.justified_days_count||0)+' • Pendentes: '+(sc.pending_days_count||0)+' • Esperados: '+(sc.expected_working_days||0)"></td>
+                  <td x-show="daysUntilEnd(p) !== null && daysUntilEnd(p) <= 5" class="px-4 py-3.5 text-[13px] text-amber-600 font-medium hidden sm:table-cell" x-text="sc.pending_days_count||0"></td>
                   <td class="px-4 py-3.5 hidden md:table-cell">
                     <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-medium"
                           :class="{'bg-emerald-50 text-emerald-700': sc.operational_status==='PRONTO', 'bg-amber-50 text-amber-700': sc.operational_status==='PENDENTE', 'bg-gray-100 text-gray-600': !sc.operational_status||sc.operational_status==='SEM_LANCAMENTO'}">
@@ -895,15 +897,16 @@ function fechamentoPage() {
             if (!this.createStartDate) { this.createError = {start_date: 'Data inicial é obrigatória.'}; return; }
             if (!this.createEndDate) { this.createError = {end_date: 'Data final é obrigatória.'}; return; }
             var end = new Date(this.createEndDate + 'T00:00:00');
+            var expectedDays = parseInt(this.createExpectedDays);
             var body = {
                 label: this.createLabel,
                 start_date: this.createStartDate,
                 end_date: this.createEndDate,
-                expected_working_days: parseInt(this.createExpectedDays) || 22,
                 notes: this.createNotes,
                 month: end.getMonth() + 1,
                 year: end.getFullYear()
             };
+            if (expectedDays > 0) body.expected_working_days = expectedDays;
             this.creating = true;
             var self = this;
             setTimeout(function(){ self.creating = false; }, 10000);
@@ -921,7 +924,7 @@ function fechamentoPage() {
                 this.createError = {detail: 'Erro de conexão.'};
             } finally { this.creating = false; }
         },
-        openEditModal(p) { this.editPeriod=p;this.editLabel=p.label||p.display_label||'';this.editStartDate=p.start_date;this.editEndDate=p.end_date;this.editExpectedDays=p.expected_working_days||22;this.editNotes=p.notes||'';this.editHasSales=(p.seller_commissions||[]).length>0;this.showEditModal=true; },
+        openEditModal(p) { this.editPeriod=p;this.editLabel=p.label||p.display_label||'';this.editStartDate=p.start_date;this.editEndDate=p.end_date;this.editExpectedDays=p.expected_working_days||0;this.editNotes=p.notes||'';this.editHasSales=(p.seller_commissions||[]).length>0;this.showEditModal=true; },
         async doEdit() {
             var body={};
             if (this.editLabel !== (this.editPeriod.label || '')) body.label = this.editLabel;

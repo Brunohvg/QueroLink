@@ -62,7 +62,7 @@
                 <span x-show="s.has_missing_days"
                       class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium"
                       :class="missingBadgeClass(s.missing_days_count)"
-                      x-text="s.missing_days_count + ' de ' + periodWorkingDays + ' dias sem lançamento'"></span>
+                      x-text="s.missing_days_count + ' de ' + periodWorkingDays + ' dias pendentes'"></span>
                 <span x-show="!s.has_missing_days" class="text-[11px] text-emerald-600">Completo</span>
               </td>
             </tr>

@@ -9,7 +9,7 @@ from django.db import transaction
 from django.db.models import Sum
 
 from app.apps.sales.models import Sale
-from app.apps.sellers.models import Seller
+from app.apps.sellers.models import Seller, SellerDayJustification
 from app.apps.commissions.models import (
     CommissionPeriod,
     SellerCommission,
@@ -849,12 +849,20 @@ def get_missing_days_before_today(seller, month, year):
             sale_date__lte=end,
         ).values_list('sale_date', flat=True).distinct()
     )
+    justified_dates = set(
+        SellerDayJustification.objects.filter(
+            tenant=seller.tenant,
+            seller=seller,
+            date__gte=start,
+            date__lte=end,
+        ).values_list('date', flat=True)
+    )
 
     missing = []
     current = start
     from app.apps.accounts.models import is_working_day
     while current <= end:
-        if current not in submitted_dates:
+        if current not in submitted_dates and current not in justified_dates:
             if is_working_day(seller.tenant, current):
                 missing.append(current)
         current += timedelta(days=1)
@@ -881,12 +889,20 @@ def get_missing_days_for_period(seller, period):
             sale_date__lte=end,
         ).values_list('sale_date', flat=True).distinct()
     )
+    justified_dates = set(
+        SellerDayJustification.objects.filter(
+            tenant=seller.tenant,
+            seller=seller,
+            date__gte=start,
+            date__lte=end,
+        ).values_list('date', flat=True)
+    )
 
     missing = []
     current = start
     from app.apps.accounts.models import is_working_day
     while current <= end:
-        if current not in submitted_dates:
+        if current not in submitted_dates and current not in justified_dates:
             if is_working_day(seller.tenant, current):
                 missing.append(current)
         current += timedelta(days=1)
