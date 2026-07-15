@@ -659,21 +659,12 @@ class CommissionPeriodCreateSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError({'end_date': 'Data final obrigatoria.'})
         if end_date < start_date:
             raise serializers.ValidationError({'end_date': 'Data final deve ser maior ou igual a data inicial.'})
-        if (end_date - start_date).days + 1 > 62:
-            raise serializers.ValidationError({'end_date': 'Competencia nao pode exceder 62 dias.'})
         if month is None:
             month = end_date.month
             attrs['month'] = month
         if year is None:
             year = end_date.year
             attrs['year'] = year
-        if CommissionPeriod.objects.filter(
-            tenant=tenant, month=month, year=year,
-        ).exclude(status=CommissionPeriod.Status.CANCELADA).exists():
-            raise serializers.ValidationError(
-                f'A competencia {month:02d}/{year} ja existe. '
-                'Use Atualizar valores para sincronizar os dados.'
-            )
         if CommissionPeriod.objects.filter(
             tenant=tenant,
             start_date__lte=end_date,

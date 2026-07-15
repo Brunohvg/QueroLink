@@ -207,6 +207,48 @@ class TestCommissionPeriodRanges(BaseTest):
         with self.assertRaises(Exception):
             period.full_clean()
 
+    def test_allows_same_month_year_without_overlap(self):
+        first = CommissionPeriod.objects.create(
+            tenant=self.tenant,
+            month=7,
+            year=2026,
+            label='Julho 1a quinzena',
+            start_date=date(2026, 7, 1),
+            end_date=date(2026, 7, 15),
+        )
+        second = CommissionPeriod(
+            tenant=self.tenant,
+            month=7,
+            year=2026,
+            label='Julho 2a quinzena',
+            start_date=date(2026, 7, 16),
+            end_date=date(2026, 7, 31),
+        )
+
+        second.full_clean()
+        second.save()
+
+        self.assertEqual(
+            CommissionPeriod.objects.filter(
+                tenant=self.tenant, month=7, year=2026,
+            ).count(),
+            2,
+        )
+        self.assertTrue(first.contains(date(2026, 7, 10)))
+        self.assertTrue(second.contains(date(2026, 7, 20)))
+
+    def test_allows_period_longer_than_62_days(self):
+        period = CommissionPeriod(
+            tenant=self.tenant,
+            month=3,
+            year=2026,
+            label='Campanha longa',
+            start_date=date(2026, 1, 1),
+            end_date=date(2026, 3, 31),
+        )
+
+        period.full_clean()
+
     def test_allows_gap_between_periods(self):
         CommissionPeriod.objects.create(
             tenant=self.tenant,
@@ -427,6 +469,59 @@ class TestAccountingExportPreviousPeriod(BaseTest):
         self.assertNotIn('561,60', vendas)
         self.assertNotIn(';Link;', vendas)
         self.assertIn(';100,00;', resumo)
+
+    def test_accounting_export_with_period_param_uses_exact_free_range(self):
+        first = CommissionPeriod.objects.create(
+            tenant=self.tenant,
+            month=7,
+            year=2026,
+            label='Julho 1a quinzena',
+            start_date=date(2026, 7, 1),
+            end_date=date(2026, 7, 15),
+        )
+        second = CommissionPeriod.objects.create(
+            tenant=self.tenant,
+            month=7,
+            year=2026,
+            label='Julho 2a quinzena',
+            start_date=date(2026, 7, 16),
+            end_date=date(2026, 7, 31),
+        )
+        Sale.objects.create(
+            tenant=self.tenant,
+            seller=self.seller,
+            origin=Sale.Origin.MANUAL,
+            status='ATIVA',
+            amount=10000,
+            sale_date=date(2026, 7, 10),
+            created_by=self.manager,
+        )
+        Sale.objects.create(
+            tenant=self.tenant,
+            seller=self.seller,
+            origin=Sale.Origin.MANUAL,
+            status='ATIVA',
+            amount=20000,
+            sale_date=date(2026, 7, 20),
+            created_by=self.manager,
+        )
+
+        with patch('app.apps.commissions.exports.HTML') as html_mock:
+            html_mock.return_value.write_pdf.return_value = b'%PDF'
+            zip_bytes = build_accounting_zip(
+                self.tenant, second.month, second.year, period=second,
+            )
+
+        with ZipFile(BytesIO(zip_bytes)) as zf:
+            vendas = zf.read('vendas_07_2026.csv').decode('utf-8-sig')
+            resumo = zf.read('resumo_07_2026.csv').decode('utf-8-sig')
+
+        self.assertNotIn('10/07/2026', vendas)
+        self.assertIn('20/07/2026', vendas)
+        self.assertIn('Julho 2a quinzena', resumo)
+        self.assertIn('16/07/2026 a 31/07/2026', resumo)
+        self.assertTrue(first.contains(date(2026, 7, 10)))
+        self.assertTrue(second.contains(date(2026, 7, 20)))
 
 
 class TestGetOrCreatePeriod(BaseTest):

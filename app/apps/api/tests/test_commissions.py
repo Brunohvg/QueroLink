@@ -335,8 +335,37 @@ class CommissionPeriodCustomDateFlowTest(TestCase):
             'start_date': '2026-01-01',
             'end_date': '2026-03-05',
         }, format='json')
-        self.assertEqual(long_range.status_code, 400)
-        self.assertIn('62 dias', str(long_range.data))
+        self.assertEqual(long_range.status_code, 201, long_range.data)
+        self.assertEqual(long_range.data['start_date'], '2026-01-01')
+        self.assertEqual(long_range.data['end_date'], '2026-03-05')
+
+    def test_manager_can_create_two_free_periods_same_month_without_overlap(self):
+        client = self._auth_manager()
+
+        first = client.post(reverse('api-commission-period-list'), {
+            'label': 'Julho 1a quinzena',
+            'start_date': '2026-07-01',
+            'end_date': '2026-07-15',
+            'month': 7,
+            'year': 2026,
+            'expected_working_days': 11,
+        }, format='json')
+        self.assertEqual(first.status_code, 201, first.data)
+
+        second = client.post(reverse('api-commission-period-list'), {
+            'label': 'Julho 2a quinzena',
+            'start_date': '2026-07-16',
+            'end_date': '2026-07-31',
+            'month': 7,
+            'year': 2026,
+            'expected_working_days': 12,
+        }, format='json')
+        self.assertEqual(second.status_code, 201, second.data)
+
+        periods = CommissionPeriod.objects.filter(
+            tenant=self.tenant, month=7, year=2026,
+        ).exclude(status=CommissionPeriod.Status.CANCELADA)
+        self.assertEqual(periods.count(), 2)
 
     def test_manager_create_overlap_returns_friendly_error(self):
         CommissionPeriod.objects.create(

@@ -84,7 +84,9 @@ def get_period_by_legacy_label(tenant, month, year):
         tenant=tenant,
         month=month,
         year=year,
-    ).exclude(status=CommissionPeriod.Status.CANCELADA).first()
+    ).exclude(status=CommissionPeriod.Status.CANCELADA).order_by(
+        'start_date', 'created_at',
+    ).first()
 
 
 def resolve_period_for_date(tenant, ref_date):
@@ -258,18 +260,20 @@ def calculate_estimated_commission(seller, month, year):
 
 def get_or_create_period(tenant, month, year, expected_working_days=None):
     start, end = legacy_month_range(month, year)
-    period, created = CommissionPeriod.objects.get_or_create(
-        tenant=tenant,
-        month=month,
-        year=year,
-        defaults={
-            'label': suggest_label(end),
-            'start_date': start,
-            'end_date': end,
-            'expected_working_days': expected_working_days or 22,
-            'status': CommissionPeriod.Status.ABERTA,
-        },
-    )
+    period = get_period_by_legacy_label(tenant, month, year)
+    created = False
+    if period is None:
+        period = CommissionPeriod.objects.create(
+            tenant=tenant,
+            month=month,
+            year=year,
+            label=suggest_label(end),
+            start_date=start,
+            end_date=end,
+            expected_working_days=expected_working_days or 22,
+            status=CommissionPeriod.Status.ABERTA,
+        )
+        created = True
     if created and expected_working_days:
         period.expected_working_days = expected_working_days
         period.save(update_fields=['expected_working_days'])
@@ -451,7 +455,10 @@ def close_seller_commissions(period, seller_commission_ids, user):
             ).exists()
             if all_closed:
                 from app.apps.notifications.tasks import send_accounting_package_email
-                send_accounting_package_email.delay(str(tenant.uuid), period.month, period.year)
+                send_accounting_package_email.delay(
+                    str(tenant.uuid), period.month, period.year,
+                    period_uuid=str(period.uuid),
+                )
     except Exception:
         logger.error('Falha ao agendar envio contabil para period %s', period.id, exc_info=True)
 

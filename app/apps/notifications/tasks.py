@@ -516,7 +516,10 @@ def send_lifecycle_emails():
 
 
 @shared_task(bind=True, max_retries=3, default_retry_delay=120, soft_time_limit=120, time_limit=180)
-def send_accounting_package_email(self, tenant_uuid, month, year, requested_by_user_id=None):
+def send_accounting_package_email(
+    self, tenant_uuid, month, year, requested_by_user_id=None,
+    period_uuid=None,
+):
     from app.apps.accounts.models import Tenant, tenant_operational
 
     try:
@@ -556,12 +559,25 @@ def send_accounting_package_email(self, tenant_uuid, month, year, requested_by_u
             )
             return
 
+    from app.apps.commissions.models import CommissionPeriod
     from app.apps.commissions.exports import build_accounting_zip, _fmt_br
     from app.apps.commissions.services import get_period_by_legacy_label, legacy_month_range
     from app.apps.sellers.models import Seller as SellerM
     from app.apps.sales.models import Sale as SModel
 
-    period = get_period_by_legacy_label(tenant, month_int, year_int)
+    period = None
+    if period_uuid:
+        period = CommissionPeriod.objects.filter(
+            tenant=tenant, uuid=period_uuid,
+        ).exclude(status=CommissionPeriod.Status.CANCELADA).first()
+        if not period:
+            logger.warning(
+                "send_accounting_package_email: period %s not found for tenant %s",
+                period_uuid, tenant_uuid,
+            )
+            return
+    else:
+        period = get_period_by_legacy_label(tenant, month_int, year_int)
     if period:
         start = period.start_date
         end = period.end_date
@@ -569,7 +585,7 @@ def send_accounting_package_email(self, tenant_uuid, month, year, requested_by_u
     else:
         start, end = legacy_month_range(month_int, year_int)
         competencia = f'{month_int:02d}/{year_int}'
-    zip_bytes = build_accounting_zip(tenant, month_int, year_int)
+    zip_bytes = build_accounting_zip(tenant, month_int, year_int, period=period)
 
     total_sold_all = SModel.objects.filter(
         tenant=tenant, status='ATIVA',
@@ -605,6 +621,7 @@ def send_accounting_package_email(self, tenant_uuid, month, year, requested_by_u
             action='accounting_email_sent',
             changes={
                 'month': month_int, 'year': year_int,
+                'period_uuid': str(period.uuid) if period else None,
                 'auto': not bool(requested_by_user_id),
                 'recipient': tenant.accountant_email,
             },

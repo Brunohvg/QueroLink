@@ -266,6 +266,39 @@ class Lote3CompleteSelector(BaseSetup):
         )
         self.assertNotIn(str(cancel.uuid), self._uuids(self._get()))
 
+    def test_two_periods_same_month_year_are_separate_by_uuid_and_range(self):
+        self.period_jul.status = CommissionPeriod.Status.CANCELADA
+        self.period_jul.save(update_fields=['status'])
+
+        first = CommissionPeriod.objects.create(
+            tenant=self.tenant, month=7, year=2026,
+            start_date=date(2026, 7, 1), end_date=date(2026, 7, 15),
+            label='Julho 1a quinzena',
+        )
+        second = CommissionPeriod.objects.create(
+            tenant=self.tenant, month=7, year=2026,
+            start_date=date(2026, 7, 16), end_date=date(2026, 7, 31),
+            label='Julho 2a quinzena',
+        )
+        self._sale('2026-07-10', amount=100000)
+        self._sale('2026-07-20', amount=200000)
+
+        resp_first = self._get(first.uuid)
+        resp_second = self._get(second.uuid)
+
+        self.assertEqual(resp_first.status_code, 200)
+        self.assertEqual(resp_second.status_code, 200)
+        self.assertEqual(resp_first.context['competence_total'], 100000)
+        self.assertEqual(resp_second.context['competence_total'], 200000)
+        self.assertEqual(
+            {s['date'] for s in resp_first.context['sales_json']},
+            {'10/07/2026'},
+        )
+        self.assertEqual(
+            {s['date'] for s in resp_second.context['sales_json']},
+            {'20/07/2026'},
+        )
+
 
 class Lote4Performance(BaseSetup):
     """Queries constantes independentes do nro de vendas/competencias."""
