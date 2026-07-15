@@ -89,6 +89,22 @@ log "Conectando em ${DB_HOST}:${DB_PORT}/${DB_NAME} como ${DB_USER}"
 
 mkdir -p "$BACKUP_DIR"
 
+# ── Validate rclone / Google Drive before expensive dump ────
+RCLONE_BIN="${RCLONE_BIN:-rclone}"
+
+if ! command -v "$RCLONE_BIN" &>/dev/null; then
+    die "rclone nao encontrado"
+fi
+
+if ! "$RCLONE_BIN" listremotes 2>/dev/null | grep -q "^${GDRIVE_REMOTE}:"; then
+    die "Remote rclone '${GDRIVE_REMOTE}' nao configurado"
+fi
+
+log "Validando acesso ao Google Drive em ${GDRIVE_REMOTE}:${GDRIVE_PATH} ..."
+if ! "$RCLONE_BIN" mkdir "${GDRIVE_REMOTE}:${GDRIVE_PATH}" >/dev/null 2>&1; then
+    die "Nao foi possivel acessar/criar pasta no Google Drive. Verifique token, refresh_token, escopo e permissoes do remote '${GDRIVE_REMOTE}'."
+fi
+
 # ── pg_dump ─────────────────────────────────────────────────
 log "Executando pg_dump ..."
 PGPASSFILE=$(mktemp)
@@ -123,17 +139,6 @@ if [ ! -s "$BACKUP_FILE" ]; then
 fi
 
 log "Dump criado: ${BACKUP_FILENAME} ($SIZE)"
-
-# ── Validate rclone ─────────────────────────────────────────
-RCLONE_BIN="${RCLONE_BIN:-rclone}"
-
-if ! command -v "$RCLONE_BIN" &>/dev/null; then
-    die "rclone nao encontrado"
-fi
-
-if ! "$RCLONE_BIN" listremotes 2>/dev/null | grep -q "^${GDRIVE_REMOTE}:"; then
-    die "Remote rclone '${GDRIVE_REMOTE}' nao configurado"
-fi
 
 # ── Upload to Google Drive ──────────────────────────────────
 log "Enviando para ${GDRIVE_REMOTE}:${GDRIVE_PATH}/${BACKUP_FILENAME} ..."
