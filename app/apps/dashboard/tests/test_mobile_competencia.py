@@ -60,6 +60,39 @@ class MobileCompetenciaFirstTest(TestCase):
         # prova da nao-mistura: comissao == round(total * taxa)
         self.assertEqual(ctx['comissao_estimada'], round(ctx['month_total'] * 0.01))
 
+    @patch('app.apps.dashboard.mobile_views.timezone')
+    def test_mobile_home_goal_excludes_link_sales(self, mock_tz):
+        from app.apps.orders.models import Order
+        mock_tz.localdate.return_value = FAKE_TODAY
+        goal_amount = 10_000_000
+        from app.apps.sellers.models import SellerGoal
+        SellerGoal.objects.create(
+            seller=self.seller,
+            month=7,
+            year=2026,
+            target_amount=goal_amount,
+        )
+        order = Order.objects.create(
+            tenant=self.tenant,
+            seller=self.seller,
+            total_amount=8_000_000,
+            customer_name='Cliente Link',
+            status=Order.Status.COMPLETED,
+        )
+        Sale.objects.create(
+            tenant=self.tenant,
+            seller=self.seller,
+            origin=Sale.Origin.LINK,
+            amount=8_000_000,
+            sale_date='2026-07-06',
+            order=order,
+        )
+
+        resp = self.client.get('/dashboard/mobile/')
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(resp.context['combined_month_total'], 9951859)
+        self.assertEqual(resp.context['goal_remaining'], 48141)
+
     # 12: ranking mobile usa o range da competencia (25/06 conta)
     @patch('app.apps.dashboard.mobile_views.timezone')
     def test_mobile_ranking_uses_period_range(self, mock_tz):
@@ -68,6 +101,31 @@ class MobileCompetenciaFirstTest(TestCase):
         self.assertEqual(resp.status_code, 200)
         self.assertEqual(resp.context['my_total'], 9951859)
         self.assertEqual(resp.context['seller_pos'], 1)
+
+    @patch('app.apps.dashboard.mobile_views.timezone')
+    def test_mobile_ranking_excludes_link_sales(self, mock_tz):
+        from app.apps.orders.models import Order
+        mock_tz.localdate.return_value = FAKE_TODAY
+        order = Order.objects.create(
+            tenant=self.tenant,
+            seller=self.seller,
+            total_amount=8_000_000,
+            customer_name='Cliente Link',
+            status=Order.Status.COMPLETED,
+        )
+        Sale.objects.create(
+            tenant=self.tenant,
+            seller=self.seller,
+            origin=Sale.Origin.LINK,
+            amount=8_000_000,
+            sale_date='2026-07-06',
+            order=order,
+        )
+
+        resp = self.client.get('/dashboard/mobile/ranking/')
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(resp.context['my_total'], 9951859)
+        self.assertEqual(resp.context['combined_month_total'], 9951859)
 
     # 13: sem competencia, ranking fica vazio (sem fallback de mes)
     @patch('app.apps.dashboard.mobile_views.timezone')
@@ -430,16 +488,19 @@ class MinhasVendasPermissionsTest(TestCase):
         self.assertFalse(row['canEdit'])
         self.assertFalse(row['canDelete'])
 
-    def test_link_read_only(self):
+    def test_link_sale_is_hidden_from_seller_sales(self):
         from app.apps.orders.models import Order
         order = Order.objects.create(
             tenant=self.tenant, seller=self.seller, total_amount=100000,
             customer_name='Cliente Teste', status=Order.Status.COMPLETED,
         )
         self._sale(origin=Sale.Origin.LINK, order=order)
-        row = self._row()
-        self.assertFalse(row['canEdit'])
-        self.assertFalse(row['canDelete'])
+        resp = self.client.get(
+            '/dashboard/mobile/vendas/?period=' + str(self.period.uuid),
+        )
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(resp.context['sales_json'], [])
+        self.assertEqual(resp.context['competence_total'], 0)
 
     def test_estornada_read_only(self):
         self._sale(status='ESTORNADA')

@@ -190,7 +190,10 @@ def notify_seller_link_status(seller, order, event_type, motivo=''):
         logger.warning("Seller %s has no phone, skipping link notification", seller.id if seller else '?')
         return None
     valor = format_brl_cents(order.total_amount)
-    create_and_send_notification(
+    payment = order.payments.order_by('created_at').first()
+    installments = payment.installments if payment else 1
+    parcelas = f"até {installments}x"
+    return create_and_send_notification(
         tenant=seller.tenant,
         event_type=event_type,
         channel=MessageTemplate.Channel.WHATSAPP,
@@ -201,6 +204,7 @@ def notify_seller_link_status(seller, order, event_type, motivo=''):
             "vendedor": seller.name,
             "cliente": order.customer_name or 'cliente',
             "valor": valor,
+            "parcelas": parcelas,
             "link": order.payment_link.gateway_url if hasattr(order, 'payment_link') and order.payment_link else '',
             "motivo": motivo,
         },
@@ -395,7 +399,16 @@ def _fallback_body(event_type, context):
             f"Lance agora pelo app para manter sua comissao em dia."
         )
     if event_type in (MessageTemplate.EventType.LINK_CREATED,):
-        return f"Ola {v}! Seu link de {val} para {cli} foi gerado com sucesso."
+        parcelas = context.get('parcelas', '')
+        return (
+            "Link de pagamento criado\n"
+            f"Cliente: {cli}\n"
+            f"Valor: {val}\n"
+            f"Pagamento: {parcelas}\n"
+            "Link:\n"
+            f"{link}\n"
+            "Encaminhe este link ao cliente."
+        )
     if event_type in (MessageTemplate.EventType.PAYMENT_PAID,):
         return f"Ola {v}! O link de {val} do(a) {cli} foi pago!"
     if event_type in (MessageTemplate.EventType.LINK_CANCELED,):

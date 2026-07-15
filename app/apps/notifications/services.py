@@ -28,7 +28,13 @@ DEFAULT_MESSAGE_TEMPLATES = (
     (
         MessageTemplate.EventType.LINK_CREATED,
         MessageTemplate.Channel.WHATSAPP,
-        'Ola {{vendedor}}! Seu link de {{valor}} para {{cliente}} foi gerado com sucesso.',
+        'Link de pagamento criado\n'
+        'Cliente: {{cliente}}\n'
+        'Valor: {{valor}}\n'
+        'Pagamento: {{parcelas}}\n'
+        'Link:\n'
+        '{{link}}\n'
+        'Encaminhe este link ao cliente.',
     ),
     (
         MessageTemplate.EventType.PAYMENT_PAID,

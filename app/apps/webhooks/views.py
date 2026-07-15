@@ -3,15 +3,19 @@ import hmac
 import hashlib
 import logging
 import time
+from datetime import timedelta
 
-from django.db import IntegrityError, OperationalError, transaction
+from django.db import IntegrityError, OperationalError
 from django.http import JsonResponse
+from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
 
 from app.apps.webhooks.models import WebhookEvent
 from app.apps.accounts.fields import scrub_payment_payload
 
 logger = logging.getLogger(__name__)
+
+PROCESSING_TIMEOUT_MINUTES = 10
 
 
 def _get_or_create_webhook_event(gateway, payload, gateway_event_id=None, tenant=None):
@@ -23,26 +27,61 @@ def _get_or_create_webhook_event(gateway, payload, gateway_event_id=None, tenant
             tenant=tenant,
         ), True
 
-    for attempt in range(3):
+    for attempt in range(6):
         try:
-            with transaction.atomic():
-                return WebhookEvent.objects.get_or_create(
-                    gateway=gateway,
-                    gateway_event_id=gateway_event_id,
-                    defaults={
-                        'payload': payload,
-                        'tenant': tenant,
-                    },
-                )
-        except (IntegrityError, OperationalError):
-            if attempt == 2:
+            event = WebhookEvent.objects.filter(
+                gateway=gateway,
+                gateway_event_id=gateway_event_id,
+            ).first()
+            if event:
+                return event, False
+
+            return WebhookEvent.objects.create(
+                gateway=gateway,
+                gateway_event_id=gateway_event_id,
+                payload=payload,
+                tenant=tenant,
+            ), True
+        except IntegrityError:
+            event = WebhookEvent.objects.filter(
+                gateway=gateway,
+                gateway_event_id=gateway_event_id,
+            ).first()
+            if event:
+                return event, False
+            if attempt == 5:
                 raise
-            time.sleep(0.05)
+            time.sleep(0.05 * (attempt + 1))
+        except OperationalError:
+            if attempt == 5:
+                raise
+            time.sleep(0.05 * (attempt + 1))
 
     return WebhookEvent.objects.get(
         gateway=gateway,
         gateway_event_id=gateway_event_id,
     ), False
+
+
+def _pagarme_existing_event_action(event):
+    if event.processed or event.status in (
+        WebhookEvent.Status.PROCESSED,
+        WebhookEvent.Status.SKIPPED,
+    ):
+        return 'duplicate'
+
+    if event.status in (WebhookEvent.Status.RECEIVED, WebhookEvent.Status.FAILED):
+        return 'reenqueue'
+
+    if event.status == WebhookEvent.Status.PROCESSING:
+        started_at = event.processing_started_at or event.last_attempt_at or event.received_at
+        if started_at and started_at >= timezone.now() - timedelta(
+            minutes=PROCESSING_TIMEOUT_MINUTES,
+        ):
+            return 'processing'
+        return 'recover'
+
+    return 'reenqueue'
 
 
 def _verify_webhook_token(tenant_uuid, token):
@@ -114,8 +153,24 @@ def pagarme_webhook(request, tenant_slug):
         tenant=tenant,
     )
     if not created:
-        logger.info("Webhook duplicado ignorado: gateway_event_id=%s", gateway_event_id)
-        return JsonResponse({"status": "duplicate"}, status=200)
+        action = _pagarme_existing_event_action(event)
+        if action == 'duplicate':
+            logger.info("Webhook duplicado ignorado: gateway_event_id=%s", gateway_event_id)
+            return JsonResponse({"status": "duplicate"}, status=200)
+        if action == 'processing':
+            logger.info("Webhook ja em processamento: gateway_event_id=%s", gateway_event_id)
+            return JsonResponse({"status": "processing"}, status=200)
+
+        if action == 'recover':
+            event.status = WebhookEvent.Status.RECEIVED
+            event.processing_error = ''
+            event.processing_started_at = None
+            event.save(update_fields=[
+                'status', 'processing_error', 'processing_started_at',
+            ])
+        from app.apps.webhooks.tasks import process_pagarme_webhook
+        process_pagarme_webhook.delay(event.id)
+        return JsonResponse({"status": "received"}, status=200)
 
     from app.apps.webhooks.tasks import process_pagarme_webhook
     process_pagarme_webhook.delay(event.id)

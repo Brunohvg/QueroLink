@@ -32,6 +32,16 @@ class Order(models.Model):
         return f"Order {self.uuid} - {self.customer_name}"
 
     @property
+    def status_display_pt(self):
+        return {
+            self.Status.PENDING: 'Pendente',
+            self.Status.COMPLETED: 'Pago',
+            self.Status.EXPIRED: 'Expirado',
+            self.Status.CANCELED: 'Cancelado',
+            self.Status.SUSPENDED: 'Suspenso',
+        }.get(self.status, self.status)
+
+    @property
     def total_amount_decimal(self):
         return f"{self.total_amount / 100:.2f}".replace('.', ',')
 

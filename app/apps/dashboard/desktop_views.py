@@ -10,6 +10,7 @@ from django.contrib.auth.decorators import login_required
 from django.utils import timezone
 from django.conf import settings
 from django.db.models import Sum
+from django_ratelimit.decorators import ratelimit
 from app.apps.accounts.models import User, Tenant
 from app.apps.sales.models import Sale
 from app.apps.sellers.models import Seller
@@ -811,7 +812,7 @@ def gestor_links(request):
             'customer_name': customer_name,
             'amount': o.total_amount,
             'status': o.status,
-            'status_display': o.get_status_display(),
+            'status_display': o.status_display_pt,
             'seller_name': o.seller.name if o.seller else '-',
             'seller_uuid': str(o.seller.uuid) if o.seller else '',
             'refusal_reason': refusal,
@@ -914,6 +915,105 @@ def gestor_link_cancelar(request, order_uuid):
             )
 
     messages.success(request, 'Link cancelado com sucesso.')
+    return redirect('dashboard:gestor_link_detalhe', order_uuid=order_uuid)
+
+
+@login_required
+@ratelimit(key='user', rate='6/m', method='POST', block=True)
+def gestor_link_verificar_pagamento(request, order_uuid):
+    if not _check_role(request, User.Role.MANAGER, User.Role.ADMIN):
+        messages.error(request, 'Permissao negada.')
+        return redirect('dashboard:gestor_links')
+    if request.method != 'POST':
+        return redirect('dashboard:gestor_link_detalhe', order_uuid=order_uuid)
+
+    tenant = request.user.tenant
+    from app.apps.orders.models import Order
+    from app.apps.webhooks.models import WebhookEvent
+    from app.apps.webhooks.services import process_paid_pagarme_event
+    from app.apps.webhooks.tasks import _notify_link_status_after_commit
+    from app.services.gateway.pagar_me import PagarMeGateway
+    from app.apps.audit.utils import log_action
+
+    order = get_object_or_404(Order, uuid=order_uuid, tenant=tenant)
+    if not tenant.pagarme_api_key:
+        messages.error(request, 'Pagar.me nao configurado.')
+        return redirect('dashboard:gestor_link_detalhe', order_uuid=order_uuid)
+
+    try:
+        gateway = PagarMeGateway(api_key=tenant.pagarme_api_key)
+        remote_order = gateway.find_order_by_code(str(order.uuid))
+    except Exception:
+        logger.exception('Verificacao Pagar.me falhou para order %s', order.uuid)
+        messages.error(request, 'Nao foi possivel consultar o Pagar.me agora.')
+        return redirect('dashboard:gestor_link_detalhe', order_uuid=order_uuid)
+
+    if not remote_order:
+        messages.info(request, 'Pagamento ainda nao localizado no Pagar.me.')
+        return redirect('dashboard:gestor_link_detalhe', order_uuid=order_uuid)
+
+    if remote_order.get('status') != 'paid':
+        messages.info(request, 'Pagamento ainda nao confirmado no Pagar.me.')
+        return redirect('dashboard:gestor_link_detalhe', order_uuid=order_uuid)
+
+    event_id_str = f'manual_verify_{order.uuid}_{remote_order.get("id", "")}'
+    event, _ = WebhookEvent.objects.get_or_create(
+        gateway='pagarme',
+        gateway_event_id=event_id_str,
+        defaults={
+            'tenant': tenant,
+            'payload': {
+                'id': event_id_str,
+                'type': 'order.paid',
+                'data': remote_order,
+            },
+        },
+    )
+    result = process_paid_pagarme_event(event.id)
+    if result.notify_event_type and result.order_uuid:
+        refreshed = Order.objects.select_related('seller').get(uuid=result.order_uuid)
+        if refreshed.seller:
+            _notify_link_status_after_commit(refreshed, result.notify_event_type)
+
+    log_action(request, 'pagarme.payment_verified', instance=order, changes={
+        'event_id': event.id,
+        'result': result.status,
+    })
+    messages.success(request, 'Verificacao concluida. Status atualizado quando confirmado.')
+    return redirect('dashboard:gestor_link_detalhe', order_uuid=order_uuid)
+
+
+@login_required
+@ratelimit(key='user', rate='6/m', method='POST', block=True)
+def gestor_link_reenviar_vendedor(request, order_uuid):
+    if not _check_role(request, User.Role.MANAGER, User.Role.ADMIN):
+        messages.error(request, 'Permissao negada.')
+        return redirect('dashboard:gestor_links')
+    if request.method != 'POST':
+        return redirect('dashboard:gestor_link_detalhe', order_uuid=order_uuid)
+
+    tenant = request.user.tenant
+    from app.apps.orders.models import Order
+    from app.apps.notifications.tasks import notify_seller_link_status
+    from app.apps.audit.utils import log_action
+
+    order = get_object_or_404(Order, uuid=order_uuid, tenant=tenant)
+    if not order.seller:
+        messages.error(request, 'Link sem vendedor vinculado.')
+        return redirect('dashboard:gestor_link_detalhe', order_uuid=order_uuid)
+
+    try:
+        notification = notify_seller_link_status(order.seller, order, 'link_created')
+    except Exception:
+        logger.exception('Reenvio de link falhou para order %s', order.uuid)
+        messages.error(request, 'Nao foi possivel reenviar o link ao vendedor.')
+        return redirect('dashboard:gestor_link_detalhe', order_uuid=order_uuid)
+
+    log_action(request, 'order.link_resent_to_seller', instance=order)
+    if notification is None:
+        messages.error(request, 'Vendedor sem telefone para receber o link.')
+    else:
+        messages.success(request, 'Link reenviado ao vendedor.')
     return redirect('dashboard:gestor_link_detalhe', order_uuid=order_uuid)
 
 
