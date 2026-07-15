@@ -152,7 +152,7 @@ class PagarMeGateway:
         logger.info("Pagar.me partial_cancel: charge_id=%s amount=%d", charge_id, amount)
         return self._request(
             "POST",
-            f"{self.api_url_charges}/{charge_id}/partial",
+            f"{self.api_url_charges}/{charge_id}/cancel",
             json={"amount": amount},
         )
 

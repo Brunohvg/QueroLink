@@ -238,6 +238,34 @@ class TestWebhookIdempotency(TransactionTestCase):
             slug='idempotency-test',
             is_active=True,
         )
+        self.seller_user = User.objects.create_user(
+            username='idempotency_seller',
+            role=User.Role.SELLER,
+            tenant=self.tenant,
+        )
+        self.seller = Seller.objects.create(
+            tenant=self.tenant,
+            user=self.seller_user,
+            name='Idempotency Seller',
+            is_active=True,
+        )
+        self.order = Order.objects.create(
+            tenant=self.tenant,
+            seller=self.seller,
+            customer_name='Cliente Idempotency',
+            total_amount=15000,
+            status=Order.Status.PENDING,
+        )
+        self.payment = Payment.objects.create(
+            order=self.order,
+            gateway_name='pagarme',
+            status=Payment.Status.PENDING,
+        )
+        self.payment_link = PaymentLink.objects.create(
+            order=self.order,
+            gateway_url='https://pagar.me/link/idempotency',
+            gateway_link_id='pl_idempotency',
+        )
         self.url = f'/api/webhooks/pagarme/{self.tenant.slug}/'
 
     def _post(self, payload):
@@ -271,8 +299,16 @@ class TestWebhookIdempotency(TransactionTestCase):
     @override_settings(WEBHOOK_AUTH_REQUIRED=False)
     @patch('app.apps.webhooks.tasks.process_pagarme_webhook.delay')
     def test_duplicate_event_keeps_original_payload(self, mock_process):
-        first_payload = {'id': 'evt_duplicate', 'type': 'order.paid', 'data': {'id': 'or_1'}}
-        second_payload = {'id': 'evt_duplicate', 'type': 'order.paid', 'data': {'id': 'or_2'}}
+        first_payload = {
+            'id': 'evt_duplicate',
+            'type': 'order.paid',
+            'data': {'id': 'or_1', 'code': str(self.order.uuid)},
+        }
+        second_payload = {
+            'id': 'evt_duplicate',
+            'type': 'order.paid',
+            'data': {'id': 'or_2', 'code': str(self.order.uuid)},
+        }
 
         first = self._post(first_payload)
         second = self._post(second_payload)
@@ -302,7 +338,7 @@ class TestWebhookIdempotency(TransactionTestCase):
         pagarme_response = self._post({
             'id': 'evt_same',
             'type': 'order.paid',
-            'data': {'id': 'or_same'},
+            'data': {'id': 'or_same', 'code': str(self.order.uuid)},
         })
         billing_response = self._post_billing({
             'id': 'evt_same',
@@ -357,7 +393,11 @@ class TestWebhookIdempotency(TransactionTestCase):
     @override_settings(WEBHOOK_AUTH_REQUIRED=False)
     @patch('app.apps.webhooks.tasks.process_pagarme_webhook.delay')
     def test_concurrent_duplicate_requests_create_one_event(self, mock_process):
-        payload = {'id': 'evt_concurrent', 'type': 'order.paid', 'data': {'id': 'or_1'}}
+        payload = {
+            'id': 'evt_concurrent',
+            'type': 'order.paid',
+            'data': {'id': 'or_1', 'code': str(self.order.uuid)},
+        }
 
         def post_and_close(_i):
             try:
@@ -399,12 +439,73 @@ class TestWebhookIdempotency(TransactionTestCase):
         )
         self.assertEqual(mock_process.call_count, 2)
 
+    @override_settings(WEBHOOK_AUTH_REQUIRED=False)
+    @patch('app.apps.webhooks.tasks.process_pagarme_webhook.delay')
+    def test_foreign_charge_paid_is_ignored_without_persisting(self, mock_process):
+        payload = {
+            'id': 'evt_foreign_charge',
+            'type': 'charge.paid',
+            'data': {
+                'id': 'ch_foreign',
+                'code': 'external-code',
+                'order': {'id': 'or_foreign', 'code': 'external-order'},
+            },
+        }
+
+        response = self._post(payload)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()['status'], 'ignored_foreign')
+        self.assertFalse(WebhookEvent.objects.filter(
+            gateway='pagarme',
+            gateway_event_id='evt_foreign_charge',
+        ).exists())
+        mock_process.assert_not_called()
+
+    @override_settings(WEBHOOK_AUTH_REQUIRED=False)
+    @patch('app.apps.webhooks.tasks.process_pagarme_webhook.delay')
+    def test_foreign_payment_link_expired_is_ignored_without_persisting(self, mock_process):
+        payload = {
+            'id': 'evt_foreign_expired',
+            'type': 'payment-link.expired',
+            'data': {'id': 'pl_foreign'},
+        }
+
+        response = self._post(payload)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()['status'], 'ignored_foreign')
+        self.assertFalse(WebhookEvent.objects.filter(
+            gateway='pagarme',
+            gateway_event_id='evt_foreign_expired',
+        ).exists())
+        mock_process.assert_not_called()
+
+    @override_settings(WEBHOOK_AUTH_REQUIRED=False)
+    @patch('app.apps.webhooks.tasks.process_pagarme_webhook.delay')
+    def test_known_payment_link_event_is_accepted(self, mock_process):
+        payload = {
+            'id': 'evt_known_expired',
+            'type': 'payment-link.expired',
+            'data': {'id': self.payment_link.gateway_link_id},
+        }
+
+        response = self._post(payload)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()['status'], 'received')
+        self.assertTrue(WebhookEvent.objects.filter(
+            gateway='pagarme',
+            gateway_event_id='evt_known_expired',
+        ).exists())
+        mock_process.assert_called_once()
+
 
 class TestReconcilePendingOrders(BaseWebhookTest):
     def setUp(self):
         super().setUp()
         Tenant.objects.filter(pk=self.tenant.pk).update(
-            pagarme_api_key='sk_test_fakekey123456',
+            pagarme_api_key='test-api-key',
         )
         self.tenant.refresh_from_db()
         self.old_order = Order.objects.create(
@@ -547,7 +648,7 @@ class TestReconcileDedup(TestCase):
     def setUp(self):
         self.tenant = Tenant.objects.create(
             company_name='Dedup Test', slug='dedup-test',
-            is_active=True, pagarme_api_key='sk_test_fakekey123456',
+            is_active=True, pagarme_api_key='test-api-key',
         )
         self.seller_user = User.objects.create_user(
             username='dedup_seller', password='test123',
@@ -905,7 +1006,7 @@ class TestPagarmeManualVerification(TestCase):
             company_name='Manual Verify',
             slug='manual-verify',
             is_active=True,
-            pagarme_api_key='sk_test_fakekey123456',
+            pagarme_api_key='test-api-key',
         )
         self.manager = User.objects.create_user(
             username='manager_verify', password='test123',
@@ -998,3 +1099,112 @@ class TestPagarmeManualVerification(TestCase):
         self.assertNotIn('webhook_url', data)
         self.assertNotIn('last_event', data)
         self.assertNotIn('error', data)
+
+
+class TestPagarmeRefundRequests(TestCase):
+    def test_partial_cancel_charge_uses_cancel_endpoint_with_amount(self):
+        from app.services.gateway.pagar_me import PagarMeGateway
+
+        gateway = PagarMeGateway(api_key='test-api-key')
+        with patch('app.services.gateway.pagar_me.requests.request') as mock_request:
+            mock_response = mock_request.return_value
+            mock_response.status_code = 200
+            mock_response.json.return_value = {'id': 'ch_refund'}
+
+            gateway.partial_cancel_charge('ch_refund', 56160)
+
+        args, kwargs = mock_request.call_args
+        self.assertEqual(args[0], 'POST')
+        self.assertEqual(
+            args[1],
+            'https://api.pagar.me/core/v5/charges/ch_refund/cancel',
+        )
+        self.assertEqual(kwargs['json'], {'amount': 56160})
+
+    def test_full_cancel_charge_uses_cancel_endpoint_without_amount(self):
+        from app.services.gateway.pagar_me import PagarMeGateway
+
+        gateway = PagarMeGateway(api_key='test-api-key')
+        with patch('app.services.gateway.pagar_me.requests.request') as mock_request:
+            mock_response = mock_request.return_value
+            mock_response.status_code = 200
+            mock_response.json.return_value = {'id': 'ch_refund'}
+
+            gateway.cancel_charge('ch_refund')
+
+        args, kwargs = mock_request.call_args
+        self.assertEqual(args[0], 'POST')
+        self.assertEqual(
+            args[1],
+            'https://api.pagar.me/core/v5/charges/ch_refund/cancel',
+        )
+        self.assertNotIn('json', kwargs)
+
+
+class TestGestorLinkRefundView(TestCase):
+    def setUp(self):
+        self.tenant = Tenant.objects.create(
+            company_name='Refund View',
+            slug='refund-view',
+            is_active=True,
+            pagarme_api_key='test-api-key',
+        )
+        self.manager = User.objects.create_user(
+            username='manager_refund',
+            password='test123',
+            role=User.Role.MANAGER,
+            tenant=self.tenant,
+        )
+        self.seller_user = User.objects.create_user(
+            username='seller_refund',
+            password='test123',
+            role=User.Role.SELLER,
+            tenant=self.tenant,
+        )
+        self.seller = Seller.objects.create(
+            tenant=self.tenant,
+            user=self.seller_user,
+            name='Seller Refund',
+            is_active=True,
+        )
+        self.order = Order.objects.create(
+            tenant=self.tenant,
+            seller=self.seller,
+            customer_name='Cliente Refund',
+            total_amount=56160,
+            status=Order.Status.COMPLETED,
+        )
+        self.payment = Payment.objects.create(
+            order=self.order,
+            gateway_name='pagarme',
+            status=Payment.Status.PAID,
+            gateway_transaction_id='ch_refund_view',
+        )
+        self.url = f'/dashboard/gestor/links/{self.order.uuid}/estornar/'
+
+    @patch('app.services.gateway.pagar_me.PagarMeGateway.partial_cancel_charge')
+    def test_partial_refund_accepts_numeric_string_amount(self, mock_partial):
+        self.client.force_login(self.manager)
+
+        response = self.client.post(
+            self.url,
+            data=json.dumps({'amount': '56160'}),
+            content_type='application/json',
+        )
+
+        self.assertEqual(response.status_code, 200)
+        mock_partial.assert_called_once_with('ch_refund_view', 56160)
+
+    @patch('app.services.gateway.pagar_me.PagarMeGateway.partial_cancel_charge')
+    def test_partial_refund_rejects_amount_greater_than_payment(self, mock_partial):
+        self.client.force_login(self.manager)
+
+        response = self.client.post(
+            self.url,
+            data=json.dumps({'amount': 56161}),
+            content_type='application/json',
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertIn('maior que o pagamento', response.json()['error'])
+        mock_partial.assert_not_called()
