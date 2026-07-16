@@ -129,20 +129,13 @@ class CustomerAccessTests(APITestCase):
             status.HTTP_403_FORBIDDEN,
         )
 
-    def test_consent_requires_source_and_is_audited(self):
+    def test_api_list_and_detail_return_customer_data(self):
         self.client.force_authenticate(self.manager)
-        url = reverse("api-customer-consent", args=[self.customer.uuid])
-        invalid = self.client.post(url, {"marketing_consent": "GRANTED"}, format="json")
-        self.assertEqual(invalid.status_code, status.HTTP_400_BAD_REQUEST)
-        valid = self.client.post(
-            url,
-            {
-                "marketing_consent": "GRANTED",
-                "consent_source": "WhatsApp em 16/07/2026",
-            },
-            format="json",
+        list_resp = self.client.get(reverse("api-customer-list"))
+        self.assertEqual(list_resp.status_code, status.HTTP_200_OK)
+        detail_resp = self.client.get(
+            reverse("api-customer-detail", args=[self.customer.uuid]),
         )
-        self.assertEqual(valid.status_code, status.HTTP_200_OK)
-        self.customer.refresh_from_db()
-        self.assertEqual(self.customer.marketing_consent, "GRANTED")
-        self.assertIsNotNone(self.customer.marketing_consent_at)
+        self.assertEqual(detail_resp.status_code, status.HTTP_200_OK)
+        self.assertEqual(detail_resp.data["name"], "Comprador Teste")
+        self.assertNotIn("marketing_consent", detail_resp.data)

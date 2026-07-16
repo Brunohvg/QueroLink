@@ -96,3 +96,44 @@ class BoletoWebhookTests(TestCase):
             process_boleto_daily_notifications.run()
         self.boleto.refresh_from_db()
         self.assertEqual(self.boleto.status, Boleto.Status.VENCIDO)
+
+    @patch('app.apps.receivables.tasks.notify_boleto_refunded.delay')
+    def test_chargeback_marks_boleto_refunded(self, notify_mock):
+        self.boleto.status = Boleto.Status.PAGO
+        self.boleto.save(update_fields=['status'])
+        event = WebhookEvent.objects.create(
+            gateway='pagar' + 'me', tenant=self.tenant,
+            payload={
+                'type': 'charge.chargedback',
+                'data': {'id': 'ch_paid', 'order': {'metadata': {'merito_boleto': '1'}}},
+            },
+        )
+        with self.captureOnCommitCallbacks(execute=True):
+            self.process_webhook.run(event.id)
+        self.boleto.refresh_from_db()
+        self.assertEqual(self.boleto.status, Boleto.Status.ESTORNADO)
+        notify_mock.assert_called_once_with(str(self.boleto.uuid))
+
+    @patch('app.apps.receivables.tasks.notify_boleto_paid.delay')
+    @patch('app.apps.customers.services.sync_boleto_customer')
+    def test_paid_webhook_creates_customer_snapshot(self, sync_customer_mock, notify_mock):
+        import json
+        payload = {
+            'type': 'charge.paid',
+            'data': {
+                'id': 'ch_paid',
+                'payment_method': 'boleto',
+                'amount': 15500,
+                'paid_at': timezone.now().isoformat(),
+                'order': {'metadata': {'merito_boleto': '1'}},
+            },
+        }
+        with self.captureOnCommitCallbacks(execute=True):
+            event = WebhookEvent.objects.create(
+                gateway='pagar' + 'me', tenant=self.tenant, payload=payload,
+            )
+            self.process_webhook.run(event.id)
+        self.boleto.refresh_from_db()
+        self.assertIsNotNone(self.boleto.customer_snapshot)
+        self.assertEqual(self.boleto.customer_snapshot['name'], self.boleto.payer_name)
+        sync_customer_mock.assert_called_once()

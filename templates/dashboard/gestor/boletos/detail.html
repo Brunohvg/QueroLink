@@ -38,14 +38,15 @@
 
   <section class="bg-white border border-gray-100 rounded-lg p-5">
     <div class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 mb-4">
-      <div><h2 class="font-semibold">Nota fiscal</h2><p class="text-[12px] text-gray-500 mt-0.5">Anexe o PDF e, quando disponivel, o XML da nota.</p></div>
-      {% if boleto.invoice_uploaded_at %}<p class="text-[12px] text-gray-500">Atualizada em {{ boleto.invoice_uploaded_at|date:'d/m/Y H:i' }}</p>{% endif %}
+      <div><h2 class="font-semibold">Nota fiscal</h2><p class="text-[12px] text-gray-500 mt-0.5">Anexe o PDF e o XML da nota.</p></div>
+      {% if boleto.invoice_uploaded_at %}<p class="text-[12px] text-gray-500">Atualizada em {{ boleto.invoice_uploaded_at|date:'d/m/Y H:i' }}{% if boleto.invoice_uploaded_by %} por {{ boleto.invoice_uploaded_by.get_full_name|default:boleto.invoice_uploaded_by.email }}{% endif %}</p>{% endif %}
     </div>
     {% if invoice_error %}<p class="mb-4 px-3 py-2 rounded-lg bg-red-50 text-red-700 text-[13px]">{{ invoice_error }}</p>{% endif %}
     <div class="flex flex-wrap gap-2 mb-4">
       {% if boleto.invoice_pdf %}<a href="{% url 'dashboard:gestor_boleto_nota_fiscal_download' boleto.uuid 'pdf' %}" class="min-h-[40px] px-4 inline-flex items-center rounded-lg border border-gray-200 font-semibold text-[13px]">Baixar PDF anexado</a>{% endif %}
       {% if boleto.invoice_xml %}<a href="{% url 'dashboard:gestor_boleto_nota_fiscal_download' boleto.uuid 'xml' %}" class="min-h-[40px] px-4 inline-flex items-center rounded-lg border border-gray-200 font-semibold text-[13px]">Baixar XML anexado</a>{% endif %}
     </div>
+
     <form method="post" enctype="multipart/form-data" action="{% url 'dashboard:gestor_boleto_nota_fiscal' boleto.uuid %}" class="grid sm:grid-cols-2 gap-3">
       {% csrf_token %}
       <label class="text-[12px] font-medium text-gray-700">PDF da nota (ate 10 MB)<input type="file" name="invoice_pdf" accept="application/pdf,.pdf" class="mt-1.5 block w-full text-[13px] border border-gray-200 rounded-lg p-2"></label>
