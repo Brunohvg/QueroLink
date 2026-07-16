@@ -7,13 +7,11 @@
   {% if feature_locked %}
   <section class="surface-card text-center py-12"><h2 class="text-lg font-semibold">Gestao de clientes disponivel no Pro</h2><p class="text-[13px] text-gray-500 mt-2">Centralize contatos e historico de cobrancas.</p><a href="{% url 'dashboard:assinatura' %}" class="btn-primary inline-flex mt-5">Conhecer planos</a></section>
   {% else %}
-  <section class="grid sm:grid-cols-2 gap-3 max-w-2xl">
+  <section class="grid sm:grid-cols-1 gap-3 max-w-2xl">
     <div class="surface-card"><p class="text-[11px] uppercase text-gray-500">Clientes identificados</p><p class="text-2xl font-bold mt-1">{{ customer_count }}</p></div>
-    <div class="surface-card"><p class="text-[11px] uppercase text-gray-500">Marketing autorizado</p><p class="text-2xl font-bold text-emerald-600 mt-1">{{ consented_count }}</p></div>
   </section>
-  <form method="get" class="bg-white border border-gray-100 rounded-lg p-4 grid sm:grid-cols-[minmax(220px,1fr)_220px_auto] gap-3 items-end">
+  <form method="get" class="bg-white border border-gray-100 rounded-lg p-4 grid sm:grid-cols-[1fr_auto] gap-3 items-end">
     <label class="text-[11px] font-semibold text-gray-500 uppercase">Buscar<input name="search" value="{{ search }}" placeholder="Nome, e-mail, telefone ou documento" class="input-field mt-1.5 w-full text-[13px]"></label>
-    <label class="text-[11px] font-semibold text-gray-500 uppercase">Consentimento<select name="consent" class="input-field mt-1.5 w-full text-[13px]"><option value="">Todos</option><option value="GRANTED" {% if consent_filter == 'GRANTED' %}selected{% endif %}>Autorizado</option><option value="REVOKED" {% if consent_filter == 'REVOKED' %}selected{% endif %}>Revogado</option><option value="UNKNOWN" {% if consent_filter == 'UNKNOWN' %}selected{% endif %}>Nao informado</option></select></label>
     <button class="btn-primary min-h-[44px]">Filtrar</button>
   </form>
   <section class="bg-white border border-gray-100 rounded-lg overflow-hidden">
