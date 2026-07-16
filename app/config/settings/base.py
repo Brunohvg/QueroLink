@@ -240,14 +240,14 @@ from datetime import timedelta
 WEBHOOK_AUTH_REQUIRED = config('WEBHOOK_AUTH_REQUIRED', default=True, cast=bool)
 
 PLAN_PRICES = {
-    'STARTER': config('PLAN_PRICE_STARTER', default=14700, cast=int),
-    'PRO': config('PLAN_PRICE_PRO', default=29700, cast=int),
-    'BUSINESS': config('PLAN_PRICE_BUSINESS', default=49700, cast=int),
+    'STARTER': config('PLAN_PRICE_STARTER', default=24700, cast=int),
+    'PRO': config('PLAN_PRICE_PRO', default=49700, cast=int),
+    'BUSINESS': config('PLAN_PRICE_BUSINESS', default=89700, cast=int),
 }
 PLAN_SELLER_LIMITS = {
     'STARTER': 5,
     'PRO': 15,
-    'BUSINESS': 50,
+    'BUSINESS': None,
 }
 PLAN_FEATURES = {
     'STARTER': {
@@ -259,7 +259,6 @@ PLAN_FEATURES = {
         'importacao_csv': False,
         'previa_fechamento': False,
         'boletos': False,
-        'customer_management': False,
     },
     'PRO': {
         'links_pagamento': True,
@@ -270,7 +269,6 @@ PLAN_FEATURES = {
         'importacao_csv': True,
         'previa_fechamento': True,
         'boletos': True,
-        'customer_management': True,
     },
     'BUSINESS': {
         'links_pagamento': True,
@@ -281,7 +279,6 @@ PLAN_FEATURES = {
         'importacao_csv': True,
         'previa_fechamento': True,
         'boletos': True,
-        'customer_management': True,
     },
 }
 

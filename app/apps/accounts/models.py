@@ -11,9 +11,9 @@ from .fields import EncryptedCharField, compute_hash
 
 class Tenant(models.Model):
     class Plan(models.TextChoices):
-        STARTER = 'STARTER', 'Starter'
+        STARTER = 'STARTER', 'Essencial'
         PRO = 'PRO', 'Pro'
-        BUSINESS = 'BUSINESS', 'Business'
+        BUSINESS = 'BUSINESS', 'Empresarial'
         ENTERPRISE = 'ENTERPRISE', 'Enterprise'  # legado
 
     uuid = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
