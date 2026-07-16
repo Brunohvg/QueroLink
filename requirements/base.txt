@@ -20,3 +20,4 @@ weasyprint==69.0
 mercadopago==3.3.0
 holidays==0.56
 pywebpush==2.0.0
+defusedxml==0.7.1

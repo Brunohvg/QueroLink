@@ -72,7 +72,7 @@ def forwards(apps, schema_editor):
     Activity = apps.get_model("customers", "CustomerActivity")
     Boleto = apps.get_model("receivables", "Boleto")
     Order = apps.get_model("orders", "Order")
-    for boleto in Boleto.objects.select_related("seller").iterator():
+    for boleto in Boleto.objects.filter(status="PAGO").select_related("seller").iterator():
         customer = _customer(
             Customer,
             boleto.tenant_id,
@@ -100,7 +100,7 @@ def forwards(apps, schema_editor):
             status=boleto.status,
             occurred_at=boleto.created_at,
         )
-    for order in Order.objects.select_related("seller").iterator():
+    for order in Order.objects.filter(status="COMPLETED").select_related("seller").iterator():
         customer = _customer(
             Customer,
             order.tenant_id,
