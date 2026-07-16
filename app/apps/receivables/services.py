@@ -10,7 +10,7 @@ from django.utils import timezone
 from app.apps.audit.models import AuditLog
 
 from .models import Boleto
-from .providers import get_provider
+from .providers import BoletoProviderError, get_provider
 
 logger = logging.getLogger(__name__)
 
@@ -92,6 +92,8 @@ def create_boleto(tenant, seller, created_by, data):
         raise
     except BoletoServiceError:
         raise
+    except BoletoProviderError as exc:
+        raise BoletoServiceError(str(exc)) from exc
     except Exception as exc:
         logger.exception('Falha ao emitir boleto para tenant=%s', tenant.uuid)
         raise BoletoServiceError(

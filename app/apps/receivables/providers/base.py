@@ -13,6 +13,10 @@ class ProviderResult:
     pdf_password: str = ''
 
 
+class BoletoProviderError(Exception):
+    pass
+
+
 class BoletoProvider(ABC):
     @abstractmethod
     def create(self, tenant, boleto_data) -> ProviderResult:

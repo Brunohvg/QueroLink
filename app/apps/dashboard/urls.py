@@ -33,9 +33,11 @@ urlpatterns = [
     path('gestor/links/<uuid:order_uuid>/estornar/', desktop_views.gestor_link_estornar, name='gestor_link_estornar'),
     path('gestor/boletos/', receivable_views.manager_boleto_list, name='gestor_boletos'),
     path('gestor/boletos/novo/', receivable_views.manager_boleto_new, name='gestor_boleto_novo'),
+    path('gestor/boletos/<uuid:boleto_uuid>/', receivable_views.manager_boleto_detail, name='gestor_boleto_detalhe'),
     path('gestor/boletos/<uuid:boleto_uuid>/cancelar/', receivable_views.manager_boleto_cancel, name='gestor_boleto_cancelar'),
     path('gestor/boletos/<uuid:boleto_uuid>/reenviar/', receivable_views.manager_boleto_resend, name='gestor_boleto_reenviar'),
     path('boletos/cnpj/<str:cnpj>/', receivable_views.cnpj_lookup, name='boleto_cnpj_lookup'),
+    path('boletos/cep/<str:cep>/', receivable_views.cep_lookup, name='boleto_cep_lookup'),
 
     path('financeiro/fila/', desktop_views.financeiro_fila, name='financeiro_fila'),
     path('financeiro/historico/', desktop_views.financeiro_historico, name='financeiro_historico'),

@@ -147,6 +147,22 @@ def manager_boleto_list(request):
 
 
 @login_required
+def manager_boleto_detail(request, boleto_uuid):
+    if not _check_role(request, User.Role.ADMIN, User.Role.MANAGER):
+        return redirect('dashboard:home')
+    if not _feature_enabled(request.user):
+        return redirect('dashboard:gestor_boletos')
+    boleto = get_object_or_404(
+        Boleto.objects.select_related('seller', 'created_by', 'launched_sale'),
+        tenant=request.user.tenant,
+        uuid=boleto_uuid,
+    )
+    return render(request, 'dashboard/gestor/boletos/detail.html', {
+        'boleto': boleto,
+    })
+
+
+@login_required
 def manager_boleto_new(request):
     if not _check_role(request, User.Role.ADMIN, User.Role.MANAGER):
         return redirect('dashboard:home')
@@ -206,3 +222,22 @@ def cnpj_lookup(request, cnpj):
         return JsonResponse(lookup_cnpj(cnpj))
     except (ValueError, BoletoServiceError) as exc:
         return JsonResponse({'detail': str(exc)}, status=400)
+
+
+@login_required
+def cep_lookup(request, cep):
+    if request.user.role not in (User.Role.SELLER, User.Role.ADMIN, User.Role.MANAGER):
+        return JsonResponse({'detail': 'Acesso nao permitido.'}, status=403)
+    if not _feature_enabled(request.user):
+        return JsonResponse({'detail': 'Recurso indisponivel no plano.'}, status=403)
+    from app.apps.freight.services import ViaCepClient
+    info = ViaCepClient().get_cep_info(cep)
+    if not info:
+        return JsonResponse({'detail': 'CEP nao encontrado.'}, status=404)
+    return JsonResponse({
+        'payer_zip_code': info.cep,
+        'payer_street': info.street,
+        'payer_neighborhood': info.neighborhood,
+        'payer_city': info.city,
+        'payer_state': info.state,
+    })

@@ -27,6 +27,9 @@ class BoletoNotificationTests(TestCase):
         self.assertEqual(send_boleto_email.run(str(boleto.uuid), 'due_tomorrow'), 'sent')
         self.assertEqual(send_boleto_email.run(str(boleto.uuid), 'due_tomorrow'), 'duplicate')
         self.assertEqual(len(mail.outbox), 1)
+        html = mail.outbox[0].alternatives[0][0]
+        self.assertIn(self.tenant.company_name, html)
+        self.assertIn('vidalys-merito-logo.png', html)
 
     @patch('app.apps.receivables.tasks.tenant_operational', return_value=True)
     def test_digest_only_sends_when_there_is_content(self, _operational_mock):

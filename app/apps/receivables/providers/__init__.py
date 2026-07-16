@@ -1,3 +1,3 @@
-from .base import BoletoProvider, ProviderResult, get_provider
+from .base import BoletoProvider, BoletoProviderError, ProviderResult, get_provider
 
-__all__ = ['BoletoProvider', 'ProviderResult', 'get_provider']
+__all__ = ['BoletoProvider', 'BoletoProviderError', 'ProviderResult', 'get_provider']

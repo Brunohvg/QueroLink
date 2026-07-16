@@ -44,7 +44,14 @@ def send_boleto_email(boleto_uuid, kind='created', force=False):
         'due_tomorrow': f'Lembrete: boleto vence amanha ({boleto.due_date:%d/%m/%Y})',
         'due_today': 'Lembrete: seu boleto vence hoje',
     }
-    context = {'boleto': boleto, 'amount': _format_cents(boleto.amount_cents), 'kind': kind}
+    context = {
+        'boleto': boleto,
+        'amount': _format_cents(boleto.amount_cents),
+        'kind': kind,
+        'brand_logo_url': (
+            f'https://{settings.SERVICE_FQDN_WEB}/static/img/vidalys-merito-logo.png'
+        ),
+    }
     html = render_to_string('boletos/email/boleto.html', context)
     text = render_to_string('boletos/email/boleto.txt', context)
     message = EmailMultiAlternatives(

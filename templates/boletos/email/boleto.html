@@ -1,18 +1,22 @@
 <!doctype html>
 <html lang="pt-BR">
-<body style="margin:0;background:#f5f7fa;font-family:Arial,sans-serif;color:#111827">
-  <div style="max-width:600px;margin:0 auto;padding:32px 16px">
-    <div style="background:#fff;border:1px solid #e5e7eb;border-radius:8px;padding:28px">
-      <p style="margin:0 0 8px;color:#1263ff;font-size:13px;font-weight:700">MERITO BY VIDALYS</p>
-      <h1 style="margin:0 0 20px;font-size:24px">{% if kind == 'due_today' %}Seu boleto vence hoje{% elif kind == 'due_tomorrow' %}Seu boleto vence amanha{% else %}Boleto emitido{% endif %}</h1>
-      <p>Ola, {{ boleto.payer_name }}.</p>
-      <div style="background:#f8fafc;border-radius:8px;padding:16px;margin:20px 0">
-        <p style="margin:0 0 8px"><strong>Valor:</strong> {{ amount }}</p>
-        <p style="margin:0"><strong>Vencimento:</strong> {{ boleto.due_date|date:'d/m/Y' }}</p>
-      </div>
-      {% if boleto.boleto_url %}<p><a href="{{ boleto.boleto_url }}" style="display:inline-block;background:#1263ff;color:#fff;text-decoration:none;padding:12px 18px;border-radius:8px;font-weight:700">Visualizar boleto</a></p>{% endif %}
-      {% if boleto.barcode %}<p style="margin-top:24px;font-size:13px;color:#4b5563">Linha digitavel</p><p style="word-break:break-all;font-family:monospace;background:#f3f4f6;padding:12px;border-radius:8px">{{ boleto.barcode }}</p>{% endif %}
-    </div>
-  </div>
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Boleto {{ boleto.tenant.company_name }}</title></head>
+<body style="margin:0;padding:0;background:#f4f7fb;font-family:Arial,Helvetica,sans-serif;color:#111827">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f4f7fb"><tr><td align="center" style="padding:28px 16px">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:600px;background:#fff;border:1px solid #e5e7eb">
+    <tr><td style="background:#0b1120;padding:24px 30px"><img src="{{ brand_logo_url }}" width="170" alt="Vidalys Merito" style="display:block;max-width:170px;height:auto"></td></tr>
+    <tr><td style="height:4px;background:#1263ff"></td></tr>
+    <tr><td style="padding:30px">
+      <p style="margin:0 0 8px;color:#1263ff;font-size:12px;font-weight:bold;text-transform:uppercase">Cobranca de {{ boleto.tenant.company_name }}</p>
+      <h1 style="margin:0 0 18px;font-size:24px;line-height:1.25;color:#0b1120">{% if kind == 'due_today' %}Seu boleto vence hoje{% elif kind == 'due_tomorrow' %}Seu boleto vence amanha{% else %}Seu boleto foi emitido{% endif %}</h1>
+      <p style="margin:0 0 20px;color:#4b5563;font-size:14px;line-height:1.6">Ola, {{ boleto.payer_name }}. Este boleto foi emitido por <strong>{{ boleto.tenant.company_name }}</strong> por meio da plataforma Merito by Vidalys.</p>
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f7f9fc;border:1px solid #e5e7eb"><tr><td style="padding:18px"><span style="display:block;color:#6b7280;font-size:11px;text-transform:uppercase">Valor</span><strong style="display:block;color:#0b1120;font-size:24px;margin-top:4px">{{ amount }}</strong></td><td style="padding:18px"><span style="display:block;color:#6b7280;font-size:11px;text-transform:uppercase">Vencimento</span><strong style="display:block;color:#0b1120;font-size:18px;margin-top:7px">{{ boleto.due_date|date:'d/m/Y' }}</strong></td></tr></table>
+      {% if boleto.boleto_url %}<p style="text-align:center;margin:26px 0"><a href="{{ boleto.boleto_url }}" style="display:inline-block;background:#1263ff;color:#fff;text-decoration:none;padding:14px 28px;font-size:15px;font-weight:bold;border-radius:8px">Visualizar boleto</a></p>{% endif %}
+      {% if boleto.barcode %}<p style="margin:24px 0 7px;color:#6b7280;font-size:11px;text-transform:uppercase">Linha digitavel</p><p style="margin:0;padding:14px;background:#f3f4f6;border:1px solid #e5e7eb;font-family:monospace;font-size:13px;line-height:1.6;word-break:break-all">{{ boleto.barcode }}</p>{% endif %}
+      <p style="margin:24px 0 0;color:#6b7280;font-size:12px;line-height:1.6">Apos o vencimento, podem incidir multa de 2% e juros de 1% ao mes, conforme as instrucoes do boleto.</p>
+    </td></tr>
+    <tr><td style="border-top:1px solid #e5e7eb;padding:20px 30px;color:#9ca3af;font-size:11px;line-height:1.6"><strong style="color:#374151">{{ boleto.tenant.company_name }}</strong><br>Emissao processada com seguranca pelo Merito by Vidalys.<br>Este e um e-mail automatico.</td></tr>
+  </table>
+</td></tr></table>
 </body>
 </html>

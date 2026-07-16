@@ -1,0 +1,39 @@
+{% extends 'dashboard/base_desktop.html' %}
+{% load currency_filters %}
+{% block title %}Boleto {{ boleto.payer_name }} - Merito{% endblock %}
+{% block content %}
+<div class="max-w-5xl mx-auto space-y-5">
+  <header class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+    <div class="flex items-center gap-3">
+      <a href="{% url 'dashboard:gestor_boletos' %}" class="w-10 h-10 inline-flex items-center justify-center border border-gray-200 rounded-lg bg-white" aria-label="Voltar">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
+      </a>
+      <div><p class="text-[12px] text-gray-500">Detalhes da cobranca</p><h1 class="font-display text-[22px] font-bold">{{ boleto.payer_name }}</h1></div>
+    </div>
+    <span class="self-start sm:self-auto px-3 py-1.5 rounded-full text-[12px] font-semibold {% if boleto.status == 'PAGO' %}bg-emerald-50 text-emerald-700{% elif boleto.status == 'VENCIDO' or boleto.status == 'ESTORNADO' %}bg-red-50 text-red-700{% elif boleto.status == 'CANCELADO' %}bg-gray-100 text-gray-600{% else %}bg-amber-50 text-amber-700{% endif %}">{{ boleto.get_status_display }}</span>
+  </header>
+
+  <section class="grid sm:grid-cols-3 gap-3">
+    <div class="surface-card"><p class="text-[11px] uppercase text-gray-500">Valor</p><p class="font-display text-xl font-bold mt-1">{{ boleto.amount_cents|brl }}</p></div>
+    <div class="surface-card"><p class="text-[11px] uppercase text-gray-500">Vencimento</p><p class="font-semibold mt-1">{{ boleto.due_date|date:'d/m/Y' }}</p></div>
+    <div class="surface-card"><p class="text-[11px] uppercase text-gray-500">Vendedor</p><p class="font-semibold mt-1">{{ boleto.seller.name }}</p></div>
+  </section>
+
+  <section class="bg-white border border-gray-100 rounded-lg overflow-hidden">
+    <div class="px-5 py-4 border-b border-gray-100 flex items-center justify-between gap-3">
+      <div><h2 class="font-semibold">Informacoes de pagamento</h2><p class="text-[12px] text-gray-500 mt-0.5">Dados retornados pelo emissor do boleto</p></div>
+      {% if boleto.boleto_url %}<div class="flex gap-2"><a href="{{ boleto.boleto_url }}" target="_blank" rel="noopener" class="min-h-[40px] px-4 inline-flex items-center rounded-lg border border-gray-200 font-semibold text-[13px]">Visualizar</a><a href="{{ boleto.boleto_url }}" target="_blank" rel="noopener" download class="min-h-[40px] px-4 inline-flex items-center rounded-lg bg-brand-500 text-white font-semibold text-[13px]">Baixar PDF</a></div>{% endif %}
+    </div>
+    <dl class="grid sm:grid-cols-2 gap-px bg-gray-100">
+      <div class="bg-white px-5 py-4"><dt class="text-[11px] uppercase text-gray-500">Pedido no gateway</dt><dd class="font-mono text-[13px] mt-1 break-all">{{ boleto.gateway_order_id|default:'-' }}</dd></div>
+      <div class="bg-white px-5 py-4"><dt class="text-[11px] uppercase text-gray-500">Cobranca no gateway</dt><dd class="font-mono text-[13px] mt-1 break-all">{{ boleto.gateway_charge_id|default:'-' }}</dd></div>
+      <div class="bg-white px-5 py-4 sm:col-span-2"><dt class="text-[11px] uppercase text-gray-500">Linha digitavel</dt><dd class="font-mono text-[13px] mt-1 break-all">{{ boleto.barcode|default:'Nao disponibilizada' }}</dd>{% if boleto.barcode %}<button type="button" onclick="navigator.clipboard.writeText('{{ boleto.barcode|escapejs }}');showToast('Linha digitavel copiada.','success')" class="mt-3 text-brand-600 font-semibold text-[13px]">Copiar linha digitavel</button>{% endif %}</div>
+    </dl>
+  </section>
+
+  <section class="grid md:grid-cols-2 gap-3">
+    <div class="surface-card"><h2 class="font-semibold mb-3">Pagador</h2><p class="font-medium">{{ boleto.payer_name }}</p><p class="text-[13px] text-gray-500 mt-1">{{ boleto.payer_document }}</p><p class="text-[13px] text-gray-500">{{ boleto.payer_email|default:'Sem e-mail' }}</p><p class="text-[13px] text-gray-500">{{ boleto.payer_phone }}</p></div>
+    <div class="surface-card"><h2 class="font-semibold mb-3">Endereco</h2><p class="text-[13px] text-gray-700">{{ boleto.payer_street }}, {{ boleto.payer_number }}{% if boleto.payer_complement %} - {{ boleto.payer_complement }}{% endif %}</p><p class="text-[13px] text-gray-500 mt-1">{{ boleto.payer_neighborhood }} - {{ boleto.payer_city }}/{{ boleto.payer_state }}</p><p class="text-[13px] text-gray-500">CEP {{ boleto.payer_zip_code }}</p></div>
+  </section>
+</div>
+{% endblock %}

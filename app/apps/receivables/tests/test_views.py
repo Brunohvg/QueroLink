@@ -1,6 +1,7 @@
 from django.test import TestCase
 from django.urls import reverse
 from django.utils import timezone
+from unittest.mock import patch
 
 from app.apps.sales.models import Sale
 
@@ -50,3 +51,34 @@ class BoletoLaunchTests(TestCase):
         self.tenant.save(update_fields=['plan'])
         response = self.client.get(reverse('dashboard:mobile_boletos'))
         self.assertContains(response, 'Boletos disponiveis no Pro')
+
+    def test_manager_detail_shows_gateway_ids_and_pdf(self):
+        from app.apps.accounts.models import User
+        from .helpers import make_user
+        manager = make_user(self.tenant, 'detail-manager', User.Role.MANAGER)
+        self.boleto.gateway_order_id = 'or_detail'
+        self.boleto.gateway_charge_id = 'ch_detail'
+        self.boleto.boleto_url = 'https://example.com/boleto.pdf'
+        self.boleto.save(update_fields=[
+            'gateway_order_id', 'gateway_charge_id', 'boleto_url',
+        ])
+        self.client.force_login(manager)
+        response = self.client.get(reverse(
+            'dashboard:gestor_boleto_detalhe', args=[self.boleto.uuid],
+        ))
+        self.assertContains(response, 'or_detail')
+        self.assertContains(response, 'ch_detail')
+        self.assertContains(response, 'Baixar PDF')
+
+    @patch('app.apps.freight.services.ViaCepClient.get_cep_info')
+    def test_cep_lookup_returns_address(self, lookup_mock):
+        from app.apps.freight.services import CepInfo
+        lookup_mock.return_value = CepInfo(
+            cep='30110000', street='Rua Teste', neighborhood='Centro',
+            city='Belo Horizonte', state='MG',
+        )
+        response = self.client.get(reverse(
+            'dashboard:boleto_cep_lookup', args=['30110000'],
+        ))
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()['payer_city'], 'Belo Horizonte')

@@ -51,6 +51,11 @@ def _find_boleto_for_payload(event):
 
 def _process_boleto_event(event, event_type, data):
     boleto = _find_boleto_for_payload(event)
+    if not boleto and event_type in ('order.payment_failed', 'charge.payment_failed'):
+        from app.apps.receivables.providers import get_provider
+        if get_provider(event.tenant).match_webhook_charge(event.payload):
+            _skip_foreign_event(event, 'Falha de emissao de boleto registrada no gateway')
+            return True
     if not boleto:
         return False
     from app.apps.receivables.services import mark_paid, mark_refunded
@@ -67,6 +72,9 @@ def _process_boleto_event(event, event_type, data):
         )
     elif event_type == 'charge.refunded':
         mark_refunded(boleto)
+    elif event_type in ('order.payment_failed', 'charge.payment_failed'):
+        _skip_foreign_event(event, 'Falha de emissao de boleto registrada no gateway')
+        return True
     else:
         return False
 
@@ -139,7 +147,10 @@ def process_pagarme_webhook(event_id):
         data = payload.get('data', {})
         logger.info("Processing webhook event %s type=%s", event_id, event_type)
 
-        if event_type in ('order.paid', 'charge.paid', 'charge.refunded'):
+        if event_type in (
+            'order.paid', 'charge.paid', 'charge.refunded',
+            'order.payment_failed', 'charge.payment_failed',
+        ):
             if _process_boleto_event(event, event_type, data):
                 logger.info('Boleto processado pelo webhook event=%s', event_id)
                 return

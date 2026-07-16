@@ -1,5 +1,7 @@
 Ola, {{ boleto.payer_name }}.
 
+Esta cobranca foi emitida por {{ boleto.tenant.company_name }}.
+
 {% if kind == 'due_today' %}Seu boleto vence hoje.{% elif kind == 'due_tomorrow' %}Seu boleto vence amanha.{% else %}Seu boleto foi emitido.{% endif %}
 
 Valor: {{ amount }}
@@ -7,4 +9,4 @@ Vencimento: {{ boleto.due_date|date:'d/m/Y' }}
 Linha digitavel: {{ boleto.barcode }}
 Visualizar boleto: {{ boleto.boleto_url }}
 
-Merito by Vidalys
+Emissao processada pelo Merito by Vidalys.

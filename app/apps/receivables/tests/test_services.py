@@ -3,7 +3,8 @@ from unittest.mock import Mock, patch
 from django.test import TestCase
 
 from ..providers import ProviderResult
-from ..services import create_boleto
+from ..models import Boleto
+from ..services import BoletoServiceError, create_boleto
 from .helpers import boleto_data, make_seller, make_tenant
 
 
@@ -30,3 +31,10 @@ class BoletoServiceTests(TestCase):
         self.assertEqual(boleto.barcode, '123456')
         provider.create.assert_called_once()
         email_mock.assert_called_once_with(str(boleto.uuid), 'created')
+
+    @patch('app.apps.receivables.services.get_provider')
+    def test_failed_provider_response_does_not_persist_boleto(self, provider_mock):
+        provider_mock.return_value.create.side_effect = RuntimeError('failed')
+        with self.assertRaises(BoletoServiceError):
+            create_boleto(self.tenant, self.seller, self.user, boleto_data())
+        self.assertFalse(Boleto.objects.exists())

@@ -1,6 +1,6 @@
 from app.services.gateway.pagar_me import PagarMeGateway
 
-from .base import BoletoProvider, ProviderResult
+from .base import BoletoProvider, BoletoProviderError, ProviderResult
 
 
 class PagarmeBoletoProvider(BoletoProvider):
@@ -11,6 +11,7 @@ class PagarmeBoletoProvider(BoletoProvider):
             'code': str(boleto_data['uuid']),
             'items': [{
                 'amount': boleto_data['amount_cents'],
+                'code': str(boleto_data['uuid']),
                 'description': f"Boleto - {boleto_data['payer_name']}",
                 'quantity': 1,
             }],
@@ -50,6 +51,18 @@ class PagarmeBoletoProvider(BoletoProvider):
         charges = response.get('charges') or []
         charge = charges[0] if charges else {}
         transaction = charge.get('last_transaction') or {}
+        if (
+            not charge
+            or not transaction
+            or transaction.get('success') is False
+            or response.get('status') == 'failed'
+            or charge.get('status') == 'failed'
+            or transaction.get('status') in ('failed', 'with_error')
+            or not any(transaction.get(field) for field in ('line', 'url', 'pdf'))
+        ):
+            raise BoletoProviderError(
+                'O emissor recusou a geracao do boleto. Confira os dados e tente novamente.'
+            )
         return ProviderResult(
             gateway='PAGARME',
             order_id=str(response.get('id') or ''),

@@ -65,6 +65,30 @@ class BoletoWebhookTests(TestCase):
         self.assertEqual(self.boleto.status, Boleto.Status.ESTORNADO)
         notify_mock.assert_called_once_with(str(self.boleto.uuid))
 
+    def test_boleto_payment_failed_does_not_enter_link_flow(self):
+        event = WebhookEvent.objects.create(
+            gateway='pagar' + 'me',
+            tenant=self.tenant,
+            payload={
+                'type': 'order.payment_failed',
+                'data': {
+                    'metadata': {
+                        'merito_boleto': '1',
+                        'boleto_uuid': str(self.boleto.uuid),
+                    },
+                    'charges': [{
+                        'id': 'ch_paid',
+                        'payment_method': 'boleto',
+                        'status': 'failed',
+                    }],
+                },
+            },
+        )
+        self.process_webhook.run(event.id)
+        event.refresh_from_db()
+        self.assertTrue(event.processed)
+        self.assertIn('Falha de emissao de boleto', event.skip_reason)
+
     def test_daily_task_expires_after_three_day_grace(self):
         self.boleto.due_date = timezone.localdate() - timedelta(days=4)
         self.boleto.save(update_fields=['due_date'])
