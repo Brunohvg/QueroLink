@@ -1,3 +1,4 @@
+import logging
 from datetime import timedelta
 
 from django.contrib.auth.decorators import login_required
@@ -8,6 +9,8 @@ from django.utils import timezone
 
 from app.apps.accounts.models import User, tenant_has_feature
 from app.apps.sellers.models import Seller
+
+logger = logging.getLogger(__name__)
 
 from .models import Boleto, DEFAULT_INSTRUCTIONS
 from .serializers import BoletoSerializer
@@ -247,11 +250,15 @@ def manager_boleto_invoice_upload(request, boleto_uuid):
             'boleto': boleto,
             'invoice_error': str(exc),
         }, status=400)
-    except Exception as exc:
+    except Exception:
+        logger.exception(
+            'Falha ao salvar nota fiscal boleto=%s user=%s',
+            boleto_uuid, request.user.pk,
+        )
         return render(request, 'dashboard/gestor/boletos/detail.html', {
             'boleto': boleto,
             'invoice_error': 'Erro ao processar o upload. Tente novamente.',
-        }, status=500)
+        })
     return redirect('dashboard:gestor_boleto_detalhe', boleto_uuid=boleto.uuid)
 
 

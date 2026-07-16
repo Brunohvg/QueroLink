@@ -12,7 +12,7 @@
     <a href="{% url 'dashboard:gestor_boletos' %}" class="min-h-[40px] px-5 flex items-center rounded-md bg-white text-brand-600 font-semibold text-[13px] shadow-sm">Boletos</a>
   </nav>
   {% if feature_locked %}
-  <section class="surface-card text-center py-10"><h2 class="font-semibold text-lg">Boletos disponiveis nos planos Pro e Business</h2><a href="{% url 'dashboard:assinatura' %}" class="btn-primary inline-flex mt-4">Ver planos</a></section>
+  <section class="surface-card text-center py-10"><h2 class="font-semibold text-lg">Boletos disponiveis nos planos Pro e Empresarial</h2><a href="{% url 'dashboard:assinatura' %}" class="btn-primary inline-flex mt-4">Ver planos</a></section>
   {% else %}
   <section class="grid grid-cols-2 lg:grid-cols-4 gap-3">
     <div class="surface-card"><p class="text-[11px] text-gray-500 uppercase">A receber</p><p class="font-display text-xl font-bold mt-1">{{ a_receber_cents|brl }}</p></div>

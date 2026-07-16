@@ -4,7 +4,7 @@
 {% block content %}
 <div class="max-w-5xl mx-auto space-y-4" x-data="desktopBoleto()">
   <div class="flex items-center justify-between"><div><p class="text-[12px] text-gray-500">Venda faturada</p><h1 class="font-display text-[22px] font-bold">Novo boleto</h1></div><a href="{% url 'dashboard:gestor_boletos' %}" class="min-h-[44px] inline-flex items-center px-4 rounded-lg border border-gray-200">Voltar</a></div>
-  {% if feature_locked %}<section class="surface-card text-center py-10">Recurso disponivel nos planos Pro e Business.</section>
+  {% if feature_locked %}<section class="surface-card text-center py-10">Recurso disponivel nos planos Pro e Empresarial.</section>
   {% elif boleto %}<section class="surface-card text-center py-8 space-y-3"><h2 class="font-display text-xl font-bold text-emerald-700">Boleto emitido</h2><p>{{ boleto.payer_name }} - {{ boleto.amount_cents|brl }}</p>{% if boleto.barcode %}<p class="font-mono text-[12px] break-all bg-gray-50 p-3 rounded-lg">{{ boleto.barcode }}</p>{% endif %}<div class="flex flex-wrap justify-center gap-2">{% if boleto.boleto_url %}<a href="{{ boleto.boleto_url }}" target="_blank" rel="noopener" class="min-h-[44px] inline-flex items-center px-4 rounded-lg border border-gray-200 font-semibold">Visualizar</a><a href="{{ boleto.boleto_url }}" target="_blank" rel="noopener" download class="btn-primary">Baixar PDF</a>{% endif %}<a href="{% url 'dashboard:gestor_boleto_detalhe' boleto.uuid %}" class="min-h-[44px] inline-flex items-center px-4 rounded-lg border border-gray-200">Ver detalhes</a></div></section>
   {% else %}
   {% if serializer.errors %}<div class="bg-red-50 border border-red-100 text-red-700 rounded-lg p-4 text-[13px]">Confira os campos informados. {{ serializer.errors }}</div>{% endif %}
