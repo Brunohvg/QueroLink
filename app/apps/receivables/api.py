@@ -136,6 +136,10 @@ class BoletoViewSet(viewsets.ModelViewSet):
             )
         except BoletoServiceError as exc:
             raise ValidationError({'detail': str(exc)}) from exc
+        except Exception as exc:
+            raise ValidationError(
+                {'detail': 'Erro ao processar o upload. Tente novamente.'},
+            ) from exc
         if request.data.get('send_email') and boleto.payer_email:
             from .tasks import send_boleto_email
             send_boleto_email.delay(str(boleto.uuid), 'invoice', True)

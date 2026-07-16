@@ -94,6 +94,7 @@ services:
       retries: 3
       start_period: 30s
     volumes:
+      - media_volume:/app/media
       - backup_volume:/app/backups
     deploy:
       resources:
@@ -132,6 +133,7 @@ services:
           cpus: '0.1'
           memory: 128M
     volumes:
+      - media_volume:/app/media
       - backup_volume:/app/backups
       - celery_beat_schedule:/app/celerybeat-schedule
     networks:

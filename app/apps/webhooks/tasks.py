@@ -70,7 +70,7 @@ def _process_boleto_event(event, event_type, data):
             charge.get('paid_amount') or charge.get('amount') or boleto.amount_cents,
             charge.get('paid_at') or data.get('paid_at'),
         )
-    elif event_type == 'charge.refunded':
+    elif event_type in ('charge.refunded', 'charge.chargedback'):
         mark_refunded(boleto)
     elif event_type in ('order.payment_failed', 'charge.payment_failed'):
         _skip_foreign_event(event, 'Falha de emissao de boleto registrada no gateway')
@@ -150,6 +150,7 @@ def process_pagarme_webhook(event_id):
         if event_type in (
             'order.paid', 'charge.paid', 'charge.refunded',
             'order.payment_failed', 'charge.payment_failed',
+            'charge.chargedback',
         ):
             if _process_boleto_event(event, event_type, data):
                 logger.info('Boleto processado pelo webhook event=%s', event_id)

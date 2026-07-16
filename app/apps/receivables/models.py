@@ -76,6 +76,7 @@ class Boleto(models.Model):
         on_delete=models.SET_NULL,
         related_name='boleto_invoices_uploaded',
     )
+    customer_snapshot = models.JSONField(null=True, blank=True)
 
     status = models.CharField(
         max_length=12,

@@ -71,8 +71,7 @@ def create_payment_link(tenant, seller, customer_name, amount_cents, installment
                 gateway_link_id=gateway_link_id,
                 short_code=hashlib.sha256(str(order.uuid).encode()).hexdigest()[:8].upper(),
             )
-            from app.apps.customers.services import sync_order_customer
-            sync_order_customer(order)
+
     except Exception:
         try:
             gateway.cancel_payment_link(gateway_link_id)

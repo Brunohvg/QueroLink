@@ -85,8 +85,6 @@ def create_boleto(tenant, seller, created_by, data):
                 'gateway', 'gateway_order_id', 'gateway_charge_id',
                 'barcode', 'boleto_url', 'boleto_pdf_password', 'updated_at',
             ])
-            from app.apps.customers.services import sync_boleto_customer
-            sync_boleto_customer(boleto)
             transaction.on_commit(
                 lambda boleto_uuid=boleto.uuid: _enqueue_created_email(boleto_uuid),
                 robust=True,
@@ -135,12 +133,13 @@ def cancel_boleto(boleto, user):
 def _validate_invoice_file(upload, kind):
     limits = {'pdf': 10 * 1024 * 1024, 'xml': 2 * 1024 * 1024}
     allowed_types = {
-        'pdf': {'application/pdf', 'application/octet-stream'},
-        'xml': {'application/xml', 'text/xml', 'application/octet-stream'},
+        'pdf': {'application/pdf', 'application/octet-stream', ''},
+        'xml': {'application/xml', 'text/xml', 'application/octet-stream', ''},
     }
-    extension = Path(upload.name or '').suffix.lower()
-    if extension != f'.{kind}':
-        raise BoletoServiceError(f'O arquivo {kind.upper()} possui extensao invalida.')
+    if not upload:
+        raise BoletoServiceError(f'Arquivo {kind.upper()} nao foi enviado.')
+    if upload.size == 0:
+        raise BoletoServiceError(f'O arquivo {kind.upper()} esta vazio.')
     if upload.size > limits[kind]:
         limit_mb = limits[kind] // (1024 * 1024)
         raise BoletoServiceError(
@@ -149,11 +148,16 @@ def _validate_invoice_file(upload, kind):
     content_type = (getattr(upload, 'content_type', '') or '').lower()
     if content_type not in allowed_types[kind]:
         raise BoletoServiceError(f'O arquivo {kind.upper()} possui tipo invalido.')
-    signature = upload.read(8)
+    try:
+        signature = upload.read(8)
+    except (IOError, OSError) as exc:
+        raise BoletoServiceError(
+            f'Nao foi possivel ler o arquivo {kind.upper()}.'
+        ) from exc
     upload.seek(0)
-    if kind == 'pdf' and not signature.startswith(b'%PDF-'):
+    if kind == 'pdf' and not (signature or b'').startswith(b'%PDF-'):
         raise BoletoServiceError('O arquivo informado nao e um PDF valido.')
-    if kind == 'xml' and not signature.lstrip().startswith(b'<'):
+    if kind == 'xml' and not (signature or b'').lstrip().startswith(b'<'):
         raise BoletoServiceError('O arquivo informado nao e um XML valido.')
 
 
@@ -165,22 +169,24 @@ def save_invoice_files(boleto, user, pdf=None, xml=None):
     if xml:
         _validate_invoice_file(xml, 'xml')
     old_files = []
+    update_fields = [
+        'invoice_uploaded_at', 'invoice_uploaded_by', 'updated_at',
+    ]
     with transaction.atomic():
         locked = Boleto.objects.select_for_update().get(pk=boleto.pk)
         if pdf:
             if locked.invoice_pdf:
                 old_files.append(locked.invoice_pdf)
             locked.invoice_pdf = pdf
+            update_fields.append('invoice_pdf')
         if xml:
             if locked.invoice_xml:
                 old_files.append(locked.invoice_xml)
             locked.invoice_xml = xml
+            update_fields.append('invoice_xml')
         locked.invoice_uploaded_at = timezone.now()
         locked.invoice_uploaded_by = user
-        locked.save(update_fields=[
-            'invoice_pdf', 'invoice_xml', 'invoice_uploaded_at',
-            'invoice_uploaded_by', 'updated_at',
-        ])
+        locked.save(update_fields=update_fields)
         AuditLog.objects.create(
             user=user,
             tenant=locked.tenant,
@@ -205,9 +211,30 @@ def mark_paid(boleto, paid_amount_cents, paid_at):
         locked.status = Boleto.Status.PAGO
         locked.paid_amount_cents = int(paid_amount_cents or locked.amount_cents)
         locked.paid_at = paid_at
+        locked.customer_snapshot = {
+            'name': locked.payer_name,
+            'document': locked.payer_document,
+            'document_type': locked.payer_document_type,
+            'email': locked.payer_email,
+            'phone': locked.payer_phone,
+
+            'address': {
+                'zip_code': locked.payer_zip_code,
+                'street': locked.payer_street,
+                'number': locked.payer_number,
+                'complement': locked.payer_complement,
+                'neighborhood': locked.payer_neighborhood,
+                'city': locked.payer_city,
+                'state': locked.payer_state,
+            },
+            'captured_at': paid_at.isoformat(),
+        }
         locked.save(update_fields=[
-            'status', 'paid_amount_cents', 'paid_at', 'updated_at',
+            'status', 'paid_amount_cents', 'paid_at',
+            'customer_snapshot', 'updated_at',
         ])
+        from app.apps.customers.services import sync_boleto_customer
+        sync_boleto_customer(locked)
         transaction.on_commit(
             lambda boleto_uuid=locked.uuid: _enqueue_paid_notification(boleto_uuid),
             robust=True,

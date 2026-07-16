@@ -300,6 +300,9 @@ def _process_paid_locked_event(event, *, dry_run):
     order.status = Order.Status.COMPLETED
     order.save(update_fields=['status', 'updated_at'])
 
+    from app.apps.customers.services import sync_order_customer
+    sync_order_customer(order)
+
     event.processed = True
     event.status = WebhookEvent.Status.PROCESSED
     event.processed_at = timezone.now()

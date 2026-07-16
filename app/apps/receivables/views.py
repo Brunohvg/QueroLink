@@ -247,6 +247,11 @@ def manager_boleto_invoice_upload(request, boleto_uuid):
             'boleto': boleto,
             'invoice_error': str(exc),
         }, status=400)
+    except Exception as exc:
+        return render(request, 'dashboard/gestor/boletos/detail.html', {
+            'boleto': boleto,
+            'invoice_error': 'Erro ao processar o upload. Tente novamente.',
+        }, status=500)
     return redirect('dashboard:gestor_boleto_detalhe', boleto_uuid=boleto.uuid)
 
 
@@ -254,10 +259,12 @@ def manager_boleto_invoice_upload(request, boleto_uuid):
 def manager_boleto_invoice_download(request, boleto_uuid, kind):
     if not _check_role(request, User.Role.ADMIN, User.Role.MANAGER):
         return redirect('dashboard:home')
+    if kind not in ('pdf', 'xml'):
+        return JsonResponse({'detail': 'Tipo de arquivo invalido.'}, status=400)
     boleto = get_object_or_404(
         Boleto, tenant=request.user.tenant, uuid=boleto_uuid,
     )
-    field = boleto.invoice_pdf if kind == 'pdf' else boleto.invoice_xml if kind == 'xml' else None
+    field = boleto.invoice_pdf if kind == 'pdf' else boleto.invoice_xml
     if not field:
         return JsonResponse({'detail': 'Arquivo nao encontrado.'}, status=404)
     content_type = 'application/pdf' if kind == 'pdf' else 'application/xml'
