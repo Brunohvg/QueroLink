@@ -2,7 +2,7 @@
 # QueroLink — Makefile
 # ============================================================
 
-.PHONY: help install dev build test test-fast clean shell migrate seed lint build-css check
+.PHONY: help install dev build test test-fast clean shell migrate lint build-css check
 
 help: ## Mostra ajuda
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-18s\033[0m %s\n", $$1, $$2}'
@@ -17,13 +17,6 @@ dev: migrate ## Roda servidor de desenvolvimento
 migrate: ## Aplica migrations
 	.venv/bin/python manage.py makemigrations --noinput
 	.venv/bin/python manage.py migrate --noinput
-
-seed: ## Popula banco com 16 vendedores de demonstração
-	.venv/bin/python -c "
-import os; os.environ.setdefault('DJANGO_SETTINGS_MODULE','app.config.settings.local')
-import django; django.setup()
-exec(open('seed.py').read())
-"
 
 test: ## Roda todos os testes
 	.venv/bin/python manage.py test app.apps.sellers app.apps.notifications app.apps.dashboard app.apps.api app.apps.commissions -v2
@@ -57,7 +50,7 @@ clean: ## Remove pycache e arquivos temporários
 reset-db: ## Remove e recria banco SQLite
 	rm -f db.sqlite3
 	.venv/bin/python manage.py migrate --run-syncdb
-	@echo "Banco resetado. Rode 'make seed' para popular dados de demo."
+	@echo "Banco resetado."
 
 check: ## Verifica configuração Django
 	.venv/bin/python manage.py check --deploy

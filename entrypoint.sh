@@ -61,17 +61,6 @@ if [ -z "$1" ] || [ "$1" = 'gunicorn' ]; then
     python manage.py migrate --noinput
     log "Migrations concluídas."
 
-    # ── Seed (opcional, só se SEED_ON_START=true) ──────────
-    if [ "${SEED_ON_START:-false}" = "true" ]; then
-        log "===== SEED ====="
-        python -c "
-import os; os.environ.setdefault('DJANGO_SETTINGS_MODULE','app.config.settings.production')
-import django; django.setup()
-exec(open('seed.py').read())
-"
-        log "Seed concluído."
-    fi
-
     # ── Static files ───────────────────────────────────────
     log "===== COLLECTSTATIC ====="
     python manage.py collectstatic --noinput

@@ -72,16 +72,10 @@ python3 -m venv .venv && source .venv/bin/activate
 pip install -r requirements/base.txt
 cp .env.example .env
 make migrate
-make seed
 make dev
 ```
 
 Acesse: `http://localhost:8000/dashboard/mobile/login/` (vendedor) ou `/dashboard/login/` (gestor/financeiro).
-
-Usuários de demo criados pelo `seed.py`:
-- **Gestor**: `admin@bibelo.com.br` / `admin123`
-- **Financeiro**: `financeiro` / `fin123`
-- **Vendedores**: `bibelo`, `celia`, `danubia`, ... (ver `seed.py`)
 
 ---
 
@@ -91,7 +85,6 @@ Usuários de demo criados pelo `seed.py`:
 make help          # Todos os comandos
 make dev           # Servidor dev (porta 8000)
 make test          # Testes automatizados
-make seed          # Popular banco com dados demo
 make reset-db      # Recriar banco do zero
 make build         # Build Docker
 make up            # Iniciar containers
@@ -134,7 +127,6 @@ Compila o Tailwind CSS a partir de `static/css/tailwind.css` usando `npm run bui
 | `API_KEY_PAGAR_ME` | Sim | Chave da API Pagar.me (raw `sk_*` ou base64) |
 | `WHATSAPP_API_KEY` | WhatsApp | Token Evolution API |
 | `WHATSAPP_INSTANCE` | WhatsApp | Nome da instância |
-| `SEED_ON_START` | Não | `true` para popular banco no boot |
 | `JWT_ACCESS_TOKEN_LIFETIME_MINUTES` | Não | Default 30 |
 
 ---
@@ -165,11 +157,12 @@ scripts/deploy.sh production
 
 ### Setup pós-deploy (1 vez)
 
-```bash
-# 1. Configurar rclone com Google Drive (para backup automático)
-docker exec -it <container-web> ./scripts/setup-rclone.sh
+1. Configure o rclone pelas variáveis descritas em [`docs/BACKUP_GDRIVE_RCLONE.md`](docs/BACKUP_GDRIVE_RCLONE.md).
+2. Reinicie `celery_worker` e `celery_beat`.
+3. Valide com `python manage.py backup_check` e `python manage.py backup_now` dentro do worker.
+4. Configure o webhook no painel do Pagar.me:
 
-# 2. Configurar webhook no painel do Pagar.me
+```text
 # URL: https://querolink.lojabibelo.com.br/api/webhooks/pagarme/<tenant_slug>/
 # Eventos: charge.paid, charge.payment_failed, charge.refunded, charge.chargedback
 # Para autenticação, configure usuário/senha no painel de configurações do tenant
@@ -190,7 +183,9 @@ docker exec -it <container-web> ./scripts/setup-rclone.sh
 
 O sistema faz backup diário do PostgreSQL para o Google Drive via **rclone**.
 
-**Guia completo:** [`docs/GOOGLE_DRIVE_CREDENTIALS.md`](docs/GOOGLE_DRIVE_CREDENTIALS.md)
+**Guia completo:** [`docs/BACKUP_GDRIVE_RCLONE.md`](docs/BACKUP_GDRIVE_RCLONE.md)
+
+Defina `RCLONE_CONFIG_GDRIVE_TOKEN` com o JSON inteiro gerado pelo rclone, incluindo o `refresh_token`. Defina também `GDRIVE_PATH`; o caminho recomendado para novas configurações é `merito-backups`.
 
 | Característica | Detalhe |
 |----------------|---------|
@@ -199,7 +194,7 @@ O sistema faz backup diário do PostgreSQL para o Google Drive via **rclone**.
 | Retenção Drive | 30 dias |
 | Retenção local | 2 dias |
 | Custo | R$ 0 (15 GB grátis Google Drive) |
-| Setup | 1 vez: `./scripts/setup-rclone.sh` (OAuth, 3 min) |
+| Setup | 1 vez: variáveis do rclone no `.env` |
 
 **Restaurar:** `./scripts/restore.sh latest` ou `./scripts/restore.sh 2026-06-29`
 
@@ -259,11 +254,11 @@ Dedup: eventos com mesmo `id` (ex: `evt_xxx`) são ignorados após o primeiro pr
 ├── docker-compose.yml    # 4 serviços + 4 volumes
 ├── Makefile              # Comandos dev
 ├── entrypoint.sh         # Boot (migrate, superuser, collectstatic)
-├── seed.py               # Dados demo
 ├── manage.py
 ├── README.md
 └── docs/
-    └── GOOGLE_DRIVE_CREDENTIALS.md
+    ├── BACKUP_GDRIVE_RCLONE.md
+    └── GOOGLE_DRIVE_CREDENTIALS.md  # Redirecionamento legado
 ```
 
 ---
@@ -398,7 +393,6 @@ python manage.py reset_seller_password <seller_uuid>
 | `PRD_QUEROLINK_COMISSOES.md` | PRD completo com especificação de todos os lotes |
 | `API.md` | Documentação detalhada da API REST |
 | `READINESS_REPORT.md` | Relatório de prontidão para produção |
-| `CONTEXTO_MERITO.md` | Contexto do projeto e estado atual |
 
 ---
 

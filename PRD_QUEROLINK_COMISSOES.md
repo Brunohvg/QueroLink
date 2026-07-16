@@ -609,8 +609,7 @@ Gera nova senha temporária para o vendedor, aplica via `set_password()`, imprim
 ### entrypoint.sh
 1. Aguarda banco (30 tentativas, 2s cada)
 2. migrate + collectstatic
-3. Seed opcional via SEED_ON_START
-4. Gunicorn
+3. Gunicorn
 
 ### Docker
 - Dockerfile multi-stage (Node → Python + rclone)
