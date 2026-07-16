@@ -72,16 +72,10 @@ python3 -m venv .venv && source .venv/bin/activate
 pip install -r requirements/base.txt
 cp .env.example .env
 make migrate
-make seed
 make dev
 ```
 
 Acesse: `http://localhost:8000/dashboard/mobile/login/` (vendedor) ou `/dashboard/login/` (gestor/financeiro).
-
-Usuários de demo criados pelo `seed.py`:
-- **Gestor**: `admin@bibelo.com.br` / `admin123`
-- **Financeiro**: `financeiro` / `fin123`
-- **Vendedores**: `bibelo`, `celia`, `danubia`, ... (ver `seed.py`)
 
 ---
 
@@ -91,7 +85,6 @@ Usuários de demo criados pelo `seed.py`:
 make help          # Todos os comandos
 make dev           # Servidor dev (porta 8000)
 make test          # Testes automatizados
-make seed          # Popular banco com dados demo
 make reset-db      # Recriar banco do zero
 make build         # Build Docker
 make up            # Iniciar containers
@@ -134,7 +127,6 @@ Compila o Tailwind CSS a partir de `static/css/tailwind.css` usando `npm run bui
 | `API_KEY_PAGAR_ME` | Sim | Chave da API Pagar.me (raw `sk_*` ou base64) |
 | `WHATSAPP_API_KEY` | WhatsApp | Token Evolution API |
 | `WHATSAPP_INSTANCE` | WhatsApp | Nome da instância |
-| `SEED_ON_START` | Não | `true` para popular banco no boot |
 | `JWT_ACCESS_TOKEN_LIFETIME_MINUTES` | Não | Default 30 |
 
 ---
@@ -259,7 +251,6 @@ Dedup: eventos com mesmo `id` (ex: `evt_xxx`) são ignorados após o primeiro pr
 ├── docker-compose.yml    # 4 serviços + 4 volumes
 ├── Makefile              # Comandos dev
 ├── entrypoint.sh         # Boot (migrate, superuser, collectstatic)
-├── seed.py               # Dados demo
 ├── manage.py
 ├── README.md
 └── docs/
@@ -398,7 +389,6 @@ python manage.py reset_seller_password <seller_uuid>
 | `PRD_QUEROLINK_COMISSOES.md` | PRD completo com especificação de todos os lotes |
 | `API.md` | Documentação detalhada da API REST |
 | `READINESS_REPORT.md` | Relatório de prontidão para produção |
-| `CONTEXTO_MERITO.md` | Contexto do projeto e estado atual |
 
 ---
 

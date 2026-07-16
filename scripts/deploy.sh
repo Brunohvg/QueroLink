@@ -33,10 +33,8 @@ source .env
 
 if [ "$ENV" = "production" ]; then
     [ -z "$DATABASE_URL" ] && error "DATABASE_URL é obrigatória em produção."
-    export SEED_ON_START=false
 elif [ "$ENV" = "staging" ]; then
     [ -z "$DATABASE_URL" ] && error "DATABASE_URL é obrigatória em staging."
-    export SEED_ON_START="${SEED_ON_START:-true}"
 fi
 
 # ── 4. Backup (produção) ───────────────────────────────────
