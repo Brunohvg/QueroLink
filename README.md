@@ -157,11 +157,12 @@ scripts/deploy.sh production
 
 ### Setup pós-deploy (1 vez)
 
-```bash
-# 1. Configurar rclone com Google Drive (para backup automático)
-docker exec -it <container-web> ./scripts/setup-rclone.sh
+1. Configure o rclone pelas variáveis descritas em [`docs/BACKUP_GDRIVE_RCLONE.md`](docs/BACKUP_GDRIVE_RCLONE.md).
+2. Reinicie `celery_worker` e `celery_beat`.
+3. Valide com `python manage.py backup_check` e `python manage.py backup_now` dentro do worker.
+4. Configure o webhook no painel do Pagar.me:
 
-# 2. Configurar webhook no painel do Pagar.me
+```text
 # URL: https://querolink.lojabibelo.com.br/api/webhooks/pagarme/<tenant_slug>/
 # Eventos: charge.paid, charge.payment_failed, charge.refunded, charge.chargedback
 # Para autenticação, configure usuário/senha no painel de configurações do tenant
@@ -182,7 +183,9 @@ docker exec -it <container-web> ./scripts/setup-rclone.sh
 
 O sistema faz backup diário do PostgreSQL para o Google Drive via **rclone**.
 
-**Guia completo:** [`docs/GOOGLE_DRIVE_CREDENTIALS.md`](docs/GOOGLE_DRIVE_CREDENTIALS.md)
+**Guia completo:** [`docs/BACKUP_GDRIVE_RCLONE.md`](docs/BACKUP_GDRIVE_RCLONE.md)
+
+Defina `RCLONE_CONFIG_GDRIVE_TOKEN` com o JSON inteiro gerado pelo rclone, incluindo o `refresh_token`. Defina também `GDRIVE_PATH`; o caminho recomendado para novas configurações é `merito-backups`.
 
 | Característica | Detalhe |
 |----------------|---------|
@@ -191,7 +194,7 @@ O sistema faz backup diário do PostgreSQL para o Google Drive via **rclone**.
 | Retenção Drive | 30 dias |
 | Retenção local | 2 dias |
 | Custo | R$ 0 (15 GB grátis Google Drive) |
-| Setup | 1 vez: `./scripts/setup-rclone.sh` (OAuth, 3 min) |
+| Setup | 1 vez: variáveis do rclone no `.env` |
 
 **Restaurar:** `./scripts/restore.sh latest` ou `./scripts/restore.sh 2026-06-29`
 
@@ -254,7 +257,8 @@ Dedup: eventos com mesmo `id` (ex: `evt_xxx`) são ignorados após o primeiro pr
 ├── manage.py
 ├── README.md
 └── docs/
-    └── GOOGLE_DRIVE_CREDENTIALS.md
+    ├── BACKUP_GDRIVE_RCLONE.md
+    └── GOOGLE_DRIVE_CREDENTIALS.md  # Redirecionamento legado
 ```
 
 ---
