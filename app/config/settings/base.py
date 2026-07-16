@@ -64,6 +64,7 @@ INSTALLED_APPS = [
     "app.apps.analytics",
     "app.apps.billing",
     "app.apps.freight",
+    "app.apps.receivables",
 
     'rest_framework',
     'rest_framework.authtoken',
@@ -220,6 +221,8 @@ REST_FRAMEWORK = {
     'DEFAULT_THROTTLE_RATES': {
         'user': '1000/hour',
         'anon': '100/hour',
+        'boleto_create': '30/hour',
+        'boleto_resend': '5/hour',
     },
     'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
 }
@@ -254,6 +257,7 @@ PLAN_FEATURES = {
         'export_contabil': False,
         'importacao_csv': False,
         'previa_fechamento': False,
+        'boletos': False,
     },
     'PRO': {
         'links_pagamento': True,
@@ -263,6 +267,7 @@ PLAN_FEATURES = {
         'export_contabil': True,
         'importacao_csv': True,
         'previa_fechamento': True,
+        'boletos': True,
     },
     'BUSINESS': {
         'links_pagamento': True,
@@ -272,6 +277,7 @@ PLAN_FEATURES = {
         'export_contabil': True,
         'importacao_csv': True,
         'previa_fechamento': True,
+        'boletos': True,
     },
 }
 

@@ -1,0 +1,59 @@
+{% extends 'mobile/base_mobile.html' %}
+{% load currency_filters %}
+{% block title %}Boletos - Merito{% endblock %}
+{% block content %}
+<div class="space-y-4 fade-up">
+  <div class="flex items-center justify-between gap-3">
+    <div>
+      <p class="text-[12px] text-gray-500">Venda faturada</p>
+      <h1 class="font-display text-[20px] font-bold text-gray-900">Boletos</h1>
+    </div>
+    {% if not feature_locked %}
+    <a href="{% url 'dashboard:mobile_boleto_novo' %}" class="btn-primary min-h-[44px] inline-flex items-center gap-2">Novo boleto</a>
+    {% endif %}
+  </div>
+
+  <nav class="grid grid-cols-2 bg-gray-100 p-1 rounded-xl" aria-label="Tipos de cobranca">
+    <a href="{% url 'dashboard:mobile_links' %}" class="min-h-[44px] flex items-center justify-center rounded-lg text-gray-600 font-semibold text-[13px]">Links</a>
+    <a href="{% url 'dashboard:mobile_boletos' %}" class="min-h-[44px] flex items-center justify-center rounded-lg bg-white text-brand-600 font-semibold text-[13px] shadow-sm">Boletos</a>
+  </nav>
+
+  {% if feature_locked %}
+  <div class="bg-white rounded-2xl card-shadow p-6 text-center">
+    <div class="w-12 h-12 mx-auto rounded-full bg-gray-100 flex items-center justify-center text-gray-500">
+      <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
+    </div>
+    <h2 class="font-semibold text-gray-900 mt-3">Boletos disponiveis no Pro</h2>
+    <p class="text-[13px] text-gray-500 mt-1">Fale com o gestor para liberar a emissao.</p>
+  </div>
+  {% else %}
+  <form method="get" class="space-y-3">
+    <input name="search" value="{{ search }}" placeholder="Buscar por cliente" class="w-full min-h-[44px] px-4 bg-white border border-gray-200 rounded-xl text-[14px]">
+    <div class="flex gap-2 overflow-x-auto pb-1">
+      <a href="?search={{ search|urlencode }}" class="px-4 min-h-[44px] inline-flex items-center rounded-full text-[12px] font-semibold whitespace-nowrap {% if not status_filter %}bg-brand-500 text-white{% else %}bg-white text-gray-600{% endif %}">Todos</a>
+      {% for value,label in status_choices %}{% if value != 'CANCELADO' and value != 'ESTORNADO' %}
+      <a href="?status={{ value }}&search={{ search|urlencode }}" class="px-4 min-h-[44px] inline-flex items-center rounded-full text-[12px] font-semibold whitespace-nowrap {% if status_filter == value %}bg-brand-500 text-white{% else %}bg-white text-gray-600{% endif %}">{{ label }}s</a>
+      {% endif %}{% endfor %}
+    </div>
+  </form>
+
+  <div class="space-y-3">
+    {% for item in boletos %}
+    <article class="bg-white rounded-2xl card-shadow p-4">
+      <div class="flex items-start justify-between gap-3">
+        <div class="min-w-0">
+          <h2 class="font-semibold text-[15px] text-gray-900 truncate">{{ item.payer_name }}</h2>
+          <p class="text-[12px] text-gray-500 mt-1">Vence {{ item.due_date|date:'d/m/Y' }}</p>
+        </div>
+        <span class="px-2.5 py-1 rounded-full text-[10px] font-semibold {% if item.status == 'PAGO' %}bg-emerald-50 text-emerald-700{% elif item.status == 'VENCIDO' or item.status == 'ESTORNADO' %}bg-red-50 text-red-700{% elif item.status == 'CANCELADO' %}bg-gray-100 text-gray-600{% else %}bg-amber-50 text-amber-700{% endif %}">{{ item.get_status_display }}</span>
+      </div>
+      <p class="font-display text-[22px] font-bold text-gray-900 mt-3">{{ item.amount_cents|brl }}</p>
+      {% if item.barcode %}<button type="button" onclick="navigator.clipboard.writeText('{{ item.barcode|escapejs }}');showToast('Linha digitavel copiada.','success')" class="mt-3 min-h-[44px] text-[12px] font-semibold text-brand-600">Copiar linha digitavel</button>{% endif %}
+    </article>
+    {% empty %}
+    <div class="bg-white rounded-2xl card-shadow p-8 text-center text-[13px] text-gray-500">Nenhum boleto encontrado.</div>
+    {% endfor %}
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

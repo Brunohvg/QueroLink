@@ -288,6 +288,17 @@ def mobile_home(request):
 
         from app.apps.accounts.models import is_working_day
         is_working_day_today = is_working_day(seller.tenant, today)
+        from app.apps.accounts.models import tenant_has_feature
+        boletos_enabled = tenant_has_feature(seller.tenant, 'boletos')
+        awaiting_boleto_count = 0
+        if boletos_enabled:
+            from app.apps.receivables.models import Boleto
+            awaiting_boleto_count = Boleto.objects.filter(
+                tenant=seller.tenant,
+                seller=seller,
+                status=Boleto.Status.PAGO,
+                launched_sale__isnull=True,
+            ).count()
 
         return render(request, 'mobile/home.html', {
             'seller': seller,
@@ -320,6 +331,8 @@ def mobile_home(request):
             'current_month': period.month if period else today.month,
             'period_uuid': str(period.uuid) if period else '',
             'is_working_day_today': is_working_day_today,
+            'boletos_enabled': boletos_enabled,
+            'awaiting_boleto_count': awaiting_boleto_count,
         })
     except Exception as e:
         logger.exception("Erro ao carregar mobile_home")
@@ -343,9 +356,30 @@ def mobile_lancar_venda(request):
     existing_sale = None
     last_amount = 0
     was_update = False
+    source_boleto = None
+    boleto_already_launched = False
+
+    boleto_uuid = request.POST.get('boleto_uuid') or request.GET.get('boleto')
+    if boleto_uuid:
+        from app.apps.receivables.models import Boleto
+        try:
+            source_boleto = Boleto.objects.select_related('launched_sale').get(
+                uuid=boleto_uuid,
+                tenant=seller.tenant,
+                seller=seller,
+                status=Boleto.Status.PAGO,
+            )
+            boleto_already_launched = source_boleto.launched_sale_id is not None
+        except (Boleto.DoesNotExist, ValueError):
+            source_boleto = None
+            error = 'Boleto pago nao encontrado ou sem acesso.'
 
     if request.method == 'POST':
         try:
+            if boleto_uuid and not source_boleto:
+                raise ValueError('Boleto pago nao encontrado ou sem acesso.')
+            if source_boleto and source_boleto.launched_sale_id:
+                raise ValueError('Este boleto ja foi lancado como venda.')
             amount_cents = int(request.POST.get('amount_cents', '0'))
             sale_date_str = request.POST.get('sale_date', '')
             notes = request.POST.get('notes', '').strip() or None
@@ -380,39 +414,61 @@ def mobile_lancar_venda(request):
                     'Procure o gestor para ajustar.'
                 )
 
-            existing = Sale.objects.filter(
-                seller=seller,
-                origin__in=Sale.COMMISSION_ORIGINS,
-                sale_date=sale_date,
-            ).first()
+            from django.db import transaction
+            with transaction.atomic():
+                if source_boleto:
+                    from app.apps.receivables.models import Boleto
+                    source_boleto = Boleto.objects.select_for_update().get(
+                        pk=source_boleto.pk,
+                    )
+                    if source_boleto.launched_sale_id:
+                        raise ValueError('Este boleto ja foi lancado como venda.')
 
-            if existing:
-                existing.amount = amount_cents
-                existing.notes = notes
-                existing.updated_by = request.user
-                existing.save()
-                log_action(
-                    request, 'sale.updated', instance=existing,
-                    changes={
-                        'sale_date': str(sale_date),
-                        'amount': amount_cents,
-                    },
-                )
-            else:
-                sale = Sale.objects.create(
-                    tenant=seller.tenant,
+                existing = Sale.objects.select_for_update().filter(
                     seller=seller,
-                    origin=Sale.Origin.MANUAL,
-                    amount=amount_cents,
+                    origin__in=Sale.COMMISSION_ORIGINS,
                     sale_date=sale_date,
-                    notes=notes,
-                    created_by=request.user,
-                )
-                log_action(
-                    request, 'sale.created', instance=sale,
-                )
-                from app.apps.commissions.services import ensure_seller_commission
-                ensure_seller_commission(seller, sale_date)
+                ).first()
+
+                if existing:
+                    if source_boleto:
+                        if hasattr(existing, 'boleto'):
+                            raise ValueError(
+                                'Ja existe outro boleto vinculado ao lancamento deste dia.'
+                            )
+                        existing.amount += amount_cents
+                        existing.notes = ' | '.join(filter(None, [existing.notes, notes]))[:255]
+                    else:
+                        existing.amount = amount_cents
+                        existing.notes = notes
+                    existing.updated_by = request.user
+                    existing.save()
+                    sale = existing
+                    log_action(
+                        request, 'sale.updated', instance=existing,
+                        changes={
+                            'sale_date': str(sale_date),
+                            'amount': existing.amount,
+                            'boleto_uuid': str(source_boleto.uuid) if source_boleto else '',
+                        },
+                    )
+                else:
+                    sale = Sale.objects.create(
+                        tenant=seller.tenant,
+                        seller=seller,
+                        origin=Sale.Origin.MANUAL,
+                        amount=amount_cents,
+                        sale_date=sale_date,
+                        notes=notes,
+                        created_by=request.user,
+                    )
+                    log_action(request, 'sale.created', instance=sale)
+                    from app.apps.commissions.services import ensure_seller_commission
+                    ensure_seller_commission(seller, sale_date)
+
+                if source_boleto:
+                    source_boleto.launched_sale = sale
+                    source_boleto.save(update_fields=['launched_sale', 'updated_at'])
 
             success = True
             last_amount = amount_cents
@@ -443,6 +499,14 @@ def mobile_lancar_venda(request):
             except (ValueError, Exception):
                 pass
 
+    prefill_amount = 0
+    prefill_date = ''
+    prefill_notes = ''
+    if source_boleto and not boleto_already_launched:
+        prefill_amount = source_boleto.paid_amount_cents or source_boleto.amount_cents
+        prefill_date = timezone.localtime(source_boleto.paid_at).date().isoformat()
+        prefill_notes = f'Boleto {source_boleto.uuid} - {source_boleto.payer_name}'
+
     today = timezone.localdate()
     reference_date = existing_sale.sale_date if existing_sale else today
     from app.apps.commissions.services import resolve_period_for_date
@@ -460,6 +524,11 @@ def mobile_lancar_venda(request):
         'was_update': was_update if success else False,
         'is_editable': is_editable,
         'seller_commission_status': sc_status,
+        'source_boleto': source_boleto,
+        'boleto_already_launched': boleto_already_launched,
+        'prefill_amount': prefill_amount,
+        'prefill_date': prefill_date,
+        'prefill_notes': prefill_notes,
     })
 
 

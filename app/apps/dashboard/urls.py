@@ -1,5 +1,6 @@
 from django.urls import path
 from . import views, mobile_views, desktop_views
+from app.apps.receivables import views as receivable_views
 
 app_name = 'dashboard'
 
@@ -30,6 +31,11 @@ urlpatterns = [
     path('gestor/links/<uuid:order_uuid>/verificar-pagamento/', desktop_views.gestor_link_verificar_pagamento, name='gestor_link_verificar_pagamento'),
     path('gestor/links/<uuid:order_uuid>/reenviar-vendedor/', desktop_views.gestor_link_reenviar_vendedor, name='gestor_link_reenviar_vendedor'),
     path('gestor/links/<uuid:order_uuid>/estornar/', desktop_views.gestor_link_estornar, name='gestor_link_estornar'),
+    path('gestor/boletos/', receivable_views.manager_boleto_list, name='gestor_boletos'),
+    path('gestor/boletos/novo/', receivable_views.manager_boleto_new, name='gestor_boleto_novo'),
+    path('gestor/boletos/<uuid:boleto_uuid>/cancelar/', receivable_views.manager_boleto_cancel, name='gestor_boleto_cancelar'),
+    path('gestor/boletos/<uuid:boleto_uuid>/reenviar/', receivable_views.manager_boleto_resend, name='gestor_boleto_reenviar'),
+    path('boletos/cnpj/<str:cnpj>/', receivable_views.cnpj_lookup, name='boleto_cnpj_lookup'),
 
     path('financeiro/fila/', desktop_views.financeiro_fila, name='financeiro_fila'),
     path('financeiro/historico/', desktop_views.financeiro_historico, name='financeiro_historico'),
@@ -47,4 +53,6 @@ urlpatterns += [
     path('mobile/ranking/', mobile_views.mobile_ranking, name='mobile_ranking'),
     path('mobile/perfil/', mobile_views.mobile_perfil, name='mobile_perfil'),
     path('mobile/frete/', mobile_views.mobile_frete, name='mobile_frete'),
+    path('mobile/boletos/', receivable_views.mobile_boleto_list, name='mobile_boletos'),
+    path('mobile/boletos/novo/', receivable_views.mobile_boleto_new, name='mobile_boleto_novo'),
 ]

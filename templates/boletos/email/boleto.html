@@ -1,0 +1,18 @@
+<!doctype html>
+<html lang="pt-BR">
+<body style="margin:0;background:#f5f7fa;font-family:Arial,sans-serif;color:#111827">
+  <div style="max-width:600px;margin:0 auto;padding:32px 16px">
+    <div style="background:#fff;border:1px solid #e5e7eb;border-radius:8px;padding:28px">
+      <p style="margin:0 0 8px;color:#1263ff;font-size:13px;font-weight:700">MERITO BY VIDALYS</p>
+      <h1 style="margin:0 0 20px;font-size:24px">{% if kind == 'due_today' %}Seu boleto vence hoje{% elif kind == 'due_tomorrow' %}Seu boleto vence amanha{% else %}Boleto emitido{% endif %}</h1>
+      <p>Ola, {{ boleto.payer_name }}.</p>
+      <div style="background:#f8fafc;border-radius:8px;padding:16px;margin:20px 0">
+        <p style="margin:0 0 8px"><strong>Valor:</strong> {{ amount }}</p>
+        <p style="margin:0"><strong>Vencimento:</strong> {{ boleto.due_date|date:'d/m/Y' }}</p>
+      </div>
+      {% if boleto.boleto_url %}<p><a href="{{ boleto.boleto_url }}" style="display:inline-block;background:#1263ff;color:#fff;text-decoration:none;padding:12px 18px;border-radius:8px;font-weight:700">Visualizar boleto</a></p>{% endif %}
+      {% if boleto.barcode %}<p style="margin-top:24px;font-size:13px;color:#4b5563">Linha digitavel</p><p style="word-break:break-all;font-family:monospace;background:#f3f4f6;padding:12px;border-radius:8px">{{ boleto.barcode }}</p>{% endif %}
+    </div>
+  </div>
+</body>
+</html>

@@ -82,6 +82,14 @@ CELERY_BEAT_SCHEDULE = {
         'task': 'app.apps.notifications.tasks.send_lifecycle_emails',
         'schedule': crontab(hour=9, minute=0),
     },
+    'process-boleto-daily-notifications': {
+        'task': 'app.apps.receivables.tasks.process_boleto_daily_notifications',
+        'schedule': crontab(hour=9, minute=0),
+    },
+    'send-boleto-manager-digest': {
+        'task': 'app.apps.receivables.tasks.send_boleto_manager_digest',
+        'schedule': crontab(hour=8, minute=0),
+    },
 }
 
 # E-mail em producao — respeita env var, default SMTP

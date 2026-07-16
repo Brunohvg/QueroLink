@@ -1,0 +1,70 @@
+{% extends 'mobile/base_mobile.html' %}
+{% load currency_filters %}
+{% block title %}Novo boleto - Merito{% endblock %}
+{% block content %}
+<div class="space-y-4 fade-up" x-data="boletoWizard()">
+  <div class="flex items-center gap-3">
+    <a href="{% url 'dashboard:mobile_boletos' %}" class="w-11 h-11 bg-white rounded-xl card-shadow flex items-center justify-center text-gray-500" aria-label="Voltar">
+      <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
+    </a>
+    <div><p class="text-[12px] text-gray-500">Venda faturada</p><h1 class="font-display text-[20px] font-bold">Novo boleto</h1></div>
+  </div>
+
+  {% if feature_locked %}
+  <div class="bg-white rounded-2xl card-shadow p-6 text-center"><p class="font-semibold">Recurso disponivel nos planos Pro e Business.</p></div>
+  {% elif boleto %}
+  <div class="bg-white rounded-2xl card-shadow p-5 space-y-4">
+    <div class="w-14 h-14 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center mx-auto">
+      <svg class="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+    </div>
+    <div class="text-center"><h2 class="font-display text-[20px] font-bold">Boleto emitido</h2><p class="text-[13px] text-gray-500 mt-1">{{ boleto.payer_name }} - {{ boleto.amount_cents|brl }}</p></div>
+    {% if not boleto.payer_email %}<p class="bg-amber-50 text-amber-700 rounded-xl p-3 text-[12px]">Comprador sem e-mail. Envie o link manualmente.</p>{% endif %}
+    {% if boleto.barcode %}<div><p class="text-[11px] text-gray-500 mb-1">Linha digitavel</p><p class="bg-gray-50 rounded-xl p-3 text-[12px] break-all font-mono">{{ boleto.barcode }}</p><button type="button" onclick="navigator.clipboard.writeText('{{ boleto.barcode|escapejs }}');showToast('Linha digitavel copiada.','success')" class="w-full min-h-[44px] mt-2 text-brand-600 font-semibold">Copiar linha digitavel</button></div>{% endif %}
+    <div class="grid grid-cols-1 gap-2">
+      <a href="https://wa.me/?text={{ boleto.payer_name|urlencode }}%20-%20{{ boleto.boleto_url|urlencode }}" target="_blank" rel="noopener" class="min-h-[44px] rounded-xl bg-emerald-600 text-white font-semibold flex items-center justify-center">Enviar por WhatsApp</a>
+      {% if boleto.boleto_url %}<a href="{{ boleto.boleto_url }}" target="_blank" rel="noopener" class="min-h-[44px] rounded-xl border border-gray-200 font-semibold flex items-center justify-center">Ver PDF</a>{% endif %}
+    </div>
+  </div>
+  {% else %}
+  {% if serializer.errors %}<div class="bg-red-50 border border-red-100 text-red-700 rounded-xl p-3 text-[12px]">Confira os campos informados. {{ serializer.errors }}</div>{% endif %}
+  <div class="flex items-center gap-2" aria-label="Etapas">
+    <span class="h-2 flex-1 rounded-full" :class="step >= 1 ? 'bg-brand-500' : 'bg-gray-200'"></span>
+    <span class="h-2 flex-1 rounded-full" :class="step >= 2 ? 'bg-brand-500' : 'bg-gray-200'"></span>
+  </div>
+  <form method="post" class="space-y-4" x-ref="form">
+    {% csrf_token %}
+    <section x-show="step === 1" class="bg-white rounded-2xl card-shadow p-4 space-y-3">
+      <h2 class="font-semibold text-[15px]">Dados do comprador</h2>
+      <div class="grid grid-cols-2 gap-2">
+        <select name="payer_document_type" x-model="documentType" class="min-h-[44px] px-3 bg-gray-50 border border-gray-200 rounded-xl"><option>CPF</option><option>CNPJ</option></select>
+        <input name="payer_document" x-ref="document" value="{{ request.POST.payer_document }}" inputmode="numeric" placeholder="CPF ou CNPJ" class="min-h-[44px] px-3 bg-gray-50 border border-gray-200 rounded-xl" @blur="lookupCnpj()" required>
+      </div>
+      <p x-show="loading" class="text-[12px] text-brand-600">Consultando CNPJ...</p>
+      <input name="payer_name" x-ref="name" value="{{ request.POST.payer_name }}" placeholder="Nome ou razao social" class="w-full min-h-[44px] px-3 bg-gray-50 border border-gray-200 rounded-xl" required>
+      <div class="grid grid-cols-1 gap-2"><input type="email" name="payer_email" value="{{ request.POST.payer_email }}" placeholder="E-mail (opcional)" class="min-h-[44px] px-3 bg-gray-50 border border-gray-200 rounded-xl"><input name="payer_phone" value="{{ request.POST.payer_phone }}" inputmode="tel" placeholder="Telefone com DDD" class="min-h-[44px] px-3 bg-gray-50 border border-gray-200 rounded-xl" required></div>
+      <div class="grid grid-cols-2 gap-2"><input name="payer_zip_code" x-ref="zip" value="{{ request.POST.payer_zip_code }}" inputmode="numeric" placeholder="CEP" class="min-h-[44px] px-3 bg-gray-50 border border-gray-200 rounded-xl" required><input name="payer_state" x-ref="state" value="{{ request.POST.payer_state }}" maxlength="2" placeholder="UF" class="min-h-[44px] px-3 bg-gray-50 border border-gray-200 rounded-xl uppercase" required></div>
+      <input name="payer_street" x-ref="street" value="{{ request.POST.payer_street }}" placeholder="Logradouro" class="w-full min-h-[44px] px-3 bg-gray-50 border border-gray-200 rounded-xl" required>
+      <div class="grid grid-cols-2 gap-2"><input name="payer_number" x-ref="number" value="{{ request.POST.payer_number }}" placeholder="Numero" class="min-h-[44px] px-3 bg-gray-50 border border-gray-200 rounded-xl" required><input name="payer_complement" x-ref="complement" value="{{ request.POST.payer_complement }}" placeholder="Complemento" class="min-h-[44px] px-3 bg-gray-50 border border-gray-200 rounded-xl"></div>
+      <input name="payer_neighborhood" x-ref="neighborhood" value="{{ request.POST.payer_neighborhood }}" placeholder="Bairro" class="w-full min-h-[44px] px-3 bg-gray-50 border border-gray-200 rounded-xl" required>
+      <input name="payer_city" x-ref="city" value="{{ request.POST.payer_city }}" placeholder="Cidade" class="w-full min-h-[44px] px-3 bg-gray-50 border border-gray-200 rounded-xl" required>
+      <button type="button" @click="step=2;window.scrollTo(0,0)" class="btn-primary w-full min-h-[44px]">Continuar</button>
+    </section>
+    <section x-show="step === 2" x-cloak class="bg-white rounded-2xl card-shadow p-4 space-y-3">
+      <h2 class="font-semibold text-[15px]">Cobranca</h2>
+      <label class="block text-[11px] font-semibold text-gray-500">Valor</label>
+      <input type="text" x-ref="amountDisplay" @input="formatAmount()" inputmode="numeric" placeholder="R$ 0,00" class="w-full min-h-[52px] px-4 bg-gray-50 border border-gray-200 rounded-xl text-[20px] font-bold" required>
+      <input type="hidden" name="amount_cents" x-ref="amount" value="{{ request.POST.amount_cents|default:'0' }}">
+      <label class="block text-[11px] font-semibold text-gray-500">Vencimento</label>
+      <input type="date" name="due_date" value="{{ request.POST.due_date }}" min="{{ min_due_date }}" max="{{ max_due_date }}" class="w-full min-h-[44px] px-3 bg-gray-50 border border-gray-200 rounded-xl" required>
+      <label class="block text-[11px] font-semibold text-gray-500">Instrucoes</label>
+      <textarea name="instructions" maxlength="256" rows="3" class="w-full px-3 py-3 bg-gray-50 border border-gray-200 rounded-xl">{{ request.POST.instructions|default:default_instructions }}</textarea>
+      <textarea name="notes" maxlength="255" rows="2" placeholder="Observacao interna (opcional)" class="w-full px-3 py-3 bg-gray-50 border border-gray-200 rounded-xl">{{ request.POST.notes }}</textarea>
+      <div class="grid grid-cols-2 gap-2"><button type="button" @click="step=1" class="min-h-[44px] rounded-xl border border-gray-200 font-semibold">Voltar</button><button type="submit" class="btn-primary min-h-[44px]">Emitir boleto</button></div>
+    </section>
+  </form>
+  {% endif %}
+</div>
+<script>
+function boletoWizard(){return{step:{% if serializer.errors %}2{% else %}1{% endif %},documentType:'{{ request.POST.payer_document_type|default:"CPF" }}',loading:false,init(){var cents=parseInt(this.$refs.amount.value||'0',10);if(cents>0)this.$refs.amountDisplay.value=Math.floor(cents/100)+','+String(cents%100).padStart(2,'0');},formatAmount(){var raw=this.$refs.amountDisplay.value.replace(/\D/g,'');this.$refs.amount.value=raw?parseInt(raw,10):0;this.$refs.amountDisplay.value=raw?(Math.floor(parseInt(raw,10)/100)+','+String(parseInt(raw,10)%100).padStart(2,'0')):'';},lookupCnpj(){if(this.documentType!=='CNPJ')return;var digits=this.$refs.document.value.replace(/\D/g,'');if(digits.length!==14)return;this.loading=true;var self=this;fetch('/dashboard/boletos/cnpj/'+digits+'/').then(function(r){return r.json()}).then(function(d){if(d.detail)throw new Error(d.detail);self.$refs.name.value=d.payer_name||'';self.$refs.zip.value=d.payer_zip_code||'';self.$refs.street.value=d.payer_street||'';self.$refs.number.value=d.payer_number||'';self.$refs.complement.value=d.payer_complement||'';self.$refs.neighborhood.value=d.payer_neighborhood||'';self.$refs.city.value=d.payer_city||'';self.$refs.state.value=d.payer_state||'';}).catch(function(e){showToast(e.message,'warning')}).finally(function(){self.loading=false})}}}
+</script>
+{% endblock %}

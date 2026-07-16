@@ -6,7 +6,7 @@
   <div class="sticky top-0 z-10 -mx-6 px-6 py-4 bg-gray-50/90 backdrop-blur-lg border-b border-gray-200/60 mb-6">
     <div class="flex items-center justify-between">
       <div>
-        <h1 class="font-display text-[22px] font-bold text-gray-900 tracking-tight">Links de Pagamento</h1>
+        <h1 class="font-display text-[22px] font-bold text-gray-900 tracking-tight">Cobrancas</h1>
         <p class="text-[13px] text-gray-500 mt-0.5" x-text="filteredOrders.length + ' de ' + orders.length + ' link' + (orders.length !== 1 ? 's' : '')"></p>
       </div>
       <div class="flex items-center gap-2">
@@ -17,6 +17,11 @@
       </div>
     </div>
   </div>
+
+  <nav class="inline-flex bg-gray-100 p-1 rounded-lg mb-5" aria-label="Tipos de cobranca">
+    <a href="{% url 'dashboard:gestor_links' %}" class="min-h-[40px] px-5 flex items-center rounded-md bg-white text-brand-600 font-semibold text-[13px] shadow-sm">Links de pagamento</a>
+    <a href="{% url 'dashboard:gestor_boletos' %}" class="min-h-[40px] px-5 flex items-center rounded-md text-gray-600 font-semibold text-[13px]">Boletos</a>
+  </nav>
 
   <div class="bg-white rounded-2xl border border-gray-100 shadow-[0_1px_3px_-1px_rgba(0,0,0,0.04),0_4px_16px_-4px_rgba(67,97,238,0.06)] p-5 mb-6">
     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">

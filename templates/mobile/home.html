@@ -149,13 +149,20 @@
   </div>
   {% endif %}
 
+  {% if awaiting_boleto_count %}
+  <a href="{% url 'dashboard:mobile_boletos' %}?status=PAGO" class="flex items-center justify-between gap-3 bg-amber-50 border border-amber-100 rounded-2xl px-4 py-3 min-h-[52px]">
+    <div><p class="text-[13px] font-semibold text-amber-800">Aguardando lancamento</p><p class="text-[11px] text-amber-700">{{ awaiting_boleto_count }} boleto{{ awaiting_boleto_count|pluralize }} pago{{ awaiting_boleto_count|pluralize }}.</p></div>
+    <svg class="w-5 h-5 text-amber-700" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+  </a>
+  {% endif %}
+
   <div class="grid grid-cols-2 gap-2.5">
-    <a href="{% url 'dashboard:mobile_links' %}"
-       class="bg-white rounded-2xl p-4 flex flex-col items-center gap-2 tap-target active:scale-[0.97] transition-all text-center shadow-md shadow-gray-200/60 hover:shadow-lg active:shadow-sm active:translate-y-0.5">
+    <a href="{% url 'dashboard:mobile_links' %}" class="relative bg-white rounded-2xl p-4 flex flex-col items-center gap-2 tap-target active:scale-[0.97] transition-all text-center shadow-md shadow-gray-200/60 hover:shadow-lg active:shadow-sm active:translate-y-0.5">
+      {% if awaiting_boleto_count %}<span class="absolute top-2 right-2 min-w-5 h-5 px-1 rounded-full bg-red-500 text-white text-[10px] font-bold flex items-center justify-center">{{ awaiting_boleto_count }}</span>{% endif %}
       <div class="w-12 h-12 rounded-2xl bg-gradient-to-br from-emerald-100 to-emerald-50 flex items-center justify-center">
         <svg class="w-6 h-6 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"/></svg>
       </div>
-      <span class="text-[12px] font-semibold text-gray-700">Links</span>
+      <span class="text-[12px] font-semibold text-gray-700">Cobrancas</span>
     </a>
 
     <a href="{% url 'dashboard:mobile_frete' %}"

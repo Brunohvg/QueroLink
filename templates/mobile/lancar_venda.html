@@ -41,6 +41,17 @@
   <script>showToast("{{ error|escapejs }}", "error");</script>
   {% endif %}
 
+  {% if boleto_already_launched %}
+  <div class="bg-emerald-50 border border-emerald-100 text-emerald-800 px-4 py-4 rounded-2xl text-[13px]">
+    Este boleto ja foi lancado. Venda vinculada: {{ source_boleto.launched_sale_id }}.
+  </div>
+  {% elif source_boleto %}
+  <div class="bg-brand-50 border border-brand-100 text-brand-800 px-4 py-4 rounded-2xl text-[13px]">
+    <p class="font-semibold">Lancamento do boleto pago</p>
+    <p class="text-[12px] mt-1">O valor e a data do pagamento foram preenchidos para manter a competencia correta.</p>
+  </div>
+  {% endif %}
+
   {% if not is_editable %}
   <div class="bg-amber-50/80 border border-amber-100 text-amber-700 px-4 py-3 rounded-2xl text-[13px] flex items-start gap-2.5">
     <svg class="w-4 h-4 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"/></svg>
@@ -60,6 +71,7 @@
 
   <form method="post" action="{% url 'dashboard:mobile_lancar_venda' %}" class="space-y-4" x-ref="form">
     {% csrf_token %}
+    {% if source_boleto %}<input type="hidden" name="boleto_uuid" value="{{ source_boleto.uuid }}">{% endif %}
 
     <div class="bg-white rounded-2xl card-shadow overflow-hidden">
       <div class="px-5 pt-5 pb-4">
@@ -75,7 +87,7 @@
                  placeholder="0,00" style="font-size:24px!important"
                  {% if existing_sale %}value="{{ existing_sale.amount|default:0 }}"{% endif %}>
         </div>
-        <input type="hidden" name="amount_cents" x-ref="amountCents" value="{{ existing_sale.amount|default:0 }}">
+        <input type="hidden" name="amount_cents" x-ref="amountCents" value="{% if prefill_amount %}{{ prefill_amount }}{% else %}{{ existing_sale.amount|default:0 }}{% endif %}">
       </div>
 
       <div class="border-t border-gray-100 px-5 py-4">
@@ -83,10 +95,11 @@
           <label for="sale_date" class="block text-[11px] font-semibold text-gray-400 uppercase tracking-wider mb-2">Data do Lancamento</label>
           <input type="date" id="sale_date" name="sale_date" x-ref="saleDate"
                  class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-[14px] outline-none transition-all focus:border-brand-400 focus:ring-2 focus:ring-brand-100 appearance-none"
-                 value="{% if existing_sale %}{{ existing_sale.sale_date|date:'Y-m-d' }}{% else %}{% now 'Y-m-d' %}{% endif %}"
+                 value="{% if prefill_date %}{{ prefill_date }}{% elif existing_sale %}{{ existing_sale.sale_date|date:'Y-m-d' }}{% else %}{% now 'Y-m-d' %}{% endif %}"
                  max="{% now 'Y-m-d' %}">
         </div>
       </div>
+      {% if source_boleto %}<div class="border-t border-gray-100 px-5 py-4"><label class="block text-[11px] font-semibold text-gray-400 uppercase mb-2">Observacao</label><textarea name="notes" maxlength="255" rows="2" class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl">{{ prefill_notes }}</textarea></div>{% endif %}
     </div>
 
     {% if is_editable %}
@@ -104,7 +117,7 @@
 <script>
 function lancarVenda() {
     return {
-        amountCents: {{ existing_sale.amount|default:0 }},
+        amountCents: {% if prefill_amount %}{{ prefill_amount }}{% else %}{{ existing_sale.amount|default:0 }}{% endif %},
         lastAmount: {{ request.session.last_venda_amount|default:0 }},
         init() {
             if (this.amountCents > 0) {

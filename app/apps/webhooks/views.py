@@ -191,6 +191,17 @@ def _pagarme_business_payload_belongs_to_tenant(payload, tenant):
     ).exists():
         return True
 
+    from app.apps.receivables.models import Boleto
+    boleto_uuid = order_metadata.get('boleto_uuid') or metadata.get('boleto_uuid')
+    if boleto_uuid and Boleto.objects.filter(
+        tenant=tenant, uuid=boleto_uuid,
+    ).exists():
+        return True
+    if charge_ids and Boleto.objects.filter(
+        tenant=tenant, gateway_charge_id__in=charge_ids,
+    ).exists():
+        return True
+
     return False
 
 

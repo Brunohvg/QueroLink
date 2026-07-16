@@ -7,8 +7,13 @@
        class="w-10 h-10 bg-white rounded-xl card-shadow flex items-center justify-center tap-target text-gray-400 hover:text-brand-500 transition-all active:scale-[0.95]">
       <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
     </a>
-    <h1 class="font-display text-[20px] font-bold text-gray-900">Meus Links</h1>
+    <h1 class="font-display text-[20px] font-bold text-gray-900">Cobrancas</h1>
   </div>
+
+  <nav class="grid grid-cols-2 bg-gray-100 p-1 rounded-xl" aria-label="Tipos de cobranca">
+    <a href="{% url 'dashboard:mobile_links' %}" class="min-h-[44px] flex items-center justify-center rounded-lg bg-white text-brand-600 font-semibold text-[13px] shadow-sm">Links</a>
+    <a href="{% url 'dashboard:mobile_boletos' %}" class="min-h-[44px] flex items-center justify-center rounded-lg text-gray-600 font-semibold text-[13px]">Boletos</a>
+  </nav>
 
   <div class="bg-white rounded-2xl p-4 card-shadow">
     <div class="flex gap-2">

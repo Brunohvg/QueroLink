@@ -27,6 +27,56 @@ def _skip_foreign_event(event, reason):
 VALID_PAYMENT_METHODS = {'credit_card', 'pix', 'boleto', 'unknown'}
 
 
+def _find_boleto_for_payload(event):
+    if not event.tenant_id:
+        return None
+    from app.apps.receivables.models import Boleto
+    from app.apps.receivables.providers import get_provider
+
+    charge_id = get_provider(event.tenant).match_webhook_charge(event.payload)
+    data = event.payload.get('data') or {}
+    if not charge_id and isinstance(data, dict):
+        if str(event.payload.get('type') or '').startswith('order.'):
+            charges = data.get('charges') or []
+            charge_id = str(charges[0].get('id') or '') if charges else ''
+        else:
+            charge_id = str(data.get('id') or '')
+    if not charge_id:
+        return None
+    return Boleto.objects.select_related('tenant', 'seller').filter(
+        tenant=event.tenant,
+        gateway_charge_id=charge_id,
+    ).first()
+
+
+def _process_boleto_event(event, event_type, data):
+    boleto = _find_boleto_for_payload(event)
+    if not boleto:
+        return False
+    from app.apps.receivables.services import mark_paid, mark_refunded
+
+    if event_type in ('order.paid', 'charge.paid'):
+        charge = data
+        if event_type == 'order.paid':
+            charges = data.get('charges') or []
+            charge = charges[0] if charges else {}
+        mark_paid(
+            boleto,
+            charge.get('paid_amount') or charge.get('amount') or boleto.amount_cents,
+            charge.get('paid_at') or data.get('paid_at'),
+        )
+    elif event_type == 'charge.refunded':
+        mark_refunded(boleto)
+    else:
+        return False
+
+    event.processed = True
+    event.status = WebhookEvent.Status.PROCESSED
+    event.processed_at = timezone.now()
+    event.save(update_fields=['processed', 'status', 'processed_at'])
+    return True
+
+
 def _normalize_payment_method(raw_method: str) -> str:
     return normalize_payment_method(raw_method)
 
@@ -88,6 +138,11 @@ def process_pagarme_webhook(event_id):
         event_type = payload.get('type')
         data = payload.get('data', {})
         logger.info("Processing webhook event %s type=%s", event_id, event_type)
+
+        if event_type in ('order.paid', 'charge.paid', 'charge.refunded'):
+            if _process_boleto_event(event, event_type, data):
+                logger.info('Boleto processado pelo webhook event=%s', event_id)
+                return
 
         if event_type in ('order.paid', 'charge.paid', 'payment-link.finished'):
             # O servico faz apenas persistencia financeira dentro da transacao.
