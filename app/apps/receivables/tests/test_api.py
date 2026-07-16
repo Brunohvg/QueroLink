@@ -1,5 +1,8 @@
 from unittest.mock import patch
+from tempfile import TemporaryDirectory
 
+from django.core.files.uploadedfile import SimpleUploadedFile
+from django.test import override_settings
 from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APITestCase
@@ -77,3 +80,28 @@ class BoletoApiScopeTests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data['pagos_mes_cents'], 15100)
         self.assertEqual(response.data['aguardando_lancamento'], 1)
+
+    def test_seller_cannot_upload_invoice_to_other_boleto(self):
+        self.client.force_authenticate(self.seller_user)
+        response = self.client.post(
+            reverse('api-boleto-invoice', args=[self.other.uuid]),
+            {'invoice_pdf': SimpleUploadedFile(
+                'nota.pdf', b'%PDF-1.4 test', 'application/pdf',
+            )},
+            format='multipart',
+        )
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+
+    def test_seller_uploads_invoice_to_own_boleto(self):
+        self.client.force_authenticate(self.seller_user)
+        with TemporaryDirectory() as media_root, override_settings(MEDIA_ROOT=media_root):
+            response = self.client.post(
+                reverse('api-boleto-invoice', args=[self.mine.uuid]),
+                {'invoice_xml': SimpleUploadedFile(
+                    'nota.xml', b'<?xml version="1.0"?><nfe/>', 'application/xml',
+                )},
+                format='multipart',
+            )
+            self.assertEqual(response.status_code, status.HTTP_200_OK)
+            self.mine.refresh_from_db()
+            self.assertTrue(self.mine.invoice_xml.name.endswith('.xml'))

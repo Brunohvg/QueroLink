@@ -2,7 +2,7 @@ Ola, {{ boleto.payer_name }}.
 
 Esta cobranca foi emitida por {{ boleto.tenant.company_name }}.
 
-{% if kind == 'due_today' %}Seu boleto vence hoje.{% elif kind == 'due_tomorrow' %}Seu boleto vence amanha.{% else %}Seu boleto foi emitido.{% endif %}
+{% if kind == 'due_today' %}Seu boleto vence hoje.{% elif kind == 'due_tomorrow' %}Seu boleto vence amanha.{% elif kind == 'invoice' %}A nota fiscal desta cobranca segue anexada.{% else %}Seu boleto foi emitido.{% endif %}
 
 Valor: {{ amount }}
 Vencimento: {{ boleto.due_date|date:'d/m/Y' }}

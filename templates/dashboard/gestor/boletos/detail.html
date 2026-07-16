@@ -35,5 +35,24 @@
     <div class="surface-card"><h2 class="font-semibold mb-3">Pagador</h2><p class="font-medium">{{ boleto.payer_name }}</p><p class="text-[13px] text-gray-500 mt-1">{{ boleto.payer_document }}</p><p class="text-[13px] text-gray-500">{{ boleto.payer_email|default:'Sem e-mail' }}</p><p class="text-[13px] text-gray-500">{{ boleto.payer_phone }}</p></div>
     <div class="surface-card"><h2 class="font-semibold mb-3">Endereco</h2><p class="text-[13px] text-gray-700">{{ boleto.payer_street }}, {{ boleto.payer_number }}{% if boleto.payer_complement %} - {{ boleto.payer_complement }}{% endif %}</p><p class="text-[13px] text-gray-500 mt-1">{{ boleto.payer_neighborhood }} - {{ boleto.payer_city }}/{{ boleto.payer_state }}</p><p class="text-[13px] text-gray-500">CEP {{ boleto.payer_zip_code }}</p></div>
   </section>
+
+  <section class="bg-white border border-gray-100 rounded-lg p-5">
+    <div class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 mb-4">
+      <div><h2 class="font-semibold">Nota fiscal</h2><p class="text-[12px] text-gray-500 mt-0.5">Anexe o PDF e, quando disponivel, o XML da nota.</p></div>
+      {% if boleto.invoice_uploaded_at %}<p class="text-[12px] text-gray-500">Atualizada em {{ boleto.invoice_uploaded_at|date:'d/m/Y H:i' }}</p>{% endif %}
+    </div>
+    {% if invoice_error %}<p class="mb-4 px-3 py-2 rounded-lg bg-red-50 text-red-700 text-[13px]">{{ invoice_error }}</p>{% endif %}
+    <div class="flex flex-wrap gap-2 mb-4">
+      {% if boleto.invoice_pdf %}<a href="{% url 'dashboard:gestor_boleto_nota_fiscal_download' boleto.uuid 'pdf' %}" class="min-h-[40px] px-4 inline-flex items-center rounded-lg border border-gray-200 font-semibold text-[13px]">Baixar PDF anexado</a>{% endif %}
+      {% if boleto.invoice_xml %}<a href="{% url 'dashboard:gestor_boleto_nota_fiscal_download' boleto.uuid 'xml' %}" class="min-h-[40px] px-4 inline-flex items-center rounded-lg border border-gray-200 font-semibold text-[13px]">Baixar XML anexado</a>{% endif %}
+    </div>
+    <form method="post" enctype="multipart/form-data" action="{% url 'dashboard:gestor_boleto_nota_fiscal' boleto.uuid %}" class="grid sm:grid-cols-2 gap-3">
+      {% csrf_token %}
+      <label class="text-[12px] font-medium text-gray-700">PDF da nota (ate 10 MB)<input type="file" name="invoice_pdf" accept="application/pdf,.pdf" class="mt-1.5 block w-full text-[13px] border border-gray-200 rounded-lg p-2"></label>
+      <label class="text-[12px] font-medium text-gray-700">XML da nota (ate 2 MB)<input type="file" name="invoice_xml" accept="application/xml,text/xml,.xml" class="mt-1.5 block w-full text-[13px] border border-gray-200 rounded-lg p-2"></label>
+      <label class="sm:col-span-2 min-h-[44px] inline-flex items-center gap-2 text-[13px] text-gray-700"><input type="checkbox" name="send_email" value="1" {% if boleto.payer_email %}checked{% else %}disabled{% endif %} class="w-4 h-4">Enviar ao comprador por e-mail apos anexar{% if not boleto.payer_email %} (comprador sem e-mail){% endif %}</label>
+      <div class="sm:col-span-2"><button type="submit" class="min-h-[44px] px-5 rounded-lg bg-brand-500 text-white font-semibold text-[13px]">Salvar nota fiscal</button></div>
+    </form>
+  </section>
 </div>
 {% endblock %}

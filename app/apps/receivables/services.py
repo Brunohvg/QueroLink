@@ -1,5 +1,6 @@
 import logging
 from datetime import datetime
+from pathlib import Path
 
 import requests
 from django.core.cache import cache
@@ -126,6 +127,68 @@ def cancel_boleto(boleto, user):
             object_id=str(locked.uuid),
             changes={'status': Boleto.Status.CANCELADO},
         )
+    return locked
+
+
+def _validate_invoice_file(upload, kind):
+    limits = {'pdf': 10 * 1024 * 1024, 'xml': 2 * 1024 * 1024}
+    allowed_types = {
+        'pdf': {'application/pdf', 'application/octet-stream'},
+        'xml': {'application/xml', 'text/xml', 'application/octet-stream'},
+    }
+    extension = Path(upload.name or '').suffix.lower()
+    if extension != f'.{kind}':
+        raise BoletoServiceError(f'O arquivo {kind.upper()} possui extensao invalida.')
+    if upload.size > limits[kind]:
+        limit_mb = limits[kind] // (1024 * 1024)
+        raise BoletoServiceError(
+            f'O arquivo {kind.upper()} deve ter no maximo {limit_mb} MB.'
+        )
+    content_type = (getattr(upload, 'content_type', '') or '').lower()
+    if content_type not in allowed_types[kind]:
+        raise BoletoServiceError(f'O arquivo {kind.upper()} possui tipo invalido.')
+    signature = upload.read(8)
+    upload.seek(0)
+    if kind == 'pdf' and not signature.startswith(b'%PDF-'):
+        raise BoletoServiceError('O arquivo informado nao e um PDF valido.')
+    if kind == 'xml' and not signature.lstrip().startswith(b'<'):
+        raise BoletoServiceError('O arquivo informado nao e um XML valido.')
+
+
+def save_invoice_files(boleto, user, pdf=None, xml=None):
+    if not pdf and not xml:
+        raise BoletoServiceError('Selecione ao menos um arquivo PDF ou XML.')
+    if pdf:
+        _validate_invoice_file(pdf, 'pdf')
+    if xml:
+        _validate_invoice_file(xml, 'xml')
+    old_files = []
+    with transaction.atomic():
+        locked = Boleto.objects.select_for_update().get(pk=boleto.pk)
+        if pdf:
+            if locked.invoice_pdf:
+                old_files.append(locked.invoice_pdf)
+            locked.invoice_pdf = pdf
+        if xml:
+            if locked.invoice_xml:
+                old_files.append(locked.invoice_xml)
+            locked.invoice_xml = xml
+        locked.invoice_uploaded_at = timezone.now()
+        locked.invoice_uploaded_by = user
+        locked.save(update_fields=[
+            'invoice_pdf', 'invoice_xml', 'invoice_uploaded_at',
+            'invoice_uploaded_by', 'updated_at',
+        ])
+        AuditLog.objects.create(
+            user=user,
+            tenant=locked.tenant,
+            action='boleto.invoice_uploaded',
+            model_name='Boleto',
+            object_id=str(locked.uuid),
+            changes={'pdf': bool(pdf), 'xml': bool(xml)},
+        )
+        for old_file in old_files:
+            transaction.on_commit(lambda file=old_file: file.delete(save=False))
     return locked
 
 

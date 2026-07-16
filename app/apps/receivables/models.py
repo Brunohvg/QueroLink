@@ -1,4 +1,5 @@
 import uuid
+from pathlib import Path
 from datetime import timedelta
 
 from django.conf import settings
@@ -13,6 +14,11 @@ from app.apps.sellers.validators import normalize_and_validate_cpf, validate_cnp
 
 
 DEFAULT_INSTRUCTIONS = 'Apos o vencimento: multa de 2% e juros de 1% ao mes.'
+
+
+def invoice_upload_to(instance, filename):
+    extension = Path(filename).suffix.lower()
+    return f'receivables/{instance.tenant_id}/{instance.uuid}/invoice-{uuid.uuid4()}{extension}'
 
 
 class Boleto(models.Model):
@@ -60,6 +66,16 @@ class Boleto(models.Model):
     barcode = models.CharField(max_length=160, blank=True)
     boleto_url = models.URLField(max_length=500, blank=True)
     boleto_pdf_password = models.CharField(max_length=100, blank=True)
+    invoice_pdf = models.FileField(upload_to=invoice_upload_to, blank=True, max_length=500)
+    invoice_xml = models.FileField(upload_to=invoice_upload_to, blank=True, max_length=500)
+    invoice_uploaded_at = models.DateTimeField(null=True, blank=True)
+    invoice_uploaded_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name='boleto_invoices_uploaded',
+    )
 
     status = models.CharField(
         max_length=12,

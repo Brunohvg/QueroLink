@@ -43,6 +43,7 @@ def send_boleto_email(boleto_uuid, kind='created', force=False):
         'created': f'Boleto emitido - vencimento {boleto.due_date:%d/%m/%Y}',
         'due_tomorrow': f'Lembrete: boleto vence amanha ({boleto.due_date:%d/%m/%Y})',
         'due_today': 'Lembrete: seu boleto vence hoje',
+        'invoice': 'Nota fiscal da sua cobranca',
     }
     context = {
         'boleto': boleto,
@@ -61,6 +62,12 @@ def send_boleto_email(boleto_uuid, kind='created', force=False):
         [boleto.payer_email],
     )
     message.attach_alternative(html, 'text/html')
+    if boleto.invoice_pdf:
+        with boleto.invoice_pdf.open('rb') as invoice:
+            message.attach('nota-fiscal.pdf', invoice.read(), 'application/pdf')
+    if boleto.invoice_xml:
+        with boleto.invoice_xml.open('rb') as invoice:
+            message.attach('nota-fiscal.xml', invoice.read(), 'application/xml')
     try:
         message.send()
     except Exception:

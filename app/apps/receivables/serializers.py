@@ -17,6 +17,8 @@ class BoletoSerializer(serializers.ModelSerializer):
     seller_name = serializers.CharField(source='seller.name', read_only=True)
     status_label = serializers.CharField(source='get_status_display', read_only=True)
     launched_sale_uuid = serializers.UUIDField(source='launched_sale_id', read_only=True)
+    has_invoice_pdf = serializers.SerializerMethodField()
+    has_invoice_xml = serializers.SerializerMethodField()
 
     class Meta:
         model = Boleto
@@ -28,16 +30,24 @@ class BoletoSerializer(serializers.ModelSerializer):
             'payer_state', 'amount_cents', 'due_date', 'instructions',
             'notes', 'gateway', 'gateway_order_id', 'gateway_charge_id',
             'barcode', 'boleto_url', 'boleto_pdf_password', 'status',
+            'has_invoice_pdf', 'has_invoice_xml', 'invoice_uploaded_at',
             'status_label', 'paid_at', 'paid_amount_cents',
             'launched_sale_uuid', 'created_at', 'updated_at',
         ]
         read_only_fields = [
             'uuid', 'seller_name', 'gateway', 'gateway_order_id',
             'gateway_charge_id', 'barcode', 'boleto_url',
-            'boleto_pdf_password', 'status', 'status_label', 'paid_at',
+            'boleto_pdf_password', 'has_invoice_pdf', 'has_invoice_xml',
+            'invoice_uploaded_at', 'status', 'status_label', 'paid_at',
             'paid_amount_cents', 'launched_sale_uuid', 'created_at',
             'updated_at',
         ]
+
+    def get_has_invoice_pdf(self, obj):
+        return bool(obj.invoice_pdf)
+
+    def get_has_invoice_xml(self, obj):
+        return bool(obj.invoice_xml)
 
     def validate_payer_document(self, value):
         return ''.join(filter(str.isdigit, value or ''))

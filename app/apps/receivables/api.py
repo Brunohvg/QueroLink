@@ -17,7 +17,7 @@ from app.apps.sellers.models import Seller
 
 from .models import Boleto
 from .serializers import BoletoSerializer
-from .services import BoletoServiceError, cancel_boleto
+from .services import BoletoServiceError, cancel_boleto, save_invoice_files
 from .throttles import BoletoCreateThrottle, BoletoResendThrottle
 
 
@@ -122,6 +122,24 @@ class BoletoViewSet(viewsets.ModelViewSet):
             changes={},
         )
         return Response({'detail': 'E-mail enfileirado.'}, status=status.HTTP_202_ACCEPTED)
+
+    @extend_schema(description='Anexa ou substitui PDF/XML da nota fiscal.')
+    @action(detail=True, methods=['post'], url_path='invoice')
+    def invoice(self, request, uuid=None):
+        boleto = self.get_object()
+        try:
+            boleto = save_invoice_files(
+                boleto,
+                request.user,
+                pdf=request.FILES.get('invoice_pdf'),
+                xml=request.FILES.get('invoice_xml'),
+            )
+        except BoletoServiceError as exc:
+            raise ValidationError({'detail': str(exc)}) from exc
+        if request.data.get('send_email') and boleto.payer_email:
+            from .tasks import send_boleto_email
+            send_boleto_email.delay(str(boleto.uuid), 'invoice', True)
+        return Response(self.get_serializer(boleto).data)
 
     @action(detail=False, methods=['get'], url_path='summary')
     def summary(self, request):

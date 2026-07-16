@@ -36,6 +36,8 @@ urlpatterns = [
     path('gestor/boletos/<uuid:boleto_uuid>/', receivable_views.manager_boleto_detail, name='gestor_boleto_detalhe'),
     path('gestor/boletos/<uuid:boleto_uuid>/cancelar/', receivable_views.manager_boleto_cancel, name='gestor_boleto_cancelar'),
     path('gestor/boletos/<uuid:boleto_uuid>/reenviar/', receivable_views.manager_boleto_resend, name='gestor_boleto_reenviar'),
+    path('gestor/boletos/<uuid:boleto_uuid>/nota-fiscal/', receivable_views.manager_boleto_invoice_upload, name='gestor_boleto_nota_fiscal'),
+    path('gestor/boletos/<uuid:boleto_uuid>/nota-fiscal/<str:kind>/', receivable_views.manager_boleto_invoice_download, name='gestor_boleto_nota_fiscal_download'),
     path('boletos/cnpj/<str:cnpj>/', receivable_views.cnpj_lookup, name='boleto_cnpj_lookup'),
     path('boletos/cep/<str:cep>/', receivable_views.cep_lookup, name='boleto_cep_lookup'),
 

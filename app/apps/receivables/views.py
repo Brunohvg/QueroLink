@@ -2,7 +2,7 @@ from datetime import timedelta
 
 from django.contrib.auth.decorators import login_required
 from django.db.models import Sum
-from django.http import JsonResponse
+from django.http import FileResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 
@@ -11,7 +11,9 @@ from app.apps.sellers.models import Seller
 
 from .models import Boleto, DEFAULT_INSTRUCTIONS
 from .serializers import BoletoSerializer
-from .services import BoletoServiceError, cancel_boleto, lookup_cnpj
+from .services import (
+    BoletoServiceError, cancel_boleto, lookup_cnpj, save_invoice_files,
+)
 
 
 def _check_role(request, *roles):
@@ -101,6 +103,7 @@ def manager_boleto_list(request):
     seller_uuid = request.GET.get('seller', '')
     due_after = request.GET.get('due_after', '')
     due_before = request.GET.get('due_before', '')
+    search = request.GET.get('search', '').strip()
     if status_value:
         queryset = queryset.filter(status=status_value)
     if seller_uuid:
@@ -109,6 +112,13 @@ def manager_boleto_list(request):
         queryset = queryset.filter(due_date__gte=due_after)
     if due_before:
         queryset = queryset.filter(due_date__lte=due_before)
+    if search:
+        from django.db.models import Q
+        digits = ''.join(filter(str.isdigit, search))
+        search_query = Q(payer_name__icontains=search)
+        if digits:
+            search_query |= Q(payer_document__icontains=digits)
+        queryset = queryset.filter(search_query)
     base = Boleto.objects.filter(tenant=request.user.tenant)
 
     def total(qs, field='amount_cents'):
@@ -131,6 +141,7 @@ def manager_boleto_list(request):
         'seller_filter': seller_uuid,
         'due_after': due_after,
         'due_before': due_before,
+        'search': search,
         'a_receber_cents': total(base.filter(status=Boleto.Status.PENDENTE)),
         'vencendo_7d_cents': total(base.filter(
             status=Boleto.Status.PENDENTE,
@@ -210,6 +221,52 @@ def manager_boleto_resend(request, boleto_uuid):
         from .tasks import send_boleto_email
         send_boleto_email.delay(str(boleto.uuid), 'created', True)
     return redirect('dashboard:gestor_boletos')
+
+
+@login_required
+def manager_boleto_invoice_upload(request, boleto_uuid):
+    if request.method != 'POST' or not _check_role(
+        request, User.Role.ADMIN, User.Role.MANAGER,
+    ):
+        return redirect('dashboard:gestor_boletos')
+    boleto = get_object_or_404(
+        Boleto, tenant=request.user.tenant, uuid=boleto_uuid,
+    )
+    try:
+        boleto = save_invoice_files(
+            boleto,
+            request.user,
+            pdf=request.FILES.get('invoice_pdf'),
+            xml=request.FILES.get('invoice_xml'),
+        )
+        if request.POST.get('send_email') and boleto.payer_email:
+            from .tasks import send_boleto_email
+            send_boleto_email.delay(str(boleto.uuid), 'invoice', True)
+    except BoletoServiceError as exc:
+        return render(request, 'dashboard/gestor/boletos/detail.html', {
+            'boleto': boleto,
+            'invoice_error': str(exc),
+        }, status=400)
+    return redirect('dashboard:gestor_boleto_detalhe', boleto_uuid=boleto.uuid)
+
+
+@login_required
+def manager_boleto_invoice_download(request, boleto_uuid, kind):
+    if not _check_role(request, User.Role.ADMIN, User.Role.MANAGER):
+        return redirect('dashboard:home')
+    boleto = get_object_or_404(
+        Boleto, tenant=request.user.tenant, uuid=boleto_uuid,
+    )
+    field = boleto.invoice_pdf if kind == 'pdf' else boleto.invoice_xml if kind == 'xml' else None
+    if not field:
+        return JsonResponse({'detail': 'Arquivo nao encontrado.'}, status=404)
+    content_type = 'application/pdf' if kind == 'pdf' else 'application/xml'
+    return FileResponse(
+        field.open('rb'),
+        content_type=content_type,
+        as_attachment=True,
+        filename=f'nota-fiscal-{boleto.uuid}.{kind}',
+    )
 
 
 @login_required

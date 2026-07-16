@@ -3,10 +3,12 @@ from unittest.mock import patch
 
 from django.core import mail
 from django.core.cache import cache
+from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import TestCase, override_settings
 from django.utils import timezone
 
 from app.apps.accounts.models import User
+from tempfile import TemporaryDirectory
 
 from ..tasks import send_boleto_email, send_boleto_manager_digest
 from .helpers import make_boleto, make_seller, make_tenant, make_user
@@ -30,6 +32,25 @@ class BoletoNotificationTests(TestCase):
         html = mail.outbox[0].alternatives[0][0]
         self.assertIn(self.tenant.company_name, html)
         self.assertIn('vidalys-merito-logo.png', html)
+
+    def test_invoice_email_includes_pdf_and_xml_attachments(self):
+        boleto = make_boleto(self.tenant, self.seller, self.user)
+        with TemporaryDirectory() as media_root, override_settings(MEDIA_ROOT=media_root):
+            boleto.invoice_pdf.save(
+                'nota.pdf', SimpleUploadedFile(
+                    'nota.pdf', b'%PDF-1.4 test', 'application/pdf',
+                ),
+            )
+            boleto.invoice_xml.save(
+                'nota.xml', SimpleUploadedFile(
+                    'nota.xml', b'<nfe/>', 'application/xml',
+                ),
+            )
+            self.assertEqual(
+                send_boleto_email.run(str(boleto.uuid), 'invoice', True), 'sent',
+            )
+        filenames = [attachment[0] for attachment in mail.outbox[0].attachments]
+        self.assertEqual(filenames, ['nota-fiscal.pdf', 'nota-fiscal.xml'])
 
     @patch('app.apps.receivables.tasks.tenant_operational', return_value=True)
     def test_digest_only_sends_when_there_is_content(self, _operational_mock):
