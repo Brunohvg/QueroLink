@@ -140,11 +140,13 @@ def assinatura(request):
             'Relatorios em PDF e previa de fechamento',
             'Importacao de vendas por CSV',
             'Notificacoes push no celular do vendedor',
+            'Boletos e gestao de clientes',
         ],
         'BUSINESS': [
             'Ate 50 vendedores',
             'Tudo do Pro',
             'Suporte prioritario',
+            'Base de clientes para relacionamento',
         ],
         'ENTERPRISE': [
             'Vendedores ilimitados (legado)',
@@ -216,5 +218,4 @@ def dashboard_home(request):
         'total_revenue': total_revenue_formatted,
         'recent_orders': recent_orders,
     })
-
 

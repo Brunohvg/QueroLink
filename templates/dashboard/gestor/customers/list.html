@@ -1,0 +1,32 @@
+{% extends 'dashboard/base_desktop.html' %}
+{% load currency_filters %}
+{% block title %}Clientes - Merito{% endblock %}
+{% block content %}
+<div class="space-y-5">
+  <header><p class="text-[12px] text-gray-500">Relacionamento</p><h1 class="font-display text-[22px] font-bold">Clientes</h1></header>
+  {% if feature_locked %}
+  <section class="surface-card text-center py-12"><h2 class="text-lg font-semibold">Gestao de clientes disponivel no Pro</h2><p class="text-[13px] text-gray-500 mt-2">Centralize contatos e historico de cobrancas.</p><a href="{% url 'dashboard:assinatura' %}" class="btn-primary inline-flex mt-5">Conhecer planos</a></section>
+  {% else %}
+  <section class="grid sm:grid-cols-2 gap-3 max-w-2xl">
+    <div class="surface-card"><p class="text-[11px] uppercase text-gray-500">Clientes identificados</p><p class="text-2xl font-bold mt-1">{{ customer_count }}</p></div>
+    <div class="surface-card"><p class="text-[11px] uppercase text-gray-500">Marketing autorizado</p><p class="text-2xl font-bold text-emerald-600 mt-1">{{ consented_count }}</p></div>
+  </section>
+  <form method="get" class="bg-white border border-gray-100 rounded-lg p-4 grid sm:grid-cols-[minmax(220px,1fr)_220px_auto] gap-3 items-end">
+    <label class="text-[11px] font-semibold text-gray-500 uppercase">Buscar<input name="search" value="{{ search }}" placeholder="Nome, e-mail, telefone ou documento" class="input-field mt-1.5 w-full text-[13px]"></label>
+    <label class="text-[11px] font-semibold text-gray-500 uppercase">Consentimento<select name="consent" class="input-field mt-1.5 w-full text-[13px]"><option value="">Todos</option><option value="GRANTED" {% if consent_filter == 'GRANTED' %}selected{% endif %}>Autorizado</option><option value="REVOKED" {% if consent_filter == 'REVOKED' %}selected{% endif %}>Revogado</option><option value="UNKNOWN" {% if consent_filter == 'UNKNOWN' %}selected{% endif %}>Nao informado</option></select></label>
+    <button class="btn-primary min-h-[44px]">Filtrar</button>
+  </form>
+  <section class="bg-white border border-gray-100 rounded-lg overflow-hidden">
+    <div class="hidden md:grid grid-cols-[1.4fr_1.2fr_110px_110px_120px_40px] gap-4 px-5 py-3 bg-gray-50 text-[11px] font-semibold text-gray-500 uppercase"><span>Cliente</span><span>Contato</span><span>Cobrancas</span><span>Movimentado</span><span>Ultimo contato</span><span></span></div>
+    {% for customer in customers %}<a href="{% url 'dashboard:gestor_customer_detail' customer.uuid %}" class="grid md:grid-cols-[1.4fr_1.2fr_110px_110px_120px_40px] gap-2 md:gap-4 px-5 py-4 border-t border-gray-100 hover:bg-gray-50 items-center">
+      <div><p class="font-semibold text-[14px]">{{ customer.name }}</p><p class="text-[12px] text-gray-500">{{ customer.document_type }} {{ customer.document|default:'Sem documento' }}</p></div>
+      <div class="text-[12px] text-gray-600"><p>{{ customer.email|default:'Sem e-mail' }}</p><p>{{ customer.phone|default:'Sem telefone' }}</p></div>
+      <p class="text-[13px]"><span class="md:hidden text-gray-500">Cobrancas: </span>{{ customer.interaction_count }}</p>
+      <p class="font-semibold text-[13px]">{{ customer.total_cents|default:0|brl }}</p>
+      <p class="text-[12px] text-gray-500">{{ customer.last_interaction|date:'d/m/Y'|default:'-' }}</p>
+      <span class="text-brand-600 text-xl">›</span>
+    </a>{% empty %}<p class="p-8 text-center text-[13px] text-gray-500">Nenhum cliente encontrado.</p>{% endfor %}
+  </section>
+  {% endif %}
+</div>
+{% endblock %}

@@ -85,6 +85,8 @@ def create_boleto(tenant, seller, created_by, data):
                 'gateway', 'gateway_order_id', 'gateway_charge_id',
                 'barcode', 'boleto_url', 'boleto_pdf_password', 'updated_at',
             ])
+            from app.apps.customers.services import sync_boleto_customer
+            sync_boleto_customer(boleto)
             transaction.on_commit(
                 lambda boleto_uuid=boleto.uuid: _enqueue_created_email(boleto_uuid),
                 robust=True,

@@ -34,6 +34,7 @@ urlpatterns = [
     path('api/billing/', include('app.apps.billing.urls')),
     path('api/freight/', include('app.apps.freight.urls')),
     path('api/boletos/', include('app.apps.receivables.urls')),
+    path('api/customers/', include('app.apps.customers.urls')),
     path('api/', include('app.apps.api.urls')),
 
     path('dashboard/esqueci-senha/', RateLimitedPasswordResetView.as_view(

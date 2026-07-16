@@ -1,6 +1,7 @@
 from django.urls import path
 from . import views, mobile_views, desktop_views
 from app.apps.receivables import views as receivable_views
+from app.apps.customers import views as customer_views
 
 app_name = 'dashboard'
 
@@ -14,6 +15,8 @@ urlpatterns = [
     path('gestor/', desktop_views.gestor_home, name='gestor_home'),
     path('gestor/ranking/', desktop_views.gestor_ranking, name='gestor_ranking'),
     path('gestor/vendedores/', desktop_views.gestor_vendedores, name='gestor_vendedores'),
+    path('gestor/clientes/', customer_views.customer_list, name='gestor_customers'),
+    path('gestor/clientes/<uuid:customer_uuid>/', customer_views.customer_detail, name='gestor_customer_detail'),
     path('gestor/importar-vendas/', desktop_views.gestor_importar_vendas, name='gestor_importar_vendas'),
     path('gestor/vendedores/<uuid:seller_id>/', desktop_views.gestor_vendedor_detalhe, name='gestor_vendedor_detalhe'),
     path('gestor/fechamento/', desktop_views.gestor_fechamento, name='gestor_fechamento'),

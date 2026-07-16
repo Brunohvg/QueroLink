@@ -569,7 +569,7 @@ body { font-family: 'Inter', system-ui, sans-serif; }
       <div class="gradient-border rounded-2xl bg-white p-6 sm:p-8 flex flex-col relative shadow-xl shadow-blue-500/10 md:scale-105 origin-center reveal">
         <span class="absolute -top-3 left-1/2 -translate-x-1/2 bg-brand-500 text-white text-[11px] font-semibold px-4 py-1 rounded-full whitespace-nowrap">Mais popular</span>
         <p class="text-[13px] font-semibold text-gray-500 uppercase tracking-wide mb-1">Pro</p>
-        <p class="text-[12px] text-gray-400 mb-5">Para quem quer folha e contabilidade sem planilha</p>
+        <p class="text-[12px] text-gray-400 mb-5">Para organizar vendas, cobrancas e relacionamento</p>
         <p class="font-display text-[36px] font-semibold text-[var(--ink)] mb-1">
           <span x-text="anual ? 'R$ 247' : 'R$ 297'"></span>
           <span class="text-[14px] font-normal text-gray-400">/mês</span>
@@ -598,7 +598,7 @@ body { font-family: 'Inter', system-ui, sans-serif; }
           </li>
           <li class="text-[13px] text-gray-600 flex items-start gap-2.5">
             <svg width="14" height="14" viewBox="0 0 14 14" fill="none" class="mt-0.5 shrink-0" aria-hidden="true"><circle cx="7" cy="7" r="7" fill="url(#pro6)"/><path d="M4.5 7l2 2 3-3" stroke="white" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/><defs><linearGradient id="pro6" x1="0" y1="0" x2="14" y2="14"><stop stop-color="#1263FF"/><stop offset="1" stop-color="#00D1E6"/></linearGradient></defs></svg>
-            Notificações push no celular do vendedor
+            Boletos, notas fiscais e gestão de clientes
           </li>
         </ul>
         <a :href="'{% url 'accounts:signup' %}?plano=pro&ciclo=' + (anual ? 'yearly' : 'monthly')" class="block text-center bg-brand-500 hover:bg-brand-600 text-white font-semibold py-3.5 rounded-xl text-[14px] transition shadow-[0_8px_30px_rgba(18,99,255,0.35)] hover:shadow-[0_8px_40px_rgba(18,99,255,0.5)]">
