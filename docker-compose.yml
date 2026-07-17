@@ -95,6 +95,7 @@ services:
       start_period: 30s
     volumes:
       - backup_volume:/app/backups
+      - media_volume:/app/media
     deploy:
       resources:
         limits:
