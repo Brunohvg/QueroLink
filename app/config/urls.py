@@ -1,12 +1,12 @@
 from django.conf import settings
-from django.conf.urls.static import static
 from django.contrib import admin
 from django.contrib.auth import views as auth_views
-from django.urls import path, include, reverse_lazy
+from django.urls import path, include, re_path, reverse_lazy
 from django.utils.decorators import method_decorator
 from django.views.decorators.csrf import csrf_protect
 from django.http import JsonResponse
 from django.views.generic import RedirectView
+from django.views.static import serve
 from django_ratelimit.decorators import ratelimit
 from app.apps.accounts import views as account_views
 from app.apps.dashboard import desktop_views
@@ -34,6 +34,7 @@ urlpatterns = [
     path('api/billing/', include('app.apps.billing.urls')),
     path('api/freight/', include('app.apps.freight.urls')),
     path('api/customers/', include('app.apps.customers.urls')),
+    path('api/receivables/', include('app.apps.receivables.urls')),
     path('api/', include('app.apps.api.urls')),
 
     path('dashboard/esqueci-senha/', RateLimitedPasswordResetView.as_view(
@@ -56,4 +57,10 @@ urlpatterns = [
 ]
 
 if settings.DEBUG:
-    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
+    urlpatterns += [
+        re_path(
+            r'^media/(?!receivables_private/)(?P<path>.*)$',
+            serve,
+            {'document_root': settings.MEDIA_ROOT},
+        ),
+    ]
