@@ -177,6 +177,95 @@ def mark_refunded(
         return locked, True
 
 
+def apply_reconciliation_result(boleto, result):
+    now = timezone.now()
+    if (
+        result.status in (ProviderStatus.PAID, ProviderStatus.REFUNDED)
+        and boleto.status == Boleto.Status.CRIANDO
+    ):
+        with transaction.atomic():
+            recovered = Boleto.objects.select_for_update().get(pk=boleto.pk)
+            if recovered.status == Boleto.Status.CRIANDO:
+                recovered.provider_order_id = (
+                    result.order_id or recovered.provider_order_id
+                )
+                recovered.provider_charge_id = (
+                    result.charge_id or recovered.provider_charge_id
+                )
+                recovered.transition_to(Boleto.Status.PENDENTE)
+                recovered.save(update_fields=[
+                    'provider_order_id', 'provider_charge_id', 'status', 'updated_at',
+                ])
+            boleto = recovered
+    if result.status == ProviderStatus.PAID:
+        reconciled, changed = mark_paid(
+            boleto,
+            result.paid_amount_cents or boleto.amount_cents,
+            result.paid_at or now,
+        )
+    elif result.status == ProviderStatus.REFUNDED:
+        current = Boleto.objects.get(pk=boleto.pk)
+        if current.status not in (Boleto.Status.PAGO, Boleto.Status.ESTORNADO):
+            current, _ = mark_paid(
+                current,
+                result.paid_amount_cents or current.amount_cents,
+                result.paid_at or now,
+            )
+        reconciled, changed = mark_refunded(
+            current,
+            refunded_amount_cents=result.paid_amount_cents,
+        )
+    else:
+        with transaction.atomic():
+            reconciled = Boleto.objects.select_for_update().get(pk=boleto.pk)
+            changed = False
+            if result.order_id and not reconciled.provider_order_id:
+                reconciled.provider_order_id = result.order_id
+                changed = True
+            if result.charge_id and not reconciled.provider_charge_id:
+                reconciled.provider_charge_id = result.charge_id
+                changed = True
+            if (
+                result.status == ProviderStatus.PENDING
+                and reconciled.status == Boleto.Status.CRIANDO
+            ):
+                reconciled.transition_to(Boleto.Status.PENDENTE)
+                changed = True
+            elif (
+                result.status == ProviderStatus.CANCELED
+                and reconciled.status == Boleto.Status.CANCEL_PEND
+            ):
+                reconciled.transition_to(Boleto.Status.CANCELADO)
+                _outbox_event(
+                    reconciled,
+                    'boleto.canceled',
+                    {'boleto_uuid': str(reconciled.uuid)},
+                )
+                changed = True
+            elif (
+                result.status == ProviderStatus.FAILED
+                and reconciled.status in (Boleto.Status.CRIANDO, Boleto.Status.PENDENTE)
+            ):
+                reconciled.transition_to(Boleto.Status.FALHOU)
+                changed = True
+            reconciled.last_provider_status = result.status.value
+            reconciled.last_synced_at = now
+            reconciled.save(update_fields=[
+                'provider_order_id', 'provider_charge_id', 'status',
+                'last_provider_status', 'last_synced_at', 'updated_at',
+            ])
+            return reconciled, changed
+
+    Boleto.objects.filter(pk=reconciled.pk).update(
+        provider_order_id=result.order_id or reconciled.provider_order_id,
+        provider_charge_id=result.charge_id or reconciled.provider_charge_id,
+        last_provider_status=result.status.value,
+        last_synced_at=now,
+    )
+    reconciled.refresh_from_db()
+    return reconciled, changed
+
+
 def claim_outbox_events(limit=100, *, event_types=None):
     safe_limit = max(1, min(int(limit), 1000))
     now = timezone.now()
