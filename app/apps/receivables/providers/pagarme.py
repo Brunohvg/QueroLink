@@ -86,6 +86,18 @@ class PagarmeBoletoProvider(BoletoProvider):
         if event_type.startswith('order.'):
             charges = data.get('charges') or []
             charge = charges[0] if charges else {}
+        metadata = data.get('metadata') or {}
+        charge_metadata = charge.get('metadata') or {}
+        order = charge.get('order') or {}
+        order_metadata = order.get('metadata') or {}
+        aggregate_uuid = (
+            metadata.get('boleto_uuid')
+            or charge_metadata.get('boleto_uuid')
+            or order_metadata.get('boleto_uuid')
+            or data.get('code')
+            or order.get('code')
+            or ''
+        )
         paid_at = charge.get('paid_at') or data.get('paid_at')
         if isinstance(paid_at, str):
             try:
@@ -94,6 +106,7 @@ class PagarmeBoletoProvider(BoletoProvider):
                 paid_at = None
         return ProviderWebhookEvent(
             event_type=event_type,
+            aggregate_uuid=str(aggregate_uuid),
             order_id=str(data.get('id') or (charge.get('order') or {}).get('id') or ''),
             charge_id=str(charge.get('id') or ''),
             status=self._normalize_status(charge.get('status') or data.get('status')),

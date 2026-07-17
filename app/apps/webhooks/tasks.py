@@ -11,12 +11,34 @@ from app.apps.webhooks.services import (
     normalize_payment_method,
     populate_payment_from_webhook,
     process_paid_pagarme_event,
+    process_receivable_pagarme_event,
+    webhook_event_belongs_to_boleto,
 )
 from app.apps.payments.models import Payment
 from app.apps.orders.models import Order, PaymentLink
 from app.apps.sales.models import Sale
 
 logger = logging.getLogger(__name__)
+
+
+@shared_task(bind=True, max_retries=3, default_retry_delay=30)
+def process_receivable_webhook(self, event_id):
+    try:
+        return process_receivable_pagarme_event(event_id)
+    except Exception as exc:
+        retries = getattr(self.request, 'retries', 0)
+        status = (
+            WebhookEvent.Status.FAILED
+            if retries >= self.max_retries
+            else WebhookEvent.Status.RECEIVED
+        )
+        WebhookEvent.objects.filter(pk=event_id).update(
+            status=status,
+            processing_error=' '.join(str(exc).split())[:4000],
+        )
+        if retries >= self.max_retries:
+            raise
+        raise self.retry(exc=exc)
 
 
 def _skip_foreign_event(event, reason):
@@ -57,6 +79,14 @@ def _notify_link_status_after_commit(order, event_type, motivo=''):
     time_limit=180,
 )
 def process_pagarme_webhook(event_id):
+    event_for_routing = WebhookEvent.objects.select_related('tenant').filter(
+        id=event_id,
+        processed=False,
+    ).first()
+    if event_for_routing and webhook_event_belongs_to_boleto(event_for_routing):
+        process_receivable_webhook.delay(event_id)
+        return
+
     with transaction.atomic():
         try:
             event = WebhookEvent.objects.select_for_update(nowait=True).get(

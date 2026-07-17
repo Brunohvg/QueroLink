@@ -1,5 +1,5 @@
 import json
-from datetime import datetime
+from datetime import datetime, timedelta
 from decimal import Decimal
 from concurrent.futures import ThreadPoolExecutor
 from unittest.mock import patch
@@ -12,10 +12,94 @@ from app.apps.accounts.models import Tenant, User
 from app.apps.sellers.models import Seller
 from app.apps.orders.models import Order, PaymentLink
 from app.apps.payments.models import Payment
+from app.apps.receivables.models import Boleto
 from app.apps.sales.models import Sale
 from app.apps.webhooks.models import WebhookEvent
 
 MockNow = datetime(2026, 7, 3, 12, 0, 0, tzinfo=timezone.get_current_timezone())
+
+
+@override_settings(WEBHOOK_AUTH_REQUIRED=False)
+class ReceivablesRoutingTests(TestCase):
+    def setUp(self):
+        self.tenant = Tenant.objects.create(company_name='Routing Tenant')
+        self.manager = User.objects.create_user(
+            username='routing-manager', tenant=self.tenant, role=User.Role.MANAGER
+        )
+        seller_user = User.objects.create_user(
+            username='routing-seller', tenant=self.tenant, role=User.Role.SELLER
+        )
+        self.seller = Seller.objects.create(
+            tenant=self.tenant, user=seller_user, name='Seller', phone='11999999999'
+        )
+        self.boleto = Boleto.objects.create(
+            tenant=self.tenant, seller=self.seller, created_by=self.manager,
+            payer_name='Maria', payer_document='52998224725',
+            payer_document_type=Boleto.DocumentType.CPF, payer_phone='11999999999',
+            payer_zip_code='01310100', payer_street='Rua A', payer_number='1',
+            payer_neighborhood='Centro', payer_city='Sao Paulo', payer_state='SP',
+            amount_cents=10000, due_date=timezone.localdate() + timedelta(days=10),
+            idempotency_key='routing-key', provider_order_id='or_boleto',
+            provider_charge_id='ch_boleto', status=Boleto.Status.PENDENTE,
+        )
+        self.url = f'/api/webhooks/pagarme/{self.tenant.slug}/'
+
+    @patch('app.apps.webhooks.tasks.process_pagarme_webhook.delay')
+    def test_boleto_event_is_persisted_and_enqueued(self, delay):
+        payload = {
+            'id': 'evt_boleto_paid',
+            'type': 'charge.paid',
+            'data': {
+                'id': self.boleto.provider_charge_id,
+                'status': 'paid',
+                'amount': 10000,
+                'metadata': {'boleto_uuid': str(self.boleto.uuid)},
+            },
+        }
+        response = Client().post(
+            self.url, data=json.dumps(payload), content_type='application/json'
+        )
+
+        self.assertEqual(response.status_code, 200)
+        event = WebhookEvent.objects.get(gateway_event_id='evt_boleto_paid')
+        self.assertNotIn('customer', event.payload['data'])
+        delay.assert_called_once_with(event.id)
+
+    @patch('app.apps.webhooks.tasks.process_pagarme_webhook.delay')
+    def test_foreign_boleto_method_without_local_correlation_stays_foreign(self, delay):
+        response = Client().post(
+            self.url,
+            data=json.dumps({
+                'id': 'evt_foreign_boleto',
+                'type': 'charge.paid',
+                'data': {
+                    'id': 'ch_foreign',
+                    'payment_method': 'boleto',
+                    'status': 'paid',
+                },
+            }),
+            content_type='application/json',
+        )
+
+        self.assertEqual(response.json()['status'], 'ignored_foreign')
+        self.assertFalse(WebhookEvent.objects.filter(
+            gateway_event_id='evt_foreign_boleto'
+        ).exists())
+        delay.assert_not_called()
+
+    @patch('app.apps.webhooks.tasks.process_receivable_webhook.delay')
+    def test_router_dispatches_correlated_boleto(self, delay):
+        event = WebhookEvent.objects.create(
+            gateway='pagarme', tenant=self.tenant,
+            payload={
+                'type': 'charge.paid',
+                'data': {'id': 'ch_boleto', 'status': 'paid'},
+            },
+        )
+        from app.apps.webhooks.tasks import process_pagarme_webhook
+
+        process_pagarme_webhook(event.id)
+        delay.assert_called_once_with(event.id)
 
 
 class BaseWebhookTest(TestCase):

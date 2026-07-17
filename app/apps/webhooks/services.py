@@ -13,6 +13,14 @@ logger = logging.getLogger(__name__)
 
 VALID_PAYMENT_METHODS = {'credit_card', 'pix', 'boleto', 'unknown'}
 PAID_EVENT_TYPES = ('order.paid', 'charge.paid', 'payment-link.finished')
+RECEIVABLE_EVENT_TYPES = {
+    'order.paid',
+    'charge.paid',
+    'charge.refunded',
+    'charge.chargedback',
+    'order.payment_failed',
+    'charge.payment_failed',
+}
 
 
 @dataclass
@@ -25,6 +33,110 @@ class PagarmePaymentResult:
     financial_changed: bool = False
     notify_event_type: str = ''
     message: str = ''
+
+
+def find_boleto_for_webhook(tenant, normalized):
+    from uuid import UUID
+
+    from app.apps.receivables.models import Boleto
+
+    aggregate_uuid = normalized.aggregate_uuid
+    if aggregate_uuid:
+        try:
+            boleto_uuid = UUID(str(aggregate_uuid))
+        except (TypeError, ValueError):
+            boleto_uuid = None
+        if boleto_uuid:
+            boleto = Boleto.objects.filter(tenant=tenant, uuid=boleto_uuid).first()
+            if boleto:
+                return boleto
+    if normalized.charge_id:
+        return Boleto.objects.filter(
+            tenant=tenant,
+            provider_charge_id=normalized.charge_id,
+        ).first()
+    return None
+
+
+def webhook_event_belongs_to_boleto(event):
+    if not event.tenant_id or not isinstance(event.payload, dict):
+        return False
+    from app.apps.receivables.providers import get_provider
+
+    try:
+        normalized = get_provider(event.tenant).parse_webhook(event.payload)
+    except Exception:
+        return False
+    if normalized.event_type not in RECEIVABLE_EVENT_TYPES:
+        return False
+    return find_boleto_for_webhook(event.tenant, normalized) is not None
+
+
+def _set_receivable_event_status(event_id, status, *, error=''):
+    with transaction.atomic():
+        event = WebhookEvent.objects.select_for_update().get(pk=event_id)
+        event.status = status
+        event.processing_error = ' '.join(str(error or '').split())[:4000]
+        fields = ['status', 'processing_error']
+        if status in (WebhookEvent.Status.PROCESSED, WebhookEvent.Status.SKIPPED):
+            event.processed = True
+            event.processed_at = timezone.now()
+            fields.extend(['processed', 'processed_at'])
+        event.save(update_fields=fields)
+        return event
+
+
+def process_receivable_pagarme_event(event_id):
+    from app.apps.receivables.models import Boleto
+    from app.apps.receivables.providers import get_provider
+    from app.apps.receivables.services import mark_paid, mark_refunded
+
+    with transaction.atomic():
+        event = WebhookEvent.objects.select_for_update(of=('self',)).select_related('tenant').get(
+            pk=event_id,
+            gateway='pagarme',
+        )
+        if event.status in (WebhookEvent.Status.PROCESSED, WebhookEvent.Status.SKIPPED):
+            return 'duplicate'
+        event.status = WebhookEvent.Status.PROCESSING
+        event.processing_started_at = timezone.now()
+        event.last_attempt_at = timezone.now()
+        event.attempt_count += 1
+        event.processing_error = ''
+        event.save(update_fields=[
+            'status', 'processing_started_at', 'last_attempt_at',
+            'attempt_count', 'processing_error',
+        ])
+
+    normalized = get_provider(event.tenant).parse_webhook(event.payload)
+    boleto = find_boleto_for_webhook(event.tenant, normalized)
+    if not boleto:
+        _set_receivable_event_status(event_id, WebhookEvent.Status.SKIPPED)
+        return 'not_receivable'
+
+    if normalized.event_type in ('order.paid', 'charge.paid'):
+        amount = normalized.paid_amount_cents or boleto.amount_cents
+        paid_at = normalized.paid_at or timezone.now()
+        mark_paid(boleto, amount, paid_at)
+    elif normalized.event_type in ('charge.refunded', 'charge.chargedback'):
+        mark_refunded(
+            boleto,
+            refunded_amount_cents=normalized.paid_amount_cents,
+            chargeback=normalized.event_type == 'charge.chargedback',
+        )
+    elif normalized.event_type in ('order.payment_failed', 'charge.payment_failed'):
+        with transaction.atomic():
+            locked = Boleto.objects.select_for_update().get(pk=boleto.pk)
+            if locked.status in (Boleto.Status.CRIANDO, Boleto.Status.PENDENTE):
+                locked.transition_to(Boleto.Status.FALHOU)
+                locked.last_provider_status = normalized.status.value
+                locked.save(update_fields=['status', 'last_provider_status', 'updated_at'])
+    else:
+        _set_receivable_event_status(event_id, WebhookEvent.Status.SKIPPED)
+        return 'unsupported'
+
+    _set_receivable_event_status(event_id, WebhookEvent.Status.PROCESSED)
+    return 'processed'
 
 
 def normalize_payment_method(raw_method: str) -> str:
