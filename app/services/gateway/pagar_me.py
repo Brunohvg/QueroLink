@@ -32,6 +32,10 @@ class PagarMeError(Exception):
     pass
 
 
+class PagarMeTransientError(PagarMeError):
+    pass
+
+
 class PagarMeGateway:
     """
     Cliente para API do Pagar.me com suporte a multitenancy.
@@ -65,21 +69,33 @@ class PagarMeGateway:
         }
 
     def _request(self, method, url, **kwargs):
+        request_headers = self._get_headers()
+        request_headers.update(kwargs.pop('headers', {}) or {})
         try:
             response = requests.request(
-                method, url, headers=self._get_headers(),
+                method, url, headers=request_headers,
                 timeout=self.timeout, **kwargs,
             )
             if response.status_code == 204:
                 return {}
             response.raise_for_status()
             return response.json()
-        except requests.exceptions.Timeout:
-            raise PagarMeError("Timeout ao comunicar com Pagar.me. Tente novamente.")
+        except requests.exceptions.Timeout as exc:
+            raise PagarMeTransientError(
+                "Timeout ao comunicar com Pagar.me. Tente novamente."
+            ) from exc
+        except requests.exceptions.HTTPError as exc:
+            status_code = exc.response.status_code if exc.response is not None else None
+            message = f"Erro na comunicacao com Pagar.me (HTTP {status_code})."
+            if status_code in (408, 425, 429) or (status_code and status_code >= 500):
+                raise PagarMeTransientError(message) from exc
+            raise PagarMeError(message) from exc
         except requests.exceptions.RequestException as e:
-            raise PagarMeError(f"Erro na comunicacao com Pagar.me: {e}")
-        except ValueError:
-            raise PagarMeError("Resposta invalida do Pagar.me.")
+            raise PagarMeTransientError(
+                "Erro transitorio na comunicacao com Pagar.me."
+            ) from e
+        except ValueError as exc:
+            raise PagarMeError("Resposta invalida do Pagar.me.") from exc
 
     def create_payment_link(
         self, total_amount, max_installments, name,
@@ -136,6 +152,24 @@ class PagarMeGateway:
         """Fetch charge details from Pagar.me."""
         logger.info("Pagar.me get_charge: charge_id=%s", charge_id)
         return self._request("GET", f"{self.api_url_charges}/{charge_id}")
+
+    def create_boleto_order(self, payload, idempotency_key):
+        """Create a boleto order with remote idempotency."""
+        return self._request(
+            "POST",
+            self.api_url_orders,
+            json=payload,
+            headers={"Idempotency-Key": str(idempotency_key)},
+        )
+
+    def get_boleto_order(self, order_id):
+        return self.get_order(order_id)
+
+    def get_boleto_charge(self, charge_id):
+        return self.get_charge(charge_id)
+
+    def cancel_boleto_charge(self, charge_id):
+        return self.cancel_charge(charge_id)
 
     def get_order(self, order_id):
         """Fetch order details from Pagar.me."""
