@@ -190,19 +190,21 @@
                 <span x-show="s.status === 'ESTORNADA'" class="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-semibold bg-red-50 text-red-600 ml-2">Estornada</span>
               </td>
               <td class="px-4 py-3.5 text-right">
-                <div class="flex items-center justify-end gap-1">
+                <div class="flex items-center justify-end gap-1.5">
                   <button @click="openEditSale(s)" x-show="s.status !== 'ESTORNADA'"
-                          class="tap-target flex items-center justify-center w-8 h-8 text-gray-400 hover:text-brand-600 bg-gray-50 hover:bg-brand-50 rounded-lg transition-all active:scale-[0.95]"
+                          class="tap-target inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium text-brand-600 bg-brand-50 border border-brand-100 hover:bg-brand-100 rounded-lg transition-all active:scale-[0.95]"
                           title="Editar venda">
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
+                    Editar
                   </button>
                   <button @click="openVoidSale(s)" x-show="s.status !== 'ESTORNADA'"
-                          class="tap-target flex items-center justify-center w-8 h-8 text-gray-400 hover:text-red-600 bg-gray-50 hover:bg-red-50 rounded-lg transition-all active:scale-[0.95]"
+                          class="tap-target inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium text-red-600 bg-red-50 border border-red-100 hover:bg-red-100 rounded-lg transition-all active:scale-[0.95]"
                           title="Anular lancamento">
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                    Anular
                   </button>
                   <button @click="openHistory(s)"
-                          class="tap-target flex items-center justify-center w-8 h-8 text-gray-400 hover:text-amber-600 bg-gray-50 hover:bg-amber-50 rounded-lg transition-all active:scale-[0.95] relative"
+                          class="tap-target inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium text-amber-600 bg-amber-50 border border-amber-100 hover:bg-amber-100 rounded-lg transition-all active:scale-[0.95] relative"
                           title="Historico de alteracoes">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
                     <span x-show="s.change_log_count > 0"
