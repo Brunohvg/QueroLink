@@ -17,18 +17,16 @@ Atualizado em 17/07/2026. Este documento permite que outra IA ou pessoa continue
 
 - Repositório: `Brunohvg/QueroLink`.
 - Branch de integração: `querolink-v2`.
-- HEAD mesclado usado como base: `af067da56eac8a4c59194768efa771740bc5ab6a` (PR #43).
-- Branch em desenvolvimento: `feat/customer-ledger-foundation`.
-- Prompt em entrega: **Prompt 08 — Customer Ledger como projeção assíncrona**.
-- Commit da implementação: `37604866d4e15d9f40d63b1b81e966b255941748`.
-- PR atual: [#44 — Customer Ledger como projeção assíncrona](https://github.com/Brunohvg/QueroLink/pull/44), aberto como Draft contra `querolink-v2`.
-- Estado: implementação concluída, gates locais verdes; aguardar os checks do GitHub e o merge manual do #44.
-- Próximo prompt, somente depois do merge verde deste PR: **Prompt 09 — API do Customer Ledger e backfill controlado**.
+- HEAD mesclado usado como base: `3504da850c258044fa025ef86e96b7f6abf8a868` (PR #44).
+- Branch em desenvolvimento: `feat/customer-ledger-api`.
+- Prompt em entrega: **Prompt 09 — API do Customer Ledger e backfill controlado**.
+- Estado local: implementação concluída e gates locais verdes; falta publicar o Draft PR e registrar seu número/commit final.
+- Próximo prompt, somente depois do merge verde deste PR: **Prompt 10 — documentos de boleto**.
 
-Antes de iniciar o Prompt 09, confirmar o estado do Draft PR do Prompt 08 que será registrado neste documento:
+Antes de iniciar o Prompt 10, confirmar o estado do Draft PR do Prompt 09 que será registrado neste documento:
 
 ```bash
-gh pr view 44 --json state,mergedAt,statusCheckRollup
+gh pr view NUMERO_DO_PR_09 --json state,mergedAt,statusCheckRollup
 git fetch origin --prune
 ```
 
@@ -45,7 +43,8 @@ git fetch origin --prune
 | #41 | Prompt 05 — reconciliação de boletos | Mesclado | `f9d8c28` |
 | #42 | Prompt 06 — alocação em vendas | Mesclado | `e592820` |
 | #43 | Prompt 07 — impacto em comissões | Mesclado | `af067da` |
-| #44 | Prompt 08 — Customer Ledger assíncrono | Draft aberto | `3760486` |
+| #44 | Prompt 08 — Customer Ledger assíncrono | Mesclado | `3504da8` |
+| a registrar | Prompt 09 — API e backfill do Customer Ledger | Implementação local verde | branch `feat/customer-ledger-api` |
 
 ## 4. Decisões de arquitetura tomadas
 
@@ -66,6 +65,11 @@ git fetch origin --prune
 - Documento é identidade forte por tenant. Nome nunca identifica; e-mail e telefone só reutilizam uma correspondência única sem identidade forte conflitante.
 - Divergências entre documento, e-mail ou telefone criam `CustomerIdentityConflict`; nunca há merge automático silencioso.
 - `CustomerActivity` é idempotente por tenant + origem + UUID da origem.
+- A API do Customer Ledger é exclusiva para ADMIN/MANAGER, sempre tenant-scoped e paginada.
+- Documento, telefone e e-mail nunca são retornados em claro; hashes também não são expostos.
+- Como o Prompt 09 proibiu migration, data, origem e responsável do consentimento são persistidos no `AuditLog`; os estados permanecem nos campos existentes de `Customer`.
+- O backfill é exclusivamente manual, exige tenant explícito ou `--all-tenants`, aceita `--dry-run` e usa cursor copiável no formato `fonte:UUID`.
+- Falhas do backfill são isoladas por tenant e logs/contadores não contêm PII.
 
 ## 5. Ambiente de teste oficial
 
@@ -77,35 +81,35 @@ git fetch origin --prune
 ./scripts/test-fast.sh down
 ```
 
-O ambiente valida host local e nome de banco contendo `test`. No Prompt 08, 24 testes focados/regressivos passaram e a suíte completa passou com **878 testes em 48,963s**.
+O ambiente valida host local e nome de banco contendo `test`. No Prompt 09, 19 testes do app `customers` passaram e a suíte completa passou com **889 testes em 73,669s**.
 
-## 6. Como continuar no Prompt 09
+## 6. Como continuar no Prompt 10
 
-Após o Draft PR do Prompt 08 estar verde e mesclado:
+Após o Draft PR do Prompt 09 estar verde e mesclado:
 
 ```bash
 git fetch origin --prune
-git switch -c feat/customer-ledger-api origin/querolink-v2
+git switch -c feat/receivables-documents origin/querolink-v2
 git status -sb
 ```
 
-Ler novamente o Prompt 09 no arquivo original anexado à sessão. Escopo resumido:
+Ler novamente o Prompt 10 no arquivo original anexado à sessão. Escopo resumido:
 
-- expor a API do Customer Ledger com paginação e isolamento por tenant;
-- implementar consentimento operacional e de marketing conforme o escopo exato;
-- criar backfill explícito e idempotente, nunca executado em migration ou boot;
-- preservar integralmente a política de identidade criada no Prompt 08;
-- alterar somente os arquivos autorizados pelo Prompt 09.
+- adicionar PDF/XML de nota fiscal com armazenamento privado;
+- validar conteúdo e tamanho dos arquivos;
+- garantir isolamento por tenant e permissões explícitas;
+- tratar substituição/exclusão após commit e erros de storage corretamente;
+- alterar somente os arquivos autorizados pelo Prompt 10.
 
-Antes de editar, reler integralmente a seção do Prompt 09, listar os arquivos autorizados e confirmar que nenhum arquivo extra será necessário.
+Antes de editar, reler integralmente a seção do Prompt 10, listar os arquivos autorizados e confirmar que nenhum arquivo extra será necessário.
 
-### Evidências locais do Prompt 08
+### Evidências locais do Prompt 09
 
 - `python manage.py check`: sem problemas.
 - `makemigrations --check --dry-run`: `No changes detected`.
-- `migrate --plan`: inclui `customers.0001_initial` depois de `accounts.0024`, criando os três modelos e somente as duas constraints autorizadas.
-- Testes focados/regressivos: 24 testes, todos verdes.
-- Suíte completa PostgreSQL: 878 testes, todos verdes.
+- Nenhuma migration criada, conforme exigido pelo prompt.
+- Testes do app `customers`: 19 testes, todos verdes.
+- Suíte completa PostgreSQL: 889 testes, todos verdes.
 - `git diff --check`: limpo.
 
 ## 7. Fluxo de entrega de cada prompt
