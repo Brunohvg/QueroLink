@@ -236,6 +236,13 @@ from datetime import timedelta
 
 WEBHOOK_AUTH_REQUIRED = config('WEBHOOK_AUTH_REQUIRED', default=True, cast=bool)
 
+PAGARME_BOLETO_FINE_ENABLED = config(
+    'PAGARME_BOLETO_FINE_ENABLED', default=False, cast=bool,
+)
+PAGARME_BOLETO_INTEREST_ENABLED = config(
+    'PAGARME_BOLETO_INTEREST_ENABLED', default=False, cast=bool,
+)
+
 PLAN_PRICES = {
     'STARTER': config('PLAN_PRICE_STARTER', default=14700, cast=int),
     'PRO': config('PLAN_PRICE_PRO', default=29700, cast=int),
