@@ -1,3 +1,5 @@
+import hashlib
+import json
 import os
 import stat
 import tempfile
@@ -91,17 +93,25 @@ class BackupScriptParsingTest(TestCase):
         super().setUpClass()
         cls.tmpdir = tempfile.mkdtemp(prefix="ql_backup_test_")
 
+    def setUp(self):
+        self._backup_dir = tempfile.mkdtemp(prefix="ql_run_", dir=self.tmpdir)
+        self._media_root = Path(self._backup_dir) / "media_root"
+        self._media_root.mkdir()
+        (self._media_root / ".gitkeep").write_text("")
+        self._bin_dir = Path(tempfile.mkdtemp(prefix="bin_", dir=self.tmpdir))
+
     def _make_bin(self, name, content):
-        bin_path = Path(self.tmpdir) / name
+        bin_path = self._bin_dir / name
         bin_path.write_text("#!/bin/bash\n" + content)
         bin_path.chmod(bin_path.stat().st_mode | stat.S_IEXEC)
         return str(bin_path)
 
     def _run_backup_script(self, extra_env=None):
         env = {
-            "PATH": self.tmpdir + ":" + os.environ.get("PATH", "/usr/bin:/bin"),
+            "PATH": str(self._bin_dir) + ":" + os.environ.get("PATH", "/usr/bin:/bin"),
             "HOME": self.tmpdir,
-            "BACKUP_DIR": self.tmpdir,
+            "BACKUP_DIR": self._backup_dir,
+            "MEDIA_ROOT": str(self._media_root),
             "GDRIVE_REMOTE": "gdrive",
             "GDRIVE_PATH": "test-backups",
             "LOCAL_RETENTION_DAYS": "1",
@@ -255,9 +265,104 @@ esac
             result = self._run_backup_script(extra_env=self._make_success_env())
         finally:
             self._teardown_db_url()
-        self.assertEqual(result.returncode, 0, f"script failed:\nSTDOUT={result.stdout}\nSTDERR={result.stderr}")
+        self.assertEqual(result.returncode, 0, f"backup failed:\nSTDOUT={result.stdout}\nSTDERR={result.stderr}")
 
-        dump_files = list(Path(self.tmpdir).glob("querolink_*.dump"))
-        self.assertGreaterEqual(len(dump_files), 1, f"Should have created a .dump file in {self.tmpdir}. Contents: {list(Path(self.tmpdir).iterdir())}")
+        dump_files = list(Path(self._backup_dir).glob("querolink_*.dump"))
+        self.assertGreaterEqual(len(dump_files), 1, f"Should have created a .dump file. Files: {list(Path(self._backup_dir).iterdir())}")
         for f in dump_files:
             self.assertTrue(f.name.endswith(".dump"), f"File should end with .dump: {f.name}")
+
+    # ── Media backup tests ──────────────────────────────────
+
+    def test_media_archive_created(self):
+        self._setup_db_url("postgres://u:p@h:5432/db")
+        try:
+            result = self._run_backup_script(extra_env=self._make_success_env())
+        finally:
+            self._teardown_db_url()
+        self.assertEqual(result.returncode, 0, f"backup failed:\nSTDOUT={result.stdout}\nSTDERR={result.stderr}")
+
+        media_files = list(Path(self._backup_dir).glob("querolink_*.media.tar.gz"))
+        self.assertEqual(len(media_files), 1, f"Should have created a .media.tar.gz file. Contents: {list(Path(self._backup_dir).iterdir())}")
+
+    def test_manifest_created_with_checksums(self):
+        self._setup_db_url("postgres://u:p@h:5432/db")
+        try:
+            result = self._run_backup_script(extra_env=self._make_success_env())
+        finally:
+            self._teardown_db_url()
+        self.assertEqual(result.returncode, 0, f"backup failed:\nSTDOUT={result.stdout}\nSTDERR={result.stderr}")
+
+        manifest_files = list(Path(self._backup_dir).glob("querolink_*.manifest.json"))
+        self.assertEqual(len(manifest_files), 1)
+
+        with open(manifest_files[0]) as f:
+            manifest = json.load(f)
+
+        self.assertIn("files", manifest)
+        self.assertIn("dump", manifest["files"])
+        self.assertIn("media", manifest["files"])
+        self.assertIn("sha256", manifest["files"]["dump"])
+        self.assertIn("sha256", manifest["files"]["media"])
+        self.assertIn("timestamp", manifest)
+        self.assertIn("created_at", manifest)
+
+    def test_manifest_checksums_match_actual_files(self):
+        self._setup_db_url("postgres://u:p@h:5432/db")
+        try:
+            result = self._run_backup_script(extra_env=self._make_success_env())
+        finally:
+            self._teardown_db_url()
+        self.assertEqual(result.returncode, 0)
+
+        manifest_files = list(Path(self._backup_dir).glob("querolink_*.manifest.json"))
+        with open(manifest_files[0]) as f:
+            manifest = json.load(f)
+
+        dump_file = list(Path(self._backup_dir).glob("querolink_*.dump"))[0]
+        with open(dump_file, "rb") as f:
+            actual_dump_sha = hashlib.sha256(f.read()).hexdigest()
+        self.assertEqual(manifest["files"]["dump"]["sha256"], actual_dump_sha)
+
+        media_file = list(Path(self._backup_dir).glob("querolink_*.media.tar.gz"))[0]
+        with open(media_file, "rb") as f:
+            actual_media_sha = hashlib.sha256(f.read()).hexdigest()
+        self.assertEqual(manifest["files"]["media"]["sha256"], actual_media_sha)
+
+    def test_missing_media_root_fails(self):
+        self._setup_db_url("postgres://u:p@h:5432/db")
+        try:
+            result = self._run_backup_script(extra_env={
+                **self._make_success_env(),
+                "MEDIA_ROOT": "/tmp/ql_nonexistent_media_test",
+            })
+        finally:
+            self._teardown_db_url()
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("MEDIA_ROOT", result.stdout + result.stderr)
+
+    def test_media_and_manifest_files_uploaded(self):
+        self._setup_db_url("postgres://u:p@h:5432/db")
+        try:
+            result = self._run_backup_script(extra_env=self._make_success_env())
+        finally:
+            self._teardown_db_url()
+        self.assertEqual(result.returncode, 0)
+
+        self.assertIn("3 objetos", result.stdout + result.stderr)
+
+    def test_all_output_files_exist_after_backup(self):
+        self._setup_db_url("postgres://u:p@h:5432/db")
+        try:
+            result = self._run_backup_script(extra_env=self._make_success_env())
+        finally:
+            self._teardown_db_url()
+        self.assertEqual(result.returncode, 0)
+
+        dumps = list(Path(self._backup_dir).glob("querolink_*.dump"))
+        medias = list(Path(self._backup_dir).glob("querolink_*.media.tar.gz"))
+        manifests = list(Path(self._backup_dir).glob("querolink_*.manifest.json"))
+
+        self.assertEqual(len(dumps), 1)
+        self.assertEqual(len(medias), 1)
+        self.assertEqual(len(manifests), 1)
