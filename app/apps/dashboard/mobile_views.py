@@ -14,10 +14,11 @@ from datetime import date, timedelta
 from calendar import monthrange
 from django.db.models import Sum
 
-from app.apps.accounts.models import User
+from app.apps.accounts.models import User, tenant_has_feature
 from app.apps.sales.models import Sale
 from app.apps.commissions.models import CommissionPeriod, SellerCommission
 from app.apps.audit.utils import log_action
+from app.apps.receivables.models import Boleto
 from django.core.exceptions import ValidationError
 
 logger = logging.getLogger(__name__)
@@ -1134,4 +1135,52 @@ def mobile_frete(request):
         'seller': seller,
         'store_cep_configured': bool(tenant.store_cep),
         'presets_json': presets,
+    })
+
+
+@login_required
+def mobile_boletos(request):
+    seller = _get_seller_profile(request)
+    if hasattr(seller, 'status_code'):
+        return seller
+    if not seller:
+        return redirect('dashboard:mobile_home')
+    if not tenant_has_feature(request.user.tenant, 'boletos'):
+        return redirect('dashboard:mobile_home')
+
+    boletos = Boleto.objects.filter(
+        tenant=request.user.tenant, seller=seller,
+    ).order_by('-created_at')[:100]
+
+    boletos_data = []
+    for b in boletos:
+        boletos_data.append({
+            'uuid': str(b.uuid),
+            'amount_cents': b.amount_cents,
+            'status': b.status,
+            'status_display': b.get_status_display(),
+            'due_date': b.due_date.isoformat(),
+            'paid_at': b.paid_at.isoformat() if b.paid_at else None,
+            'paid_amount_cents': b.paid_amount_cents,
+            'created_at': b.created_at.isoformat(),
+        })
+
+    return render(request, 'mobile/boletos/list.html', {
+        'seller': seller,
+        'boletos_json': boletos_data,
+    })
+
+
+@login_required
+def mobile_boleto_new(request):
+    seller = _get_seller_profile(request)
+    if hasattr(seller, 'status_code'):
+        return seller
+    if not seller:
+        return redirect('dashboard:mobile_home')
+    if not tenant_has_feature(request.user.tenant, 'boletos'):
+        return redirect('dashboard:mobile_home')
+
+    return render(request, 'mobile/boletos/new.html', {
+        'seller': seller,
     })

@@ -1,0 +1,90 @@
+{% extends 'mobile/base_mobile.html' %}
+{% load currency_filters %}
+{% block title %}Meus Boletos — Mérito{% endblock %}
+{% block content %}
+<div class="space-y-5 fade-up" x-data="mobileBoletos()" x-init="init()">
+  <div class="flex items-center justify-between">
+    <div class="flex items-center gap-3">
+      <a href="{% url 'dashboard:mobile_home' %}" class="w-10 h-10 bg-white rounded-xl card-shadow flex items-center justify-center">
+        <svg class="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
+      </a>
+      <h1 class="font-display text-[20px] font-bold text-gray-900">Meus Boletos</h1>
+    </div>
+    <a href="{% url 'dashboard:mobile_boleto_new' %}" class="w-10 h-10 bg-brand-600 rounded-xl flex items-center justify-center shadow-sm">
+      <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+    </a>
+  </div>
+
+  <template x-if="boletos.length === 0">
+    <div class="text-center py-10 text-gray-400">
+      <p class="text-lg mb-2">Nenhum boleto ainda</p>
+      <a href="{% url 'dashboard:mobile_boleto_new' %}" class="text-brand-600 text-sm font-medium">Criar primeiro boleto</a>
+    </div>
+  </template>
+
+  <div class="space-y-3">
+    {% verbatim %}
+    <template x-for="b in boletos" :key="b.uuid">
+      <div class="bg-white rounded-2xl card-shadow p-4 space-y-3">
+        <div class="flex items-center justify-between">
+          <span class="font-display font-bold text-lg">R$ <span x-text="(b.amount_cents / 100).toFixed(2)"></span></span>
+          <span :class="{
+            'text-yellow-600 bg-yellow-50': b.status === 'PENDENTE',
+            'text-green-600 bg-green-50': b.status === 'PAGO',
+            'text-red-600 bg-red-50': b.status === 'VENCIDO' || b.status === 'FALHOU',
+            'text-gray-500 bg-gray-50': b.status === 'CANCELADO',
+            'text-purple-600 bg-purple-50': b.status === 'ESTORNADO',
+          }" class="px-2 py-0.5 rounded-full text-xs font-medium" x-text="b.status_display"></span>
+        </div>
+        <div class="flex items-center justify-between text-sm text-gray-500">
+          <span>Vence: <span class="text-gray-700" x-text="b.due_date"></span></span>
+          <span x-show="b.paid_at">Pago: <span class="text-gray-700" x-text="b.paid_at.substring(0, 10)"></span></span>
+        </div>
+        <div x-show="b.status === 'PAGO'" class="pt-2">
+          <button @click="confirmAllocation(b.uuid)" class="w-full py-2 bg-green-50 text-green-700 text-sm font-medium rounded-xl hover:bg-green-100">
+            Confirmar Alocacao
+          </button>
+        </div>
+      </div>
+    </template>
+    {% endverbatim %}
+  </div>
+</div>
+
+{{ boletos_json|json_script:"boletos-data" }}
+<script>
+function mobileBoletos() {
+    return {
+        boletos: [],
+        init() {
+            var _p = JSON.parse(document.getElementById('boletos-data')?.textContent || '[]');
+            if (typeof _p === 'string') _p = JSON.parse(_p);
+            this.boletos = Array.isArray(_p) ? _p : [];
+        },
+        confirmAllocation(boletoUuid) {
+            fetch('/api/receivables/allocations/', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '',
+                },
+                body: JSON.stringify({ boleto_uuid: boletoUuid }),
+            })
+            .then(function(r) {
+                if (r.ok) {
+                    showToast('Venda alocada com sucesso!', 'success');
+                    window.location.reload();
+                } else {
+                    return r.json().then(function(d) {
+                        showToast(d.detail || 'Erro ao alocar.', 'error');
+                    });
+                }
+            })
+            .catch(function() {
+                showToast('Erro ao alocar venda.', 'error');
+            });
+        },
+    }
+}
+</script>
+{% endblock %}

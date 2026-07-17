@@ -1,0 +1,115 @@
+{% extends 'dashboard/base_desktop.html' %}
+{% block title %}Boletos — Mérito{% endblock %}
+{% block content %}
+<div x-data="gestorBoletosPage()" x-init="init()" class="max-w-7xl mx-auto">
+  <div class="sticky top-0 z-10 -mx-6 px-6 py-4 bg-gray-50/90 backdrop-blur-lg border-b border-gray-200/60 mb-6">
+    <div class="flex items-center justify-between">
+      <div>
+        <h1 class="font-display text-[22px] font-bold text-gray-900 tracking-tight">Boletos</h1>
+        <p class="text-[13px] text-gray-500 mt-0.5">
+          <span x-text="filteredList().length + ' boletos'"></span>
+        </p>
+      </div>
+      <div class="flex items-center gap-2">
+        <a href="{% url 'dashboard:gestor_boleto_new' %}" class="inline-flex items-center gap-2 px-4 py-2 bg-brand-600 text-white text-sm font-semibold rounded-xl hover:bg-brand-700 transition-colors">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+          Novo Boleto
+        </a>
+      </div>
+    </div>
+    <div class="flex gap-4 mt-3 text-sm">
+      <div class="bg-white rounded-xl px-4 py-2 shadow-sm border border-gray-100">
+        <span class="text-gray-500">A receber</span>
+        <span class="ml-2 font-semibold text-gray-900" x-text="stats.total_a_receber"></span>
+      </div>
+      <div class="bg-white rounded-xl px-4 py-2 shadow-sm border border-gray-100">
+        <span class="text-gray-500">Vencidos</span>
+        <span class="ml-2 font-semibold text-red-600" x-text="stats.vencidos"></span>
+      </div>
+      <div class="bg-white rounded-xl px-4 py-2 shadow-sm border border-gray-100">
+        <span class="text-gray-500">Pagos hoje</span>
+        <span class="ml-2 font-semibold text-green-600" x-text="stats.pagos_hoje"></span>
+      </div>
+    </div>
+  </div>
+
+  <div class="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+    <div class="p-4 border-b border-gray-50 flex gap-2">
+      <select x-model="filterStatus" class="text-sm border border-gray-200 rounded-lg px-3 py-1.5">
+        <option value="">Todos status</option>
+        <option value="PENDENTE">Pendente</option>
+        <option value="PAGO">Pago</option>
+        <option value="VENCIDO">Vencido</option>
+        <option value="CANCELADO">Cancelado</option>
+        <option value="ESTORNADO">Estornado</option>
+        <option value="FALHOU">Falhou</option>
+      </select>
+    </div>
+    <table class="w-full text-sm">
+      <thead>
+        <tr class="text-left text-gray-500 border-b border-gray-50">
+          <th class="px-4 py-3 font-medium">Vendedor</th>
+          <th class="px-4 py-3 font-medium">Valor</th>
+          <th class="px-4 py-3 font-medium">Status</th>
+          <th class="px-4 py-3 font-medium">Vencimento</th>
+          <th class="px-4 py-3 font-medium">Pagamento</th>
+          <th class="px-4 py-3 font-medium"></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% verbatim %}
+        <template x-for="b in filteredList()" :key="b.uuid">
+          <tr class="border-b border-gray-50 hover:bg-gray-50/50">
+            <td class="px-4 py-3" x-text="b.seller_name"></td>
+            <td class="px-4 py-3 font-medium" x-text="'R$ ' + (b.amount_cents / 100).toFixed(2)"></td>
+            <td class="px-4 py-3">
+              <span :class="{
+                'text-yellow-600 bg-yellow-50': b.status === 'PENDENTE',
+                'text-green-600 bg-green-50': b.status === 'PAGO',
+                'text-red-600 bg-red-50': b.status === 'VENCIDO' || b.status === 'FALHOU',
+                'text-gray-500 bg-gray-50': b.status === 'CANCELADO',
+                'text-purple-600 bg-purple-50': b.status === 'ESTORNADO',
+              }" class="px-2 py-0.5 rounded-full text-xs font-medium" x-text="b.status_display"></span>
+            </td>
+            <td class="px-4 py-3 text-gray-600" x-text="b.due_date"></td>
+            <td class="px-4 py-3" x-text="b.paid_at ? 'R$ ' + (b.paid_amount_cents / 100).toFixed(2) : '-'"></td>
+            <td class="px-4 py-3">
+              <a :href="'/dashboard/gestor/boletos/' + b.uuid + '/'" class="text-brand-600 hover:text-brand-800 text-xs font-medium">Detalhes</a>
+            </td>
+          </tr>
+        </template>
+        {% endverbatim %}
+      </tbody>
+    </table>
+    <div x-show="filteredList().length === 0" class="p-8 text-center text-gray-400">
+      Nenhum boleto encontrado.
+    </div>
+  </div>
+</div>
+
+{{ boletos_json|json_script:"boletos-data" }}
+<script>
+function gestorBoletosPage() {
+    return {
+        boletos: [],
+        filterStatus: '',
+        stats: { total_a_receber: 0, vencidos: 0, pagos_hoje: 0 },
+        init() {
+            var _p = JSON.parse(document.getElementById('boletos-data')?.textContent || '[]');
+            if (typeof _p === 'string') _p = JSON.parse(_p);
+            this.boletos = Array.isArray(_p) ? _p : [];
+            this.stats = {
+                total_a_receber: {{ stats.total_a_receber }},
+                vencidos: {{ stats.vencidos }},
+                pagos_hoje: {{ stats.pagos_hoje }},
+            };
+        },
+        filteredList() {
+            if (!this.filterStatus) return this.boletos;
+            var self = this;
+            return this.boletos.filter(function(b) { return b.status === self.filterStatus; });
+        },
+    }
+}
+</script>
+{% endblock %}

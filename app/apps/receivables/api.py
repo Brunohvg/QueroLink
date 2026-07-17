@@ -1,0 +1,285 @@
+import logging
+
+from django.db import IntegrityError, transaction
+from django.shortcuts import get_object_or_404
+from django.utils import timezone
+
+from rest_framework import status
+from rest_framework.decorators import (
+    api_view, permission_classes, throttle_classes,
+)
+from rest_framework.permissions import IsAuthenticated
+from rest_framework.response import Response
+
+from app.apps.accounts.models import User, tenant_has_feature
+from app.apps.audit.utils import log_action
+
+from .allocation_services import allocate_paid_boleto as allocate_boleto
+from .commission_services import apply_commission_impact
+from .models import Boleto, ReceivableAllocation, CommissionImpactReview
+from .serializers import (
+    BoletoListSerializer,
+    BoletoDetailSerializer,
+    BoletoCreateSerializer,
+    AllocationSerializer,
+    AllocationCreateSerializer,
+    CommissionImpactReviewSerializer,
+)
+from .services import create_boleto, cancel_boleto, BoletoServiceError
+from .throttles import BoletoCreateThrottle, BoletoCancelThrottle
+
+
+logger = logging.getLogger(__name__)
+
+
+def _tenant_enabled(request):
+    if not tenant_has_feature(request.user.tenant, 'boletos'):
+        return False
+    return True
+
+
+def _get_boleto_queryset(user):
+    qs = Boleto.objects.filter(tenant=user.tenant)
+    if user.role == User.Role.SELLER:
+        qs = qs.filter(seller__user=user)
+    return qs.select_related('seller', 'created_by')
+
+
+@api_view(['GET', 'POST'])
+@permission_classes([IsAuthenticated])
+def boleto_list_create(request):
+    if not _tenant_enabled(request):
+        return Response(
+            {'detail': 'Funcionalidade nao disponivel.'},
+            status=status.HTTP_403_FORBIDDEN,
+        )
+
+    if request.method == 'GET':
+        boletos = _get_boleto_queryset(request.user)
+        status_filter = request.query_params.get('status')
+        if status_filter:
+            boletos = boletos.filter(status=status_filter)
+        seller_filter = request.query_params.get('seller_uuid')
+        if seller_filter and request.user.role != User.Role.SELLER:
+            boletos = boletos.filter(seller__uuid=seller_filter)
+        boletos = boletos.order_by('-created_at')[:100]
+        serializer = BoletoListSerializer(boletos, many=True)
+        return Response(serializer.data)
+
+    serializer = BoletoCreateSerializer(
+        data=request.data, context={'request': request},
+    )
+    serializer.is_valid(raise_exception=True)
+    data = serializer.validated_data
+    seller = data.pop('seller_uuid')
+    idempotency_key = request.headers.get(
+        'X-Idempotency-Key', str(request.user.pk)
+    )
+
+    try:
+        boleto = create_boleto(
+            tenant=request.user.tenant,
+            seller=seller,
+            created_by=request.user,
+            data=data,
+            idempotency_key=idempotency_key,
+        )
+    except BoletoServiceError as e:
+        return Response(
+            {'detail': str(e), 'boleto_uuid': str(e.boleto.pk)},
+            status=status.HTTP_422_UNPROCESSABLE_ENTITY,
+        )
+
+    log_action(
+        request, 'receivable.boleto_created', boleto,
+        {'amount_cents': boleto.amount_cents},
+    )
+    result = BoletoDetailSerializer(boleto).data
+    result['boleto_url'] = boleto.provider_order_id or ''
+    return Response(result, status=status.HTTP_201_CREATED)
+
+
+@api_view(['GET', 'POST'])
+@permission_classes([IsAuthenticated])
+def boleto_detail_cancel(request, boleto_uuid):
+    if not _tenant_enabled(request):
+        return Response(
+            {'detail': 'Funcionalidade nao disponivel.'},
+            status=status.HTTP_403_FORBIDDEN,
+        )
+
+    boleto = get_object_or_404(
+        _get_boleto_queryset(request.user), uuid=boleto_uuid
+    )
+
+    if request.method == 'GET':
+        serializer = BoletoDetailSerializer(boleto)
+        return Response(serializer.data)
+
+    if boleto.status not in (Boleto.Status.PENDENTE,):
+        return Response(
+            {'detail': 'Boleto nao pode ser cancelado no status atual.'},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    try:
+        result = cancel_boleto(boleto)
+    except BoletoServiceError as e:
+        return Response(
+            {'detail': str(e)},
+            status=status.HTTP_422_UNPROCESSABLE_ENTITY,
+        )
+
+    log_action(
+        request, 'receivable.boleto_canceled', result,
+        {'previous_status': boleto.status},
+    )
+    return Response(BoletoDetailSerializer(result).data)
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def boleto_stats(request):
+    if not _tenant_enabled(request):
+        return Response(
+            {'detail': 'Funcionalidade nao disponivel.'},
+            status=status.HTTP_403_FORBIDDEN,
+        )
+    if request.user.role == User.Role.SELLER:
+        return Response(
+            {'detail': 'Acesso negado.'},
+            status=status.HTTP_403_FORBIDDEN,
+        )
+
+    qs = Boleto.objects.filter(tenant=request.user.tenant)
+    today = timezone.localdate()
+    stats = {
+        'total_a_receber': qs.filter(
+            status=Boleto.Status.PENDENTE,
+        ).count(),
+        'vencendo_hoje': qs.filter(
+            status=Boleto.Status.PENDENTE,
+            due_date=today,
+        ).count(),
+        'vencidos': qs.filter(
+            status=Boleto.Status.PENDENTE,
+            due_date__lt=today,
+        ).count(),
+        'pagos_periodo': qs.filter(
+            status=Boleto.Status.PAGO,
+            paid_at__date=today,
+        ).count(),
+        'pagos_sem_alocacao': qs.filter(
+            status=Boleto.Status.PAGO,
+            allocations__isnull=True,
+        ).count(),
+        'falhas_emissao': qs.filter(
+            status=Boleto.Status.FALHOU,
+        ).count(),
+        'cancelamentos_pendentes': qs.filter(
+            status=Boleto.Status.CANCEL_PEND,
+        ).count(),
+    }
+    return Response(stats)
+
+
+@api_view(['GET', 'POST'])
+@permission_classes([IsAuthenticated])
+def allocation_list_create(request):
+    if not _tenant_enabled(request):
+        return Response(
+            {'detail': 'Funcionalidade nao disponivel.'},
+            status=status.HTTP_403_FORBIDDEN,
+        )
+
+    if request.method == 'GET':
+        qs = ReceivableAllocation.objects.filter(
+            tenant=request.user.tenant,
+        ).select_related('boleto', 'boleto__seller')
+        if request.user.role == User.Role.SELLER:
+            qs = qs.filter(boleto__seller__user=request.user)
+        qs = qs.order_by('-allocated_at')[:100]
+        return Response(AllocationSerializer(qs, many=True).data)
+
+    serializer = AllocationCreateSerializer(data=request.data)
+    serializer.is_valid(raise_exception=True)
+    boleto_uuid = serializer.validated_data['boleto_uuid']
+
+    boleto = get_object_or_404(
+        _get_boleto_queryset(request.user), uuid=boleto_uuid
+    )
+
+    try:
+        allocation, created = allocate_boleto(
+            boleto, allocated_by=request.user,
+        )
+    except ValueError as e:
+        return Response(
+            {'detail': str(e)},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    log_action(
+        request, 'receivable.allocation_created', allocation,
+        {'amount_cents': allocation.amount_cents},
+    )
+    return Response(
+        AllocationSerializer(allocation).data,
+        status=status.HTTP_201_CREATED,
+    )
+
+
+@api_view(['GET', 'POST'])
+@permission_classes([IsAuthenticated])
+def impact_review_list_approve(request):
+    if not _tenant_enabled(request):
+        return Response(
+            {'detail': 'Funcionalidade nao disponivel.'},
+            status=status.HTTP_403_FORBIDDEN,
+        )
+    if request.user.role == User.Role.SELLER:
+        return Response(
+            {'detail': 'Acesso negado.'},
+            status=status.HTTP_403_FORBIDDEN,
+        )
+
+    if request.method == 'GET':
+        qs = CommissionImpactReview.objects.filter(
+            tenant=request.user.tenant,
+        ).select_related('seller').order_by('-created_at')[:100]
+        return Response(
+            CommissionImpactReviewSerializer(qs, many=True).data,
+        )
+
+    review_uuid = request.data.get('review_uuid')
+    action = request.data.get('action')
+    if not review_uuid or action not in ('approve', 'reject'):
+        return Response(
+            {'detail': 'review_uuid e action (approve/reject) sao obrigatorios.'},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    review = get_object_or_404(
+        CommissionImpactReview,
+        uuid=review_uuid,
+        tenant=request.user.tenant,
+    )
+
+    if action == 'approve':
+        try:
+            from .commission_services import approve_and_apply_review
+            approve_and_apply_review(review, request.user, '')
+        except ValueError as e:
+            return Response(
+                {'detail': str(e)},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+    else:
+        review.status = CommissionImpactReview.Status.REJECTED
+        review.reviewed_by = request.user
+        review.reviewed_at = timezone.now()
+        review.save(update_fields=['status', 'reviewed_by', 'reviewed_at'])
+
+    return Response(
+        CommissionImpactReviewSerializer(review).data,
+    )
