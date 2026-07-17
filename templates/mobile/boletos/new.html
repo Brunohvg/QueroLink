@@ -118,6 +118,7 @@ function mobileNovoBoleto() {
             instructions: '',
             notes: '',
         },
+        idempotencyKey: 'boleto-' + Date.now() + '-' + Math.random().toString(36).slice(2, 8),
         error: '',
         submitting: false,
         submit() {
@@ -126,9 +127,11 @@ function mobileNovoBoleto() {
             var payload = {};
             for (var key in this.form) {
                 if (this.form.hasOwnProperty(key)) {
-                    payload[key] = this.form[key] === '' ? null : this.form[key];
+                    var val = this.form[key];
+                    payload[key] = val === '' ? '' : val;
                 }
             }
+            delete payload.seller_uuid;
             if (payload.amount_cents) {
                 var val = parseFloat(payload.amount_cents);
                 if (!isNaN(val)) payload.amount_cents = Math.round(val * 100);
@@ -138,7 +141,7 @@ function mobileNovoBoleto() {
                 headers: {
                     'Content-Type': 'application/json',
                     'X-CSRFToken': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '',
-                    'X-Idempotency-Key': Date.now().toString(),
+                    'X-Idempotency-Key': this.idempotencyKey,
                 },
                 body: JSON.stringify(payload),
             })

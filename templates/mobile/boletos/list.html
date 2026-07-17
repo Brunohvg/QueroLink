@@ -40,6 +40,17 @@
           <span>Vence: <span class="text-gray-700" x-text="b.due_date"></span></span>
           <span x-show="b.paid_at">Pago: <span class="text-gray-700" x-text="b.paid_at.substring(0, 10)"></span></span>
         </div>
+        <div x-show="b.provider_url && b.status === 'PENDENTE'" class="pt-1">
+          <a :href="b.provider_url" target="_blank" rel="noopener"
+             class="text-xs text-brand-600 hover:text-brand-800 font-medium">
+            Abrir Boleto
+          </a>
+          <span x-show="b.provider_barcode" class="text-xs text-gray-400 ml-3 cursor-pointer"
+                @click="copyBarcode(b.provider_barcode)">Copiar linha</span>
+        </div>
+        <div x-show="!b.provider_url && b.status === 'PENDENTE'" class="pt-1 text-xs text-amber-600">
+          Aguardando confirmacao...
+        </div>
         <div x-show="b.status === 'PAGO'" class="pt-2">
           <button @click="confirmAllocation(b.uuid)" class="w-full py-2 bg-green-50 text-green-700 text-sm font-medium rounded-xl hover:bg-green-100">
             Confirmar Alocacao
@@ -60,6 +71,11 @@ function mobileBoletos() {
             var _p = JSON.parse(document.getElementById('boletos-data')?.textContent || '[]');
             if (typeof _p === 'string') _p = JSON.parse(_p);
             this.boletos = Array.isArray(_p) ? _p : [];
+        },
+        copyBarcode(code) {
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                navigator.clipboard.writeText(code);
+            }
         },
         confirmAllocation(boletoUuid) {
             fetch('/api/receivables/allocations/', {

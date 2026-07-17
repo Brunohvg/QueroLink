@@ -111,13 +111,13 @@ class ReceivablesAPITests(TestCase):
         self._login(self.manager)
         response = self.client.get(self._url('boleto-list-create'))
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(len(response.data), 2)
+        self.assertEqual(len(response.data['results']), 2)
 
     def test_seller_can_only_list_own_boletos(self):
         self._login(self.seller.user)
         response = self.client.get(self._url('boleto-list-create'))
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        for b in response.data:
+        for b in response.data['results']:
             self.assertEqual(b['seller_name'], 'Seller One')
 
     def test_list_filters_by_status(self):
@@ -127,7 +127,7 @@ class ReceivablesAPITests(TestCase):
             {'status': 'PENDENTE'},
         )
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(len(response.data), 2)
+        self.assertEqual(len(response.data['results']), 2)
 
     def test_other_tenant_cannot_access(self):
         other_tenant = Tenant.objects.create(
@@ -143,7 +143,7 @@ class ReceivablesAPITests(TestCase):
         self._login(other_user)
         response = self.client.get(self._url('boleto-list-create'))
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(len(response.data), 0)
+        self.assertEqual(len(response.data['results']), 0)
 
     # ── Boleto detail ────────────────────────────────────────
 
@@ -267,4 +267,4 @@ class ReceivablesAPITests(TestCase):
         )
         self._login(other_user)
         response = self.client.get(self._url('boleto-list-create'))
-        self.assertEqual(len(response.data), 0)
+        self.assertEqual(len(response.data['results']), 0)

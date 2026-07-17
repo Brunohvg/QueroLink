@@ -1,6 +1,6 @@
 from rest_framework import serializers
 
-from app.apps.accounts.models import tenant_has_feature
+from app.apps.accounts.models import User, tenant_has_feature
 
 from .models import Boleto, ReceivableAllocation, CommissionImpactReview
 
@@ -15,7 +15,8 @@ class BoletoListSerializer(serializers.ModelSerializer):
         fields = [
             'uuid', 'seller_name', 'amount_cents', 'amount_formatted',
             'status', 'status_display', 'due_date', 'paid_at',
-            'paid_amount_cents', 'created_at', 'provider_order_id',
+            'paid_amount_cents', 'created_at',
+            'provider_barcode', 'provider_url',
         ]
 
     def get_status_display(self, obj):
@@ -48,6 +49,7 @@ class BoletoDetailSerializer(serializers.ModelSerializer):
             'last_provider_status', 'operation_error_code',
             'operation_error_message',
             'has_invoice_pdf', 'has_invoice_xml',
+            'provider_barcode', 'provider_url',
             'created_at', 'updated_at',
         ]
 
@@ -66,19 +68,19 @@ class BoletoDetailSerializer(serializers.ModelSerializer):
 
 
 class BoletoCreateSerializer(serializers.Serializer):
-    seller_uuid = serializers.UUIDField()
+    seller_uuid = serializers.UUIDField(required=False)
     payer_name = serializers.CharField(max_length=255)
     payer_document = serializers.CharField(max_length=20)
     payer_document_type = serializers.ChoiceField(
         choices=['CPF', 'CNPJ']
     )
-    payer_email = serializers.EmailField(required=False, allow_blank=True)
+    payer_email = serializers.EmailField(required=False, allow_blank=True, default='')
     payer_phone = serializers.CharField(max_length=20)
     payer_zip_code = serializers.CharField(max_length=10)
     payer_street = serializers.CharField(max_length=255)
     payer_number = serializers.CharField(max_length=20)
     payer_complement = serializers.CharField(
-        max_length=255, required=False, allow_blank=True
+        max_length=255, required=False, allow_blank=True, default=''
     )
     payer_neighborhood = serializers.CharField(max_length=255)
     payer_city = serializers.CharField(max_length=255)
@@ -86,10 +88,10 @@ class BoletoCreateSerializer(serializers.Serializer):
     amount_cents = serializers.IntegerField(min_value=100)
     due_date = serializers.DateField()
     instructions = serializers.CharField(
-        max_length=256, required=False, allow_blank=True
+        max_length=256, required=False, allow_blank=True, default=''
     )
     notes = serializers.CharField(
-        max_length=255, required=False, allow_blank=True
+        max_length=255, required=False, allow_blank=True, default=''
     )
 
     def validate_seller_uuid(self, value):
@@ -97,11 +99,27 @@ class BoletoCreateSerializer(serializers.Serializer):
         request = self.context.get('request')
         if not request:
             return value
+        if request.user.role == User.Role.SELLER:
+            raise serializers.ValidationError(
+                'Vendedor nao pode escolher seller_uuid.'
+            )
         try:
             seller = Seller.objects.get(uuid=value, tenant=request.user.tenant)
         except Seller.DoesNotExist:
             raise serializers.ValidationError('Vendedor nao encontrado.')
         return seller
+
+    def validate_payer_email(self, value):
+        return value or ''
+
+    def validate_payer_complement(self, value):
+        return value or ''
+
+    def validate_instructions(self, value):
+        return value or ''
+
+    def validate_notes(self, value):
+        return value or ''
 
     def validate(self, attrs):
         from app.apps.sellers.validators import (

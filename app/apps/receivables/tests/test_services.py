@@ -184,3 +184,44 @@ class CreateBoletoTests(TransactionTestCase):
             )
 
         self.assertEqual(error.exception.boleto.status, Boleto.Status.FALHOU)
+
+    @patch('app.apps.receivables.services.get_provider')
+    def test_barcode_and_url_persisted(self, get_provider):
+        provider = self.provider()
+        provider.create.return_value = ProviderResult(
+            provider='PAGARME',
+            order_id='or_barcode',
+            charge_id='ch_barcode',
+            status=ProviderStatus.PENDING,
+            barcode='12345678901234567890123456789012345678901234',
+            url='https://pagarme.me/boleto/test',
+        )
+        get_provider.return_value = provider
+        boleto = create_boleto(
+            self.tenant, self.seller, self.user,
+            self.boleto_data(), 'barcode-key',
+        )
+        self.assertEqual(
+            boleto.provider_barcode,
+            '12345678901234567890123456789012345678901234',
+        )
+        self.assertEqual(
+            boleto.provider_url, 'https://pagarme.me/boleto/test',
+        )
+
+    @patch('app.apps.receivables.services.get_provider')
+    def test_same_key_different_payload_raises_error(self, get_provider):
+        provider = self.provider()
+        get_provider.return_value = provider
+        create_boleto(
+            self.tenant, self.seller, self.user,
+            self.boleto_data(), 'conflict-key',
+        )
+        diff_data = dict(self.boleto_data())
+        diff_data['amount_cents'] = 99999
+        from django.core.exceptions import ValidationError
+        with self.assertRaises(ValidationError):
+            create_boleto(
+                self.tenant, self.seller, self.user,
+                diff_data, 'conflict-key',
+            )

@@ -256,12 +256,17 @@ def apply_reconciliation_result(boleto, result):
             ])
             return reconciled, changed
 
-    Boleto.objects.filter(pk=reconciled.pk).update(
-        provider_order_id=result.order_id or reconciled.provider_order_id,
-        provider_charge_id=result.charge_id or reconciled.provider_charge_id,
-        last_provider_status=result.status.value,
-        last_synced_at=now,
-    )
+    update_kwargs = {
+        'provider_order_id': result.order_id or reconciled.provider_order_id,
+        'provider_charge_id': result.charge_id or reconciled.provider_charge_id,
+        'last_provider_status': result.status.value,
+        'last_synced_at': now,
+    }
+    if result.barcode and not reconciled.provider_barcode:
+        update_kwargs['provider_barcode'] = result.barcode[:255]
+    if result.url and not reconciled.provider_url:
+        update_kwargs['provider_url'] = result.url[:500]
+    Boleto.objects.filter(pk=reconciled.pk).update(**update_kwargs)
     reconciled.refresh_from_db()
     return reconciled, changed
 
@@ -322,17 +327,32 @@ def create_boleto(tenant, seller, created_by, data, idempotency_key):
         'status': Boleto.Status.CRIANDO,
     })
     with transaction.atomic():
-        boleto, created = Boleto.objects.get_or_create(
+        existing = Boleto.objects.filter(
+            tenant=tenant, idempotency_key=key,
+        ).select_for_update().first()
+        if existing:
+            compare_fields = {
+                k for k in data.keys()
+                if k not in ('status',)
+            }
+            for field in compare_fields:
+                existing_val = getattr(existing, field, None)
+                new_val = data.get(field)
+                if str(existing_val) != str(new_val) or (
+                    existing_val is None and new_val is not None
+                ):
+                    raise ValidationError(
+                        {'idempotency_key': 'Chave de idempotencia ja utilizada com dados diferentes.'}
+                    )
+            return existing
+
+        boleto = Boleto(
             tenant=tenant,
             idempotency_key=key,
-            defaults=defaults,
+            **defaults,
         )
-        if created:
-            boleto.full_clean()
-            boleto.save()
-
-    if not created:
-        return boleto
+        boleto.full_clean()
+        boleto.save()
 
     provider = get_provider(tenant)
     provider_data = {
@@ -371,6 +391,8 @@ def create_boleto(tenant, seller, created_by, data, idempotency_key):
             locked.last_synced_at = timezone.now()
             locked.operation_error_code = ''
             locked.operation_error_message = ''
+            locked.provider_barcode = (result.barcode or '')[:255]
+            locked.provider_url = (result.url or '')[:500]
             locked.transition_to(Boleto.Status.PENDENTE)
             locked.save(update_fields=[
                 'provider',
@@ -380,6 +402,8 @@ def create_boleto(tenant, seller, created_by, data, idempotency_key):
                 'last_synced_at',
                 'operation_error_code',
                 'operation_error_message',
+                'provider_barcode',
+                'provider_url',
                 'status',
                 'updated_at',
             ])

@@ -147,12 +147,14 @@ function novoBoletoPage() {
             instructions: '',
             notes: '',
         },
+        idempotencyKey: '',
         error: '',
         submitting: false,
         init() {
             var _p = JSON.parse(document.getElementById('sellers-data')?.textContent || '[]');
             if (typeof _p === 'string') _p = JSON.parse(_p);
             this.sellers = Array.isArray(_p) ? _p : [];
+            this.idempotencyKey = 'boleto-' + Date.now() + '-' + Math.random().toString(36).slice(2, 8);
         },
         submit() {
             this.error = '';
@@ -172,7 +174,7 @@ function novoBoletoPage() {
                 headers: {
                     'Content-Type': 'application/json',
                     'X-CSRFToken': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '',
-                    'X-Idempotency-Key': Date.now().toString(),
+                    'X-Idempotency-Key': this.idempotencyKey,
                 },
                 body: JSON.stringify(payload),
             })

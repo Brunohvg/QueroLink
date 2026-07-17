@@ -8,13 +8,17 @@ from rest_framework import status
 from rest_framework.decorators import (
     api_view, permission_classes, throttle_classes,
 )
+from rest_framework.pagination import PageNumberPagination
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
 from app.apps.accounts.models import User, tenant_has_feature
 from app.apps.audit.utils import log_action
 
-from .allocation_services import allocate_paid_boleto as allocate_boleto
+from .allocation_services import (
+    allocate_paid_boleto as allocate_boleto,
+    AllocationDomainError,
+)
 from .commission_services import apply_commission_impact
 from .models import Boleto, ReceivableAllocation, CommissionImpactReview
 from .serializers import (
@@ -32,10 +36,32 @@ from .throttles import BoletoCreateThrottle, BoletoCancelThrottle
 logger = logging.getLogger(__name__)
 
 
+class BoletoPagination(PageNumberPagination):
+    page_size = 50
+    page_size_query_param = 'page_size'
+    max_page_size = 200
+
+
+class AllocationPagination(PageNumberPagination):
+    page_size = 50
+    page_size_query_param = 'page_size'
+    max_page_size = 200
+
+
+class ReviewPagination(PageNumberPagination):
+    page_size = 50
+    page_size_query_param = 'page_size'
+    max_page_size = 200
+
+
 def _tenant_enabled(request):
     if not tenant_has_feature(request.user.tenant, 'boletos'):
         return False
     return True
+
+
+def _is_gestor(user):
+    return user.role in (User.Role.ADMIN, User.Role.MANAGER)
 
 
 def _get_boleto_queryset(user):
@@ -47,6 +73,7 @@ def _get_boleto_queryset(user):
 
 @api_view(['GET', 'POST'])
 @permission_classes([IsAuthenticated])
+@throttle_classes([BoletoCreateThrottle])
 def boleto_list_create(request):
     if not _tenant_enabled(request):
         return Response(
@@ -60,21 +87,47 @@ def boleto_list_create(request):
         if status_filter:
             boletos = boletos.filter(status=status_filter)
         seller_filter = request.query_params.get('seller_uuid')
-        if seller_filter and request.user.role != User.Role.SELLER:
+        if seller_filter and _is_gestor(request.user):
             boletos = boletos.filter(seller__uuid=seller_filter)
-        boletos = boletos.order_by('-created_at')[:100]
-        serializer = BoletoListSerializer(boletos, many=True)
-        return Response(serializer.data)
+        boletos = boletos.order_by('-created_at')
+        paginator = BoletoPagination()
+        page = paginator.paginate_queryset(boletos, request)
+        serializer = BoletoListSerializer(page, many=True)
+        return paginator.get_paginated_response(serializer.data)
+
+    if request.user.role == User.Role.FINANCEIRO:
+        return Response(
+            {'detail': 'Acesso negado.'},
+            status=status.HTTP_403_FORBIDDEN,
+        )
+
+    idempotency_key = request.headers.get('X-Idempotency-Key')
+    if not idempotency_key:
+        return Response(
+            {'detail': 'Cabecalho X-Idempotency-Key obrigatorio.'},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
 
     serializer = BoletoCreateSerializer(
         data=request.data, context={'request': request},
     )
     serializer.is_valid(raise_exception=True)
     data = serializer.validated_data
-    seller = data.pop('seller_uuid')
-    idempotency_key = request.headers.get(
-        'X-Idempotency-Key', str(request.user.pk)
-    )
+
+    if request.user.role == User.Role.SELLER:
+        seller = getattr(request.user, 'seller_profile', None)
+        if not seller:
+            return Response(
+                {'detail': 'Perfil de vendedor nao encontrado.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+    else:
+        seller = data.pop('seller_uuid', None)
+        if not seller:
+            return Response(
+                {'detail': 'seller_uuid obrigatorio para gestor.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
     try:
         boleto = create_boleto(
@@ -95,12 +148,12 @@ def boleto_list_create(request):
         {'amount_cents': boleto.amount_cents},
     )
     result = BoletoDetailSerializer(boleto).data
-    result['boleto_url'] = boleto.provider_order_id or ''
     return Response(result, status=status.HTTP_201_CREATED)
 
 
 @api_view(['GET', 'POST'])
 @permission_classes([IsAuthenticated])
+@throttle_classes([BoletoCancelThrottle])
 def boleto_detail_cancel(request, boleto_uuid):
     if not _tenant_enabled(request):
         return Response(
@@ -115,6 +168,12 @@ def boleto_detail_cancel(request, boleto_uuid):
     if request.method == 'GET':
         serializer = BoletoDetailSerializer(boleto)
         return Response(serializer.data)
+
+    if not _is_gestor(request.user):
+        return Response(
+            {'detail': 'Acesso negado.'},
+            status=status.HTTP_403_FORBIDDEN,
+        )
 
     if boleto.status not in (Boleto.Status.PENDENTE,):
         return Response(
@@ -145,7 +204,7 @@ def boleto_stats(request):
             {'detail': 'Funcionalidade nao disponivel.'},
             status=status.HTTP_403_FORBIDDEN,
         )
-    if request.user.role == User.Role.SELLER:
+    if not _is_gestor(request.user):
         return Response(
             {'detail': 'Acesso negado.'},
             status=status.HTTP_403_FORBIDDEN,
@@ -198,8 +257,12 @@ def allocation_list_create(request):
         ).select_related('boleto', 'boleto__seller')
         if request.user.role == User.Role.SELLER:
             qs = qs.filter(boleto__seller__user=request.user)
-        qs = qs.order_by('-allocated_at')[:100]
-        return Response(AllocationSerializer(qs, many=True).data)
+        qs = qs.order_by('-allocated_at')
+        paginator = AllocationPagination()
+        page = paginator.paginate_queryset(qs, request)
+        return paginator.get_paginated_response(
+            AllocationSerializer(page, many=True).data,
+        )
 
     serializer = AllocationCreateSerializer(data=request.data)
     serializer.is_valid(raise_exception=True)
@@ -213,7 +276,7 @@ def allocation_list_create(request):
         allocation, created = allocate_boleto(
             boleto, allocated_by=request.user,
         )
-    except ValueError as e:
+    except AllocationDomainError as e:
         return Response(
             {'detail': str(e)},
             status=status.HTTP_400_BAD_REQUEST,
@@ -237,7 +300,7 @@ def impact_review_list_approve(request):
             {'detail': 'Funcionalidade nao disponivel.'},
             status=status.HTTP_403_FORBIDDEN,
         )
-    if request.user.role == User.Role.SELLER:
+    if not _is_gestor(request.user):
         return Response(
             {'detail': 'Acesso negado.'},
             status=status.HTTP_403_FORBIDDEN,
@@ -246,9 +309,11 @@ def impact_review_list_approve(request):
     if request.method == 'GET':
         qs = CommissionImpactReview.objects.filter(
             tenant=request.user.tenant,
-        ).select_related('seller').order_by('-created_at')[:100]
-        return Response(
-            CommissionImpactReviewSerializer(qs, many=True).data,
+        ).select_related('seller').order_by('-created_at')
+        paginator = ReviewPagination()
+        page = paginator.paginate_queryset(qs, request)
+        return paginator.get_paginated_response(
+            CommissionImpactReviewSerializer(page, many=True).data,
         )
 
     review_uuid = request.data.get('review_uuid')

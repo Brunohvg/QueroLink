@@ -92,6 +92,8 @@ def gestor_boleto_detalhe(request, boleto_uuid):
         'last_provider_status': boleto.last_provider_status,
         'operation_error_code': boleto.operation_error_code,
         'operation_error_message': boleto.operation_error_message,
+        'provider_barcode': boleto.provider_barcode,
+        'provider_url': boleto.provider_url,
         'has_invoice_pdf': bool(boleto.invoice_pdf.name),
         'has_invoice_xml': bool(boleto.invoice_xml.name),
         'boleto_uuid': str(boleto.uuid),

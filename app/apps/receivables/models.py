@@ -128,6 +128,8 @@ class Boleto(models.Model):
     last_synced_at = models.DateTimeField(null=True, blank=True)
     operation_error_code = models.CharField(max_length=50, blank=True)
     operation_error_message = models.CharField(max_length=255, blank=True)
+    provider_barcode = models.CharField(max_length=255, blank=True)
+    provider_url = models.URLField(max_length=500, blank=True)
     invoice_pdf = models.FileField(
         upload_to=invoice_pdf_upload_to, max_length=255, blank=True
     )
