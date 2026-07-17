@@ -28,6 +28,7 @@ class ProviderResult:
 @dataclass(frozen=True)
 class ProviderWebhookEvent:
     event_type: str
+    aggregate_uuid: str = ''
     order_id: str = ''
     charge_id: str = ''
     status: ProviderStatus = ProviderStatus.UNKNOWN

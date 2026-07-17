@@ -163,6 +163,8 @@ def _pagarme_business_payload_belongs_to_tenant(payload, tenant):
 
     from app.apps.orders.models import Order, PaymentLink
     from app.apps.payments.models import Payment
+    from app.apps.receivables.providers import get_provider
+    from app.apps.webhooks.services import find_boleto_for_webhook
     from uuid import UUID
 
     valid_order_uuids = []
@@ -189,6 +191,13 @@ def _pagarme_business_payload_belongs_to_tenant(payload, tenant):
     if gateway_order_ids and Payment.objects.filter(
         order__tenant=tenant, gateway_order_id__in=gateway_order_ids,
     ).exists():
+        return True
+
+    try:
+        normalized = get_provider(tenant).parse_webhook(payload)
+    except Exception:
+        normalized = None
+    if normalized and find_boleto_for_webhook(tenant, normalized):
         return True
 
     return False
