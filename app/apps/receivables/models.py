@@ -113,6 +113,9 @@ class Boleto(models.Model):
     )
     paid_at = models.DateTimeField(null=True, blank=True)
     paid_amount_cents = models.PositiveIntegerField(null=True, blank=True)
+    refunded_at = models.DateTimeField(null=True, blank=True)
+    refunded_amount_cents = models.PositiveIntegerField(null=True, blank=True)
+    refund_reason = models.CharField(max_length=255, blank=True)
     last_provider_status = models.CharField(max_length=50, blank=True)
     last_synced_at = models.DateTimeField(null=True, blank=True)
     operation_error_code = models.CharField(max_length=50, blank=True)
@@ -227,3 +230,52 @@ class Boleto(models.Model):
             errors['created_by'] = 'Usuario nao pertence ao tenant.'
         if errors:
             raise ValidationError(errors)
+
+
+class IntegrationOutbox(models.Model):
+    class Status(models.TextChoices):
+        PENDING = 'PENDING', 'Pending'
+        PROCESSING = 'PROCESSING', 'Processing'
+        PROCESSED = 'PROCESSED', 'Processed'
+        FAILED = 'FAILED', 'Failed'
+
+    uuid = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    tenant = models.ForeignKey(
+        Tenant,
+        on_delete=models.CASCADE,
+        related_name='receivables_outbox_events',
+    )
+    aggregate_type = models.CharField(max_length=50)
+    aggregate_uuid = models.UUIDField()
+    event_type = models.CharField(max_length=100)
+    event_key = models.CharField(max_length=150)
+    payload = models.JSONField(default=dict)
+    status = models.CharField(
+        max_length=10,
+        choices=Status.choices,
+        default=Status.PENDING,
+    )
+    attempt_count = models.PositiveIntegerField(default=0)
+    available_at = models.DateTimeField(default=timezone.now)
+    processing_started_at = models.DateTimeField(null=True, blank=True)
+    processed_at = models.DateTimeField(null=True, blank=True)
+    last_error = models.CharField(max_length=255, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['available_at', 'created_at']
+        constraints = [
+            models.UniqueConstraint(
+                fields=['tenant', 'event_key'],
+                name='uniq_outbox_tenant_event_key',
+            ),
+        ]
+        indexes = [
+            models.Index(fields=['status', 'available_at']),
+        ]
+
+    @staticmethod
+    def sanitize_error(message):
+        sanitized = re.sub(r'[\x00-\x1f\x7f]+', ' ', str(message or ''))
+        return ' '.join(sanitized.split())[:255]
