@@ -33,6 +33,7 @@ urlpatterns = [
     path('api/webhooks/', include('app.apps.webhooks.urls')),
     path('api/billing/', include('app.apps.billing.urls')),
     path('api/freight/', include('app.apps.freight.urls')),
+    path('api/customers/', include('app.apps.customers.urls')),
     path('api/', include('app.apps.api.urls')),
 
     path('dashboard/esqueci-senha/', RateLimitedPasswordResetView.as_view(
