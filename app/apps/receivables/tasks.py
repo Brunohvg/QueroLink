@@ -22,12 +22,14 @@ logger = logging.getLogger(__name__)
 
 def _mark_boleto_awaiting_allocation(event):
     boleto_uuid = (event.payload or {}).get('boleto_uuid')
-    return Boleto.objects.filter(
+    awaiting_allocation = Boleto.objects.filter(
         pk=boleto_uuid,
         tenant=event.tenant,
         status=Boleto.Status.PAGO,
         allocations__isnull=True,
     ).exists()
+    _project_customer_event(event)
+    return awaiting_allocation
 
 
 def _reverse_allocated_boleto(event):
@@ -39,15 +41,28 @@ def _reverse_allocated_boleto(event):
         boleto_id=(event.payload or {}).get('boleto_uuid'),
         status=ReceivableAllocation.Status.ACTIVE,
     ).first()
-    if not allocation:
-        return False
-    reverse_allocation(allocation, event.event_type)
-    return True
+    reversed_allocation = False
+    if allocation:
+        reverse_allocation(allocation, event.event_type)
+        reversed_allocation = True
+    _project_customer_event(event)
+    return reversed_allocation
+
+
+def _project_customer_event(event):
+    from app.apps.customers.services import project_outbox_event
+
+    return project_outbox_event(event)
+
+
+def _project_canceled_boleto(event):
+    return _project_customer_event(event)
 
 
 OUTBOX_HANDLERS['boleto.paid'] = _mark_boleto_awaiting_allocation
 OUTBOX_HANDLERS['boleto.refunded'] = _reverse_allocated_boleto
 OUTBOX_HANDLERS['boleto.chargeback'] = _reverse_allocated_boleto
+OUTBOX_HANDLERS['boleto.canceled'] = _project_canceled_boleto
 
 
 @shared_task(soft_time_limit=300, time_limit=360)

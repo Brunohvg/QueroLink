@@ -17,17 +17,18 @@ Atualizado em 17/07/2026. Este documento permite que outra IA ou pessoa continue
 
 - Repositório: `Brunohvg/QueroLink`.
 - Branch de integração: `querolink-v2`.
-- HEAD mesclado atual: `e592820b5d6c45101b8b765f9356cb48011702fd` (PR #42).
-- Branch em desenvolvimento: `feat/receivables-commission-impact`.
-- Commit da branch: `343cd9febc4dcb98e5ea0e1f1882ffdfc72c8fb9`.
-- PR atual: [#43 — Política de impacto em comissões](https://github.com/Brunohvg/QueroLink/pull/43), Draft e ainda não mesclado no momento desta atualização.
-- Gates do PR #43: frontend e GitGuardian verdes; backend PostgreSQL ainda em execução na última consulta.
-- Próximo prompt após merge verde do #43: **Prompt 08 — Customer Ledger como projeção assíncrona**.
+- HEAD mesclado usado como base: `af067da56eac8a4c59194768efa771740bc5ab6a` (PR #43).
+- Branch em desenvolvimento: `feat/customer-ledger-foundation`.
+- Prompt em entrega: **Prompt 08 — Customer Ledger como projeção assíncrona**.
+- Commit da implementação: `37604866d4e15d9f40d63b1b81e966b255941748`.
+- PR atual: [#44 — Customer Ledger como projeção assíncrona](https://github.com/Brunohvg/QueroLink/pull/44), aberto como Draft contra `querolink-v2`.
+- Estado: implementação concluída, gates locais verdes; aguardar os checks do GitHub e o merge manual do #44.
+- Próximo prompt, somente depois do merge verde deste PR: **Prompt 09 — API do Customer Ledger e backfill controlado**.
 
-Não iniciar o Prompt 08 antes de confirmar:
+Antes de iniciar o Prompt 09, confirmar o estado do Draft PR do Prompt 08 que será registrado neste documento:
 
 ```bash
-gh pr view 43 --json state,mergedAt,statusCheckRollup
+gh pr view 44 --json state,mergedAt,statusCheckRollup
 git fetch origin --prune
 ```
 
@@ -43,7 +44,8 @@ git fetch origin --prune
 | #40 | Padronização PostgreSQL; remoção do gate SQLite | Mesclado | `3bb9608` |
 | #41 | Prompt 05 — reconciliação de boletos | Mesclado | `f9d8c28` |
 | #42 | Prompt 06 — alocação em vendas | Mesclado | `e592820` |
-| #43 | Prompt 07 — impacto em comissões | Draft aberto | branch `343cd9f` |
+| #43 | Prompt 07 — impacto em comissões | Mesclado | `af067da` |
+| #44 | Prompt 08 — Customer Ledger assíncrono | Draft aberto | `3760486` |
 
 ## 4. Decisões de arquitetura tomadas
 
@@ -59,6 +61,11 @@ git fetch origin --prune
 - Comissão aberta/reaberta é recalculada.
 - Comissão fechada/ajustada/paga não tem valores congelados/pagos alterados automaticamente; gera `CommissionImpactReview PENDING`.
 - Aprovação explícita usa `CommissionAdjustment`; comissão PAGA exige compensação futura e não é ajustada automaticamente.
+- Customer Ledger é projeção assíncrona dos eventos duráveis de boleto e mantém transação própria.
+- A outbox contém somente UUID do boleto; PII é buscada dentro da task e armazenada criptografada.
+- Documento é identidade forte por tenant. Nome nunca identifica; e-mail e telefone só reutilizam uma correspondência única sem identidade forte conflitante.
+- Divergências entre documento, e-mail ou telefone criam `CustomerIdentityConflict`; nunca há merge automático silencioso.
+- `CustomerActivity` é idempotente por tenant + origem + UUID da origem.
 
 ## 5. Ambiente de teste oficial
 
@@ -70,29 +77,36 @@ git fetch origin --prune
 ./scripts/test-fast.sh down
 ```
 
-O ambiente valida host local e nome de banco contendo `test`. A suíte completa mais recente antes do Prompt 07 tinha 860 testes. Os testes focados do Prompt 07 executaram 18 casos com sucesso.
+O ambiente valida host local e nome de banco contendo `test`. No Prompt 08, 24 testes focados/regressivos passaram e a suíte completa passou com **878 testes em 48,963s**.
 
-## 6. Como continuar no Prompt 08
+## 6. Como continuar no Prompt 09
 
-Após o PR #43 estar verde e mesclado:
+Após o Draft PR do Prompt 08 estar verde e mesclado:
 
 ```bash
 git fetch origin --prune
-git switch -c feat/customer-ledger-foundation origin/querolink-v2
+git switch -c feat/customer-ledger-api origin/querolink-v2
 git status -sb
 ```
 
-Ler novamente o Prompt 08 no arquivo original anexado à sessão. Escopo resumido:
+Ler novamente o Prompt 09 no arquivo original anexado à sessão. Escopo resumido:
 
-- criar o app `customers` como projeção assíncrona;
-- PII criptografada;
-- identidade nunca pode usar somente nome/name_hash;
-- unicidade condicional apenas por tenant + document_hash não vazio;
-- consumir eventos da outbox sem participar da transação financeira;
-- não criar signals, API, views, templates ou backfill automático;
-- adicionar o app ao settings apenas nos arquivos autorizados pelo Prompt 08.
+- expor a API do Customer Ledger com paginação e isolamento por tenant;
+- implementar consentimento operacional e de marketing conforme o escopo exato;
+- criar backfill explícito e idempotente, nunca executado em migration ou boot;
+- preservar integralmente a política de identidade criada no Prompt 08;
+- alterar somente os arquivos autorizados pelo Prompt 09.
 
-Antes de editar, listar os arquivos autorizados e confirmar que nenhum arquivo extra será necessário.
+Antes de editar, reler integralmente a seção do Prompt 09, listar os arquivos autorizados e confirmar que nenhum arquivo extra será necessário.
+
+### Evidências locais do Prompt 08
+
+- `python manage.py check`: sem problemas.
+- `makemigrations --check --dry-run`: `No changes detected`.
+- `migrate --plan`: inclui `customers.0001_initial` depois de `accounts.0024`, criando os três modelos e somente as duas constraints autorizadas.
+- Testes focados/regressivos: 24 testes, todos verdes.
+- Suíte completa PostgreSQL: 878 testes, todos verdes.
+- `git diff --check`: limpo.
 
 ## 7. Fluxo de entrega de cada prompt
 
@@ -214,4 +228,4 @@ O warning indica que JWTs estão sendo assinados com `SECRET_KEY`. Não é a cau
 
 ## 10. Estado do documento
 
-Este arquivo é documentação operacional. Ele não deve ser incluído no PR #43 sem decisão explícita, pois o Prompt 07 tem lista fechada de arquivos.
+Este arquivo é documentação operacional contínua. O usuário autorizou explicitamente em 17/07/2026 que ele seja atualizado em todas as etapas para permitir que outra IA retome o trabalho. A partir do Prompt 08, toda entrega deve registrar aqui: PR/commit, gates, decisões, pendências e próximo ponto exato de retomada.
