@@ -8,7 +8,7 @@ Arquitetura:
 - Multi-tenant por `Tenant`, com usuarios ADMIN, MANAGER, SELLER e FINANCIAL.
 - Workers Celery e Celery Beat para tarefas assincronas e agendadas.
 - Redis como broker Celery e cache em producao.
-- PostgreSQL em producao; SQLite apenas para desenvolvimento e job CI legado.
+- PostgreSQL em producao, desenvolvimento e testes automatizados.
 - Frontend server-rendered com templates Django, Alpine.js local e Tailwind compilado.
 - Deploy por Docker Compose no Coolify.
 
@@ -129,8 +129,8 @@ Hardenings implementados:
 
 Quantidade atual:
 
-- 394 testes automatizados executados com `python manage.py test -v2`.
-- O CI executa a suite em SQLite e PostgreSQL.
+- 840 testes automatizados executados no ambiente PostgreSQL isolado.
+- O CI executa a suite completa em PostgreSQL, o mesmo banco usado em producao.
 
 Cobertura conhecida:
 
@@ -186,8 +186,7 @@ Celery:
 
 GitHub Actions:
 
-- `backend-sqlite`: check, deploy check, migrations e suite em SQLite.
-- `backend-postgres`: check, migrations e suite em PostgreSQL.
+- `backend-postgres`: check, deploy check, migrations e suite em PostgreSQL.
 - `frontend`: install e build CSS.
 - Jobs independentes.
 
@@ -215,7 +214,6 @@ Restore:
 # Checklist Produção
 
 - [ ] Branch do Prompt 32 com PR aprovado.
-- [ ] `backend-sqlite` verde.
 - [ ] `backend-postgres` verde.
 - [ ] `frontend` verde.
 - [ ] `python manage.py check` limpo.
