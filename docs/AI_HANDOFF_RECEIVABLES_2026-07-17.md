@@ -17,18 +17,16 @@ Atualizado em 17/07/2026. Este documento permite que outra IA ou pessoa continue
 
 - Repositório: `Brunohvg/QueroLink`.
 - Branch de integração: `querolink-v2`.
-- HEAD mesclado usado como base: `3504da850c258044fa025ef86e96b7f6abf8a868` (PR #44).
-- Branch em desenvolvimento: `feat/customer-ledger-api`.
-- Prompt em entrega: **Prompt 09 — API do Customer Ledger e backfill controlado**.
-- Commit da implementação: `b77bef9d7179f66e78ceaea854e29480796bb993`.
-- PR atual: [#45 — API e backfill controlado do Customer Ledger](https://github.com/Brunohvg/QueroLink/pull/45), aberto como Draft contra `querolink-v2`.
-- Estado: implementação concluída, gates locais verdes; aguardar checks do GitHub e merge manual do #45.
-- Próximo prompt, somente depois do merge verde deste PR: **Prompt 10 — documentos de boleto**.
+- HEAD mesclado usado como base: `afe6a6e512c3c59343834fb98c2d58077e775eab` (PR #45).
+- Branch em desenvolvimento: `feat/receivables-documents`.
+- Prompt em entrega: **Prompt 10 — documentos de boleto**.
+- Estado local: implementação concluída e gates locais verdes; falta publicar o Draft PR e registrar seu número/commit final.
+- Próximo prompt, somente depois do merge verde deste PR: **Prompt 11 — backup e restore completos**.
 
-Antes de iniciar o Prompt 10, confirmar o estado do Draft PR do Prompt 09 que será registrado neste documento:
+Antes de iniciar o Prompt 11, confirmar o estado do Draft PR do Prompt 10 que será registrado neste documento:
 
 ```bash
-gh pr view 45 --json state,mergedAt,statusCheckRollup
+gh pr view NUMERO_DO_PR_10 --json state,mergedAt,statusCheckRollup
 git fetch origin --prune
 ```
 
@@ -46,7 +44,8 @@ git fetch origin --prune
 | #42 | Prompt 06 — alocação em vendas | Mesclado | `e592820` |
 | #43 | Prompt 07 — impacto em comissões | Mesclado | `af067da` |
 | #44 | Prompt 08 — Customer Ledger assíncrono | Mesclado | `3504da8` |
-| #45 | Prompt 09 — API e backfill do Customer Ledger | Draft aberto | `b77bef9` |
+| #45 | Prompt 09 — API e backfill do Customer Ledger | Mesclado | `afe6a6e` |
+| a registrar | Prompt 10 — documentos fiscais privados | Implementação local verde | branch `feat/receivables-documents` |
 
 ## 4. Decisões de arquitetura tomadas
 
@@ -72,6 +71,11 @@ git fetch origin --prune
 - Como o Prompt 09 proibiu migration, data, origem e responsável do consentimento são persistidos no `AuditLog`; os estados permanecem nos campos existentes de `Customer`.
 - O backfill é exclusivamente manual, exige tenant explícito ou `--all-tenants`, aceita `--dry-run` e usa cursor copiável no formato `fonte:UUID`.
 - Falhas do backfill são isoladas por tenant e logs/contadores não contêm PII.
+- PDF/XML fiscal usa caminho privado com tenant e UUID do boleto; o diretório é bloqueado até no servidor de mídia de desenvolvimento.
+- Upload e download são permitidos somente para ADMIN/MANAGER do mesmo tenant; SELLER não tem acesso.
+- PDF é validado por tamanho e assinatura; XML rejeita DTD/entidades e exige parse válido.
+- Substituição salva o novo arquivo primeiro e exclui o antigo somente após commit, com callback robusto e log de falha.
+- Auditoria registra tipo/operação sem nome ou conteúdo do documento.
 
 ## 5. Ambiente de teste oficial
 
@@ -83,35 +87,34 @@ git fetch origin --prune
 ./scripts/test-fast.sh down
 ```
 
-O ambiente valida host local e nome de banco contendo `test`. No Prompt 09, 19 testes do app `customers` passaram e a suíte completa passou com **889 testes em 73,669s**.
+O ambiente valida host local e nome de banco contendo `test`. No Prompt 10, 12 testes focados passaram e a suíte completa passou com **901 testes em 67,039s**.
 
-## 6. Como continuar no Prompt 10
+## 6. Como continuar no Prompt 11
 
-Após o Draft PR do Prompt 09 estar verde e mesclado:
+Após o Draft PR do Prompt 10 estar verde e mesclado:
 
 ```bash
 git fetch origin --prune
-git switch -c feat/receivables-documents origin/querolink-v2
+git switch -c ops/receivables-media-backup origin/querolink-v2
 git status -sb
 ```
 
-Ler novamente o Prompt 10 no arquivo original anexado à sessão. Escopo resumido:
+Ler novamente o Prompt 11 no arquivo original anexado à sessão. Escopo resumido:
 
-- adicionar PDF/XML de nota fiscal com armazenamento privado;
-- validar conteúdo e tamanho dos arquivos;
-- garantir isolamento por tenant e permissões explícitas;
-- tratar substituição/exclusão após commit e erros de storage corretamente;
-- alterar somente os arquivos autorizados pelo Prompt 10.
+- estender o backup existente para incluir `MEDIA_ROOT` sem degradar o backup PostgreSQL;
+- criar restauração verificável apenas em ambiente de teste/vazio;
+- documentar backup, restore, validação e rollback;
+- alterar somente os arquivos autorizados pelo Prompt 11.
 
-Antes de editar, reler integralmente a seção do Prompt 10, listar os arquivos autorizados e confirmar que nenhum arquivo extra será necessário.
+Antes de editar, reler integralmente a seção do Prompt 11, listar os arquivos autorizados e confirmar que nenhum arquivo extra será necessário.
 
-### Evidências locais do Prompt 09
+### Evidências locais do Prompt 10
 
 - `python manage.py check`: sem problemas.
 - `makemigrations --check --dry-run`: `No changes detected`.
-- Nenhuma migration criada, conforme exigido pelo prompt.
-- Testes do app `customers`: 19 testes, todos verdes.
-- Suíte completa PostgreSQL: 889 testes, todos verdes.
+- `migrate --plan`: `receivables.0005_boleto_invoice_files` adiciona somente os seis campos de arquivo/metadados.
+- Testes focados de documentos: 12 testes, todos verdes.
+- Suíte completa PostgreSQL: 901 testes, todos verdes.
 - `git diff --check`: limpo.
 
 ## 7. Fluxo de entrega de cada prompt

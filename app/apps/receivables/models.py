@@ -18,6 +18,14 @@ def _digits(value):
     return ''.join(filter(str.isdigit, value or ''))
 
 
+def invoice_pdf_upload_to(instance, filename):
+    return f'receivables_private/{instance.tenant_id}/{instance.uuid}/invoice.pdf'
+
+
+def invoice_xml_upload_to(instance, filename):
+    return f'receivables_private/{instance.tenant_id}/{instance.uuid}/invoice.xml'
+
+
 def _validate_cnpj(value):
     digits = _digits(value)
     if len(digits) != 14:
@@ -120,6 +128,28 @@ class Boleto(models.Model):
     last_synced_at = models.DateTimeField(null=True, blank=True)
     operation_error_code = models.CharField(max_length=50, blank=True)
     operation_error_message = models.CharField(max_length=255, blank=True)
+    invoice_pdf = models.FileField(
+        upload_to=invoice_pdf_upload_to, max_length=255, blank=True
+    )
+    invoice_pdf_uploaded_at = models.DateTimeField(null=True, blank=True)
+    invoice_pdf_uploaded_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='invoice_pdfs_uploaded',
+    )
+    invoice_xml = models.FileField(
+        upload_to=invoice_xml_upload_to, max_length=255, blank=True
+    )
+    invoice_xml_uploaded_at = models.DateTimeField(null=True, blank=True)
+    invoice_xml_uploaded_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='invoice_xmls_uploaded',
+    )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
