@@ -6,6 +6,10 @@ on:
   pull_request:
     branches: [main, querolink-v2]
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   backend-postgres:
     runs-on: ubuntu-latest
@@ -27,6 +31,11 @@ jobs:
         image: redis:7-alpine
         ports:
           - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
 
     steps:
       - uses: actions/checkout@v4
@@ -34,8 +43,12 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
+          cache: 'pip'
+          cache-dependency-path: requirements/production.txt
 
       - name: Install dependencies
+        env:
+          PIP_DISABLE_PIP_VERSION_CHECK: '1'
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements/production.txt
@@ -72,7 +85,16 @@ jobs:
           REDIS_URL: redis://localhost:6379/0
         run: python manage.py makemigrations --check --dry-run
 
-      - name: Run tests
+      - name: Show migration plan
+        env:
+          DJANGO_SETTINGS_MODULE: app.config.settings.ci_postgres
+          SECRET_KEY: ci-test-secret-key-not-for-production
+          DATABASE_URL: postgres://querolink:querolink@localhost:5432/querolink_ci
+          REDIS_URL: redis://localhost:6379/0
+        run: python manage.py migrate --plan
+
+      # ── Migrate, create a fresh test database, run tests ──
+      - name: Run full test suite
         env:
           DJANGO_SETTINGS_MODULE: app.config.settings.ci_postgres
           SECRET_KEY: ci-test-secret-key-not-for-production
@@ -80,13 +102,21 @@ jobs:
           REDIS_URL: redis://localhost:6379/0
         run: |
           set +e
-          python manage.py test -v2 --buffer > test-output.log 2>&1
+          python manage.py test -v2 --buffer --parallel > test-output.log 2>&1
           code=$?
           if [ "$code" -ne 0 ]; then
             echo "Django test failure summary:"
             grep -E '^(ERROR|FAIL):|^Ran |^FAILED \(' test-output.log || true
           fi
           exit "$code"
+
+      # ── Upload test log on failure ──
+      - name: Upload test log
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-output
+          path: test-output.log
 
   frontend:
     runs-on: ubuntu-latest
@@ -96,8 +126,37 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: package-lock.json
 
-      - name: Install and build CSS
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build CSS
+        run: npm run build:css
+
+      - name: Compress built assets
+        run: gzip -kf static/css/tailwind.css 2>/dev/null || true
+
+  config-and-scripts:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate docker compose configuration
+        env:
+          DATABASE_URL: postgres://u:p@localhost:5432/db
+          RCLONE_CONFIG_GDRIVE_TYPE: drive
+          RCLONE_CONFIG_GDRIVE_SCOPE: drive
+          RCLONE_CONFIG_GDRIVE_TOKEN: '{}'
         run: |
-          npm install
-          npm run build:css
+          touch .env
+          docker compose config
+
+      - name: Check shell script syntax
+        run: |
+          for f in scripts/*.sh; do
+            echo "Checking $f..."
+            bash -n "$f"
+          done
+          echo "All shell scripts syntax OK"
