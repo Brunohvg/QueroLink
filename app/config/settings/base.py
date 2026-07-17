@@ -261,9 +261,9 @@ RECEIVABLES_RECONCILE_STALE_MINUTES = config(
 )
 
 PLAN_PRICES = {
-    'STARTER': config('PLAN_PRICE_STARTER', default=14700, cast=int),
-    'PRO': config('PLAN_PRICE_PRO', default=29700, cast=int),
-    'BUSINESS': config('PLAN_PRICE_BUSINESS', default=49700, cast=int),
+    'STARTER': config('PLAN_PRICE_STARTER', default=24700, cast=int),
+    'PRO': config('PLAN_PRICE_PRO', default=49700, cast=int),
+    'BUSINESS': config('PLAN_PRICE_BUSINESS', default=89700, cast=int),
 }
 PLAN_SELLER_LIMITS = {
     'STARTER': 5,

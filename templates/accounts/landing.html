@@ -529,15 +529,15 @@ body { font-family: 'Inter', system-ui, sans-serif; }
     <!-- Price cards -->
     <div class="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-4xl mx-auto reveal-group">
 
-      <!-- Starter -->
+      <!-- Essencial -->
       <div class="bg-white rounded-2xl border border-gray-200 p-6 sm:p-8 flex flex-col hover:shadow-lg hover:-translate-y-1 transition-all duration-300 reveal">
-        <p class="text-[13px] font-semibold text-gray-500 uppercase tracking-wide mb-1">Starter</p>
-        <p class="text-[12px] text-gray-400 mb-5">Para começar a organizar as comissões</p>
+        <p class="text-[13px] font-semibold text-gray-500 uppercase tracking-wide mb-1">Essencial</p>
+        <p class="text-[12px] text-gray-400 mb-5">Até 5 vendedores</p>
         <p class="font-display text-[36px] font-semibold text-[var(--ink)] mb-1">
-          <span x-text="anual ? 'R$ 122' : 'R$ 147'"></span>
+          <span x-text="anual ? 'R$ 205' : 'R$ 247'"></span>
           <span class="text-[14px] font-normal text-gray-400">/mês</span>
         </p>
-        <p class="text-[13px] text-gray-400 mb-6" x-text="anual ? 'R$ 1.470/ano' : 'cancele quando quiser'"></p>
+        <p class="text-[13px] text-gray-400 mb-6" x-text="anual ? 'R$ 2.470/ano' : 'cancele quando quiser'"></p>
         <ul class="space-y-3 mb-8 flex-1">
           <li class="text-[13px] text-gray-600 flex items-start gap-2.5">
             <svg width="14" height="14" viewBox="0 0 14 14" fill="none" class="mt-0.5 shrink-0" aria-hidden="true"><circle cx="7" cy="7" r="7" fill="url(#st1)"/><path d="M4.5 7l2 2 3-3" stroke="white" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/><defs><linearGradient id="st1" x1="0" y1="0" x2="14" y2="14"><stop stop-color="#1263FF"/><stop offset="1" stop-color="#00D1E6"/></linearGradient></defs></svg>
@@ -545,10 +545,14 @@ body { font-family: 'Inter', system-ui, sans-serif; }
           </li>
           <li class="text-[13px] text-gray-600 flex items-start gap-2.5">
             <svg width="14" height="14" viewBox="0 0 14 14" fill="none" class="mt-0.5 shrink-0" aria-hidden="true"><circle cx="7" cy="7" r="7" fill="url(#st2)"/><path d="M4.5 7l2 2 3-3" stroke="white" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/><defs><linearGradient id="st2" x1="0" y1="0" x2="14" y2="14"><stop stop-color="#1263FF"/><stop offset="1" stop-color="#00D1E6"/></linearGradient></defs></svg>
-            App do vendedor + dashboard do gestor
+            App do vendedor e painel do gestor
           </li>
           <li class="text-[13px] text-gray-600 flex items-start gap-2.5">
             <svg width="14" height="14" viewBox="0 0 14 14" fill="none" class="mt-0.5 shrink-0" aria-hidden="true"><circle cx="7" cy="7" r="7" fill="url(#st3)"/><path d="M4.5 7l2 2 3-3" stroke="white" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/><defs><linearGradient id="st3" x1="0" y1="0" x2="14" y2="14"><stop stop-color="#1263FF"/><stop offset="1" stop-color="#00D1E6"/></linearGradient></defs></svg>
+            Lançamento e acompanhamento de vendas
+          </li>
+          <li class="text-[13px] text-gray-600 flex items-start gap-2.5">
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none" class="mt-0.5 shrink-0" aria-hidden="true"><circle cx="7" cy="7" r="7" fill="url(#st4)"/><path d="M4.5 7l2 2 3-3" stroke="white" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/><defs><linearGradient id="st4" x1="0" y1="0" x2="14" y2="14"><stop stop-color="#1263FF"/><stop offset="1" stop-color="#00D1E6"/></linearGradient></defs></svg>
             Fechamento de comissões
           </li>
           <li class="text-[13px] text-gray-600 flex items-start gap-2.5">
@@ -561,7 +565,7 @@ body { font-family: 'Inter', system-ui, sans-serif; }
           </li>
         </ul>
         <a :href="'{% url 'accounts:signup' %}?plano=starter&ciclo=' + (anual ? 'yearly' : 'monthly')" class="block text-center bg-brand-500 hover:bg-brand-600 text-white font-semibold py-3.5 rounded-xl text-[14px] transition shadow-[0_4px_20px_rgba(18,99,255,0.25)] hover:shadow-[0_4px_30px_rgba(18,99,255,0.4)]">
-          Começar grátis
+          Assinar Essencial
         </a>
       </div>
 
@@ -569,12 +573,12 @@ body { font-family: 'Inter', system-ui, sans-serif; }
       <div class="gradient-border rounded-2xl bg-white p-6 sm:p-8 flex flex-col relative shadow-xl shadow-blue-500/10 md:scale-105 origin-center reveal">
         <span class="absolute -top-3 left-1/2 -translate-x-1/2 bg-brand-500 text-white text-[11px] font-semibold px-4 py-1 rounded-full whitespace-nowrap">Mais popular</span>
         <p class="text-[13px] font-semibold text-gray-500 uppercase tracking-wide mb-1">Pro</p>
-        <p class="text-[12px] text-gray-400 mb-5">Para quem quer folha e contabilidade sem planilha</p>
+        <p class="text-[12px] text-gray-400 mb-5">Até 15 vendedores</p>
         <p class="font-display text-[36px] font-semibold text-[var(--ink)] mb-1">
-          <span x-text="anual ? 'R$ 247' : 'R$ 297'"></span>
+          <span x-text="anual ? 'R$ 414' : 'R$ 497'"></span>
           <span class="text-[14px] font-normal text-gray-400">/mês</span>
         </p>
-        <p class="text-[13px] text-gray-400 mb-6" x-text="anual ? 'R$ 2.970/ano' : 'cancele quando quiser'"></p>
+        <p class="text-[13px] text-gray-400 mb-6" x-text="anual ? 'R$ 4.970/ano' : 'cancele quando quiser'"></p>
         <ul class="space-y-3 mb-8 flex-1">
           <li class="text-[13px] text-gray-600 flex items-start gap-2.5">
             <svg width="14" height="14" viewBox="0 0 14 14" fill="none" class="mt-0.5 shrink-0" aria-hidden="true"><circle cx="7" cy="7" r="7" fill="url(#pro1)"/><path d="M4.5 7l2 2 3-3" stroke="white" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/><defs><linearGradient id="pro1" x1="0" y1="0" x2="14" y2="14"><stop stop-color="#1263FF"/><stop offset="1" stop-color="#00D1E6"/></linearGradient></defs></svg>
@@ -582,10 +586,18 @@ body { font-family: 'Inter', system-ui, sans-serif; }
           </li>
           <li class="text-[13px] text-gray-600 flex items-start gap-2.5">
             <svg width="14" height="14" viewBox="0 0 14 14" fill="none" class="mt-0.5 shrink-0" aria-hidden="true"><circle cx="7" cy="7" r="7" fill="url(#pro2)"/><path d="M4.5 7l2 2 3-3" stroke="white" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/><defs><linearGradient id="pro2" x1="0" y1="0" x2="14" y2="14"><stop stop-color="#1263FF"/><stop offset="1" stop-color="#00D1E6"/></linearGradient></defs></svg>
-            Tudo do Starter
+            Tudo do Essencial
           </li>
           <li class="text-[13px] text-gray-600 flex items-start gap-2.5">
             <svg width="14" height="14" viewBox="0 0 14 14" fill="none" class="mt-0.5 shrink-0" aria-hidden="true"><circle cx="7" cy="7" r="7" fill="url(#pro3)"/><path d="M4.5 7l2 2 3-3" stroke="white" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/><defs><linearGradient id="pro3" x1="0" y1="0" x2="14" y2="14"><stop stop-color="#1263FF"/><stop offset="1" stop-color="#00D1E6"/></linearGradient></defs></svg>
+            Importação de vendas por CSV
+          </li>
+          <li class="text-[13px] text-gray-600 flex items-start gap-2.5">
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none" class="mt-0.5 shrink-0" aria-hidden="true"><circle cx="7" cy="7" r="7" fill="url(#pro4)"/><path d="M4.5 7l2 2 3-3" stroke="white" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/><defs><linearGradient id="pro4" x1="0" y1="0" x2="14" y2="14"><stop stop-color="#1263FF"/><stop offset="1" stop-color="#00D1E6"/></linearGradient></defs></svg>
+            Relatórios em PDF e prévia de fechamento
+          </li>
+          <li class="text-[13px] text-gray-600 flex items-start gap-2.5">
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none" class="mt-0.5 shrink-0" aria-hidden="true"><circle cx="7" cy="7" r="7" fill="url(#pro5)"/><path d="M4.5 7l2 2 3-3" stroke="white" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/><defs><linearGradient id="pro5" x1="0" y1="0" x2="14" y2="14"><stop stop-color="#1263FF"/><stop offset="1" stop-color="#00D1E6"/></linearGradient></defs></svg>
             Pacote contábil automático por e-mail
           </li>
           <li class="text-[13px] text-gray-600 flex items-start gap-2.5">
@@ -598,23 +610,39 @@ body { font-family: 'Inter', system-ui, sans-serif; }
           </li>
           <li class="text-[13px] text-gray-600 flex items-start gap-2.5">
             <svg width="14" height="14" viewBox="0 0 14 14" fill="none" class="mt-0.5 shrink-0" aria-hidden="true"><circle cx="7" cy="7" r="7" fill="url(#pro6)"/><path d="M4.5 7l2 2 3-3" stroke="white" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/><defs><linearGradient id="pro6" x1="0" y1="0" x2="14" y2="14"><stop stop-color="#1263FF"/><stop offset="1" stop-color="#00D1E6"/></linearGradient></defs></svg>
-            Notificações push no celular do vendedor
+            Notificações push para vendedores
+          </li>
+          <li class="text-[13px] text-gray-600 flex items-start gap-2.5">
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none" class="mt-0.5 shrink-0" aria-hidden="true"><circle cx="7" cy="7" r="7" fill="url(#pro7)"/><path d="M4.5 7l2 2 3-3" stroke="white" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/><defs><linearGradient id="pro7" x1="0" y1="0" x2="14" y2="14"><stop stop-color="#1263FF"/><stop offset="1" stop-color="#00D1E6"/></linearGradient></defs></svg>
+            Boletos e cobranças integrados
+          </li>
+          <li class="text-[13px] text-gray-600 flex items-start gap-2.5">
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none" class="mt-0.5 shrink-0" aria-hidden="true"><circle cx="7" cy="7" r="7" fill="url(#pro8)"/><path d="M4.5 7l2 2 3-3" stroke="white" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/><defs><linearGradient id="pro8" x1="0" y1="0" x2="14" y2="14"><stop stop-color="#1263FF"/><stop offset="1" stop-color="#00D1E6"/></linearGradient></defs></svg>
+            Acompanhamento de recebimentos
+          </li>
+          <li class="text-[13px] text-gray-600 flex items-start gap-2.5">
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none" class="mt-0.5 shrink-0" aria-hidden="true"><circle cx="7" cy="7" r="7" fill="url(#pro9)"/><path d="M4.5 7l2 2 3-3" stroke="white" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/><defs><linearGradient id="pro9" x1="0" y1="0" x2="14" y2="14"><stop stop-color="#1263FF"/><stop offset="1" stop-color="#00D1E6"/></linearGradient></defs></svg>
+            Integração com vendas e comissões
+          </li>
+          <li class="text-[13px] text-gray-600 flex items-start gap-2.5">
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none" class="mt-0.5 shrink-0" aria-hidden="true"><circle cx="7" cy="7" r="7" fill="url(#pro10)"/><path d="M4.5 7l2 2 3-3" stroke="white" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/><defs><linearGradient id="pro10" x1="0" y1="0" x2="14" y2="14"><stop stop-color="#1263FF"/><stop offset="1" stop-color="#00D1E6"/></linearGradient></defs></svg>
+            Histórico de clientes e pagamentos
           </li>
         </ul>
         <a :href="'{% url 'accounts:signup' %}?plano=pro&ciclo=' + (anual ? 'yearly' : 'monthly')" class="block text-center bg-brand-500 hover:bg-brand-600 text-white font-semibold py-3.5 rounded-xl text-[14px] transition shadow-[0_8px_30px_rgba(18,99,255,0.35)] hover:shadow-[0_8px_40px_rgba(18,99,255,0.5)]">
-          Começar grátis
+          Assinar Pro
         </a>
       </div>
 
-      <!-- Business -->
+      <!-- Empresarial -->
       <div class="bg-white rounded-2xl border border-gray-200 p-6 sm:p-8 flex flex-col hover:shadow-lg hover:-translate-y-1 transition-all duration-300 reveal">
-        <p class="text-[13px] font-semibold text-gray-500 uppercase tracking-wide mb-1">Business</p>
-        <p class="text-[12px] text-gray-400 mb-5">Para operações maiores</p>
+        <p class="text-[13px] font-semibold text-gray-500 uppercase tracking-wide mb-1">Empresarial</p>
+        <p class="text-[12px] text-gray-400 mb-5">Até 50 vendedores</p>
         <p class="font-display text-[36px] font-semibold text-[var(--ink)] mb-1">
-          <span x-text="anual ? 'R$ 414' : 'R$ 497'"></span>
+          <span x-text="anual ? 'R$ 747' : 'R$ 897'"></span>
           <span class="text-[14px] font-normal text-gray-400">/mês</span>
         </p>
-        <p class="text-[13px] text-gray-400 mb-6" x-text="anual ? 'R$ 4.970/ano' : 'cancele quando quiser'"></p>
+        <p class="text-[13px] text-gray-400 mb-6" x-text="anual ? 'R$ 8.970/ano' : 'cancele quando quiser'"></p>
         <ul class="space-y-3 mb-8 flex-1">
           <li class="text-[13px] text-gray-600 flex items-start gap-2.5">
             <svg width="14" height="14" viewBox="0 0 14 14" fill="none" class="mt-0.5 shrink-0" aria-hidden="true"><circle cx="7" cy="7" r="7" fill="url(#bus1)"/><path d="M4.5 7l2 2 3-3" stroke="white" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/><defs><linearGradient id="bus1" x1="0" y1="0" x2="14" y2="14"><stop stop-color="#1263FF"/><stop offset="1" stop-color="#00D1E6"/></linearGradient></defs></svg>
@@ -626,11 +654,31 @@ body { font-family: 'Inter', system-ui, sans-serif; }
           </li>
           <li class="text-[13px] text-gray-600 flex items-start gap-2.5">
             <svg width="14" height="14" viewBox="0 0 14 14" fill="none" class="mt-0.5 shrink-0" aria-hidden="true"><circle cx="7" cy="7" r="7" fill="url(#bus3)"/><path d="M4.5 7l2 2 3-3" stroke="white" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/><defs><linearGradient id="bus3" x1="0" y1="0" x2="14" y2="14"><stop stop-color="#1263FF"/><stop offset="1" stop-color="#00D1E6"/></linearGradient></defs></svg>
+            Acesso para a equipe financeira
+          </li>
+          <li class="text-[13px] text-gray-600 flex items-start gap-2.5">
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none" class="mt-0.5 shrink-0" aria-hidden="true"><circle cx="7" cy="7" r="7" fill="url(#bus4)"/><path d="M4.5 7l2 2 3-3" stroke="white" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/><defs><linearGradient id="bus4" x1="0" y1="0" x2="14" y2="14"><stop stop-color="#1263FF"/><stop offset="1" stop-color="#00D1E6"/></linearGradient></defs></svg>
+            Auditoria detalhada das operações
+          </li>
+          <li class="text-[13px] text-gray-600 flex items-start gap-2.5">
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none" class="mt-0.5 shrink-0" aria-hidden="true"><circle cx="7" cy="7" r="7" fill="url(#bus5)"/><path d="M4.5 7l2 2 3-3" stroke="white" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/><defs><linearGradient id="bus5" x1="0" y1="0" x2="14" y2="14"><stop stop-color="#1263FF"/><stop offset="1" stop-color="#00D1E6"/></linearGradient></defs></svg>
+            Revisão de estornos e impactos em comissões
+          </li>
+          <li class="text-[13px] text-gray-600 flex items-start gap-2.5">
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none" class="mt-0.5 shrink-0" aria-hidden="true"><circle cx="7" cy="7" r="7" fill="url(#bus6)"/><path d="M4.5 7l2 2 3-3" stroke="white" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/><defs><linearGradient id="bus6" x1="0" y1="0" x2="14" y2="14"><stop stop-color="#1263FF"/><stop offset="1" stop-color="#00D1E6"/></linearGradient></defs></svg>
+            Controles avançados de aprovação
+          </li>
+          <li class="text-[13px] text-gray-600 flex items-start gap-2.5">
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none" class="mt-0.5 shrink-0" aria-hidden="true"><circle cx="7" cy="7" r="7" fill="url(#bus7)"/><path d="M4.5 7l2 2 3-3" stroke="white" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/><defs><linearGradient id="bus7" x1="0" y1="0" x2="14" y2="14"><stop stop-color="#1263FF"/><stop offset="1" stop-color="#00D1E6"/></linearGradient></defs></svg>
+            Implantação assistida
+          </li>
+          <li class="text-[13px] text-gray-600 flex items-start gap-2.5">
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none" class="mt-0.5 shrink-0" aria-hidden="true"><circle cx="7" cy="7" r="7" fill="url(#bus8)"/><path d="M4.5 7l2 2 3-3" stroke="white" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/><defs><linearGradient id="bus8" x1="0" y1="0" x2="14" y2="14"><stop stop-color="#1263FF"/><stop offset="1" stop-color="#00D1E6"/></linearGradient></defs></svg>
             Suporte prioritário
           </li>
         </ul>
         <a :href="'{% url 'accounts:signup' %}?plano=business&ciclo=' + (anual ? 'yearly' : 'monthly')" class="block text-center bg-brand-500 hover:bg-brand-600 text-white font-semibold py-3.5 rounded-xl text-[14px] transition shadow-[0_4px_20px_rgba(18,99,255,0.25)] hover:shadow-[0_4px_30px_rgba(18,99,255,0.4)]">
-          Começar grátis
+          Assinar Empresarial
         </a>
       </div>
 

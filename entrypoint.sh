@@ -56,6 +56,9 @@ if [ -z "$1" ] || [ "$1" = 'gunicorn' ]; then
         fi
     fi
 
+    # ── Media directories ──────────────────────────────────
+    mkdir -p /app/media/receivables_private 2>/dev/null || true
+
     # ── Migrations ─────────────────────────────────────────
     log "===== MIGRATIONS ====="
     python manage.py migrate --noinput

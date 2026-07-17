@@ -128,22 +128,32 @@ def assinatura(request):
     PLAN_FEATURES = {
         'STARTER': [
             'Ate 5 vendedores',
-            'App do vendedor + dashboard do gestor',
+            'App do vendedor e painel do gestor',
+            'Lancamento e acompanhamento de vendas',
             'Fechamento de comissoes',
             'Links de pagamento',
             'Lembretes automaticos por WhatsApp',
         ],
         'PRO': [
             'Ate 15 vendedores',
-            'Tudo do Starter',
-            'Pacote contabil automatico por e-mail para seu contador',
-            'Relatorios em PDF e previa de fechamento',
+            'Tudo do Essencial',
             'Importacao de vendas por CSV',
-            'Notificacoes push no celular do vendedor',
+            'Relatorios em PDF e previa de fechamento',
+            'Pacote contabil automatico por e-mail',
+            'Notificacoes push para vendedores',
+            'Boletos e cobrancas integrados',
+            'Acompanhamento de recebimentos',
+            'Integracao com vendas e comissoes',
+            'Historico de clientes e pagamentos',
         ],
         'BUSINESS': [
             'Ate 50 vendedores',
             'Tudo do Pro',
+            'Acesso para a equipe financeira',
+            'Auditoria detalhada das operacoes',
+            'Revisao de estornos e impactos em comissoes',
+            'Controles avancados de aprovacao',
+            'Implantacao assistida',
             'Suporte prioritario',
         ],
         'ENTERPRISE': [
@@ -153,17 +163,21 @@ def assinatura(request):
         ],
     }
 
+    plan_display_names = {
+        'STARTER': 'Essencial',
+        'PRO': 'Pro',
+        'BUSINESS': 'Empresarial',
+        'ENTERPRISE': 'Enterprise (legado)',
+    }
+
     has_active_sub = sub and sub.status not in ('CANCELED',)
-    plan_names = dict(Tenant.Plan.choices)
-    if 'ENTERPRISE' not in dict(plan_names):
-        plan_names['ENTERPRISE'] = 'Enterprise (legado)'
     all_plans = []
     for key in ['STARTER', 'PRO', 'BUSINESS']:
         monthly = prices.get(key, 0)
         yearly = plan_amount(key, 'YEARLY') if monthly else 0
         all_plans.append({
             'id': key,
-            'name': plan_names.get(key, key),
+            'name': plan_display_names.get(key, key),
             'seller_limit': limits.get(key, '—'),
             'price_monthly': monthly,
             'price_yearly': yearly,
