@@ -4,7 +4,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#1463FF">
     <title>{% block title %}Mérito{% endblock %}</title>
+    <link rel="icon" type="image/png" sizes="32x32" href="{% static 'icons/favicon-32.png' %}">
+    <link rel="icon" type="image/png" sizes="16x16" href="{% static 'icons/favicon-16.png' %}">
+    <link rel="apple-touch-icon" href="{% static 'icons/apple-touch-icon.png' %}">
+    <link rel="manifest" href="{% static 'manifest.json' %}">
     <link href="{% static 'css/tailwind.css' %}" rel="stylesheet">
     {% block chart_js %}{% endblock %}
     <script src="{% static 'js/alpine.min.js' %}" defer></script>

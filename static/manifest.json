@@ -2,12 +2,12 @@
     "name": "Mérito by Vidalys",
     "short_name": "Mérito",
     "description": "Gestão de comissões para equipes de vendas",
-    "start_url": "/dashboard/mobile/",
-    "scope": "/dashboard/mobile/",
+    "start_url": "/dashboard/",
+    "scope": "/dashboard/",
     "display": "standalone",
     "orientation": "portrait",
-    "theme_color": "#111827",
-    "background_color": "#F5F7FA",
+    "theme_color": "#1463FF",
+    "background_color": "#F9FAFB",
     "lang": "pt-BR",
     "icons": [
         {
