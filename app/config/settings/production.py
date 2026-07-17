@@ -86,6 +86,22 @@ CELERY_BEAT_SCHEDULE = {
         'task': 'app.apps.notifications.tasks.send_lifecycle_emails',
         'schedule': crontab(hour=9, minute=0),
     },
+    'process-outbox-batch': {
+        'task': 'app.apps.receivables.tasks.process_outbox_batch',
+        'schedule': 120.0,
+    },
+    'send-boleto-due-reminders': {
+        'task': 'app.apps.receivables.tasks.send_boleto_due_reminders',
+        'schedule': crontab(hour=8, minute=0),
+    },
+    'reprocess-stuck-outbox': {
+        'task': 'app.apps.receivables.tasks.reprocess_stuck_outbox_events',
+        'schedule': 1800.0,
+    },
+    'report-stuck-outbox-metrics': {
+        'task': 'app.apps.receivables.tasks.report_stuck_outbox_metrics',
+        'schedule': crontab(hour=6, minute=0),
+    },
 }
 
 # E-mail em producao — respeita env var, default SMTP

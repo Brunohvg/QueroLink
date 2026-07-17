@@ -20,6 +20,38 @@ OUTBOX_HANDLERS = {}
 logger = logging.getLogger(__name__)
 
 
+def _notify_boleto_event(event, event_slug):
+    try:
+        boleto = Boleto.objects.get(
+            pk=(event.payload or {}).get('boleto_uuid'),
+            tenant=event.tenant,
+        )
+        from .notification_services import (
+            notify_boleto_paid,
+            notify_boleto_canceled,
+            notify_boleto_refunded,
+            notify_boleto_chargeback,
+            notify_boleto_awaiting_allocation,
+        )
+        switcher = {
+            'boleto.paid': notify_boleto_paid,
+            'boleto.canceled': notify_boleto_canceled,
+            'boleto.refunded': notify_boleto_refunded,
+            'boleto.chargeback': notify_boleto_chargeback,
+        }
+        notifier = switcher.get(event_slug)
+        if notifier:
+            notifier(boleto)
+        if event_slug == 'boleto.paid' and not boleto.allocations.exists():
+            notify_boleto_awaiting_allocation(boleto)
+    except Boleto.DoesNotExist:
+        logger.warning('Boleto nao encontrado para notificacao event=%s', event.uuid)
+    except Exception:
+        logger.exception(
+            'Falha ao notificar evento %s event=%s', event_slug, event.uuid
+        )
+
+
 def _mark_boleto_awaiting_allocation(event):
     boleto_uuid = (event.payload or {}).get('boleto_uuid')
     awaiting_allocation = Boleto.objects.filter(
@@ -29,6 +61,7 @@ def _mark_boleto_awaiting_allocation(event):
         allocations__isnull=True,
     ).exists()
     _project_customer_event(event)
+    _notify_boleto_event(event, 'boleto.paid')
     return awaiting_allocation
 
 
@@ -46,6 +79,10 @@ def _reverse_allocated_boleto(event):
         reverse_allocation(allocation, event.event_type)
         reversed_allocation = True
     _project_customer_event(event)
+    _notify_boleto_event(
+        event,
+        'boleto.chargeback' if 'chargeback' in event.event_type else 'boleto.refunded',
+    )
     return reversed_allocation
 
 
@@ -56,7 +93,9 @@ def _project_customer_event(event):
 
 
 def _project_canceled_boleto(event):
-    return _project_customer_event(event)
+    result = _project_customer_event(event)
+    _notify_boleto_event(event, 'boleto.canceled')
+    return result
 
 
 OUTBOX_HANDLERS['boleto.paid'] = _mark_boleto_awaiting_allocation
@@ -152,3 +191,98 @@ def process_outbox_event(event_uuid):
         raise
     complete_outbox_event(event.uuid)
     return True
+
+
+@shared_task(soft_time_limit=300, time_limit=360)
+def send_boleto_due_reminders():
+    from app.apps.accounts.models import Tenant, tenant_has_feature
+
+    today = timezone.localdate()
+    tomorrow = today + timedelta(days=1)
+    three_days = today + timedelta(days=3)
+
+    tenants = Tenant.objects.filter(receivables_enabled=True).iterator()
+    processed = 0
+    for tenant in tenants:
+        if not tenant_has_feature(tenant, 'boletos'):
+            continue
+        try:
+            upcoming = Boleto.objects.filter(
+                tenant=tenant,
+                status=Boleto.Status.PENDENTE,
+                due_date__in=[tomorrow, three_days],
+            ).select_related('seller')
+
+            overdue = Boleto.objects.filter(
+                tenant=tenant,
+                status=Boleto.Status.PENDENTE,
+                due_date__lt=today,
+            ).select_related('seller')
+
+            from .notification_services import notify_boleto_due_reminder
+
+            for boleto in upcoming:
+                notify_boleto_due_reminder(boleto)
+                processed += 1
+            for boleto in overdue:
+                notify_boleto_due_reminder(boleto)
+                processed += 1
+        except Exception:
+            logger.warning('Falha no lote de lembretes tenant=%s', tenant.uuid)
+    logger.info('Lembretes de boleto enviados=%s', processed)
+    return processed
+
+
+@shared_task(soft_time_limit=60, time_limit=90)
+def reprocess_stuck_outbox_events():
+    from .models import IntegrationOutbox
+
+    cutoff = timezone.now() - timedelta(hours=1)
+    stuck = IntegrationOutbox.objects.filter(
+        status__in=(
+            IntegrationOutbox.Status.PROCESSING,
+            IntegrationOutbox.Status.FAILED,
+        ),
+        updated_at__lt=cutoff,
+    ).order_by('updated_at')[:50]
+
+    count = 0
+    for event in stuck:
+        if event.status == IntegrationOutbox.Status.FAILED:
+            event.status = IntegrationOutbox.Status.PENDING
+            event.available_at = timezone.now()
+            event.save(update_fields=['status', 'available_at', 'updated_at'])
+            count += 1
+        elif event.status == IntegrationOutbox.Status.PROCESSING:
+            if event.processing_started_at and (
+                timezone.now() - event.processing_started_at
+            ) > timedelta(minutes=30):
+                event.status = IntegrationOutbox.Status.PENDING
+                event.processing_started_at = None
+                event.available_at = timezone.now()
+                event.save(
+                    update_fields=[
+                        'status', 'processing_started_at',
+                        'available_at', 'updated_at',
+                    ]
+                )
+                count += 1
+    logger.info('Eventos da outbox reprocessados=%s', count)
+    return count
+
+
+@shared_task(soft_time_limit=60, time_limit=90)
+def report_stuck_outbox_metrics():
+    from .models import IntegrationOutbox
+
+    failed = IntegrationOutbox.objects.filter(
+        status=IntegrationOutbox.Status.FAILED,
+    ).count()
+    pending_old = IntegrationOutbox.objects.filter(
+        status=IntegrationOutbox.Status.PENDING,
+        available_at__lt=timezone.now() - timedelta(hours=6),
+    ).count()
+    logger.info(
+        'Metricas outbox: failed=%s pending_old=%s', failed, pending_old,
+    )
+    return {'failed': failed, 'pending_old': pending_old}
