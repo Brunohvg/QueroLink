@@ -1,7 +1,7 @@
 from datetime import timedelta
 
 from django.core.exceptions import ValidationError
-from django.db import IntegrityError, transaction
+from django.db import IntegrityError, connection, transaction
 from django.test import TestCase
 from django.utils import timezone
 
@@ -215,21 +215,16 @@ class BoletoModelTests(TestCase):
         boleto.full_clean()
         boleto.save()
 
-        with self.connection.cursor() as cursor:
+        prepared_uuid = Boleto._meta.pk.get_db_prep_value(boleto.uuid, connection)
+        with connection.cursor() as cursor:
             cursor.execute(
                 'SELECT payer_name, payer_document FROM receivables_boleto WHERE uuid = %s',
-                [boleto.uuid],
+                [prepared_uuid],
             )
             stored_name, stored_document = cursor.fetchone()
 
         self.assertNotEqual(stored_name, 'Maria da Silva')
         self.assertNotEqual(stored_document, '52998224725')
-
-    @property
-    def connection(self):
-        from django.db import connection
-
-        return connection
 
     def test_operation_error_message_is_sanitized(self):
         boleto = self.make_boleto()
