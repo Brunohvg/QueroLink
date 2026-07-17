@@ -138,7 +138,7 @@ class ReceivableAllocationTests(TransactionTestCase):
         self.assertEqual(allocation.sale.amount, 0)
         self.assertEqual(allocation.sale.status, 'ESTORNADA')
 
-    def test_locked_commission_rejects_allocation(self):
+    def test_locked_commission_records_sale_for_impact_review(self):
         sale_date = timezone.localtime(self.paid_at).date()
         period = CommissionPeriod.objects.create(
             tenant=self.tenant, month=sale_date.month, year=sale_date.year,
@@ -147,9 +147,10 @@ class ReceivableAllocationTests(TransactionTestCase):
         SellerCommission.objects.create(
             period=period, seller=self.seller, status=SellerCommission.Status.FECHADA,
         )
-        with self.assertRaises(AllocationDomainError):
-            allocate_paid_boleto(self.boleto('locked'), self.user)
-        self.assertFalse(ReceivableAllocation.objects.exists())
+        allocation, created = allocate_paid_boleto(self.boleto('locked'), self.user)
+        self.assertTrue(created)
+        self.assertEqual(allocation.sale.amount, 10000)
+        self.assertEqual(allocation.commission_impact_reviews.count(), 1)
 
     def test_tenant_isolation(self):
         other_tenant, other_user, other_seller = self.make_tenant('other-allocation')

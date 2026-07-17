@@ -1,7 +1,6 @@
 from django.db import IntegrityError, transaction
 from django.utils import timezone
 
-from app.apps.commissions.models import CommissionPeriod
 from app.apps.sales.models import Sale
 from app.apps.sellers.models import Seller
 
@@ -10,12 +9,6 @@ from .models import Boleto, ReceivableAllocation
 
 class AllocationDomainError(Exception):
     pass
-
-
-def _ensure_commission_is_open(boleto, sale_date):
-    locked_sellers = CommissionPeriod.is_locked_for(boleto.tenant, sale_date)
-    if boleto.seller_id in locked_sellers:
-        raise AllocationDomainError('Competencia fechada ou paga para o vendedor.')
 
 
 def _get_or_create_manual_sale(boleto, sale_date, allocated_by):
@@ -64,7 +57,6 @@ def allocate_paid_boleto(boleto, allocated_by, **_client_values):
             raise AllocationDomainError('Usuario nao pertence ao tenant do boleto.')
 
         sale_date = timezone.localtime(locked.paid_at).date()
-        _ensure_commission_is_open(locked, sale_date)
         Seller.objects.select_for_update().get(pk=locked.seller_id)
         sale = _get_or_create_manual_sale(locked, sale_date, allocated_by)
         sale.amount += locked.paid_amount_cents
@@ -79,6 +71,12 @@ def allocate_paid_boleto(boleto, allocated_by, **_client_values):
             sale_date=sale_date,
             allocated_by=allocated_by,
         )
+        from .commission_services import apply_commission_impact
+        from .models import CommissionImpactReview
+        apply_commission_impact(
+            allocation, CommissionImpactReview.ImpactType.ALLOCATION,
+            allocation.amount_cents, 'Alocacao de boleto pago',
+        )
         return allocation, True
 
 
@@ -89,7 +87,6 @@ def reverse_allocation(allocation, reason=''):
         ).get(pk=allocation.pk)
         if locked.status == ReceivableAllocation.Status.REVERSED:
             return locked, False
-        _ensure_commission_is_open(locked.boleto, locked.sale_date)
         sale = Sale.objects.select_for_update().get(pk=locked.sale_id)
         if sale.amount < locked.amount_cents:
             raise AllocationDomainError('Saldo da venda menor que a alocacao.')
@@ -104,4 +101,12 @@ def reverse_allocation(allocation, reason=''):
         locked.save(update_fields=[
             'status', 'reversed_at', 'reversal_reason', 'updated_at',
         ])
+        from .commission_services import apply_commission_impact
+        from .models import CommissionImpactReview
+        impact_type = (
+            CommissionImpactReview.ImpactType.CHARGEBACK
+            if 'chargeback' in str(reason or '').lower()
+            else CommissionImpactReview.ImpactType.REFUND
+        )
+        apply_commission_impact(locked, impact_type, -locked.amount_cents, reason)
         return locked, True
