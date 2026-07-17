@@ -1,0 +1,8 @@
+Novo boleto emitido
+
+Vendedor: {{ seller_name }}
+Valor: {{ amount }}
+Status: {{ status }}
+Vencimento: {{ due_date }}
+
+Merito by Vidalys

@@ -16,6 +16,12 @@ OBSERVED_TASKS = {
     'app.apps.webhooks.tasks.process_billing_webhook',
     'app.apps.webhooks.tasks.process_pagarme_webhook',
     'app.apps.webhooks.tasks.reconcile_pending_orders',
+    'app.apps.receivables.tasks.reconcile_pending_boletos',
+    'app.apps.receivables.tasks.process_outbox_batch',
+    'app.apps.receivables.tasks.process_outbox_event',
+    'app.apps.receivables.tasks.send_boleto_due_reminders',
+    'app.apps.receivables.tasks.reprocess_stuck_outbox_events',
+    'app.apps.receivables.tasks.report_stuck_outbox_metrics',
 }
 
 _TASK_STARTS = {}

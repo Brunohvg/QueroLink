@@ -1,0 +1,8 @@
+Impacto em comissao aguardando revisao
+
+Vendedor: {{ seller_name }}
+Impacto: {{ impact_type }}
+Valor: {{ amount }}
+Status: {{ status }}
+
+Merito by Vidalys

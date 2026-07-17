@@ -1,0 +1,8 @@
+Boleto {{ status }}
+
+Vendedor: {{ seller_name }}
+Valor: {{ amount }}
+Valor pago: {{ paid_amount }}
+Vencimento: {{ due_date }}
+
+Merito by Vidalys

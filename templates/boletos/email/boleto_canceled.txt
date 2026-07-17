@@ -1,0 +1,7 @@
+Boleto cancelado
+
+Vendedor: {{ seller_name }}
+Valor: {{ amount }}
+Status: {{ status }}
+
+Merito by Vidalys
