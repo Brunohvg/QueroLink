@@ -1,99 +1,126 @@
 {% extends 'mobile/base_mobile.html' %}
 {% block title %}Novo Boleto — Mérito{% endblock %}
 {% block content %}
-<div class="space-y-5 fade-up" x-data="mobileNovoBoleto()">
-  <div class="flex items-center gap-3">
-    <a href="{% url 'dashboard:mobile_boletos' %}" class="w-10 h-10 bg-white rounded-xl card-shadow flex items-center justify-center">
-      <svg class="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
+<div class="px-4 py-5 fade-up" x-data="mobileNovoBoleto()">
+  <!-- Header -->
+  <div class="flex items-center gap-3 mb-6">
+    <a href="{% url 'dashboard:mobile_boletos' %}" class="w-10 h-10 bg-white rounded-xl card-shadow flex items-center justify-center flex-shrink-0">
+      <svg class="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
     </a>
-    <h1 class="font-display text-[20px] font-bold text-gray-900">Novo Boleto</h1>
+    <div>
+      <h1 class="font-display text-[20px] font-bold text-gray-900">Novo Boleto</h1>
+      <p class="text-[12px] text-gray-400">Preencha os dados para emitir</p>
+    </div>
   </div>
 
-  <form @submit.prevent="submit()" class="space-y-4 bg-white rounded-2xl card-shadow p-4">
-    <div>
-      <label class="block text-sm font-medium text-gray-700 mb-1">Nome do Pagador</label>
-      <input type="text" x-model="form.payer_name" required class="w-full text-sm border border-gray-200 rounded-lg px-3 py-2">
+  <form @submit.prevent="submit()" class="space-y-5">
+
+    <!-- Card: Dados do comprador -->
+    <div class="bg-white rounded-2xl card-shadow p-5 space-y-4">
+      <h2 class="text-[14px] font-semibold text-gray-700 border-b border-gray-50 pb-3">Dados do comprador</h2>
+
+      <div>
+        <label class="block text-[12px] font-medium text-gray-500 mb-1">Nome completo <span class="text-red-400">*</span></label>
+        <input type="text" x-model="form.payer_name" required class="w-full h-11 text-sm bg-gray-50 border border-gray-200 rounded-xl px-3.5 text-gray-900 placeholder-gray-400 focus:border-brand-400 focus:ring-2 focus:ring-brand-100 focus:outline-none transition-all" placeholder="Nome do comprador">
+      </div>
+
+      <div class="grid grid-cols-2 gap-3">
+        <div>
+          <label class="block text-[12px] font-medium text-gray-500 mb-1">Documento <span class="text-red-400">*</span></label>
+          <input type="text" x-model="form.payer_document" required class="w-full h-11 text-sm bg-gray-50 border border-gray-200 rounded-xl px-3.5 text-gray-900 placeholder-gray-400 focus:border-brand-400 focus:ring-2 focus:ring-brand-100 focus:outline-none transition-all" placeholder="CPF/CNPJ">
+        </div>
+        <div>
+          <label class="block text-[12px] font-medium text-gray-500 mb-1">Tipo</label>
+          <select x-model="form.payer_document_type" class="w-full h-11 text-sm bg-gray-50 border border-gray-200 rounded-xl px-3.5 text-gray-900 focus:border-brand-400 focus:ring-2 focus:ring-brand-100 focus:outline-none transition-all appearance-none">
+            <option value="CPF">CPF</option>
+            <option value="CNPJ">CNPJ</option>
+          </select>
+        </div>
+      </div>
+
+      <div>
+        <label class="block text-[12px] font-medium text-gray-500 mb-1">E-mail</label>
+        <input type="email" x-model="form.payer_email" class="w-full h-11 text-sm bg-gray-50 border border-gray-200 rounded-xl px-3.5 text-gray-900 placeholder-gray-400 focus:border-brand-400 focus:ring-2 focus:ring-brand-100 focus:outline-none transition-all" placeholder="comprador@exemplo.com">
+      </div>
+
+      <div>
+        <label class="block text-[12px] font-medium text-gray-500 mb-1">Telefone <span class="text-red-400">*</span></label>
+        <input type="tel" x-model="form.payer_phone" required class="w-full h-11 text-sm bg-gray-50 border border-gray-200 rounded-xl px-3.5 text-gray-900 placeholder-gray-400 focus:border-brand-400 focus:ring-2 focus:ring-brand-100 focus:outline-none transition-all" placeholder="(11) 99999-9999">
+      </div>
+
+      <div class="pt-2">
+        <p class="text-[12px] font-medium text-gray-500 mb-3">Endereço</p>
+
+        <div>
+          <label class="block text-[12px] font-medium text-gray-500 mb-1">CEP <span class="text-red-400">*</span></label>
+          <input type="text" x-model="form.payer_zip_code" required class="w-full h-11 text-sm bg-gray-50 border border-gray-200 rounded-xl px-3.5 text-gray-900 placeholder-gray-400 focus:border-brand-400 focus:ring-2 focus:ring-brand-100 focus:outline-none transition-all" placeholder="00000-000">
+        </div>
+
+        <div class="mt-3">
+          <label class="block text-[12px] font-medium text-gray-500 mb-1">Rua <span class="text-red-400">*</span></label>
+          <input type="text" x-model="form.payer_street" required class="w-full h-11 text-sm bg-gray-50 border border-gray-200 rounded-xl px-3.5 text-gray-900 placeholder-gray-400 focus:border-brand-400 focus:ring-2 focus:ring-brand-100 focus:outline-none transition-all">
+        </div>
+
+        <div class="grid grid-cols-2 gap-3 mt-3">
+          <div>
+            <label class="block text-[12px] font-medium text-gray-500 mb-1">Número <span class="text-red-400">*</span></label>
+            <input type="text" x-model="form.payer_number" required class="w-full h-11 text-sm bg-gray-50 border border-gray-200 rounded-xl px-3.5 text-gray-900 placeholder-gray-400 focus:border-brand-400 focus:ring-2 focus:ring-brand-100 focus:outline-none transition-all">
+          </div>
+          <div>
+            <label class="block text-[12px] font-medium text-gray-500 mb-1">Bairro <span class="text-red-400">*</span></label>
+            <input type="text" x-model="form.payer_neighborhood" required class="w-full h-11 text-sm bg-gray-50 border border-gray-200 rounded-xl px-3.5 text-gray-900 placeholder-gray-400 focus:border-brand-400 focus:ring-2 focus:ring-brand-100 focus:outline-none transition-all">
+          </div>
+        </div>
+
+        <div class="grid grid-cols-2 gap-3 mt-3">
+          <div>
+            <label class="block text-[12px] font-medium text-gray-500 mb-1">Cidade <span class="text-red-400">*</span></label>
+            <input type="text" x-model="form.payer_city" required class="w-full h-11 text-sm bg-gray-50 border border-gray-200 rounded-xl px-3.5 text-gray-900 placeholder-gray-400 focus:border-brand-400 focus:ring-2 focus:ring-brand-100 focus:outline-none transition-all">
+          </div>
+          <div>
+            <label class="block text-[12px] font-medium text-gray-500 mb-1">UF <span class="text-red-400">*</span></label>
+            <input type="text" x-model="form.payer_state" required maxlength="2" class="w-full h-11 text-sm bg-gray-50 border border-gray-200 rounded-xl px-3.5 text-gray-900 placeholder-gray-400 uppercase focus:border-brand-400 focus:ring-2 focus:ring-brand-100 focus:outline-none transition-all">
+          </div>
+        </div>
+      </div>
     </div>
 
-    <div class="grid grid-cols-2 gap-3">
+    <!-- Card: Cobranca -->
+    <div class="bg-white rounded-2xl card-shadow p-5 space-y-4">
+      <h2 class="text-[14px] font-semibold text-gray-700 border-b border-gray-50 pb-3">Cobrança</h2>
+
       <div>
-        <label class="block text-sm font-medium text-gray-700 mb-1">Documento</label>
-        <input type="text" x-model="form.payer_document" required class="w-full text-sm border border-gray-200 rounded-lg px-3 py-2" placeholder="CPF/CNPJ">
+        <label class="block text-[12px] font-medium text-gray-500 mb-1">Valor <span class="text-red-400">*</span></label>
+        <div class="relative">
+          <span class="absolute left-3.5 top-1/2 -translate-y-1/2 text-sm text-gray-400 font-medium">R$</span>
+          <input type="number" x-model="form.amount_cents" step="0.01" min="1" required class="w-full h-11 text-sm bg-gray-50 border border-gray-200 rounded-xl pl-9 pr-3.5 text-gray-900 placeholder-gray-400 font-semibold focus:border-brand-400 focus:ring-2 focus:ring-brand-100 focus:outline-none transition-all" placeholder="0,00">
+        </div>
       </div>
+
       <div>
-        <label class="block text-sm font-medium text-gray-700 mb-1">Tipo</label>
-        <select x-model="form.payer_document_type" class="w-full text-sm border border-gray-200 rounded-lg px-3 py-2">
-          <option value="CPF">CPF</option>
-          <option value="CNPJ">CNPJ</option>
-        </select>
+        <label class="block text-[12px] font-medium text-gray-500 mb-1">Vencimento <span class="text-red-400">*</span></label>
+        <input type="date" x-model="form.due_date" required class="w-full h-11 text-sm bg-gray-50 border border-gray-200 rounded-xl px-3.5 text-gray-900 focus:border-brand-400 focus:ring-2 focus:ring-brand-100 focus:outline-none transition-all">
+      </div>
+
+      <div>
+        <label class="block text-[12px] font-medium text-gray-500 mb-1">Instruções</label>
+        <textarea x-model="form.instructions" class="w-full text-sm bg-gray-50 border border-gray-200 rounded-xl px-3.5 py-2.5 text-gray-900 placeholder-gray-400 focus:border-brand-400 focus:ring-2 focus:ring-brand-100 focus:outline-none transition-all resize-none" rows="3" placeholder="Instruções para o pagador (opcional)"></textarea>
       </div>
     </div>
 
-    <div>
-      <label class="block text-sm font-medium text-gray-700 mb-1">Email</label>
-      <input type="email" x-model="form.payer_email" class="w-full text-sm border border-gray-200 rounded-lg px-3 py-2">
+    <!-- Error -->
+    <div x-show="error" x-cloak class="bg-red-50 border border-red-100 text-red-700 text-sm rounded-xl px-4 py-3 flex items-start gap-2.5">
+      <svg class="w-5 h-5 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+      <span x-text="error"></span>
     </div>
 
-    <div>
-      <label class="block text-sm font-medium text-gray-700 mb-1">Telefone</label>
-      <input type="tel" x-model="form.payer_phone" required class="w-full text-sm border border-gray-200 rounded-lg px-3 py-2" placeholder="(11) 99999-9999">
-    </div>
-
-    <div class="grid grid-cols-3 gap-3">
-      <div>
-        <label class="block text-sm font-medium text-gray-700 mb-1">CEP</label>
-        <input type="text" x-model="form.payer_zip_code" required class="w-full text-sm border border-gray-200 rounded-lg px-3 py-2">
-      </div>
-      <div class="col-span-2">
-        <label class="block text-sm font-medium text-gray-700 mb-1">Rua</label>
-        <input type="text" x-model="form.payer_street" required class="w-full text-sm border border-gray-200 rounded-lg px-3 py-2">
-      </div>
-    </div>
-
-    <div class="grid grid-cols-2 gap-3">
-      <div>
-        <label class="block text-sm font-medium text-gray-700 mb-1">Numero</label>
-        <input type="text" x-model="form.payer_number" required class="w-full text-sm border border-gray-200 rounded-lg px-3 py-2">
-      </div>
-      <div>
-        <label class="block text-sm font-medium text-gray-700 mb-1">Bairro</label>
-        <input type="text" x-model="form.payer_neighborhood" required class="w-full text-sm border border-gray-200 rounded-lg px-3 py-2">
-      </div>
-    </div>
-
-    <div class="grid grid-cols-2 gap-3">
-      <div>
-        <label class="block text-sm font-medium text-gray-700 mb-1">Cidade</label>
-        <input type="text" x-model="form.payer_city" required class="w-full text-sm border border-gray-200 rounded-lg px-3 py-2">
-      </div>
-      <div>
-        <label class="block text-sm font-medium text-gray-700 mb-1">UF</label>
-        <input type="text" x-model="form.payer_state" required maxlength="2" class="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 uppercase">
-      </div>
-    </div>
-
-    <div class="grid grid-cols-2 gap-3">
-      <div>
-        <label class="block text-sm font-medium text-gray-700 mb-1">Valor (R$)</label>
-        <input type="number" x-model="form.amount_cents" step="0.01" min="1" required class="w-full text-sm border border-gray-200 rounded-lg px-3 py-2">
-      </div>
-      <div>
-        <label class="block text-sm font-medium text-gray-700 mb-1">Vencimento</label>
-        <input type="date" x-model="form.due_date" required class="w-full text-sm border border-gray-200 rounded-lg px-3 py-2">
-      </div>
-    </div>
-
-    <div>
-      <label class="block text-sm font-medium text-gray-700 mb-1">Instrucoes</label>
-      <textarea x-model="form.instructions" class="w-full text-sm border border-gray-200 rounded-lg px-3 py-2" rows="2"></textarea>
-    </div>
-
-    <div x-show="error" class="bg-red-50 text-red-700 text-sm rounded-lg px-4 py-3" x-text="error"></div>
-
-    <button type="submit" :disabled="submitting" class="w-full py-3 bg-brand-600 text-white font-semibold rounded-xl hover:bg-brand-700 disabled:opacity-50">
-      <span x-show="!submitting">Emitir Boleto</span>
+    <!-- Submit -->
+    <button type="submit" :disabled="submitting" class="w-full py-3.5 bg-brand-600 hover:bg-brand-700 text-white font-semibold rounded-xl transition-all shadow-sm disabled:opacity-50 flex items-center justify-center gap-2">
+      <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+      <span x-show="!submitting">Emitir boleto</span>
       <span x-show="submitting">Emitindo...</span>
     </button>
+
   </form>
 </div>
 

@@ -2,125 +2,165 @@
 {% block title %}Novo Boleto — Mérito{% endblock %}
 {% block content %}
 <div x-data="novoBoletoPage()" x-init="init()" class="max-w-2xl mx-auto">
-  <div class="mb-6">
-    <a href="{% url 'dashboard:gestor_boletos' %}" class="text-sm text-gray-500 hover:text-gray-700">&larr; Voltar</a>
+  <!-- Header -->
+  <div class="flex items-center justify-between mb-6">
+    <div>
+      <a href="{% url 'dashboard:gestor_boletos' %}" class="inline-flex items-center gap-1.5 text-sm text-gray-400 hover:text-gray-600 transition-colors mb-2">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
+        Boletos
+      </a>
+      <h1 class="font-display text-[22px] font-bold text-gray-900 tracking-tight">Novo Boleto</h1>
+      <p class="text-[13px] text-gray-400 mt-0.5">Preencha os dados do comprador e o valor da cobrança</p>
+    </div>
   </div>
 
-  <div class="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
-    <h1 class="font-display text-xl font-bold text-gray-900 mb-6">Novo Boleto</h1>
+  <form @submit.prevent="submit()" class="space-y-6">
 
-    <form @submit.prevent="submit()" class="space-y-4">
-      <div>
-        <label class="block text-sm font-medium text-gray-700 mb-1">Vendedor</label>
-        <select x-model="form.seller_uuid" required class="w-full text-sm border border-gray-200 rounded-lg px-3 py-2">
-          <option value="">Selecione...</option>
-          {% verbatim %}
-          <template x-for="s in sellers" :key="s.uuid">
-            <option :value="s.uuid" x-text="s.name"></option>
-          </template>
-          {% endverbatim %}
-        </select>
+    <!-- Card: Responsavel e comprador -->
+    <div class="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+      <div class="px-6 py-4 border-b border-gray-50">
+        <h2 class="text-[15px] font-semibold text-gray-800">Dados do comprador</h2>
       </div>
+      <div class="p-6 space-y-5">
 
-      <div class="grid grid-cols-2 gap-4">
         <div>
-          <label class="block text-sm font-medium text-gray-700 mb-1">Nome do Pagador</label>
-          <input type="text" x-model="form.payer_name" required class="w-full text-sm border border-gray-200 rounded-lg px-3 py-2">
-        </div>
-        <div>
-          <label class="block text-sm font-medium text-gray-700 mb-1">Documento</label>
-          <input type="text" x-model="form.payer_document" required class="w-full text-sm border border-gray-200 rounded-lg px-3 py-2" placeholder="CPF ou CNPJ">
-        </div>
-      </div>
-
-      <div class="grid grid-cols-2 gap-4">
-        <div>
-          <label class="block text-sm font-medium text-gray-700 mb-1">Tipo Documento</label>
-          <select x-model="form.payer_document_type" class="w-full text-sm border border-gray-200 rounded-lg px-3 py-2">
-            <option value="CPF">CPF</option>
-            <option value="CNPJ">CNPJ</option>
+          <label class="block text-[13px] font-medium text-gray-600 mb-1.5">Vendedor <span class="text-red-400">*</span></label>
+          <select x-model="form.seller_uuid" required class="w-full h-11 text-sm border border-gray-200 rounded-xl px-3.5 bg-white text-gray-900 appearance-none focus:border-brand-400 focus:ring-2 focus:ring-brand-100 focus:outline-none transition-all hover:border-gray-300">
+            <option value="">Selecionar vendedor...</option>
+            {% verbatim %}
+            <template x-for="s in sellers" :key="s.uuid">
+              <option :value="s.uuid" x-text="s.name"></option>
+            </template>
+            {% endverbatim %}
           </select>
         </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div>
+            <label class="block text-[13px] font-medium text-gray-600 mb-1.5">Nome do comprador <span class="text-red-400">*</span></label>
+            <input type="text" x-model="form.payer_name" required class="w-full h-11 text-sm border border-gray-200 rounded-xl px-3.5 text-gray-900 placeholder-gray-400 focus:border-brand-400 focus:ring-2 focus:ring-brand-100 focus:outline-none transition-all hover:border-gray-300" placeholder="Nome completo">
+          </div>
+          <div>
+            <label class="block text-[13px] font-medium text-gray-600 mb-1.5">Documento <span class="text-red-400">*</span></label>
+            <input type="text" x-model="form.payer_document" required class="w-full h-11 text-sm border border-gray-200 rounded-xl px-3.5 text-gray-900 placeholder-gray-400 focus:border-brand-400 focus:ring-2 focus:ring-brand-100 focus:outline-none transition-all hover:border-gray-300" placeholder="CPF ou CNPJ">
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div>
+            <label class="block text-[13px] font-medium text-gray-600 mb-1.5">Tipo de documento</label>
+            <select x-model="form.payer_document_type" class="w-full h-11 text-sm border border-gray-200 rounded-xl px-3.5 bg-white text-gray-900 focus:border-brand-400 focus:ring-2 focus:ring-brand-100 focus:outline-none transition-all hover:border-gray-300 appearance-none">
+              <option value="CPF">CPF</option>
+              <option value="CNPJ">CNPJ</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-[13px] font-medium text-gray-600 mb-1.5">E-mail</label>
+            <input type="email" x-model="form.payer_email" class="w-full h-11 text-sm border border-gray-200 rounded-xl px-3.5 text-gray-900 placeholder-gray-400 focus:border-brand-400 focus:ring-2 focus:ring-brand-100 focus:outline-none transition-all hover:border-gray-300" placeholder="comprador@exemplo.com">
+          </div>
+        </div>
+
         <div>
-          <label class="block text-sm font-medium text-gray-700 mb-1">Email</label>
-          <input type="email" x-model="form.payer_email" class="w-full text-sm border border-gray-200 rounded-lg px-3 py-2">
+          <label class="block text-[13px] font-medium text-gray-600 mb-1.5">Telefone <span class="text-red-400">*</span></label>
+          <input type="tel" x-model="form.payer_phone" required class="w-full h-11 text-sm border border-gray-200 rounded-xl px-3.5 text-gray-900 placeholder-gray-400 focus:border-brand-400 focus:ring-2 focus:ring-brand-100 focus:outline-none transition-all hover:border-gray-300" placeholder="(11) 99999-9999">
+        </div>
+
+        <div class="border-t border-gray-50 pt-4">
+          <p class="text-[13px] font-medium text-gray-600 mb-3">Endereço</p>
+
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div>
+              <label class="block text-[13px] font-medium text-gray-600 mb-1.5">CEP <span class="text-red-400">*</span></label>
+              <input type="text" x-model="form.payer_zip_code" required class="w-full h-11 text-sm border border-gray-200 rounded-xl px-3.5 text-gray-900 placeholder-gray-400 focus:border-brand-400 focus:ring-2 focus:ring-brand-100 focus:outline-none transition-all hover:border-gray-300" placeholder="00000-000">
+            </div>
+            <div class="sm:col-span-2">
+              <label class="block text-[13px] font-medium text-gray-600 mb-1.5">Rua <span class="text-red-400">*</span></label>
+              <input type="text" x-model="form.payer_street" required class="w-full h-11 text-sm border border-gray-200 rounded-xl px-3.5 text-gray-900 placeholder-gray-400 focus:border-brand-400 focus:ring-2 focus:ring-brand-100 focus:outline-none transition-all hover:border-gray-300" placeholder="Nome da rua, avenida...">
+            </div>
+          </div>
+
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-4">
+            <div>
+              <label class="block text-[13px] font-medium text-gray-600 mb-1.5">Número <span class="text-red-400">*</span></label>
+              <input type="text" x-model="form.payer_number" required class="w-full h-11 text-sm border border-gray-200 rounded-xl px-3.5 text-gray-900 placeholder-gray-400 focus:border-brand-400 focus:ring-2 focus:ring-brand-100 focus:outline-none transition-all hover:border-gray-300" placeholder="Nº">
+            </div>
+            <div>
+              <label class="block text-[13px] font-medium text-gray-600 mb-1.5">Complemento</label>
+              <input type="text" x-model="form.payer_complement" class="w-full h-11 text-sm border border-gray-200 rounded-xl px-3.5 text-gray-900 placeholder-gray-400 focus:border-brand-400 focus:ring-2 focus:ring-brand-100 focus:outline-none transition-all hover:border-gray-300" placeholder="Apto, sala...">
+            </div>
+            <div>
+              <label class="block text-[13px] font-medium text-gray-600 mb-1.5">Bairro <span class="text-red-400">*</span></label>
+              <input type="text" x-model="form.payer_neighborhood" required class="w-full h-11 text-sm border border-gray-200 rounded-xl px-3.5 text-gray-900 placeholder-gray-400 focus:border-brand-400 focus:ring-2 focus:ring-brand-100 focus:outline-none transition-all hover:border-gray-300" placeholder="Bairro">
+            </div>
+          </div>
+
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4">
+            <div>
+              <label class="block text-[13px] font-medium text-gray-600 mb-1.5">Cidade <span class="text-red-400">*</span></label>
+              <input type="text" x-model="form.payer_city" required class="w-full h-11 text-sm border border-gray-200 rounded-xl px-3.5 text-gray-900 placeholder-gray-400 focus:border-brand-400 focus:ring-2 focus:ring-brand-100 focus:outline-none transition-all hover:border-gray-300" placeholder="Cidade">
+            </div>
+            <div>
+              <label class="block text-[13px] font-medium text-gray-600 mb-1.5">UF <span class="text-red-400">*</span></label>
+              <input type="text" x-model="form.payer_state" required maxlength="2" class="w-full h-11 text-sm border border-gray-200 rounded-xl px-3.5 text-gray-900 placeholder-gray-400 uppercase focus:border-brand-400 focus:ring-2 focus:ring-brand-100 focus:outline-none transition-all hover:border-gray-300" placeholder="SP">
+            </div>
+          </div>
         </div>
       </div>
+    </div>
 
-      <div>
-        <label class="block text-sm font-medium text-gray-700 mb-1">Telefone</label>
-        <input type="text" x-model="form.payer_phone" required class="w-full text-sm border border-gray-200 rounded-lg px-3 py-2" placeholder="(11) 99999-9999">
+    <!-- Card: Cobranca -->
+    <div class="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+      <div class="px-6 py-4 border-b border-gray-50">
+        <h2 class="text-[15px] font-semibold text-gray-800">Cobrança</h2>
       </div>
+      <div class="p-6 space-y-5">
 
-      <div class="grid grid-cols-3 gap-4">
-        <div class="col-span-1">
-          <label class="block text-sm font-medium text-gray-700 mb-1">CEP</label>
-          <input type="text" x-model="form.payer_zip_code" required class="w-full text-sm border border-gray-200 rounded-lg px-3 py-2" placeholder="00000-000">
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div>
+            <label class="block text-[13px] font-medium text-gray-600 mb-1.5">Valor da cobrança <span class="text-red-400">*</span></label>
+            <div class="relative">
+              <span class="absolute left-3.5 top-1/2 -translate-y-1/2 text-sm text-gray-400 font-medium">R$</span>
+              <input type="number" x-model="form.amount_cents" step="0.01" min="1" required class="w-full h-11 text-sm border border-gray-200 rounded-xl pl-9 pr-3.5 text-gray-900 placeholder-gray-400 font-semibold focus:border-brand-400 focus:ring-2 focus:ring-brand-100 focus:outline-none transition-all hover:border-gray-300" placeholder="0,00" @input="formatAmount">
+            </div>
+          </div>
+          <div>
+            <label class="block text-[13px] font-medium text-gray-600 mb-1.5">Vencimento <span class="text-red-400">*</span></label>
+            <input type="date" x-model="form.due_date" required class="w-full h-11 text-sm border border-gray-200 rounded-xl px-3.5 text-gray-900 focus:border-brand-400 focus:ring-2 focus:ring-brand-100 focus:outline-none transition-all hover:border-gray-300">
+          </div>
         </div>
-        <div class="col-span-2">
-          <label class="block text-sm font-medium text-gray-700 mb-1">Rua</label>
-          <input type="text" x-model="form.payer_street" required class="w-full text-sm border border-gray-200 rounded-lg px-3 py-2">
-        </div>
-      </div>
 
-      <div class="grid grid-cols-3 gap-4">
         <div>
-          <label class="block text-sm font-medium text-gray-700 mb-1">Numero</label>
-          <input type="text" x-model="form.payer_number" required class="w-full text-sm border border-gray-200 rounded-lg px-3 py-2">
+          <label class="block text-[13px] font-medium text-gray-600 mb-1.5">Instruções</label>
+          <textarea x-model="form.instructions" class="w-full text-sm border border-gray-200 rounded-xl px-3.5 py-2.5 text-gray-900 placeholder-gray-400 focus:border-brand-400 focus:ring-2 focus:ring-brand-100 focus:outline-none transition-all hover:border-gray-300 resize-none" rows="3" placeholder="Instruções para o pagador (opcional)"></textarea>
         </div>
+
         <div>
-          <label class="block text-sm font-medium text-gray-700 mb-1">Complemento</label>
-          <input type="text" x-model="form.payer_complement" class="w-full text-sm border border-gray-200 rounded-lg px-3 py-2">
-        </div>
-        <div>
-          <label class="block text-sm font-medium text-gray-700 mb-1">Bairro</label>
-          <input type="text" x-model="form.payer_neighborhood" required class="w-full text-sm border border-gray-200 rounded-lg px-3 py-2">
+          <label class="block text-[13px] font-medium text-gray-600 mb-1.5">Observação interna</label>
+          <textarea x-model="form.notes" class="w-full text-sm border border-gray-200 rounded-xl px-3.5 py-2.5 text-gray-900 placeholder-gray-400 focus:border-brand-400 focus:ring-2 focus:ring-brand-100 focus:outline-none transition-all hover:border-gray-300 resize-none" rows="3" placeholder="Anotações internas (opcional)"></textarea>
         </div>
       </div>
+    </div>
 
-      <div class="grid grid-cols-2 gap-4">
-        <div>
-          <label class="block text-sm font-medium text-gray-700 mb-1">Cidade</label>
-          <input type="text" x-model="form.payer_city" required class="w-full text-sm border border-gray-200 rounded-lg px-3 py-2">
-        </div>
-        <div>
-          <label class="block text-sm font-medium text-gray-700 mb-1">UF</label>
-          <input type="text" x-model="form.payer_state" required maxlength="2" class="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 uppercase" placeholder="SP">
-        </div>
-      </div>
+    <!-- Error message -->
+    <div x-show="error" x-cloak class="bg-red-50 border border-red-100 text-red-700 text-sm rounded-xl px-5 py-3.5 flex items-start gap-3">
+      <svg class="w-5 h-5 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+      <span x-text="error"></span>
+    </div>
 
-      <div class="grid grid-cols-2 gap-4">
-        <div>
-          <label class="block text-sm font-medium text-gray-700 mb-1">Valor (R$)</label>
-          <input type="number" x-model="form.amount_cents" step="0.01" min="1" required class="w-full text-sm border border-gray-200 rounded-lg px-3 py-2" @input="formatAmount">
-        </div>
-        <div>
-          <label class="block text-sm font-medium text-gray-700 mb-1">Vencimento</label>
-          <input type="date" x-model="form.due_date" required class="w-full text-sm border border-gray-200 rounded-lg px-3 py-2">
-        </div>
-      </div>
+    <!-- Actions -->
+    <div class="flex items-center justify-between gap-4 pt-2 pb-8">
+      <a href="{% url 'dashboard:gestor_boletos' %}" class="inline-flex items-center gap-2 px-5 py-2.5 text-sm font-medium text-gray-500 hover:text-gray-700 border border-gray-200 hover:border-gray-300 rounded-xl transition-all">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+        Cancelar
+      </a>
+      <button type="submit" :disabled="submitting" class="inline-flex items-center gap-2 px-6 py-2.5 bg-brand-600 hover:bg-brand-700 text-white text-sm font-semibold rounded-xl transition-all shadow-sm disabled:opacity-50 disabled:cursor-not-allowed">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+        <span x-show="!submitting">Emitir boleto</span>
+        <span x-show="submitting">Emitindo...</span>
+      </button>
+    </div>
 
-      <div>
-        <label class="block text-sm font-medium text-gray-700 mb-1">Instrucoes</label>
-        <textarea x-model="form.instructions" class="w-full text-sm border border-gray-200 rounded-lg px-3 py-2" rows="2"></textarea>
-      </div>
-
-      <div>
-        <label class="block text-sm font-medium text-gray-700 mb-1">Observacoes</label>
-        <textarea x-model="form.notes" class="w-full text-sm border border-gray-200 rounded-lg px-3 py-2" rows="2"></textarea>
-      </div>
-
-      <div x-show="error" class="bg-red-50 text-red-700 text-sm rounded-lg px-4 py-3" x-text="error"></div>
-
-      <div class="flex justify-end gap-3 pt-4 border-t border-gray-100">
-        <a href="{% url 'dashboard:gestor_boletos' %}" class="px-4 py-2 text-sm text-gray-600 hover:text-gray-800">Cancelar</a>
-        <button type="submit" :disabled="submitting" class="px-6 py-2 bg-brand-600 text-white text-sm font-semibold rounded-xl hover:bg-brand-700 disabled:opacity-50">
-          <span x-show="!submitting">Emitir Boleto</span>
-          <span x-show="submitting">Emitindo...</span>
-        </button>
-      </div>
-    </form>
-  </div>
+  </form>
 </div>
 
 {{ sellers_json|json_script:"sellers-data" }}
@@ -162,7 +202,7 @@ function novoBoletoPage() {
             var payload = {};
             for (var key in this.form) {
                 if (this.form.hasOwnProperty(key)) {
-                    payload[key] = this.form[key] === '' ? null : this.form[key];
+                    payload[key] = this.form[key] === '' ? '' : this.form[key];
                 }
             }
             if (payload.amount_cents) {
