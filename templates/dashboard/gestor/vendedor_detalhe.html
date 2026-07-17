@@ -192,17 +192,17 @@
               <td class="px-4 py-3.5 text-right">
                 <div class="flex items-center justify-end gap-1">
                   <button @click="openEditSale(s)" x-show="s.status !== 'ESTORNADA'"
-                          class="tap-target flex items-center justify-center w-8 h-8 text-gray-300 hover:text-brand-500 transition rounded-lg hover:bg-brand-50 active:scale-[0.95]"
+                          class="tap-target flex items-center justify-center w-8 h-8 text-gray-400 hover:text-brand-600 bg-gray-50 hover:bg-brand-50 rounded-lg transition-all active:scale-[0.95]"
                           title="Editar venda">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
                   </button>
                   <button @click="openVoidSale(s)" x-show="s.status !== 'ESTORNADA'"
-                          class="tap-target flex items-center justify-center w-8 h-8 text-gray-300 hover:text-red-500 transition rounded-lg hover:bg-red-50 active:scale-[0.95]"
+                          class="tap-target flex items-center justify-center w-8 h-8 text-gray-400 hover:text-red-600 bg-gray-50 hover:bg-red-50 rounded-lg transition-all active:scale-[0.95]"
                           title="Anular lancamento">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
                   </button>
                   <button @click="openHistory(s)"
-                          class="tap-target flex items-center justify-center w-8 h-8 text-gray-300 hover:text-amber-500 transition rounded-lg hover:bg-amber-50 active:scale-[0.95] relative"
+                          class="tap-target flex items-center justify-center w-8 h-8 text-gray-400 hover:text-amber-600 bg-gray-50 hover:bg-amber-50 rounded-lg transition-all active:scale-[0.95] relative"
                           title="Historico de alteracoes">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
                     <span x-show="s.change_log_count > 0"
