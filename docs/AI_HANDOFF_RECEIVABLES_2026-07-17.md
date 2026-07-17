@@ -20,13 +20,15 @@ Atualizado em 17/07/2026. Este documento permite que outra IA ou pessoa continue
 - HEAD mesclado usado como base: `3504da850c258044fa025ef86e96b7f6abf8a868` (PR #44).
 - Branch em desenvolvimento: `feat/customer-ledger-api`.
 - Prompt em entrega: **Prompt 09 — API do Customer Ledger e backfill controlado**.
-- Estado local: implementação concluída e gates locais verdes; falta publicar o Draft PR e registrar seu número/commit final.
+- Commit da implementação: `b77bef9d7179f66e78ceaea854e29480796bb993`.
+- PR atual: [#45 — API e backfill controlado do Customer Ledger](https://github.com/Brunohvg/QueroLink/pull/45), aberto como Draft contra `querolink-v2`.
+- Estado: implementação concluída, gates locais verdes; aguardar checks do GitHub e merge manual do #45.
 - Próximo prompt, somente depois do merge verde deste PR: **Prompt 10 — documentos de boleto**.
 
 Antes de iniciar o Prompt 10, confirmar o estado do Draft PR do Prompt 09 que será registrado neste documento:
 
 ```bash
-gh pr view NUMERO_DO_PR_09 --json state,mergedAt,statusCheckRollup
+gh pr view 45 --json state,mergedAt,statusCheckRollup
 git fetch origin --prune
 ```
 
@@ -44,7 +46,7 @@ git fetch origin --prune
 | #42 | Prompt 06 — alocação em vendas | Mesclado | `e592820` |
 | #43 | Prompt 07 — impacto em comissões | Mesclado | `af067da` |
 | #44 | Prompt 08 — Customer Ledger assíncrono | Mesclado | `3504da8` |
-| a registrar | Prompt 09 — API e backfill do Customer Ledger | Implementação local verde | branch `feat/customer-ledger-api` |
+| #45 | Prompt 09 — API e backfill do Customer Ledger | Draft aberto | `b77bef9` |
 
 ## 4. Decisões de arquitetura tomadas
 
