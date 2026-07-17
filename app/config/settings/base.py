@@ -64,6 +64,7 @@ INSTALLED_APPS = [
     "app.apps.analytics",
     "app.apps.billing",
     "app.apps.freight",
+    "app.apps.receivables",
 
     'rest_framework',
     'rest_framework.authtoken',
@@ -254,6 +255,7 @@ PLAN_FEATURES = {
         'export_contabil': False,
         'importacao_csv': False,
         'previa_fechamento': False,
+        'boletos': False,
     },
     'PRO': {
         'links_pagamento': True,
@@ -263,6 +265,7 @@ PLAN_FEATURES = {
         'export_contabil': True,
         'importacao_csv': True,
         'previa_fechamento': True,
+        'boletos': True,
     },
     'BUSINESS': {
         'links_pagamento': True,
@@ -272,6 +275,7 @@ PLAN_FEATURES = {
         'export_contabil': True,
         'importacao_csv': True,
         'previa_fechamento': True,
+        'boletos': True,
     },
 }
 
