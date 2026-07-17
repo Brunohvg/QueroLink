@@ -187,6 +187,8 @@ class PagarmeBoletoProvider(BoletoProvider):
             status=self._normalize_status(charge.get('status') or response.get('status')),
             barcode=str(transaction.get('line') or transaction.get('barcode') or ''),
             url=str(transaction.get('pdf') or transaction.get('url') or ''),
+            paid_amount_cents=charge.get('paid_amount') or charge.get('amount'),
+            paid_at=self._parse_datetime(charge.get('paid_at')),
         )
 
     def _result_from_charge(self, charge):
@@ -200,7 +202,20 @@ class PagarmeBoletoProvider(BoletoProvider):
             status=self._normalize_status(charge.get('status')),
             barcode=str(transaction.get('line') or transaction.get('barcode') or ''),
             url=str(transaction.get('pdf') or transaction.get('url') or ''),
+            paid_amount_cents=charge.get('paid_amount') or charge.get('amount'),
+            paid_at=self._parse_datetime(charge.get('paid_at')),
         )
+
+    @staticmethod
+    def _parse_datetime(value):
+        if isinstance(value, datetime):
+            return value
+        if isinstance(value, str):
+            try:
+                return datetime.fromisoformat(value.replace('Z', '+00:00'))
+            except ValueError:
+                return None
+        return None
 
     @staticmethod
     def _gateway(tenant):

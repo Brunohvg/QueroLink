@@ -70,6 +70,10 @@ CELERY_BEAT_SCHEDULE = {
         'task': 'app.apps.webhooks.tasks.reconcile_pending_orders',
         'schedule': 1800.0,  # a cada 30 minutos
     },
+    'reconcile-pending-boletos': {
+        'task': 'app.apps.receivables.tasks.reconcile_pending_boletos',
+        'schedule': 3600.0,  # inicialmente a cada hora
+    },
     'cleanup-old-webhook-events': {
         'task': 'app.apps.webhooks.tasks.cleanup_old_webhook_events',
         'schedule': 86400.0,  # diariamente

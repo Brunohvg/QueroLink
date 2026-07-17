@@ -23,6 +23,8 @@ class ProviderResult:
     status: ProviderStatus
     barcode: str = ''
     url: str = ''
+    paid_amount_cents: int | None = None
+    paid_at: datetime | None = None
 
 
 @dataclass(frozen=True)
