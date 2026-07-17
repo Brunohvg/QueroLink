@@ -386,15 +386,18 @@ class SellerImportSerializer(serializers.Serializer):
 class SaleSerializer(serializers.ModelSerializer):
     seller_uuid = serializers.CharField(source='seller.uuid', read_only=True)
     seller_name = serializers.CharField(source='seller.name', read_only=True)
+    origin_display = serializers.CharField(source='get_origin_display', read_only=True)
 
     class Meta:
         model = Sale
         fields = [
-            'uuid', 'seller_uuid', 'seller_name', 'origin', 'amount',
-            'sale_date', 'notes', 'created_at', 'updated_at',
+            'uuid', 'seller_uuid', 'seller_name', 'origin', 'origin_display',
+            'amount', 'sale_date', 'notes', 'status',
+            'created_at', 'updated_at',
         ]
         read_only_fields = [
-            'uuid', 'seller_uuid', 'seller_name', 'created_at', 'updated_at',
+            'uuid', 'seller_uuid', 'seller_name', 'origin', 'status',
+            'created_at', 'updated_at',
         ]
 
 

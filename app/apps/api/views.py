@@ -428,6 +428,74 @@ class SaleViewSet(viewsets.ModelViewSet):
         serializer = SaleChangeLogSerializer(qs, many=True)
         return Response(serializer.data)
 
+    @action(detail=True, methods=['post'], permission_classes=[IsAuthenticated, IsManagerOrAdmin], url_path='void')
+    def void(self, request, pk=None):
+        sale = self.get_object()
+        reason = (request.data or {}).get('reason', '').strip()
+        if len(reason) < 5:
+            return Response(
+                {'error': 'Motivo é obrigatório (mínimo 5 caracteres).'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if sale.status == 'ESTORNADA':
+            return Response(
+                {'error': 'Venda já está estornada.'},
+                status=status.HTTP_409_CONFLICT,
+            )
+
+        if sale.receivable_allocations.filter(
+            status='ACTIVE',
+        ).exists():
+            return Response(
+                {'error': 'Este valor foi originado por um recebível. Faça a reversão pelo detalhe da cobrança para preservar a conciliação financeira.'},
+                status=status.HTTP_409_CONFLICT,
+            )
+
+        from app.apps.commissions.services import validate_sale_can_be_changed
+        can_change, error_msg = validate_sale_can_be_changed(
+            sale.seller, sale.sale_date, request.user,
+        )
+        if not can_change:
+            return Response(
+                {'error': error_msg or 'Periodo fechado — reabra a competencia para corrigir este lancamento.'},
+                status=status.HTTP_409_CONFLICT,
+            )
+
+        from django.db import transaction
+        with transaction.atomic():
+            sale_original = Sale.objects.get(pk=sale.pk)
+            sale_original.status = 'ESTORNADA'
+            sale_original.updated_by = request.user
+            sale_original.save(update_fields=['status', 'updated_by', 'updated_at'])
+
+            SaleChangeLog.objects.create(
+                sale=sale_original,
+                tenant=sale_original.tenant,
+                action=SaleChangeLog.Action.VOID,
+                changed_by=request.user,
+                field_changes={
+                    'old_status': 'ATIVA',
+                    'new_status': 'ESTORNADA',
+                    'old_amount': sale_original.amount,
+                    'origin': sale_original.origin,
+                },
+                reason=reason,
+            )
+
+            from app.apps.commissions.services import ensure_seller_commission
+            ensure_seller_commission(sale_original.seller, sale_original.sale_date)
+
+        from app.apps.audit.utils import log_action
+        log_action(request, 'sale.voided', instance=sale_original, changes={
+            'reason': reason, 'old_status': 'ATIVA', 'new_status': 'ESTORNADA',
+        })
+
+        return Response({
+            'message': 'Lancamento anulado com sucesso.',
+            'sale': SaleSerializer(sale_original).data,
+        })
+
 
 class CommissionPeriodViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated, IsManagerOrAdmin]

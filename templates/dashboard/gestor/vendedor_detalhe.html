@@ -167,6 +167,7 @@
         <thead>
           <tr class="bg-gray-50/80">
             <th class="px-4 py-3 text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Data</th>
+            <th class="px-4 py-3 text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Origem</th>
             <th class="px-4 py-3 text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Valor</th>
             <th class="px-4 py-3 text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Observacao</th>
             <th class="px-4 py-3 text-[11px] font-semibold text-gray-500 uppercase tracking-wider text-right">Acoes</th>
@@ -176,6 +177,13 @@
           <template x-for="s in sellerData?.manual_sales" :key="s.uuid">
             <tr class="border-b border-gray-50 hover:bg-gray-50/50 transition-colors">
               <td class="px-4 py-3.5 text-[13px] text-gray-500" x-text="formatCivilDate(s.sale_date)"></td>
+              <td class="px-4 py-3.5 text-[12px] text-gray-500">
+                <span :class="{
+                  'text-brand-600': s.origin === 'MANUAL',
+                  'text-emerald-600': s.origin === 'IMPORTADA',
+                  'text-blue-600': s.origin === 'LINK',
+                }" x-text="s.origin_display || s.origin"></span>
+              </td>
               <td class="px-4 py-3.5 font-semibold text-[14px]" :class="s.status === 'ESTORNADA' ? 'text-gray-400 line-through opacity-60' : 'text-gray-900'" x-text="formatMoneyBRL(s.amount)"></td>
               <td class="px-4 py-3.5 text-[13px] text-gray-500">
                 <span x-text="s.notes || '—'"></span>
@@ -183,10 +191,15 @@
               </td>
               <td class="px-4 py-3.5 text-right">
                 <div class="flex items-center justify-end gap-1">
-                  <button @click="openEditSale(s)" x-show="s.status !== 'ESTORNADA' && s.origin === 'MANUAL'"
+                  <button @click="openEditSale(s)" x-show="s.status !== 'ESTORNADA'"
                           class="tap-target flex items-center justify-center w-8 h-8 text-gray-300 hover:text-brand-500 transition rounded-lg hover:bg-brand-50 active:scale-[0.95]"
                           title="Editar venda">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
+                  </button>
+                  <button @click="openVoidSale(s)" x-show="s.status !== 'ESTORNADA'"
+                          class="tap-target flex items-center justify-center w-8 h-8 text-gray-300 hover:text-red-500 transition rounded-lg hover:bg-red-50 active:scale-[0.95]"
+                          title="Anular lancamento">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
                   </button>
                   <button @click="openHistory(s)"
                           class="tap-target flex items-center justify-center w-8 h-8 text-gray-300 hover:text-amber-500 transition rounded-lg hover:bg-amber-50 active:scale-[0.95] relative"
@@ -296,6 +309,52 @@
             </div>
           </div>
         </template>
+      </div>
+    </div>
+
+    <!-- Modal de anulacao -->
+    <div x-show="voidModalOpen" x-cloak class="fixed inset-0 z-50 flex items-center justify-center p-4"
+         x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100"
+         x-transition:leave="transition ease-in duration-150" x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0"
+         @keydown.escape.window="voidModalOpen = false">
+      <div class="fixed inset-0 bg-black/40 backdrop-blur-sm" @click="voidModalOpen = false"></div>
+      <div class="relative bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 z-10"
+           @click.outside="voidModalOpen = false">
+        <div class="flex items-center justify-between mb-5">
+          <h3 class="text-[16px] font-bold text-gray-900">Anular lançamento</h3>
+          <button @click="voidModalOpen = false" class="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-gray-100 transition text-gray-400">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+          </button>
+        </div>
+        <div class="space-y-4">
+          <div class="bg-gray-50 rounded-xl p-3.5 space-y-1.5 text-[13px]">
+            <p><span class="text-gray-500">Data:</span> <span class="font-medium" x-text="formatCivilDate(voidForm.sale_date)"></span></p>
+            <p><span class="text-gray-500">Valor:</span> <span class="font-medium" x-text="formatMoneyBRL(voidForm.amount)"></span></p>
+            <p><span class="text-gray-500">Origem:</span> <span class="font-medium" x-text="voidForm.origin_display"></span></p>
+            <p><span class="text-gray-500">Vendedor:</span> <span class="font-medium" x-text="sellerData?.seller?.name"></span></p>
+          </div>
+          <p class="text-[12px] text-gray-500">Esta acao ficara registrada no historico da venda.</p>
+          <div>
+            <label class="text-[12px] font-semibold text-gray-500 uppercase tracking-wide block mb-1.5">
+              Motivo <span class="text-red-500">*</span>
+            </label>
+            <textarea x-model="voidForm.reason" rows="3" maxlength="500"
+                      class="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-[14px] outline-none transition-all focus:border-brand-400 focus:ring-2 focus:ring-brand-100 resize-none"
+                      placeholder="Por que este lancamento precisa ser anulado?"></textarea>
+            <p x-show="voidForm.reason.length > 0 && voidForm.reason.length < 5" class="text-[11px] text-red-500 mt-1">Minimo de 5 caracteres</p>
+          </div>
+          <div x-show="voidError" class="bg-red-50 border border-red-200 text-red-700 px-3.5 py-2.5 rounded-xl text-[12px] font-medium" x-text="voidError"></div>
+          <div class="flex gap-3 pt-1">
+            <button @click="voidModalOpen = false"
+                    class="flex-1 px-4 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl text-[13px] font-medium transition active:scale-[0.98]">
+              Voltar
+            </button>
+            <button @click="confirmVoidSale()" :disabled="voidSaving"
+                    class="flex-1 px-4 py-2.5 bg-red-600 hover:bg-red-700 text-white rounded-xl text-[13px] font-medium transition active:scale-[0.98] disabled:opacity-50"
+                    x-text="voidSaving ? 'Anulando...' : 'Confirmar anulacao'">
+            </button>
+          </div>
+        </div>
       </div>
     </div>
   </div>
@@ -452,6 +511,10 @@ function sellerDetailPage() {
         editError: '',
         historyModalOpen: false,
         historyData: [],
+        voidModalOpen: false,
+        voidForm: { uuid: '', amount: 0, sale_date: '', origin_display: '', reason: '' },
+        voidSaving: false,
+        voidError: '',
         init(sellerId) {
             this.sellerId = sellerId;
             var pageParams = new URLSearchParams(window.location.search);
@@ -510,6 +573,40 @@ function sellerDetailPage() {
             this.editForm.reason = '';
             this.editError = '';
             this.editModalOpen = true;
+        },
+        openVoidSale(s) {
+            this.voidForm.uuid = s.uuid;
+            this.voidForm.amount = s.amount;
+            this.voidForm.sale_date = s.sale_date;
+            this.voidForm.origin_display = s.origin_display || s.origin;
+            this.voidForm.reason = '';
+            this.voidError = '';
+            this.voidModalOpen = true;
+        },
+        async confirmVoidSale() {
+            if (this.voidSaving) return;
+            var reason = (this.voidForm.reason || '').trim();
+            if (reason.length < 5) { this.voidError = 'Motivo deve ter no minimo 5 caracteres.'; return; }
+            this.voidSaving = true;
+            this.voidError = '';
+            try {
+                var r = await fetch('/api/sales/' + this.voidForm.uuid + '/void/', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCSRFToken() },
+                    body: JSON.stringify({ reason: reason }),
+                });
+                var data = await r.json();
+                if (r.ok) {
+                    this.voidModalOpen = false;
+                    this.load();
+                } else {
+                    this.voidError = data.error || 'Erro ao anular lancamento.';
+                    this.voidSaving = false;
+                }
+            } catch (e) {
+                this.voidError = 'Erro de conexao. Tente novamente.';
+                this.voidSaving = false;
+            }
         },
         async saveEditSale() {
             if (this.editSaving) return;
