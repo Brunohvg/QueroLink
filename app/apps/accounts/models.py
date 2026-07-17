@@ -81,6 +81,10 @@ class Tenant(models.Model):
         help_text='Dias de funcionamento (0=seg ... 6=dom). Vazio = seg a sab.')
     skip_national_holidays = models.BooleanField(default=True,
         help_text='Nao cobrar lancamentos em feriados nacionais')
+    receivables_enabled = models.BooleanField(
+        default=False,
+        help_text='Habilita recebiveis para este tenant quando o plano permitir',
+    )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -194,7 +198,10 @@ def is_working_day(tenant, d):
 def tenant_has_feature(tenant, feature_name):
     from django.conf import settings
     features = getattr(settings, 'PLAN_FEATURES', {}).get(tenant.plan, {})
-    return features.get(feature_name, False)
+    plan_has_feature = features.get(feature_name, False)
+    if feature_name == 'boletos':
+        return bool(plan_has_feature and tenant.receivables_enabled)
+    return plan_has_feature
 
 
 def mark_onboarding_step(tenant, step_name):
