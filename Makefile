@@ -18,11 +18,11 @@ migrate: ## Aplica migrations
 	.venv/bin/python manage.py makemigrations --noinput
 	.venv/bin/python manage.py migrate --noinput
 
-test: ## Roda todos os testes
-	.venv/bin/python manage.py test app.apps.sellers app.apps.notifications app.apps.dashboard app.apps.api app.apps.commissions -v2
+test: ## Roda todos os testes no PostgreSQL isolado
+	./scripts/test-fast.sh full
 
-test-fast: ## Roda testes sem verbose
-	.venv/bin/python manage.py test app.apps.sellers app.apps.notifications app.apps.dashboard app.apps.api app.apps.commissions
+test-fast: ## Alias para a suite PostgreSQL isolada
+	./scripts/test-fast.sh full
 
 test-env-up: ## Sobe PostgreSQL e Redis isolados de teste
 	./scripts/test-fast.sh up
@@ -62,11 +62,6 @@ clean: ## Remove pycache e arquivos temporários
 	find . -type d -name __pycache__ -exec rm -rf {} + 2>/dev/null || true
 	find . -type f -name "*.pyc" -delete 2>/dev/null || true
 	rm -rf staticfiles media .pytest_cache
-
-reset-db: ## Remove e recria banco SQLite
-	rm -f db.sqlite3
-	.venv/bin/python manage.py migrate --run-syncdb
-	@echo "Banco resetado."
 
 check: ## Verifica configuração Django
 	.venv/bin/python manage.py check --deploy
