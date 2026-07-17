@@ -20,13 +20,15 @@ Atualizado em 17/07/2026. Este documento permite que outra IA ou pessoa continue
 - HEAD mesclado usado como base: `afe6a6e512c3c59343834fb98c2d58077e775eab` (PR #45).
 - Branch em desenvolvimento: `feat/receivables-documents`.
 - Prompt em entrega: **Prompt 10 — documentos de boleto**.
-- Estado local: implementação concluída e gates locais verdes; falta publicar o Draft PR e registrar seu número/commit final.
+- Commit da implementação: `0db968f26fce51cab3b21a0e5233f9381ca44bc7`.
+- PR atual: [#46 — documentos fiscais privados de boleto](https://github.com/Brunohvg/QueroLink/pull/46), aberto como Draft contra `querolink-v2`.
+- Estado: implementação concluída, gates locais verdes; aguardar checks do GitHub e merge manual do #46.
 - Próximo prompt, somente depois do merge verde deste PR: **Prompt 11 — backup e restore completos**.
 
 Antes de iniciar o Prompt 11, confirmar o estado do Draft PR do Prompt 10 que será registrado neste documento:
 
 ```bash
-gh pr view NUMERO_DO_PR_10 --json state,mergedAt,statusCheckRollup
+gh pr view 46 --json state,mergedAt,statusCheckRollup
 git fetch origin --prune
 ```
 
@@ -45,7 +47,7 @@ git fetch origin --prune
 | #43 | Prompt 07 — impacto em comissões | Mesclado | `af067da` |
 | #44 | Prompt 08 — Customer Ledger assíncrono | Mesclado | `3504da8` |
 | #45 | Prompt 09 — API e backfill do Customer Ledger | Mesclado | `afe6a6e` |
-| a registrar | Prompt 10 — documentos fiscais privados | Implementação local verde | branch `feat/receivables-documents` |
+| #46 | Prompt 10 — documentos fiscais privados | Draft aberto | `0db968f` |
 
 ## 4. Decisões de arquitetura tomadas
 
