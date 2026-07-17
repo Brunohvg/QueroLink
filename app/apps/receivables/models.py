@@ -323,3 +323,35 @@ class ReceivableAllocation(models.Model):
             models.Index(fields=['tenant', 'status']),
             models.Index(fields=['tenant', 'sale']),
         ]
+
+
+class CommissionImpactReview(models.Model):
+    class ImpactType(models.TextChoices):
+        ALLOCATION = 'ALLOCATION', 'Allocation'
+        REFUND = 'REFUND', 'Refund'
+        CHARGEBACK = 'CHARGEBACK', 'Chargeback'
+
+    class Status(models.TextChoices):
+        PENDING = 'PENDING', 'Pending'
+        APPROVED = 'APPROVED', 'Approved'
+        APPLIED = 'APPLIED', 'Applied'
+        REJECTED = 'REJECTED', 'Rejected'
+
+    uuid = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    tenant = models.ForeignKey(Tenant, on_delete=models.CASCADE, related_name='commission_impact_reviews')
+    seller = models.ForeignKey(Seller, on_delete=models.PROTECT, related_name='commission_impact_reviews')
+    allocation = models.ForeignKey(ReceivableAllocation, on_delete=models.PROTECT, related_name='commission_impact_reviews')
+    source_period = models.ForeignKey('commissions.CommissionPeriod', on_delete=models.PROTECT, related_name='receivable_impact_reviews')
+    seller_commission = models.ForeignKey('commissions.SellerCommission', on_delete=models.PROTECT, related_name='receivable_impact_reviews')
+    impact_type = models.CharField(max_length=12, choices=ImpactType.choices)
+    delta_sale_cents = models.IntegerField()
+    estimated_commission_delta_cents = models.IntegerField()
+    status = models.CharField(max_length=10, choices=Status.choices, default=Status.PENDING)
+    reason = models.CharField(max_length=255, blank=True)
+    reviewed_by = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.PROTECT, related_name='commission_impact_reviews')
+    reviewed_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=['tenant', 'allocation', 'impact_type'], name='uniq_commission_impact_review')]

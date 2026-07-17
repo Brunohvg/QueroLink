@@ -30,7 +30,24 @@ def _mark_boleto_awaiting_allocation(event):
     ).exists()
 
 
+def _reverse_allocated_boleto(event):
+    from .allocation_services import reverse_allocation
+    from .models import ReceivableAllocation
+
+    allocation = ReceivableAllocation.objects.filter(
+        tenant=event.tenant,
+        boleto_id=(event.payload or {}).get('boleto_uuid'),
+        status=ReceivableAllocation.Status.ACTIVE,
+    ).first()
+    if not allocation:
+        return False
+    reverse_allocation(allocation, event.event_type)
+    return True
+
+
 OUTBOX_HANDLERS['boleto.paid'] = _mark_boleto_awaiting_allocation
+OUTBOX_HANDLERS['boleto.refunded'] = _reverse_allocated_boleto
+OUTBOX_HANDLERS['boleto.chargeback'] = _reverse_allocated_boleto
 
 
 @shared_task(soft_time_limit=300, time_limit=360)
