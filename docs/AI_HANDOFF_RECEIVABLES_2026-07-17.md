@@ -1,6 +1,6 @@
 # Handoff técnico — Mérito Cobranças e Recebíveis
 
-Atualizado em 17/07/2026 — revisão 3 (Prompt 12 concluído).
+Atualizado em 17/07/2026 — revisão 4 (Prompt 13 concluído).
 
 ## 1. Regras obrigatórias antes de continuar
 
@@ -18,12 +18,12 @@ Atualizado em 17/07/2026 — revisão 3 (Prompt 12 concluído).
 - Repositório: `Brunohvg/QueroLink`.
 - Branch de integração: `querolink-v2`.
 - HEAD mesclado usado como base: `afe6a6e512c3c59343834fb98c2d58077e775eab` (PR #45).
-- Branch em desenvolvimento: `feat/receivables-ui-api`.
-- Prompt em entrega: **Prompt 12 — UI e API do piloto**.
-- Commit da implementação: `f12e649`.
-- PR atual: [#48 — UI e API do piloto de recebíveis](https://github.com/Brunohvg/QueroLink/pull/48), aberto como Draft contra `querolink-v2`.
-- Estado: implementação concluída, gates locais verdes (928 testes); aguardar checks do GitHub e merge manual do #48.
-- Próximo prompt, somente depois do merge verde deste PR: **Prompt 13 — Notificações e operação**.
+- Branch em desenvolvimento: `feat/receivables-notifications-ops`.
+- Prompt em entrega: **Prompt 13 — Notificações e operação**.
+- Commit da implementação: `f326d51`.
+- PR atual: [#49 — Notificações e operação de recebíveis](https://github.com/Brunohvg/QueroLink/pull/49), aberto como Draft contra `querolink-v2`.
+- Estado: implementação concluída, gates locais verdes (938 testes); aguardar checks do GitHub e merge manual do #49.
+- Próximo prompt, somente depois do merge verde deste PR: **Prompt 14 — CI obrigatório com PostgreSQL e Redis**.
 
 Antes de iniciar o Prompt 11, confirmar o estado do Draft PR do Prompt 10 que será registrado neste documento:
 
@@ -49,7 +49,8 @@ git fetch origin --prune
 | #45 | Prompt 09 — API e backfill do Customer Ledger | Mesclado | `afe6a6e` |
 | #46 | Prompt 10 — documentos fiscais privados | Mesclado | `d1ca541` |
 | #47 | Prompt 11 — backup e restore completos | Mesclado | `f564b7f` |
-| #48 | Prompt 12 — UI e API do piloto | Draft aberto | `f12e649` |
+| #48 | Prompt 12 — UI e API do piloto | Mesclado | `8b1059b` |
+| #49 | Prompt 13 — Notificações e operação | Draft aberto | `f326d51` |
 
 ## 4. Decisões de arquitetura tomadas
 
@@ -93,35 +94,32 @@ git fetch origin --prune
 
 O ambiente valida host local e nome de banco contendo `test`. No Prompt 10, 12 testes focados passaram e a suíte completa passou com **901 testes em 67,039s**.
 
-## 6. Como continuar no Prompt 13
+## 6. Como continuar no Prompt 14
 
-Após o Draft PR do Prompt 12 estar verde e mesclado:
+Após o Draft PR do Prompt 13 estar verde e mesclado:
 
 ```bash
 git fetch origin --prune
-git switch -c feat/receivables-notifications-ops origin/querolink-v2
+git switch -c ops/receivables-ci origin/querolink-v2
 git status -sb
 ```
 
-Ler novamente o Prompt 13 no arquivo original anexado à sessão. Escopo resumido:
+Ler novamente o Prompt 14 no arquivo original anexado à sessão. Escopo resumido:
 
-- consumir a outbox para notificações transacionais (boleto criado, pago, cancelado, estornado, vencendo, vencido);
-- idempotência de entrega: chave única por evento + canal + destinatário;
-- lembrete de vencimento em lote com try/except por tenant;
-- rotinas de reprocessamento de outbox presa;
-- schedules conservadores, apenas para tenants habilitados;
-- alterar somente os arquivos autorizados pelo Prompt 13.
+- criar pipeline de CI obrigatório (PostgreSQL + Redis como services);
+- gates: check, makemigrations, migrate --plan, full test suite, CSS build, bash -n;
+- documentar os nomes dos checks que devem ser obrigatórios na proteção de branch;
+- alterar somente `.github/workflows/ci.yml` e `docs/CI_RECEIVABLES.md`.
 
-Antes de editar, reler integralmente a seção do Prompt 13, listar os arquivos autorizados e confirmar que nenhum arquivo extra será necessário.
+Antes de editar, reler integralmente a seção do Prompt 14, listar os arquivos autorizados e confirmar que nenhum arquivo extra será necessário.
 
-### Evidências locais do Prompt 12
+### Evidências locais do Prompt 13
 
 - `python manage.py check`: sem problemas.
 - `makemigrations --check --dry-run`: `No changes detected`.
 - `migrate --plan`: N/A (nenhuma migration criada).
-- Testes focados de API + views: 21 testes, todos verdes.
-- Suíte completa PostgreSQL: 928 testes, todos verdes.
-- `grep json.dumps`: nenhum resultado.
+- Testes focados de notificações + outbox: 10 testes, todos verdes.
+- Suíte completa PostgreSQL: 938 testes, todos verdes.
 - `git diff --check`: limpo.
 
 ## 7. Fluxo de entrega de cada prompt
@@ -246,4 +244,4 @@ O warning indica que JWTs estão sendo assinados com `SECRET_KEY`. Não é a cau
 
 Este arquivo é documentação operacional contínua. O usuário autorizou explicitamente em 17/07/2026 que ele seja atualizado em todas as etapas para permitir que outra IA retome o trabalho. A partir do Prompt 08, toda entrega deve registrar aqui: PR/commit, gates, decisões, pendências e próximo ponto exato de retomada.
 
-Atualizado em 17/07/2026 após Prompt 12 (revisão 3): PR #48 aberto, próximo = Prompt 13 (notificações).
+Atualizado em 17/07/2026 após Prompt 13 (revisão 4): PR #49 aberto, próximo = Prompt 14 (CI).
