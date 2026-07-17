@@ -6,103 +6,236 @@ from django.core.mail import send_mail
 from django.template.loader import render_to_string
 from django.utils import timezone
 
-from app.apps.accounts.models import User
-from app.apps.notifications.models import MessageTemplate
-from app.apps.notifications.tasks import create_and_send_notification
+from app.apps.accounts.models import User as UserModel
+
+from .models import ReceivableNotificationDelivery, Boleto
 
 
 logger = logging.getLogger(__name__)
 
-_BRL_CENTS_TEMPLATE = '{},{}'
+DELIVERY_MAX_ATTEMPTS = 5
+DEAD_LETTER_HOURS = 72
+
+
+def _delivery_key(boleto_uuid, event_slug, channel, recipient):
+    raw = f'{boleto_uuid}:{event_slug}:{channel}:{recipient}'
+    return hashlib.sha256(raw.encode()).hexdigest()[:40]
+
+
+def _recipient_hash(value):
+    return hashlib.sha256((value or '').encode()).hexdigest()[:40]
 
 
 def _format_brl(cents):
     if cents is None:
         return 'R$ 0,00'
-    reais = cents // 100
-    centavos = cents % 100
-    return f'R$ {reais},{centavos:02d}'
+    return f'R$ {cents // 100},{cents % 100:02d}'
 
 
-def _notification_key(boleto_uuid, event_slug, channel, recipient):
-    raw = f'{boleto_uuid}:{event_slug}:{channel}:{recipient}'
-    return hashlib.sha256(raw.encode()).hexdigest()[:40]
-
-
-def _send_email_notification(boleto, subject, template_name, context):
-    html_body = render_to_string(
-        f'boletos/email/{template_name}.html', context
+def _register_delivery(outbox_event, channel, recipient, delivery_key):
+    delivery, created = ReceivableNotificationDelivery.objects.get_or_create(
+        tenant=outbox_event.tenant,
+        delivery_key=delivery_key,
+        defaults={
+            'outbox_event': outbox_event,
+            'channel': channel,
+            'recipient_hash': _recipient_hash(recipient),
+            'max_attempts': DELIVERY_MAX_ATTEMPTS,
+            'status': ReceivableNotificationDelivery.Status.PENDING,
+        },
     )
-    text_body = render_to_string(
-        f'boletos/email/{template_name}.txt', context
-    )
-    try:
-        send_mail(
-            subject=subject,
-            message=text_body,
-            from_email=settings.DEFAULT_FROM_EMAIL,
-            recipient_list=[boleto.payer_email],
-            html_message=html_body,
-            fail_silently=False,
+    if created:
+        return delivery, False
+    if delivery.status == ReceivableNotificationDelivery.Status.SENT:
+        return delivery, True
+    return delivery, False
+
+
+def _mark_sent(delivery):
+    delivery.status = ReceivableNotificationDelivery.Status.SENT
+    delivery.sent_at = timezone.now()
+    delivery.attempt_count += 1
+    delivery.save(update_fields=['status', 'sent_at', 'attempt_count', 'updated_at'])
+
+
+def _mark_failed(delivery, error):
+    delivery.attempt_count += 1
+    delivery.last_error = ReceivableNotificationDelivery.sanitize_error(str(error))
+    if delivery.attempt_count >= delivery.max_attempts:
+        delivery.status = ReceivableNotificationDelivery.Status.DEAD
+        delivery.next_attempt_at = timezone.now() + timezone.timedelta(
+            hours=DEAD_LETTER_HOURS
         )
-    except Exception:
-        logger.warning(
-            'Falha ao enviar email boleto=%s tenant=%s',
-            boleto.uuid, boleto.tenant_id,
-        )
-
-
-def _notify_seller_whatsapp(boleto, event_type_slug, context):
-    event_type_map = {
-        'boleto_created': 'payment_paid',
-        'boleto_paid': 'payment_paid',
-        'boleto_canceled': 'link_canceled',
-        'boleto_refunded': 'payment_refunded',
-        'boleto_chargeback': 'payment_chargeback',
-        'boleto_due_reminder': 'daily_reminder',
-    }
-    mapped = event_type_map.get(event_type_slug, 'payment_paid')
-    try:
-        create_and_send_notification(
-            tenant=boleto.tenant,
-            event_type=mapped,
-            channel=MessageTemplate.Channel.WHATSAPP,
-            recipient=boleto.seller.phone,
-            seller=boleto.seller,
-            context=context,
-        )
-    except Exception:
-        logger.warning(
-            'Falha ao enviar whatsapp boleto=%s tenant=%s',
-            boleto.uuid, boleto.tenant_id,
-        )
-
-
-def _notify_gestor_email(boleto, event_type_slug):
-    from app.apps.accounts.models import User as UserModel
-
-    if event_type_slug == 'boleto_created':
-        subject = 'Novo boleto emitido'
-        template = 'boleto_created'
-    elif event_type_slug == 'boleto_paid':
-        subject = 'Boleto pago'
-        template = 'boleto_paid'
-    elif event_type_slug == 'boleto_canceled':
-        subject = 'Boleto cancelado'
-        template = 'boleto_canceled'
-    elif event_type_slug == 'boleto_awaiting_allocation':
-        subject = 'Boleto aguardando alocacao'
-        template = 'boleto_paid'
     else:
-        return
+        delivery.status = ReceivableNotificationDelivery.Status.FAILED
+        delay_minutes = 2 ** delivery.attempt_count
+        delivery.next_attempt_at = timezone.now() + timezone.timedelta(
+            minutes=min(delay_minutes, 60)
+        )
+    delivery.save(update_fields=[
+        'status', 'attempt_count', 'last_error',
+        'next_attempt_at', 'updated_at',
+    ])
 
+
+def _mark_skipped(delivery, reason):
+    delivery.status = ReceivableNotificationDelivery.Status.SKIPPED
+    delivery.skip_reason = reason[:255]
+    delivery.save(update_fields=['status', 'skip_reason', 'updated_at'])
+
+
+def _send_email(boleto, subject, template_name, context, recipient_list):
+    html_body = render_to_string(f'boletos/email/{template_name}.html', context)
+    text_body = render_to_string(f'boletos/email/{template_name}.txt', context)
+    send_mail(
+        subject=subject,
+        message=text_body,
+        from_email=settings.DEFAULT_FROM_EMAIL,
+        recipient_list=recipient_list,
+        html_message=html_body,
+        fail_silently=False,
+    )
+
+
+def _deliver_boleto_created(outbox_event):
+    boleto = Boleto.objects.get(pk=outbox_event.payload['boleto_uuid'])
+    context = {
+        'boleto_uuid': str(boleto.uuid),
+        'seller_name': boleto.seller.name,
+        'amount': _format_brl(boleto.amount_cents),
+        'due_date': boleto.due_date.isoformat(),
+        'provider_barcode': boleto.provider_barcode,
+        'provider_url': boleto.provider_url,
+    }
+    sent_count = 0
+
+    # Email ao cliente
+    if boleto.payer_email:
+        dk = _delivery_key(boleto.uuid, 'created', 'email', boleto.payer_email)
+        delivery, already_sent = _register_delivery(
+            outbox_event, 'email', boleto.payer_email, dk,
+        )
+        if already_sent:
+            sent_count += 1
+        elif delivery.status == ReceivableNotificationDelivery.Status.PENDING:
+            delivery.status = ReceivableNotificationDelivery.Status.SENDING
+            delivery.save(update_fields=['status', 'updated_at'])
+            try:
+                _send_email(
+                    boleto,
+                    subject=f'Boleto {_format_brl(boleto.amount_cents)} - Merito',
+                    template_name='boleto_created',
+                    context=context,
+                    recipient_list=[boleto.payer_email],
+                )
+                _mark_sent(delivery)
+                sent_count += 1
+            except Exception as e:
+                _mark_failed(delivery, e)
+    else:
+        delivery = ReceivableNotificationDelivery.objects.create(
+            tenant=boleto.tenant,
+            outbox_event=outbox_event,
+            channel='email',
+            recipient_hash=_recipient_hash(''),
+            delivery_key=_delivery_key(boleto.uuid, 'created', 'email', ''),
+            status=ReceivableNotificationDelivery.Status.SKIPPED,
+            skip_reason='Sem email do pagador',
+        )
+
+    # Notificacao ao gestor
+    gestores = UserModel.objects.filter(
+        tenant=boleto.tenant,
+        role__in=(UserModel.Role.ADMIN, UserModel.Role.MANAGER),
+        email__isnull=False,
+    ).exclude(email='').values_list('email', flat=True)
+    if gestores:
+        gestor_key = _delivery_key(
+            boleto.uuid, 'created', 'gestor', str(boleto.tenant_id)
+        )
+        g_delivery, g_sent = _register_delivery(
+            outbox_event, 'gestor', str(boleto.tenant_id), gestor_key,
+        )
+        if not g_sent and g_delivery.status == ReceivableNotificationDelivery.Status.PENDING:
+            g_delivery.status = ReceivableNotificationDelivery.Status.SENDING
+            g_delivery.save(update_fields=['status', 'updated_at'])
+            try:
+                _send_email(
+                    boleto,
+                    subject=f'[Merito] Novo boleto emitido - {boleto.seller.name}',
+                    template_name='boleto_created',
+                    context=context,
+                    recipient_list=list(gestores),
+                )
+                _mark_sent(g_delivery)
+            except Exception as e:
+                _mark_failed(g_delivery, e)
+
+    return sent_count
+
+
+def _deliver_boleto_paid(outbox_event):
+    boleto = Boleto.objects.get(pk=outbox_event.payload['boleto_uuid'])
     context = {
         'boleto_uuid': str(boleto.uuid),
         'seller_name': boleto.seller.name,
         'amount': _format_brl(boleto.amount_cents),
         'paid_amount': _format_brl(boleto.paid_amount_cents),
-        'status': boleto.get_status_display(),
         'due_date': boleto.due_date.isoformat(),
+    }
+
+    if boleto.payer_email:
+        dk = _delivery_key(boleto.uuid, 'paid', 'email', boleto.payer_email)
+        delivery, already_sent = _register_delivery(
+            outbox_event, 'email', boleto.payer_email, dk,
+        )
+        if not already_sent and delivery.status == ReceivableNotificationDelivery.Status.PENDING:
+            delivery.status = ReceivableNotificationDelivery.Status.SENDING
+            delivery.save(update_fields=['status', 'updated_at'])
+            try:
+                _send_email(
+                    boleto,
+                    subject='Seu boleto foi pago - Merito',
+                    template_name='boleto_paid',
+                    context=context,
+                    recipient_list=[boleto.payer_email],
+                )
+                _mark_sent(delivery)
+            except Exception as e:
+                _mark_failed(delivery, e)
+
+    gestores = UserModel.objects.filter(
+        tenant=boleto.tenant,
+        role__in=(UserModel.Role.ADMIN, UserModel.Role.MANAGER),
+        email__isnull=False,
+    ).exclude(email='').values_list('email', flat=True)
+    if gestores:
+        gk = _delivery_key(boleto.uuid, 'paid', 'gestor', str(boleto.tenant_id))
+        g_delivery, g_sent = _register_delivery(
+            outbox_event, 'gestor', str(boleto.tenant_id), gk,
+        )
+        if not g_sent and g_delivery.status == ReceivableNotificationDelivery.Status.PENDING:
+            g_delivery.status = ReceivableNotificationDelivery.Status.SENDING
+            g_delivery.save(update_fields=['status', 'updated_at'])
+            try:
+                _send_email(
+                    boleto,
+                    subject=f'[Merito] Boleto pago - {boleto.seller.name}',
+                    template_name='boleto_paid',
+                    context=context,
+                    recipient_list=list(gestores),
+                )
+                _mark_sent(g_delivery)
+            except Exception as e:
+                _mark_failed(g_delivery, e)
+
+
+def _deliver_boleto_canceled(outbox_event):
+    boleto = Boleto.objects.get(pk=outbox_event.payload['boleto_uuid'])
+    context = {
+        'boleto_uuid': str(boleto.uuid),
+        'seller_name': boleto.seller.name,
+        'amount': _format_brl(boleto.amount_cents),
     }
 
     gestores = UserModel.objects.filter(
@@ -110,182 +243,55 @@ def _notify_gestor_email(boleto, event_type_slug):
         role__in=(UserModel.Role.ADMIN, UserModel.Role.MANAGER),
         email__isnull=False,
     ).exclude(email='').values_list('email', flat=True)
-
-    if not gestores:
-        return
-
-    html_body = render_to_string(
-        f'boletos/email/{template}.html', context
-    )
-    text_body = render_to_string(
-        f'boletos/email/{template}.txt', context
-    )
-
-    try:
-        send_mail(
-            subject=f'[Merito] {subject}',
-            message=text_body,
-            from_email=settings.DEFAULT_FROM_EMAIL,
-            recipient_list=list(gestores),
-            html_message=html_body,
-            fail_silently=False,
+    if gestores:
+        gk = _delivery_key(boleto.uuid, 'canceled', 'gestor', str(boleto.tenant_id))
+        g_delivery, g_sent = _register_delivery(
+            outbox_event, 'gestor', str(boleto.tenant_id), gk,
         )
-    except Exception:
-        logger.warning(
-            'Falha ao enviar email gestor boleto=%s tenant=%s',
-            boleto.uuid, boleto.tenant_id,
-        )
+        if not g_sent and g_delivery.status == ReceivableNotificationDelivery.Status.PENDING:
+            g_delivery.status = ReceivableNotificationDelivery.Status.SENDING
+            g_delivery.save(update_fields=['status', 'updated_at'])
+            try:
+                _send_email(
+                    boleto,
+                    subject=f'[Merito] Boleto cancelado - {boleto.seller.name}',
+                    template_name='boleto_canceled',
+                    context=context,
+                    recipient_list=list(gestores),
+                )
+                _mark_sent(g_delivery)
+            except Exception as e:
+                _mark_failed(g_delivery, e)
 
 
-def notify_boleto_created(boleto):
-    try:
-        context = {
-            'vendedor': boleto.seller.name,
-            'cliente': boleto.payer_name,
-            'valor': _format_brl(boleto.amount_cents),
-            'link': '',
-        }
-        _notify_seller_whatsapp(boleto, 'boleto_created', context)
-        _notify_gestor_email(boleto, 'boleto_created')
-    except Exception:
-        logger.warning(
-            'Falha ao notificar criacao boleto=%s', boleto.uuid,
-        )
+def _has_failed_deliveries(outbox_event):
+    return ReceivableNotificationDelivery.objects.filter(
+        outbox_event=outbox_event,
+        status__in=(
+            ReceivableNotificationDelivery.Status.FAILED,
+            ReceivableNotificationDelivery.Status.DEAD,
+        ),
+    ).exists()
 
 
-def notify_boleto_paid(boleto):
-    try:
-        context = {
-            'vendedor': boleto.seller.name,
-            'cliente': boleto.payer_name,
-            'valor': _format_brl(boleto.paid_amount_cents),
-            'link': '',
-        }
-        _notify_seller_whatsapp(boleto, 'boleto_paid', context)
-        _notify_gestor_email(boleto, 'boleto_paid')
-        _send_email_notification(
-            boleto,
-            subject='Seu boleto foi pago',
-            template_name='boleto_paid',
-            context={
-                'boleto_uuid': str(boleto.uuid),
-                'seller_name': boleto.seller.name,
-                'amount': _format_brl(boleto.amount_cents),
-                'paid_amount': _format_brl(boleto.paid_amount_cents),
-            },
-        )
-    except Exception:
-        logger.warning(
-            'Falha ao notificar pagamento boleto=%s', boleto.uuid,
-        )
+def _has_pending_deliveries(outbox_event):
+    return ReceivableNotificationDelivery.objects.filter(
+        outbox_event=outbox_event,
+        status=ReceivableNotificationDelivery.Status.PENDING,
+    ).exists()
 
 
-def notify_boleto_canceled(boleto):
-    try:
-        context = {
-            'vendedor': boleto.seller.name,
-            'cliente': boleto.payer_name,
-            'valor': _format_brl(boleto.amount_cents),
-            'link': '',
-        }
-        _notify_seller_whatsapp(boleto, 'boleto_canceled', context)
-        _notify_gestor_email(boleto, 'boleto_canceled')
-    except Exception:
-        logger.warning(
-            'Falha ao notificar cancelamento boleto=%s', boleto.uuid,
-        )
-
-
-def notify_boleto_refunded(boleto):
-    try:
-        context = {
-            'vendedor': boleto.seller.name,
-            'cliente': boleto.payer_name,
-            'valor': _format_brl(boleto.amount_cents),
-            'link': '',
-        }
-        _notify_seller_whatsapp(boleto, 'boleto_refunded', context)
-    except Exception:
-        logger.warning(
-            'Falha ao notificar estorno boleto=%s', boleto.uuid,
-        )
-
-
-def notify_boleto_chargeback(boleto):
-    try:
-        context = {
-            'vendedor': boleto.seller.name,
-            'cliente': boleto.payer_name,
-            'valor': _format_brl(boleto.amount_cents),
-            'link': '',
-        }
-        _notify_seller_whatsapp(boleto, 'boleto_chargeback', context)
-    except Exception:
-        logger.warning(
-            'Falha ao notificar chargeback boleto=%s', boleto.uuid,
-        )
-
-
-def notify_boleto_due_reminder(boleto):
-    try:
-        context = {
-            'vendedor': boleto.seller.name,
-            'cliente': boleto.payer_name,
-            'valor': _format_brl(boleto.amount_cents),
-        }
-        _notify_seller_whatsapp(boleto, 'boleto_due_reminder', context)
-    except Exception:
-        logger.warning(
-            'Falha ao notificar lembrete boleto=%s', boleto.uuid,
-        )
-
-
-def notify_boleto_awaiting_allocation(boleto):
-    try:
-        _notify_gestor_email(boleto, 'boleto_awaiting_allocation')
-    except Exception:
-        logger.warning(
-            'Falha ao notificar alocacao pendente boleto=%s', boleto.uuid,
-        )
-
-
-def notify_commission_impact_pending(review):
-    from app.apps.accounts.models import User as UserModel
-
-    gestores = UserModel.objects.filter(
-        tenant=review.tenant,
-        role__in=(UserModel.Role.ADMIN, UserModel.Role.MANAGER),
-        email__isnull=False,
-    ).exclude(email='').values_list('email', flat=True)
-
-    if not gestores:
-        return
-
-    context = {
-        'seller_name': review.seller.name,
-        'amount': _format_brl(review.delta_sale_cents),
-        'impact_type': review.get_impact_type_display(),
-        'status': review.get_status_display(),
+def deliver_outbox_event(outbox_event):
+    event_type = outbox_event.event_type
+    handlers = {
+        'boleto.created': _deliver_boleto_created,
+        'boleto.paid': _deliver_boleto_paid,
+        'boleto.canceled': _deliver_boleto_canceled,
     }
-
-    html_body = render_to_string(
-        'boletos/email/commission_impact.html', context
-    )
-    text_body = render_to_string(
-        'boletos/email/commission_impact.txt', context
-    )
-
-    try:
-        send_mail(
-            subject='[Merito] Impacto em comissao aguardando revisao',
-            message=text_body,
-            from_email=settings.DEFAULT_FROM_EMAIL,
-            recipient_list=list(gestores),
-            html_message=html_body,
-            fail_silently=False,
-        )
-    except Exception:
-        logger.warning(
-            'Falha ao enviar email impacto comissao tenant=%s',
-            review.tenant_id,
-        )
+    handler = handlers.get(event_type)
+    if not handler:
+        return True
+    handler(outbox_event)
+    if _has_failed_deliveries(outbox_event) and not _has_pending_deliveries(outbox_event):
+        return False
+    return True

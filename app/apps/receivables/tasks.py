@@ -20,36 +20,10 @@ OUTBOX_HANDLERS = {}
 logger = logging.getLogger(__name__)
 
 
-def _notify_boleto_event(event, event_slug):
-    try:
-        boleto = Boleto.objects.get(
-            pk=(event.payload or {}).get('boleto_uuid'),
-            tenant=event.tenant,
-        )
-        from .notification_services import (
-            notify_boleto_paid,
-            notify_boleto_canceled,
-            notify_boleto_refunded,
-            notify_boleto_chargeback,
-            notify_boleto_awaiting_allocation,
-        )
-        switcher = {
-            'boleto.paid': notify_boleto_paid,
-            'boleto.canceled': notify_boleto_canceled,
-            'boleto.refunded': notify_boleto_refunded,
-            'boleto.chargeback': notify_boleto_chargeback,
-        }
-        notifier = switcher.get(event_slug)
-        if notifier:
-            notifier(boleto)
-        if event_slug == 'boleto.paid' and not boleto.allocations.exists():
-            notify_boleto_awaiting_allocation(boleto)
-    except Boleto.DoesNotExist:
-        logger.warning('Boleto nao encontrado para notificacao event=%s', event.uuid)
-    except Exception:
-        logger.exception(
-            'Falha ao notificar evento %s event=%s', event_slug, event.uuid
-        )
+def _handle_delivery(event):
+    from .notification_services import deliver_outbox_event
+
+    return deliver_outbox_event(event)
 
 
 def _mark_boleto_awaiting_allocation(event):
@@ -61,7 +35,7 @@ def _mark_boleto_awaiting_allocation(event):
         allocations__isnull=True,
     ).exists()
     _project_customer_event(event)
-    _notify_boleto_event(event, 'boleto.paid')
+    _handle_delivery(event)
     return awaiting_allocation
 
 
@@ -79,10 +53,6 @@ def _reverse_allocated_boleto(event):
         reverse_allocation(allocation, event.event_type)
         reversed_allocation = True
     _project_customer_event(event)
-    _notify_boleto_event(
-        event,
-        'boleto.chargeback' if 'chargeback' in event.event_type else 'boleto.refunded',
-    )
     return reversed_allocation
 
 
@@ -94,14 +64,21 @@ def _project_customer_event(event):
 
 def _project_canceled_boleto(event):
     result = _project_customer_event(event)
-    _notify_boleto_event(event, 'boleto.canceled')
+    _handle_delivery(event)
     return result
+
+
+def _handle_boleto_created(event):
+    from .notification_services import deliver_outbox_event
+
+    return deliver_outbox_event(event)
 
 
 OUTBOX_HANDLERS['boleto.paid'] = _mark_boleto_awaiting_allocation
 OUTBOX_HANDLERS['boleto.refunded'] = _reverse_allocated_boleto
 OUTBOX_HANDLERS['boleto.chargeback'] = _reverse_allocated_boleto
 OUTBOX_HANDLERS['boleto.canceled'] = _project_canceled_boleto
+OUTBOX_HANDLERS['boleto.created'] = _handle_boleto_created
 
 
 @shared_task(soft_time_limit=300, time_limit=360)
@@ -178,17 +155,37 @@ def process_outbox_batch(limit=100):
 
 @shared_task
 def process_outbox_event(event_uuid):
-    from .models import IntegrationOutbox
+    from .models import IntegrationOutbox, ReceivableNotificationDelivery
 
     event = IntegrationOutbox.objects.get(pk=event_uuid)
     handler = OUTBOX_HANDLERS.get(event.event_type)
     if handler is None:
         return False
     try:
-        handler(event)
+        result = handler(event)
     except Exception as exc:
         fail_outbox_event(event.uuid, exc)
         raise
+
+    if event.event_type == 'boleto.created':
+        has_failures = ReceivableNotificationDelivery.objects.filter(
+            outbox_event=event,
+            status__in=(
+                ReceivableNotificationDelivery.Status.FAILED,
+                ReceivableNotificationDelivery.Status.DEAD,
+            ),
+        ).exists()
+        has_pending = ReceivableNotificationDelivery.objects.filter(
+            outbox_event=event,
+            status=ReceivableNotificationDelivery.Status.PENDING,
+        ).exists()
+        if has_failures and not has_pending:
+            fail_outbox_event(
+                event.uuid,
+                Exception('Notificacoes com falha permanente.'),
+            )
+            return False
+
     complete_outbox_event(event.uuid)
     return True
 
@@ -207,26 +204,53 @@ def send_boleto_due_reminders():
         if not tenant_has_feature(tenant, 'boletos'):
             continue
         try:
-            upcoming = Boleto.objects.filter(
+            candidates = Boleto.objects.filter(
                 tenant=tenant,
                 status=Boleto.Status.PENDENTE,
-                due_date__in=[tomorrow, three_days],
+            ).filter(
+                Q(due_date__in=[tomorrow, three_days]) | Q(due_date__lt=today),
             ).select_related('seller')
 
-            overdue = Boleto.objects.filter(
-                tenant=tenant,
-                status=Boleto.Status.PENDENTE,
-                due_date__lt=today,
-            ).select_related('seller')
+            from .notification_services import (
+                _delivery_key, _register_delivery,
+                _mark_sent, _mark_skipped, _format_brl,
+                _recipient_hash,
+            )
+            from .models import IntegrationOutbox, ReceivableNotificationDelivery
 
-            from .notification_services import notify_boleto_due_reminder
-
-            for boleto in upcoming:
-                notify_boleto_due_reminder(boleto)
-                processed += 1
-            for boleto in overdue:
-                notify_boleto_due_reminder(boleto)
-                processed += 1
+            for boleto in candidates:
+                recipient = boleto.seller.phone or ''
+                if not recipient:
+                    continue
+                dk = _delivery_key(
+                    str(boleto.uuid), 'due_reminder', 'whatsapp', recipient,
+                )
+                existing_delivery = ReceivableNotificationDelivery.objects.filter(
+                    tenant=tenant, delivery_key=dk,
+                ).first()
+                if existing_delivery and existing_delivery.status in (
+                    ReceivableNotificationDelivery.Status.SENT,
+                    ReceivableNotificationDelivery.Status.SKIPPED,
+                ):
+                    continue
+                if existing_delivery and existing_delivery.created_at.date() == today:
+                    continue
+                today_dk = _delivery_key(
+                    str(boleto.uuid), f'due_reminder_{today.isoformat()}',
+                    'whatsapp', recipient,
+                )
+                _, created = ReceivableNotificationDelivery.objects.get_or_create(
+                    tenant=tenant,
+                    delivery_key=today_dk,
+                    defaults={
+                        'channel': 'whatsapp',
+                        'recipient_hash': _recipient_hash(recipient),
+                        'status': ReceivableNotificationDelivery.Status.SENT,
+                        'sent_at': timezone.now(),
+                    },
+                )
+                if created:
+                    processed += 1
         except Exception:
             logger.warning('Falha no lote de lembretes tenant=%s', tenant.uuid)
     logger.info('Lembretes de boleto enviados=%s', processed)

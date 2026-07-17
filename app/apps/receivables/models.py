@@ -313,6 +313,50 @@ class IntegrationOutbox(models.Model):
         return ' '.join(sanitized.split())[:255]
 
 
+class ReceivableNotificationDelivery(models.Model):
+    class Status(models.TextChoices):
+        PENDING = 'PENDING', 'Pending'
+        SENDING = 'SENDING', 'Sending'
+        SENT = 'SENT', 'Sent'
+        FAILED = 'FAILED', 'Failed'
+        DEAD = 'DEAD', 'Dead'
+        SKIPPED = 'SKIPPED', 'Skipped'
+
+    uuid = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    tenant = models.ForeignKey(Tenant, on_delete=models.CASCADE)
+    outbox_event = models.ForeignKey(
+        IntegrationOutbox, on_delete=models.CASCADE,
+        related_name='deliveries', null=True, blank=True,
+    )
+    channel = models.CharField(max_length=20)
+    recipient_hash = models.CharField(max_length=64)
+    delivery_key = models.CharField(max_length=150)
+    status = models.CharField(
+        max_length=10, choices=Status.choices, default=Status.PENDING,
+    )
+    attempt_count = models.PositiveIntegerField(default=0)
+    max_attempts = models.PositiveIntegerField(default=5)
+    sent_at = models.DateTimeField(null=True, blank=True)
+    next_attempt_at = models.DateTimeField(null=True, blank=True)
+    last_error = models.CharField(max_length=255, blank=True)
+    skip_reason = models.CharField(max_length=255, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=['tenant', 'delivery_key'],
+                name='uniq_delivery_tenant_key',
+            ),
+        ]
+
+    @staticmethod
+    def sanitize_error(message):
+        sanitized = re.sub(r'[\x00-\x1f\x7f]+', ' ', str(message or ''))
+        return ' '.join(sanitized.split())[:255]
+
+
 class ReceivableAllocation(models.Model):
     class Status(models.TextChoices):
         ACTIVE = 'ACTIVE', 'Active'

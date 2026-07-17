@@ -79,14 +79,16 @@ class OutboxConsumerTests(TestCase):
             idempotency_key='outbox-test-2',
         )
 
-    @patch(
-        'app.apps.receivables.notification_services.notify_boleto_due_reminder'
-    )
-    def test_send_due_reminders_calls_notification(
-        self, mock_notify
-    ):
+    def test_send_due_reminders_creates_delivery(self):
+        from app.apps.receivables.models import ReceivableNotificationDelivery
+
         result = send_boleto_due_reminders()
         self.assertGreater(result, 0)
+        self.assertTrue(
+            ReceivableNotificationDelivery.objects.filter(
+                tenant=self.tenant,
+            ).exists()
+        )
 
     def test_reprocess_stuck_outbox_events_processes_none_when_empty(self):
         result = reprocess_stuck_outbox_events()

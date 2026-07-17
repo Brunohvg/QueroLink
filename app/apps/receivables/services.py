@@ -407,6 +407,12 @@ def create_boleto(tenant, seller, created_by, data, idempotency_key):
                 'status',
                 'updated_at',
             ])
+            if locked.provider_barcode or locked.provider_url:
+                _outbox_event(
+                    locked,
+                    'boleto.created',
+                    {'boleto_uuid': str(locked.uuid)},
+                )
     return locked
 
 
