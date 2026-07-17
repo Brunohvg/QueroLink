@@ -20,6 +20,19 @@ OUTBOX_HANDLERS = {}
 logger = logging.getLogger(__name__)
 
 
+def _mark_boleto_awaiting_allocation(event):
+    boleto_uuid = (event.payload or {}).get('boleto_uuid')
+    return Boleto.objects.filter(
+        pk=boleto_uuid,
+        tenant=event.tenant,
+        status=Boleto.Status.PAGO,
+        allocations__isnull=True,
+    ).exists()
+
+
+OUTBOX_HANDLERS['boleto.paid'] = _mark_boleto_awaiting_allocation
+
+
 @shared_task(soft_time_limit=300, time_limit=360)
 def reconcile_pending_boletos(limit=None):
     from app.apps.accounts.models import Tenant

@@ -279,3 +279,47 @@ class IntegrationOutbox(models.Model):
     def sanitize_error(message):
         sanitized = re.sub(r'[\x00-\x1f\x7f]+', ' ', str(message or ''))
         return ' '.join(sanitized.split())[:255]
+
+
+class ReceivableAllocation(models.Model):
+    class Status(models.TextChoices):
+        ACTIVE = 'ACTIVE', 'Active'
+        REVERSED = 'REVERSED', 'Reversed'
+
+    uuid = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    tenant = models.ForeignKey(
+        Tenant, on_delete=models.CASCADE, related_name='receivable_allocations'
+    )
+    boleto = models.ForeignKey(
+        Boleto, on_delete=models.PROTECT, related_name='allocations'
+    )
+    sale = models.ForeignKey(
+        'sales.Sale', on_delete=models.PROTECT, related_name='receivable_allocations'
+    )
+    amount_cents = models.PositiveIntegerField()
+    sale_date = models.DateField()
+    status = models.CharField(
+        max_length=10, choices=Status.choices, default=Status.ACTIVE
+    )
+    allocated_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name='receivable_allocations_created',
+    )
+    allocated_at = models.DateTimeField(default=timezone.now)
+    reversed_at = models.DateTimeField(null=True, blank=True)
+    reversal_reason = models.CharField(max_length=255, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=['tenant', 'boleto'],
+                name='uniq_receivable_allocation_boleto',
+            ),
+        ]
+        indexes = [
+            models.Index(fields=['tenant', 'status']),
+            models.Index(fields=['tenant', 'sale']),
+        ]
