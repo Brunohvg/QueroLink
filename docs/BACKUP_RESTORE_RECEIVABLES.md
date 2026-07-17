@@ -101,12 +101,15 @@ A maioria das variáveis já configuradas no backup legado permanece válida:
 - Acesso ao Google Drive via rclone
 - `SAFETY_BLOCKED_HOSTS` configurado em produção para bloquear acidentes
 
-### Safety Gate
+### Safety Gate (3 proteções)
 
 O script recusa executar se:
 
-- `$SAFETY_BLOCKED_HOSTS` contém o host do banco (lista separada por vírgula de hosts de produção)
-- O usuário não confirma interativamente digitando `SIM`
+1. `$ALLOW_TEST_RESTORE` não for exatamente `YES`
+2. O nome do banco não contiver `test`, `staging` ou `qa`
+3. `$SAFETY_BLOCKED_HOSTS` contém o host do banco (lista separada por vírgula de hosts de produção)
+
+Além disso, o `python manage.py check` após o restore DEVE passar — se falhar, o script é abortado com código de erro.
 
 ### Fluxo
 

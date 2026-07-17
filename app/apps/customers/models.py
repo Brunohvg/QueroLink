@@ -56,6 +56,7 @@ class Customer(models.Model):
 class CustomerActivity(models.Model):
     class Source(models.TextChoices):
         BOLETO = 'BOLETO', 'Boleto'
+        PAYMENT_LINK = 'PAYMENT_LINK', 'Payment Link'
 
     uuid = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     tenant = models.ForeignKey(
@@ -111,3 +112,12 @@ class CustomerIdentityConflict(models.Model):
     source_uuid = models.UUIDField()
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=['tenant', 'identifier_type', 'identifier_hash',
+                        'selected_customer', 'conflicting_customer'],
+                name='uniq_customer_identity_conflict',
+            ),
+        ]

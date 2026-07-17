@@ -10,9 +10,10 @@ set -Eeuo pipefail
 # Variaveis de ambiente obrigatorias:
 #   DATABASE_URL    — URL do banco de teste (nunca producao)
 #
-# Variaveis de seguranca:
+# Variaveis de seguranca (TODAS obrigatorias):
 #   SAFETY_BLOCKED_HOSTS — lista separada por virgula de
 #                          hosts bloqueados (ex: db-prod-1,db-prod-2)
+#   ALLOW_TEST_RESTORE   — deve ser exatamente "YES" para permitir restore
 #
 # Variaveis opcionais:
 #   GDRIVE_REMOTE      (default: gdrive)
@@ -101,6 +102,22 @@ if [ -n "$SAFETY_BLOCKED_HOSTS" ]; then
     done
     log "Safety gate: host '${DB_HOST}' nao esta na lista de bloqueio. Prosseguindo."
 fi
+
+# ── Safety gate: ALLOW_TEST_RESTORE deve ser YES ────────────
+if [ "${ALLOW_TEST_RESTORE:-}" != "YES" ]; then
+    die "ALLOW_TEST_RESTORE nao esta configurado como YES. Restore bloqueado por seguranca."
+fi
+
+# ── Safety gate: nome do banco deve indicar teste ──────────
+lower_db=$(echo "$DB_NAME" | tr '[:upper:]' '[:lower:]')
+case "$lower_db" in
+    *test*|*staging*|*qa*)
+        log "Nome do banco '${DB_NAME}' parece ser de teste. Prosseguindo."
+        ;;
+    *)
+        die "Nome do banco '${DB_NAME}' nao parece ser de teste (deve conter 'test', 'staging' ou 'qa')."
+        ;;
+esac
 
 log "Banco de teste: ${DB_HOST}:${DB_PORT}/${DB_NAME}"
 
@@ -256,10 +273,14 @@ fi
 
 if [ -n "$DJANGO_CHECK_CMD" ]; then
     if cd "$PROJECT_DIR" 2>/dev/null; then
-        DJANGO_SETTINGS_MODULE="$DJANGO_SETTINGS_MODULE" "$DJANGO_CHECK_CMD" manage.py check 2>&1 || log "AVISO: manage.py check retornou codigo de erro (possivelmente devido a settings de producao em ambiente de teste)"
+        if ! DJANGO_SETTINGS_MODULE="$DJANGO_SETTINGS_MODULE" "$DJANGO_CHECK_CMD" manage.py check 2>&1; then
+            log "FALHA: manage.py check retornou erro. Restore considerado invalido."
+            cd "$OLDPWD" 2>/dev/null || true
+            die "manage.py check falhou - restore abortado."
+        fi
         cd "$OLDPWD" 2>/dev/null || true
     else
-        log "AVISO: Nao foi possivel acessar PROJECT_DIR=${PROJECT_DIR}. Pulando manage.py check."
+        die "Nao foi possivel acessar PROJECT_DIR=${PROJECT_DIR}. Restore abortado."
     fi
 fi
 

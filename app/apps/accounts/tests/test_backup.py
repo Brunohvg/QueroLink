@@ -13,8 +13,13 @@ from django.test import TestCase
 MOCK_RCLONE_SUCCESS = """#!/bin/bash
 case "$1" in
     mkdir) exit 0 ;;
-    copyto) exit 0 ;;
+    copyto)
+        dest="${@: -1}"
+        dir=$(dirname "$dest")
+        echo "mock_data_${dest##*/}" > "$dest"
+        exit 0 ;;
     listremotes) echo 'gdrive:' ;;
+    ls) echo " 2026-01-01_000000 querolink_2026-01-01_000000.dump" ;;
     lsf) echo "querolink_2026-01-01_000000.dump" ;;
     delete)
         if echo "$*" | grep -q "dry-run"; then
@@ -271,6 +276,44 @@ esac
         self.assertGreaterEqual(len(dump_files), 1, f"Should have created a .dump file. Files: {list(Path(self._backup_dir).iterdir())}")
         for f in dump_files:
             self.assertTrue(f.name.endswith(".dump"), f"File should end with .dump: {f.name}")
+
+    # ── Restore safety gate tests ──────────────────────────
+
+    def _run_restore_script(self, extra_env=None):
+        env = {
+            "PATH": str(self._bin_dir) + ":" + os.environ.get("PATH", "/usr/bin:/bin"),
+            "HOME": self.tmpdir,
+            "BACKUP_DIR": self._backup_dir,
+            "GDRIVE_REMOTE": "gdrive",
+            "GDRIVE_PATH": "test-backups",
+            "RCLONE_BIN": self._make_bin("mock_rclone", MOCK_RCLONE_SUCCESS),
+        }
+        if extra_env:
+            env.update(extra_env)
+
+        script_path = os.path.join(
+            os.path.dirname(__file__), "..", "..", "..", "..", "scripts", "restore_to_test.sh"
+        )
+        return subprocess.run(
+            ["bash", script_path],
+            capture_output=True, text=True, timeout=30,
+            env=env,
+        )
+
+    def test_restore_requires_allow_test_restore(self):
+        result = self._run_restore_script(extra_env={
+            "DATABASE_URL": "postgres://u:p@testhost:5432/test_db",
+        })
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("ALLOW_TEST_RESTORE", result.stdout + result.stderr)
+
+    def test_restore_requires_test_db_name(self):
+        result = self._run_restore_script(extra_env={
+            "DATABASE_URL": "postgres://u:p@host:5432/production_db",
+            "ALLOW_TEST_RESTORE": "YES",
+        })
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("nome", (result.stdout + result.stderr).lower())
 
     # ── Media backup tests ──────────────────────────────────
 

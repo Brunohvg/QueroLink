@@ -232,6 +232,12 @@ def apply_reconciliation_result(boleto, result):
                 reconciled.transition_to(Boleto.Status.PENDENTE)
                 changed = True
             elif (
+                result.status == ProviderStatus.OVERDUE
+                and reconciled.status == Boleto.Status.PENDENTE
+            ):
+                reconciled.transition_to(Boleto.Status.VENCIDO)
+                changed = True
+            elif (
                 result.status == ProviderStatus.CANCELED
                 and reconciled.status == Boleto.Status.CANCEL_PEND
             ):
