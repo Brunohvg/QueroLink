@@ -2,7 +2,7 @@
 # QueroLink — Makefile
 # ============================================================
 
-.PHONY: help install dev build test test-fast clean shell migrate lint build-css check
+.PHONY: help install dev build test test-fast clean shell migrate lint build-css check test-env-up test-env-down test-check test-affected test-full
 
 help: ## Mostra ajuda
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-18s\033[0m %s\n", $$1, $$2}'
@@ -23,6 +23,22 @@ test: ## Roda todos os testes
 
 test-fast: ## Roda testes sem verbose
 	.venv/bin/python manage.py test app.apps.sellers app.apps.notifications app.apps.dashboard app.apps.api app.apps.commissions
+
+test-env-up: ## Sobe PostgreSQL e Redis isolados de teste
+	./scripts/test-fast.sh up
+
+test-env-down: ## Remove o ambiente isolado de teste
+	./scripts/test-fast.sh down
+
+test-check: ## Valida o Django no ambiente isolado
+	./scripts/test-fast.sh check
+
+test-affected: ## Roda labels informados em TESTS com --keepdb e paralelismo
+	@test -n "$(TESTS)" || (echo 'Use TESTS="app.apps.modulo.tests"' && exit 2)
+	./scripts/test-fast.sh run $(TESTS)
+
+test-full: ## Roda a suite completa no ambiente isolado
+	./scripts/test-fast.sh full
 
 build: ## Build Docker (Tailwind + Python)
 	docker compose build
