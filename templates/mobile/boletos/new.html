@@ -1,0 +1,163 @@
+{% extends 'mobile/base_mobile.html' %}
+{% block title %}Novo Boleto — Mérito{% endblock %}
+{% block content %}
+<div class="space-y-5 fade-up" x-data="mobileNovoBoleto()">
+  <div class="flex items-center gap-3">
+    <a href="{% url 'dashboard:mobile_boletos' %}" class="w-10 h-10 bg-white rounded-xl card-shadow flex items-center justify-center">
+      <svg class="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
+    </a>
+    <h1 class="font-display text-[20px] font-bold text-gray-900">Novo Boleto</h1>
+  </div>
+
+  <form @submit.prevent="submit()" class="space-y-4 bg-white rounded-2xl card-shadow p-4">
+    <div>
+      <label class="block text-sm font-medium text-gray-700 mb-1">Nome do Pagador</label>
+      <input type="text" x-model="form.payer_name" required class="w-full text-sm border border-gray-200 rounded-lg px-3 py-2">
+    </div>
+
+    <div class="grid grid-cols-2 gap-3">
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">Documento</label>
+        <input type="text" x-model="form.payer_document" required class="w-full text-sm border border-gray-200 rounded-lg px-3 py-2" placeholder="CPF/CNPJ">
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">Tipo</label>
+        <select x-model="form.payer_document_type" class="w-full text-sm border border-gray-200 rounded-lg px-3 py-2">
+          <option value="CPF">CPF</option>
+          <option value="CNPJ">CNPJ</option>
+        </select>
+      </div>
+    </div>
+
+    <div>
+      <label class="block text-sm font-medium text-gray-700 mb-1">Email</label>
+      <input type="email" x-model="form.payer_email" class="w-full text-sm border border-gray-200 rounded-lg px-3 py-2">
+    </div>
+
+    <div>
+      <label class="block text-sm font-medium text-gray-700 mb-1">Telefone</label>
+      <input type="tel" x-model="form.payer_phone" required class="w-full text-sm border border-gray-200 rounded-lg px-3 py-2" placeholder="(11) 99999-9999">
+    </div>
+
+    <div class="grid grid-cols-3 gap-3">
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">CEP</label>
+        <input type="text" x-model="form.payer_zip_code" required class="w-full text-sm border border-gray-200 rounded-lg px-3 py-2">
+      </div>
+      <div class="col-span-2">
+        <label class="block text-sm font-medium text-gray-700 mb-1">Rua</label>
+        <input type="text" x-model="form.payer_street" required class="w-full text-sm border border-gray-200 rounded-lg px-3 py-2">
+      </div>
+    </div>
+
+    <div class="grid grid-cols-2 gap-3">
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">Numero</label>
+        <input type="text" x-model="form.payer_number" required class="w-full text-sm border border-gray-200 rounded-lg px-3 py-2">
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">Bairro</label>
+        <input type="text" x-model="form.payer_neighborhood" required class="w-full text-sm border border-gray-200 rounded-lg px-3 py-2">
+      </div>
+    </div>
+
+    <div class="grid grid-cols-2 gap-3">
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">Cidade</label>
+        <input type="text" x-model="form.payer_city" required class="w-full text-sm border border-gray-200 rounded-lg px-3 py-2">
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">UF</label>
+        <input type="text" x-model="form.payer_state" required maxlength="2" class="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 uppercase">
+      </div>
+    </div>
+
+    <div class="grid grid-cols-2 gap-3">
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">Valor (R$)</label>
+        <input type="number" x-model="form.amount_cents" step="0.01" min="1" required class="w-full text-sm border border-gray-200 rounded-lg px-3 py-2">
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">Vencimento</label>
+        <input type="date" x-model="form.due_date" required class="w-full text-sm border border-gray-200 rounded-lg px-3 py-2">
+      </div>
+    </div>
+
+    <div>
+      <label class="block text-sm font-medium text-gray-700 mb-1">Instrucoes</label>
+      <textarea x-model="form.instructions" class="w-full text-sm border border-gray-200 rounded-lg px-3 py-2" rows="2"></textarea>
+    </div>
+
+    <div x-show="error" class="bg-red-50 text-red-700 text-sm rounded-lg px-4 py-3" x-text="error"></div>
+
+    <button type="submit" :disabled="submitting" class="w-full py-3 bg-brand-600 text-white font-semibold rounded-xl hover:bg-brand-700 disabled:opacity-50">
+      <span x-show="!submitting">Emitir Boleto</span>
+      <span x-show="submitting">Emitindo...</span>
+    </button>
+  </form>
+</div>
+
+<script>
+function mobileNovoBoleto() {
+    return {
+        form: {
+            payer_name: '',
+            payer_document: '',
+            payer_document_type: 'CPF',
+            payer_email: '',
+            payer_phone: '',
+            payer_zip_code: '',
+            payer_street: '',
+            payer_number: '',
+            payer_complement: '',
+            payer_neighborhood: '',
+            payer_city: '',
+            payer_state: '',
+            amount_cents: '',
+            due_date: '',
+            instructions: '',
+            notes: '',
+        },
+        error: '',
+        submitting: false,
+        submit() {
+            this.error = '';
+            this.submitting = true;
+            var payload = {};
+            for (var key in this.form) {
+                if (this.form.hasOwnProperty(key)) {
+                    payload[key] = this.form[key] === '' ? null : this.form[key];
+                }
+            }
+            if (payload.amount_cents) {
+                var val = parseFloat(payload.amount_cents);
+                if (!isNaN(val)) payload.amount_cents = Math.round(val * 100);
+            }
+            fetch('/api/receivables/boletos/', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '',
+                    'X-Idempotency-Key': Date.now().toString(),
+                },
+                body: JSON.stringify(payload),
+            })
+            .then(function(r) { return r.json().then(function(d) { return { status: r.status, data: d }; }); })
+            .then(function(result) {
+                if (result.status === 201) {
+                    window.location.href = '/dashboard/mobile/boletos/';
+                } else {
+                    var detail = result.data.detail || JSON.stringify(result.data);
+                    this.error = detail;
+                    this.submitting = false;
+                }
+            }.bind(this))
+            .catch(function(err) {
+                this.error = 'Erro ao emitir boleto. Tente novamente.';
+                this.submitting = false;
+            }.bind(this));
+        },
+    }
+}
+</script>
+{% endblock %}

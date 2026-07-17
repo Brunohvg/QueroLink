@@ -1,0 +1,96 @@
+{% extends 'dashboard/base_desktop.html' %}
+{% block title %}Boleto — Mérito{% endblock %}
+{% block content %}
+<div x-data="gestorBoletoDetalhe()" x-init="init()" class="max-w-3xl mx-auto">
+  <div class="mb-6">
+    <a href="{% url 'dashboard:gestor_boletos' %}" class="text-sm text-gray-500 hover:text-gray-700">&larr; Voltar para Boletos</a>
+  </div>
+
+  <div class="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 space-y-6">
+    <div class="flex items-center justify-between">
+      <h1 class="font-display text-xl font-bold text-gray-900">Detalhe do Boleto</h1>
+      <span :class="{
+        'text-yellow-600 bg-yellow-50': b.status === 'PENDENTE',
+        'text-green-600 bg-green-50': b.status === 'PAGO',
+        'text-red-600 bg-red-50': b.status === 'VENCIDO' || b.status === 'FALHOU',
+        'text-gray-500 bg-gray-50': b.status === 'CANCELADO',
+        'text-purple-600 bg-purple-50': b.status === 'ESTORNADO',
+      }" class="px-3 py-1 rounded-full text-sm font-medium" x-text="b.status_display"></span>
+    </div>
+
+    <div class="grid grid-cols-2 gap-4 text-sm">
+      <div>
+        <p class="text-gray-500">Vendedor</p>
+        <p class="font-medium" x-text="b.seller_name"></p>
+      </div>
+      <div>
+        <p class="text-gray-500">Criado por</p>
+        <p class="font-medium" x-text="b.created_by_name"></p>
+      </div>
+      <div>
+        <p class="text-gray-500">Valor</p>
+        <p class="font-medium" x-text="'R$ ' + (b.amount_cents / 100).toFixed(2)"></p>
+      </div>
+      <div>
+        <p class="text-gray-500">Vencimento</p>
+        <p class="font-medium" x-text="b.due_date"></p>
+      </div>
+      <div x-show="b.paid_at">
+        <p class="text-gray-500">Pago em</p>
+        <p class="font-medium" x-text="b.paid_at"></p>
+      </div>
+      <div x-show="b.paid_amount_cents">
+        <p class="text-gray-500">Valor pago</p>
+        <p class="font-medium" x-text="'R$ ' + (b.paid_amount_cents / 100).toFixed(2)"></p>
+      </div>
+    </div>
+
+    <div x-show="b.instructions" class="text-sm">
+      <p class="text-gray-500">Instrucoes</p>
+      <p class="mt-1" x-text="b.instructions"></p>
+    </div>
+
+    <div x-show="b.notes" class="text-sm">
+      <p class="text-gray-500">Observacoes</p>
+      <p class="mt-1" x-text="b.notes"></p>
+    </div>
+
+    <div class="border-t border-gray-100 pt-4 text-sm space-y-2">
+      <p><span class="text-gray-500">Provider:</span> <span class="font-medium" x-text="b.provider || '-'"></span></p>
+      <p><span class="text-gray-500">Order ID:</span> <span class="font-medium" x-text="b.provider_order_id || '-'"></span></p>
+      <p><span class="text-gray-500">Charge ID:</span> <span class="font-medium" x-text="b.provider_charge_id || '-'"></span></p>
+      <p x-show="b.operation_error_code">
+        <span class="text-red-500">Erro:</span>
+        <span class="text-red-600" x-text="b.operation_error_code + ': ' + b.operation_error_message"></span>
+      </p>
+    </div>
+
+    <div class="border-t border-gray-100 pt-4 flex gap-3">
+      <a :href="'/api/receivables/boletos/' + b.boleto_uuid + '/documents/pdf/download/'"
+         x-show="b.has_invoice_pdf"
+         class="text-sm text-brand-600 hover:text-brand-800">
+        Download PDF
+      </a>
+      <a :href="'/api/receivables/boletos/' + b.boleto_uuid + '/documents/xml/download/'"
+         x-show="b.has_invoice_xml"
+         class="text-sm text-brand-600 hover:text-brand-800">
+        Download XML
+      </a>
+    </div>
+  </div>
+</div>
+
+{{ boleto_json|json_script:"boleto-data" }}
+<script>
+function gestorBoletoDetalhe() {
+    return {
+        b: {},
+        init() {
+            var _p = JSON.parse(document.getElementById('boleto-data')?.textContent || '{}');
+            if (typeof _p === 'string') _p = JSON.parse(_p);
+            this.b = _p;
+        },
+    }
+}
+</script>
+{% endblock %}
