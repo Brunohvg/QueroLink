@@ -20,13 +20,15 @@ Atualizado em 17/07/2026. Este documento permite que outra IA ou pessoa continue
 - HEAD mesclado usado como base: `af067da56eac8a4c59194768efa771740bc5ab6a` (PR #43).
 - Branch em desenvolvimento: `feat/customer-ledger-foundation`.
 - Prompt em entrega: **Prompt 08 — Customer Ledger como projeção assíncrona**.
-- Estado local: implementação concluída e gates locais verdes; falta publicar o Draft PR e registrar abaixo seu número/commit final.
+- Commit da implementação: `37604866d4e15d9f40d63b1b81e966b255941748`.
+- PR atual: [#44 — Customer Ledger como projeção assíncrona](https://github.com/Brunohvg/QueroLink/pull/44), aberto como Draft contra `querolink-v2`.
+- Estado: implementação concluída, gates locais verdes; aguardar os checks do GitHub e o merge manual do #44.
 - Próximo prompt, somente depois do merge verde deste PR: **Prompt 09 — API do Customer Ledger e backfill controlado**.
 
 Antes de iniciar o Prompt 09, confirmar o estado do Draft PR do Prompt 08 que será registrado neste documento:
 
 ```bash
-gh pr view NUMERO_DO_PR_08 --json state,mergedAt,statusCheckRollup
+gh pr view 44 --json state,mergedAt,statusCheckRollup
 git fetch origin --prune
 ```
 
@@ -43,7 +45,7 @@ git fetch origin --prune
 | #41 | Prompt 05 — reconciliação de boletos | Mesclado | `f9d8c28` |
 | #42 | Prompt 06 — alocação em vendas | Mesclado | `e592820` |
 | #43 | Prompt 07 — impacto em comissões | Mesclado | `af067da` |
-| a registrar | Prompt 08 — Customer Ledger assíncrono | Implementação local verde | branch `feat/customer-ledger-foundation` |
+| #44 | Prompt 08 — Customer Ledger assíncrono | Draft aberto | `3760486` |
 
 ## 4. Decisões de arquitetura tomadas
 
