@@ -377,11 +377,12 @@ def detect_import_format(content_bytes, filename):
 
     sheet_names = wb.sheetnames
     if 'IMPORTACAO' in sheet_names:
-        ws = wb['IMPORTACAO']
-    else:
-        ws = wb.active
+        wb.close()
+        return 'matrix'
 
+    # Sem aba IMPORTACAO, tenta detectar pelo cabecalho na aba ativa
     try:
+        ws = wb.active
         header_row = next(ws.iter_rows(values_only=True))
     except StopIteration:
         wb.close()
@@ -395,9 +396,8 @@ def detect_import_format(content_bytes, filename):
     wb.close()
 
     if first_col == 'DATA' and len(header_row) > 2:
-        # Verificar se as demais colunas parecem vendedores (nao sao VENDEDOR, VALOR, OBSERVACAO)
         others = [str(h).strip().upper() for h in header_row[1:] if h is not None]
-        if len(others) >= 1 and not any(h in ('VENDEDOR', 'VALOR', 'OBSERVACAO', 'OBSERVACAO') for h in others[:3]):
+        if len(others) >= 1 and not any(h in ('VENDEDOR', 'VALOR', 'OBSERVACAO') for h in others[:3]):
             return 'matrix'
 
     return 'list'
