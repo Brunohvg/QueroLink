@@ -217,14 +217,13 @@ function gestorCobrancasPage() {
         },
 
         displayName(c) {
-            if (c.type === 'link') return c.customer_name || '-';
             return c.customer_name || '-';
         },
 
         fmt(cents) {
-            var r = Math.floor(cents / 100);
-            var c = Math.abs(cents % 100);
-            return 'R$ ' + r.toLocaleString('pt-BR') + ',' + String(c).padStart(2, '0');
+            var reais = Math.floor(cents / 100);
+            var centavos = Math.abs(cents % 100);
+            return 'R$ ' + reais.toLocaleString('pt-BR') + ',' + String(centavos).padStart(2, '0');
         },
 
         fmtDate(iso) {
