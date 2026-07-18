@@ -7,56 +7,82 @@
     <div class="flex items-center justify-between">
       <div>
         <h1 class="font-display text-[22px] font-bold text-gray-900 tracking-tight">Cobrancas</h1>
-        <p class="text-[13px] text-gray-500 mt-0.5">
-          <span x-text="filteredCobrancas().length + ' cobranca' + (filteredCobrancas().length !== 1 ? 's' : '')"></span>
-        </p>
+        <p class="text-[13px] text-gray-500 mt-0.5">Acompanhe links de pagamento, boletos e recebimentos em um so lugar.</p>
       </div>
-      <div class="flex items-center gap-2">
-        {% if has_boletos %}
-        <a href="{% url 'dashboard:gestor_boleto_new' %}" class="inline-flex items-center gap-2 px-4 py-2 bg-brand-600 text-white text-sm font-semibold rounded-xl hover:bg-brand-700 transition-colors">
-          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
-          Novo Boleto
-        </a>
+      <div class="flex items-center gap-2" x-data="{open:false}" @click.away="open=false">
+        {% if can_create_links or can_create_boletos %}
+        <div class="relative">
+          <button @click="open=!open"
+                  class="inline-flex items-center gap-2 px-4 py-2.5 bg-brand-600 text-white text-sm font-semibold rounded-xl hover:bg-brand-700 transition-colors shadow-sm">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+            Nova cobranca
+            <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+          </button>
+          <div x-show="open" x-cloak x-transition
+               class="absolute right-0 mt-2 w-56 bg-white rounded-xl border border-gray-100 shadow-lg z-20 py-1">
+            {% if can_create_links %}
+            <a href="{% url 'dashboard:gestor_links' %}"
+               class="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50">
+              <svg class="w-4 h-4 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"/></svg>
+              Gerar link de pagamento
+            </a>
+            {% endif %}
+            {% if can_create_boletos %}
+            <a href="{% url 'dashboard:gestor_boleto_new' %}"
+               class="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50">
+              <svg class="w-4 h-4 text-violet-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+              Emitir boleto
+            </a>
+            {% endif %}
+            {% if not pagarme_configured %}
+            <div class="px-4 py-2 text-xs text-gray-400 italic">
+              Configure a integracao de pagamento para emitir novas cobrancas.
+            </div>
+            {% endif %}
+          </div>
+        </div>
+        {% elif not pagarme_configured %}
+        <div class="text-xs text-gray-400 italic px-3 py-2 bg-gray-50 rounded-lg">
+          Configure a integracao de pagamento para emitir novas cobrancas.
+        </div>
         {% endif %}
       </div>
     </div>
 
     <div class="flex gap-4 mt-3 text-sm">
       <div class="bg-white rounded-xl px-4 py-2 shadow-sm border border-gray-100">
-        <span class="text-gray-500">Links ativos</span>
-        <span class="ml-2 font-semibold text-gray-900" x-text="linkStats.pending + ' pendentes'"></span>
+        <span class="text-gray-500">Aguardando pagamento</span>
+        <span class="ml-2 font-semibold text-brand-600" x-text="stats.aguardando"></span>
       </div>
       <div class="bg-white rounded-xl px-4 py-2 shadow-sm border border-gray-100">
-        <span class="text-gray-500">Links pagos</span>
-        <span class="ml-2 font-semibold text-green-600" x-text="linkStats.paid"></span>
-      </div>
-      {% if has_boletos %}
-      <div class="bg-white rounded-xl px-4 py-2 shadow-sm border border-gray-100">
-        <span class="text-gray-500">A receber</span>
-        <span class="ml-2 font-semibold text-gray-900" x-text="boletoStats.total_a_receber || 0"></span>
+        <span class="text-gray-500">Pagas</span>
+        <span class="ml-2 font-semibold text-green-600" x-text="stats.pagas"></span>
       </div>
       <div class="bg-white rounded-xl px-4 py-2 shadow-sm border border-gray-100">
-        <span class="text-gray-500">Vencidos</span>
-        <span class="ml-2 font-semibold text-red-600" x-text="boletoStats.vencidos || 0"></span>
+        <span class="text-gray-500">Vencidas</span>
+        <span class="ml-2 font-semibold text-red-600" x-text="stats.vencidas"></span>
       </div>
       <div class="bg-white rounded-xl px-4 py-2 shadow-sm border border-gray-100">
-        <span class="text-gray-500">Pagos hoje</span>
-        <span class="ml-2 font-semibold text-green-600" x-text="boletoStats.pagos_hoje || 0"></span>
+        <span class="text-gray-500">Canceladas</span>
+        <span class="ml-2 font-semibold text-gray-500" x-text="stats.canceladas"></span>
       </div>
-      {% endif %}
     </div>
+  </div>
+
+  <div class="flex items-center gap-1 mb-4">
+    <button @click="typeFilter=''; filter()"
+            :class="!typeFilter ? 'bg-brand-50 text-brand-700' : 'text-gray-500 hover:bg-gray-50'"
+            class="px-4 py-2 rounded-lg text-sm font-medium transition">Todas</button>
+    <button @click="typeFilter='link'; filter()"
+            :class="typeFilter==='link' ? 'bg-brand-50 text-brand-700' : 'text-gray-500 hover:bg-gray-50'"
+            class="px-4 py-2 rounded-lg text-sm font-medium transition">Links de pagamento</button>
+    <button @click="typeFilter='boleto'; filter()"
+            :class="typeFilter==='boleto' ? 'bg-brand-50 text-brand-700' : 'text-gray-500 hover:bg-gray-50'"
+            class="px-4 py-2 rounded-lg text-sm font-medium transition">Boletos</button>
   </div>
 
   <div class="bg-white rounded-2xl border border-gray-100 shadow-[0_1px_3px_-1px_rgba(0,0,0,0.04),0_4px_16px_-4px_rgba(67,97,238,0.06)] p-5 mb-6">
     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
-      <div>
-        <label class="block text-[11px] font-semibold text-gray-400 uppercase tracking-wider mb-1.5">Tipo</label>
-        <select x-model="typeFilter" @change="filter()" class="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-[13px] outline-none transition-all focus:border-brand-400 focus:ring-2 focus:ring-brand-100">
-          <option value="">Todos</option>
-          <option value="link">Links de Pagamento</option>
-          <option value="boleto">Boletos</option>
-        </select>
-      </div>
       <div>
         <label class="block text-[11px] font-semibold text-gray-400 uppercase tracking-wider mb-1.5">Buscar cliente</label>
         <input type="text" x-model="search" @input="filter()" placeholder="Nome do cliente..."
@@ -75,16 +101,27 @@
         <label class="block text-[11px] font-semibold text-gray-400 uppercase tracking-wider mb-1.5">Status</label>
         <select x-model="statusFilter" @change="filter()" class="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-[13px] outline-none transition-all focus:border-brand-400 focus:ring-2 focus:ring-brand-100">
           <option value="">Todos</option>
-          <option value="PENDING">Pendente</option>
-          <option value="COMPLETED">Pago</option>
-          <option value="EXPIRED">Expirado</option>
-          <option value="CANCELED">Cancelado</option>
-          <option value="FAILED">Falha</option>
-          <option value="PENDENTE">Boleto Pendente</option>
-          <option value="PAGO">Boleto Pago</option>
-          <option value="VENCIDO">Vencido</option>
-          <option value="ESTORNADO">Estornado</option>
+          <optgroup label="Links">
+            <option value="PENDING">Pendente</option>
+            <option value="COMPLETED">Pago</option>
+            <option value="EXPIRED">Expirado</option>
+            <option value="CANCELED">Cancelado</option>
+            <option value="FAILED">Falha</option>
+          </optgroup>
+          <optgroup label="Boletos">
+            <option value="PENDENTE">Pendente</option>
+            <option value="PAGO">Pago</option>
+            <option value="VENCIDO">Vencido</option>
+            <option value="CANCELADO">Cancelado</option>
+            <option value="ESTORNADO">Estornado</option>
+            <option value="FALHOU">Falhou</option>
+          </optgroup>
         </select>
+      </div>
+      <div>
+        <label class="block text-[11px] font-semibold text-gray-400 uppercase tracking-wider mb-1.5">De</label>
+        <input type="date" x-model="dateStart" @change="filter()"
+               class="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-[13px] outline-none transition-all focus:border-brand-400 focus:ring-2 focus:ring-brand-100">
       </div>
       <div>
         <label class="block text-[11px] font-semibold text-gray-400 uppercase tracking-wider mb-1.5">&nbsp;</label>
@@ -124,13 +161,7 @@
               <td class="px-4 py-3.5">
                 <div class="flex items-center gap-2">
                   <div class="w-8 h-8 rounded-full flex items-center justify-center text-white font-bold text-[12px]"
-                       :class="{
-                         'bg-brand-100 text-brand-600': c.status === 'PENDING' || c.status === 'PENDENTE',
-                         'bg-emerald-100 text-emerald-600': c.status === 'COMPLETED' || c.status === 'PAGO',
-                         'bg-red-100 text-red-600': c.status === 'CANCELADO' || c.status === 'CANCELED' || c.status === 'FAILED' || c.status === 'EXPIRED' || c.status === 'FALHOU',
-                         'bg-amber-100 text-amber-600': c.status === 'VENCIDO',
-                         'bg-purple-100 text-purple-600': c.status === 'ESTORNADO',
-                       }">
+                       :class="statusAvatar(c.status)">
                     <span x-text="(c.customer_name||'?')[0].toUpperCase()"></span>
                   </div>
                   <div>
@@ -141,17 +172,7 @@
               </td>
               <td class="px-4 py-3.5 font-semibold text-[14px] text-gray-900 text-right" x-text="formatMoneyBRL(c.amount_cents)"></td>
               <td class="px-4 py-3.5">
-                <span :class="{
-                  'text-[12px] px-2 py-0.5 rounded-full font-medium': true,
-                  'text-brand-700 bg-brand-50': c.status === 'PENDING',
-                  'text-emerald-700 bg-emerald-50': c.status === 'COMPLETED',
-                  'text-red-700 bg-red-50': c.status === 'CANCELED' || c.status === 'FAILED' || c.status === 'EXPIRED',
-                  'text-gray-500 bg-gray-50': c.status === 'SUSPENDED',
-                  'text-yellow-700 bg-yellow-50': c.status === 'PENDENTE',
-                  'text-green-700 bg-green-50': c.status === 'PAGO',
-                  'text-red-700 bg-red-50': c.status === 'VENCIDO' || c.status === 'FALHOU',
-                  'text-purple-700 bg-purple-50': c.status === 'ESTORNADO',
-                }" x-text="c.status_display"></span>
+                <span :class="statusBadge(c.status)" class="text-[12px] px-2 py-0.5 rounded-full font-medium" x-text="c.status_display"></span>
               </td>
               <td class="px-4 py-3.5 text-[13px] text-gray-500 hidden md:table-cell" x-text="c.created_at ? c.created_at.split('T')[0].split('-').reverse().join('/') : '-'"></td>
               <td class="px-4 py-3.5 text-[13px] text-gray-500 hidden md:table-cell" x-text="c.due_date || '-'"></td>
@@ -160,7 +181,11 @@
           {% endverbatim %}
         </tbody>
       </table>
-      <div x-show="filteredCobrancas().length === 0" class="p-8 text-center text-gray-400">
+      <div x-show="cobrancas.length === 0" class="p-12 text-center text-gray-400">
+        <svg class="w-12 h-12 mx-auto mb-3 text-gray-200" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"/></svg>
+        <p class="text-[15px] font-medium text-gray-500">Nenhuma cobranca encontrada.</p>
+      </div>
+      <div x-show="cobrancas.length > 0 && filteredCobrancas().length === 0" class="p-8 text-center text-gray-400">
         Nenhuma cobranca encontrada com os filtros selecionados.
       </div>
     </div>
@@ -168,8 +193,7 @@
 </div>
 
 {{ cobrancas_json|json_script:"cobrancas-data" }}
-{{ link_stats_json|json_script:"link-stats-data" }}
-{{ boleto_stats_json|json_script:"boleto-stats-data" }}
+{{ unified_stats_json|json_script:"unified-stats-data" }}
 <script>
 function gestorCobrancasPage() {
     return {
@@ -178,18 +202,49 @@ function gestorCobrancasPage() {
         typeFilter: '',
         sellerFilter: '',
         statusFilter: '',
-        linkStats: { total: 0, pending: 0, paid: 0 },
-        boletoStats: { total_a_receber: 0, vencidos: 0, pagos_hoje: 0 },
+        dateStart: '',
+        stats: { aguardando: 0, pagas: 0, vencidas: 0, canceladas: 0 },
         init() {
             var _p = JSON.parse(document.getElementById('cobrancas-data')?.textContent || '[]');
             if (typeof _p === 'string') _p = JSON.parse(_p);
             this.cobrancas = Array.isArray(_p) ? _p : [];
-            var _ls = JSON.parse(document.getElementById('link-stats-data')?.textContent || '{}');
-            if (typeof _ls === 'string') _ls = JSON.parse(_ls);
-            this.linkStats = _ls || { total: 0, pending: 0, paid: 0 };
-            var _bs = JSON.parse(document.getElementById('boleto-stats-data')?.textContent || '{}');
-            if (typeof _bs === 'string') _bs = JSON.parse(_bs);
-            this.boletoStats = _bs || { total_a_receber: 0, vencidos: 0, pagos_hoje: 0 };
+            var _s = JSON.parse(document.getElementById('unified-stats-data')?.textContent || '{}');
+            if (typeof _s === 'string') _s = JSON.parse(_s);
+            this.stats = _s || { aguardando: 0, pagas: 0, vencidas: 0, canceladas: 0 };
+        },
+        statusAvatar(status) {
+            var map = {
+                'PENDING': 'bg-brand-100 text-brand-600',
+                'COMPLETED': 'bg-emerald-100 text-emerald-600',
+                'CANCELED': 'bg-red-100 text-red-600',
+                'FAILED': 'bg-red-100 text-red-600',
+                'EXPIRED': 'bg-red-100 text-red-600',
+                'SUSPENDED': 'bg-amber-100 text-amber-600',
+                'PENDENTE': 'bg-yellow-100 text-yellow-600',
+                'PAGO': 'bg-green-100 text-green-600',
+                'VENCIDO': 'bg-red-100 text-red-600',
+                'ESTORNADO': 'bg-purple-100 text-purple-600',
+                'FALHOU': 'bg-red-100 text-red-600',
+                'CANCEL_PEND': 'bg-gray-100 text-gray-600',
+            };
+            return map[status] || 'bg-gray-100 text-gray-600';
+        },
+        statusBadge(status) {
+            var map = {
+                'PENDING': 'text-brand-700 bg-brand-50',
+                'COMPLETED': 'text-emerald-700 bg-emerald-50',
+                'CANCELED': 'text-red-700 bg-red-50',
+                'FAILED': 'text-red-700 bg-red-50',
+                'EXPIRED': 'text-red-700 bg-red-50',
+                'SUSPENDED': 'text-gray-500 bg-gray-50',
+                'PENDENTE': 'text-yellow-700 bg-yellow-50',
+                'PAGO': 'text-green-700 bg-green-50',
+                'VENCIDO': 'text-red-700 bg-red-50',
+                'ESTORNADO': 'text-purple-700 bg-purple-50',
+                'FALHOU': 'text-red-700 bg-red-50',
+                'CANCEL_PEND': 'text-gray-500 bg-gray-50',
+            };
+            return map[status] || 'text-gray-500 bg-gray-50';
         },
         filteredCobrancas() {
             return this.cobrancas.filter(c => {
@@ -201,6 +256,10 @@ function gestorCobrancasPage() {
                     var name = (c.customer_name || '').toLowerCase();
                     if (name.indexOf(q) === -1) return false;
                 }
+                if (this.dateStart) {
+                    var d = c.created_at ? c.created_at.split('T')[0] : '';
+                    if (d < this.dateStart) return false;
+                }
                 return true;
             });
         },
@@ -210,6 +269,7 @@ function gestorCobrancasPage() {
             this.typeFilter = '';
             this.sellerFilter = '';
             this.statusFilter = '';
+            this.dateStart = '';
         }
     };
 }
