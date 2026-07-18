@@ -46,6 +46,7 @@ urlpatterns += [
     path('mobile/logout/', mobile_views.mobile_logout, name='mobile_logout'),
     path('mobile/forgot-password/', mobile_views.mobile_forgot_password, name='mobile_forgot_password'),
     path('mobile/', mobile_views.mobile_home, name='mobile_home'),
+    path('mobile/cobrancas/', mobile_views.mobile_cobrancas, name='mobile_cobrancas'),
     path('mobile/lancar/', mobile_views.mobile_lancar_venda, name='mobile_lancar_venda'),
     path('mobile/vendas/', mobile_views.mobile_minhas_vendas, name='mobile_minhas_vendas'),
     path('mobile/desempenho/', mobile_views.mobile_meu_desempenho, name='mobile_meu_desempenho'),

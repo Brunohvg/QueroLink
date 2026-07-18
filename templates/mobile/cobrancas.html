@@ -1,0 +1,95 @@
+{% extends 'mobile/base_mobile.html' %}
+{% block title %}Cobrancas — Merito{% endblock %}
+{% block content %}
+<div x-data="mobileCobrancasPage()" x-init="init()">
+
+  <div class="flex items-center justify-between px-5 py-4 border-b border-gray-100">
+    <div>
+      <h1 class="text-[20px] font-bold text-gray-900">Cobrancas</h1>
+      <p class="text-[12px] text-gray-400" x-text="cobrancas.length + ' cobranca' + (cobrancas.length !== 1 ? 's' : '')"></p>
+    </div>
+    <div x-data="{open:false}" @click.outside="open=false" class="relative">
+      <button @click="open=!open"
+              class="w-10 h-10 rounded-full bg-brand-600 text-white flex items-center justify-center shadow-lg shadow-brand-200 active:scale-90 transition-transform">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+      </button>
+      <div x-show="open" x-cloak x-transition
+           class="absolute right-0 top-12 w-48 bg-white rounded-xl border border-gray-100 shadow-lg z-20 py-1">
+        <a href="{% url 'dashboard:mobile_links' %}"
+           class="flex items-center gap-3 px-4 py-3 text-sm text-gray-700 hover:bg-gray-50">
+          <svg class="w-4 h-4 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"/></svg>
+          Gerar link
+        </a>
+        {% if has_boletos %}
+        <a href="{% url 'dashboard:mobile_boleto_new' %}"
+           class="flex items-center gap-3 px-4 py-3 text-sm text-gray-700 hover:bg-gray-50">
+          <svg class="w-4 h-4 text-violet-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+          Emitir boleto
+        </a>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <div class="px-5 py-3 space-y-2">
+    {% verbatim %}
+    <template x-for="c in cobrancas" :key="c.type + '_' + c.uuid">
+      <a :href="c.detail_url"
+         class="block bg-white rounded-2xl p-4 border border-gray-100 shadow-sm active:scale-[0.98] transition-transform">
+        <div class="flex items-start justify-between">
+          <div class="flex items-center gap-3">
+            <div class="w-10 h-10 rounded-full flex items-center justify-center text-white text-[14px] font-bold"
+                 :class="c.type === 'link' ? 'bg-emerald-100 text-emerald-600' : 'bg-violet-100 text-violet-600'">
+              <span x-text="c.type_display[0]"></span>
+            </div>
+            <div>
+              <p class="text-[14px] font-semibold text-gray-900" x-text="c.customer_name || '-'"></p>
+              <p class="text-[11px] text-gray-400">
+                <span :class="{
+                  'text-green-600': c.status === 'COMPLETED' || c.status === 'PAGO',
+                  'text-yellow-600': c.status === 'PENDING' || c.status === 'PENDENTE',
+                  'text-red-600': c.status === 'CANCELED' || c.status === 'VENCIDO' || c.status === 'FALHOU',
+                  'text-purple-600': c.status === 'ESTORNADO',
+                }" class="font-medium" x-text="c.status_display"></span>
+                <span x-text="' · ' + fmtDate(c.created_at)"></span>
+              </p>
+            </div>
+          </div>
+          <p class="text-[15px] font-bold text-gray-900" x-text="fmt(c.amount_cents)"></p>
+        </div>
+      </a>
+    </template>
+    {% endverbatim %}
+
+    <div x-show="cobrancas.length === 0" class="text-center py-10">
+      <svg class="w-12 h-12 mx-auto mb-3 text-gray-200" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"/></svg>
+      <p class="text-[14px] text-gray-400 font-medium">Nenhuma cobranca encontrada.</p>
+      <p class="text-[12px] text-gray-300 mt-1">Crie sua primeira cobranca tocando no +</p>
+    </div>
+  </div>
+</div>
+
+{{ cobrancas_json|json_script:"cobrancas-data" }}
+<script>
+function mobileCobrancasPage() {
+    return {
+        cobrancas: [],
+        init() {
+            var _p = JSON.parse(document.getElementById('cobrancas-data')?.textContent || '[]');
+            if (typeof _p === 'string') _p = JSON.parse(_p);
+            this.cobrancas = Array.isArray(_p) ? _p : [];
+        },
+        fmt(cents) {
+            var reais = Math.floor(cents / 100);
+            var centavos = Math.abs(cents % 100);
+            return 'R$ ' + reais.toLocaleString('pt-BR') + ',' + String(centavos).padStart(2, '0');
+        },
+        fmtDate(iso) {
+            if (!iso) return '-';
+            var parts = iso.split('T')[0].split('-');
+            return parts[2] + '/' + parts[1] + '/' + parts[0];
+        },
+    };
+}
+</script>
+{% endblock %}
