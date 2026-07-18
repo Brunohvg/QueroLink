@@ -214,6 +214,7 @@ function gestorCobrancasPage() {
             var _s = JSON.parse(document.getElementById('unified-stats-data')?.textContent || '{}');
             if (typeof _s === 'string') _s = JSON.parse(_s);
             this.kpi = _s || { aguardando: 0, pagas: 0, vencidas: 0, canceladas: 0 };
+            console.debug('cobrancas_data:', this.cobrancas.length, 'items, kpi:', this.kpi);
         },
 
         displayName(c) {
