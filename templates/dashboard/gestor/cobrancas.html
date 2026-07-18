@@ -1,0 +1,217 @@
+{% extends 'dashboard/base_desktop.html' %}
+{% block title %}Cobrancas — Merito{% endblock %}
+{% block content %}
+<div x-data="gestorCobrancasPage()" x-init="init()" class="max-w-7xl mx-auto">
+
+  <div class="sticky top-0 z-10 -mx-6 px-6 py-4 bg-gray-50/90 backdrop-blur-lg border-b border-gray-200/60 mb-6">
+    <div class="flex items-center justify-between">
+      <div>
+        <h1 class="font-display text-[22px] font-bold text-gray-900 tracking-tight">Cobrancas</h1>
+        <p class="text-[13px] text-gray-500 mt-0.5">
+          <span x-text="filteredCobrancas().length + ' cobranca' + (filteredCobrancas().length !== 1 ? 's' : '')"></span>
+        </p>
+      </div>
+      <div class="flex items-center gap-2">
+        {% if has_boletos %}
+        <a href="{% url 'dashboard:gestor_boleto_new' %}" class="inline-flex items-center gap-2 px-4 py-2 bg-brand-600 text-white text-sm font-semibold rounded-xl hover:bg-brand-700 transition-colors">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+          Novo Boleto
+        </a>
+        {% endif %}
+      </div>
+    </div>
+
+    <div class="flex gap-4 mt-3 text-sm">
+      <div class="bg-white rounded-xl px-4 py-2 shadow-sm border border-gray-100">
+        <span class="text-gray-500">Links ativos</span>
+        <span class="ml-2 font-semibold text-gray-900" x-text="linkStats.pending + ' pendentes'"></span>
+      </div>
+      <div class="bg-white rounded-xl px-4 py-2 shadow-sm border border-gray-100">
+        <span class="text-gray-500">Links pagos</span>
+        <span class="ml-2 font-semibold text-green-600" x-text="linkStats.paid"></span>
+      </div>
+      {% if has_boletos %}
+      <div class="bg-white rounded-xl px-4 py-2 shadow-sm border border-gray-100">
+        <span class="text-gray-500">A receber</span>
+        <span class="ml-2 font-semibold text-gray-900" x-text="boletoStats.total_a_receber || 0"></span>
+      </div>
+      <div class="bg-white rounded-xl px-4 py-2 shadow-sm border border-gray-100">
+        <span class="text-gray-500">Vencidos</span>
+        <span class="ml-2 font-semibold text-red-600" x-text="boletoStats.vencidos || 0"></span>
+      </div>
+      <div class="bg-white rounded-xl px-4 py-2 shadow-sm border border-gray-100">
+        <span class="text-gray-500">Pagos hoje</span>
+        <span class="ml-2 font-semibold text-green-600" x-text="boletoStats.pagos_hoje || 0"></span>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="bg-white rounded-2xl border border-gray-100 shadow-[0_1px_3px_-1px_rgba(0,0,0,0.04),0_4px_16px_-4px_rgba(67,97,238,0.06)] p-5 mb-6">
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+      <div>
+        <label class="block text-[11px] font-semibold text-gray-400 uppercase tracking-wider mb-1.5">Tipo</label>
+        <select x-model="typeFilter" @change="filter()" class="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-[13px] outline-none transition-all focus:border-brand-400 focus:ring-2 focus:ring-brand-100">
+          <option value="">Todos</option>
+          <option value="link">Links de Pagamento</option>
+          <option value="boleto">Boletos</option>
+        </select>
+      </div>
+      <div>
+        <label class="block text-[11px] font-semibold text-gray-400 uppercase tracking-wider mb-1.5">Buscar cliente</label>
+        <input type="text" x-model="search" @input="filter()" placeholder="Nome do cliente..."
+               class="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-[13px] outline-none transition-all focus:border-brand-400 focus:ring-2 focus:ring-brand-100">
+      </div>
+      <div>
+        <label class="block text-[11px] font-semibold text-gray-400 uppercase tracking-wider mb-1.5">Vendedor</label>
+        <select x-model="sellerFilter" @change="filter()" class="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-[13px] outline-none transition-all focus:border-brand-400 focus:ring-2 focus:ring-brand-100">
+          <option value="">Todos</option>
+          {% for s in sellers %}
+          <option value="{{ s.uuid }}">{{ s.name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div>
+        <label class="block text-[11px] font-semibold text-gray-400 uppercase tracking-wider mb-1.5">Status</label>
+        <select x-model="statusFilter" @change="filter()" class="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-[13px] outline-none transition-all focus:border-brand-400 focus:ring-2 focus:ring-brand-100">
+          <option value="">Todos</option>
+          <option value="PENDING">Pendente</option>
+          <option value="COMPLETED">Pago</option>
+          <option value="EXPIRED">Expirado</option>
+          <option value="CANCELED">Cancelado</option>
+          <option value="FAILED">Falha</option>
+          <option value="PENDENTE">Boleto Pendente</option>
+          <option value="PAGO">Boleto Pago</option>
+          <option value="VENCIDO">Vencido</option>
+          <option value="ESTORNADO">Estornado</option>
+        </select>
+      </div>
+      <div>
+        <label class="block text-[11px] font-semibold text-gray-400 uppercase tracking-wider mb-1.5">&nbsp;</label>
+        <button @click="resetFilters()" class="w-full px-3 py-2 bg-gray-100 hover:bg-gray-200 text-gray-600 rounded-xl text-[13px] font-medium transition">
+          Limpar filtros
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <div class="bg-white rounded-2xl border border-gray-100 shadow-[0_1px_3px_-1px_rgba(0,0,0,0.04),0_4px_16px_-4px_rgba(67,97,238,0.06)] overflow-hidden">
+    <div class="overflow-x-auto">
+      <table class="w-full text-left">
+        <thead>
+          <tr class="bg-gray-50/80">
+            <th class="px-4 py-3 text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Tipo</th>
+            <th class="px-4 py-3 text-[11px] font-semibold text-gray-500 uppercase tracking-wider hidden lg:table-cell">Vendedor</th>
+            <th class="px-4 py-3 text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Cliente</th>
+            <th class="px-4 py-3 text-[11px] font-semibold text-gray-500 uppercase tracking-wider text-right">Valor</th>
+            <th class="px-4 py-3 text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Status</th>
+            <th class="px-4 py-3 text-[11px] font-semibold text-gray-500 uppercase tracking-wider hidden md:table-cell">Data</th>
+            <th class="px-4 py-3 text-[11px] font-semibold text-gray-500 uppercase tracking-wider hidden md:table-cell">Vencimento</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% verbatim %}
+          <template x-for="c in filteredCobrancas()" :key="c.type + '_' + c.uuid">
+            <tr class="border-b border-gray-50 hover:bg-gray-50/50 transition-colors cursor-pointer"
+                @click="window.location.href = c.detail_url">
+              <td class="px-4 py-3.5">
+                <span :class="{
+                  'bg-blue-50 text-blue-700': c.type === 'link',
+                  'bg-violet-50 text-violet-700': c.type === 'boleto',
+                }" class="px-2 py-0.5 rounded-full text-[11px] font-semibold" x-text="c.type_display"></span>
+              </td>
+              <td class="px-4 py-3.5 text-[13px] text-gray-700 font-medium hidden lg:table-cell" x-text="c.seller_name"></td>
+              <td class="px-4 py-3.5">
+                <div class="flex items-center gap-2">
+                  <div class="w-8 h-8 rounded-full flex items-center justify-center text-white font-bold text-[12px]"
+                       :class="{
+                         'bg-brand-100 text-brand-600': c.status === 'PENDING' || c.status === 'PENDENTE',
+                         'bg-emerald-100 text-emerald-600': c.status === 'COMPLETED' || c.status === 'PAGO',
+                         'bg-red-100 text-red-600': c.status === 'CANCELADO' || c.status === 'CANCELED' || c.status === 'FAILED' || c.status === 'EXPIRED' || c.status === 'FALHOU',
+                         'bg-amber-100 text-amber-600': c.status === 'VENCIDO',
+                         'bg-purple-100 text-purple-600': c.status === 'ESTORNADO',
+                       }">
+                    <span x-text="(c.customer_name||'?')[0].toUpperCase()"></span>
+                  </div>
+                  <div>
+                    <p class="text-[14px] font-semibold text-gray-900 leading-tight" x-text="c.customer_name || '-'"></p>
+                    <p class="text-[11px] text-gray-400 lg:hidden" x-text="c.seller_name"></p>
+                  </div>
+                </div>
+              </td>
+              <td class="px-4 py-3.5 font-semibold text-[14px] text-gray-900 text-right" x-text="formatMoneyBRL(c.amount_cents)"></td>
+              <td class="px-4 py-3.5">
+                <span :class="{
+                  'text-[12px] px-2 py-0.5 rounded-full font-medium': true,
+                  'text-brand-700 bg-brand-50': c.status === 'PENDING',
+                  'text-emerald-700 bg-emerald-50': c.status === 'COMPLETED',
+                  'text-red-700 bg-red-50': c.status === 'CANCELED' || c.status === 'FAILED' || c.status === 'EXPIRED',
+                  'text-gray-500 bg-gray-50': c.status === 'SUSPENDED',
+                  'text-yellow-700 bg-yellow-50': c.status === 'PENDENTE',
+                  'text-green-700 bg-green-50': c.status === 'PAGO',
+                  'text-red-700 bg-red-50': c.status === 'VENCIDO' || c.status === 'FALHOU',
+                  'text-purple-700 bg-purple-50': c.status === 'ESTORNADO',
+                }" x-text="c.status_display"></span>
+              </td>
+              <td class="px-4 py-3.5 text-[13px] text-gray-500 hidden md:table-cell" x-text="c.created_at ? c.created_at.split('T')[0].split('-').reverse().join('/') : '-'"></td>
+              <td class="px-4 py-3.5 text-[13px] text-gray-500 hidden md:table-cell" x-text="c.due_date || '-'"></td>
+            </tr>
+          </template>
+          {% endverbatim %}
+        </tbody>
+      </table>
+      <div x-show="filteredCobrancas().length === 0" class="p-8 text-center text-gray-400">
+        Nenhuma cobranca encontrada com os filtros selecionados.
+      </div>
+    </div>
+  </div>
+</div>
+
+{{ cobrancas_json|json_script:"cobrancas-data" }}
+{{ link_stats_json|json_script:"link-stats-data" }}
+{{ boleto_stats_json|json_script:"boleto-stats-data" }}
+<script>
+function gestorCobrancasPage() {
+    return {
+        cobrancas: [],
+        search: '',
+        typeFilter: '',
+        sellerFilter: '',
+        statusFilter: '',
+        linkStats: { total: 0, pending: 0, paid: 0 },
+        boletoStats: { total_a_receber: 0, vencidos: 0, pagos_hoje: 0 },
+        init() {
+            var _p = JSON.parse(document.getElementById('cobrancas-data')?.textContent || '[]');
+            if (typeof _p === 'string') _p = JSON.parse(_p);
+            this.cobrancas = Array.isArray(_p) ? _p : [];
+            var _ls = JSON.parse(document.getElementById('link-stats-data')?.textContent || '{}');
+            if (typeof _ls === 'string') _ls = JSON.parse(_ls);
+            this.linkStats = _ls || { total: 0, pending: 0, paid: 0 };
+            var _bs = JSON.parse(document.getElementById('boleto-stats-data')?.textContent || '{}');
+            if (typeof _bs === 'string') _bs = JSON.parse(_bs);
+            this.boletoStats = _bs || { total_a_receber: 0, vencidos: 0, pagos_hoje: 0 };
+        },
+        filteredCobrancas() {
+            return this.cobrancas.filter(c => {
+                if (this.typeFilter && c.type !== this.typeFilter) return false;
+                if (this.statusFilter && c.status !== this.statusFilter) return false;
+                if (this.sellerFilter && c.seller_uuid && c.seller_uuid !== this.sellerFilter) return false;
+                if (this.search) {
+                    var q = this.search.toLowerCase();
+                    var name = (c.customer_name || '').toLowerCase();
+                    if (name.indexOf(q) === -1) return false;
+                }
+                return true;
+            });
+        },
+        filter() {},
+        resetFilters() {
+            this.search = '';
+            this.typeFilter = '';
+            this.sellerFilter = '';
+            this.statusFilter = '';
+        }
+    };
+}
+</script>
+{% endblock %}

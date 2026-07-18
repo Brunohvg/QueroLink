@@ -284,11 +284,11 @@
 <div class="surface-card mb-6">
     <div class="flex items-center justify-between mb-4">
         <div>
-            <h2 class="text-[13px] font-semibold text-gray-500 uppercase tracking-wider">Links de pagamento</h2>
-            <p class="text-[11px] text-gray-400 mt-0.5">Informativo — nao entram no calculo da comissao</p>
+            <h2 class="text-[13px] font-semibold text-gray-500 uppercase tracking-wider">Cobrancas</h2>
+            <a href="{% url 'dashboard:gestor_cobrancas' %}" class="text-[11px] text-brand-600 hover:text-brand-800 mt-0.5 inline-block">Ver todas as cobrancas &rarr;</a>
         </div>
         <div class="text-right">
-            <p class="text-[11px] text-gray-500 font-medium">Taxa de conversao</p>
+            <p class="text-[11px] text-gray-500 font-medium">Taxa de conversao (links)</p>
             <p class="text-[15px] font-semibold text-success-600"
                x-text="summary?.links_gerados > 0 ? (summary?.links_pagos / summary?.links_gerados * 100).toFixed(1) + '%' : '—'"></p>
         </div>

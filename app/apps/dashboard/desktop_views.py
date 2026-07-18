@@ -774,6 +774,107 @@ def gestor_webhooks(request):
 
 
 @login_required
+def gestor_cobrancas(request):
+    if not _check_role(request, User.Role.MANAGER, User.Role.ADMIN):
+        return redirect('dashboard:home')
+
+    tenant = request.user.tenant
+    if not tenant:
+        return redirect('dashboard:home')
+
+    from app.apps.orders.models import Order
+    from app.apps.receivables.models import Boleto
+    from app.apps.sellers.models import Seller as SellerModel
+    from app.apps.accounts.models import tenant_has_feature
+
+    orders = Order.objects.filter(
+        tenant=tenant,
+    ).select_related('seller', 'payment_link').prefetch_related(
+        'payments',
+    ).order_by('-created_at')[:100]
+
+    orders_data = []
+    for o in orders:
+        payment = o.payments.first()
+        link = o.payment_link if hasattr(o, 'payment_link') else None
+        refusal = payment.refusal_reason if payment else None
+        try:
+            customer_name = o.customer_name
+        except Exception:
+            customer_name = ''
+        orders_data.append({
+            'uuid': str(o.uuid),
+            'type': 'link',
+            'type_display': 'Link de Pagamento',
+            'customer_name': customer_name,
+            'amount_cents': o.total_amount,
+            'status': o.status,
+            'status_display': o.status_display_pt,
+            'seller_name': o.seller.name if o.seller else '-',
+            'seller_uuid': str(o.seller.uuid) if o.seller else '',
+            'refusal_reason': refusal,
+            'created_at': o.created_at.isoformat(),
+            'due_date': None,
+            'paid_at': payment.paid_at.isoformat() if (payment and payment.paid_at) else None,
+            'detail_url': f'/dashboard/gestor/links/{o.uuid}/',
+        })
+
+    has_boletos = tenant_has_feature(tenant, 'boletos')
+    boletos_data = []
+    boleto_stats = {}
+    if has_boletos:
+        boletos_qs = Boleto.objects.filter(tenant=tenant).select_related(
+            'seller', 'created_by',
+        ).order_by('-created_at')[:100]
+
+        for b in boletos_qs:
+            boletos_data.append({
+                'uuid': str(b.uuid),
+                'type': 'boleto',
+                'type_display': 'Boleto',
+                'customer_name': b.payer_name if hasattr(b, 'payer_name') else '',
+                'amount_cents': b.amount_cents,
+                'status': b.status,
+                'status_display': b.get_status_display(),
+                'seller_name': b.seller.name,
+                'seller_uuid': '',
+                'refusal_reason': b.operation_error_message or '',
+                'created_at': b.created_at.isoformat(),
+                'due_date': b.due_date.isoformat(),
+                'paid_at': b.paid_at.isoformat() if b.paid_at else None,
+                'detail_url': f'/dashboard/gestor/boletos/{b.uuid}/',
+            })
+
+        today = timezone.localdate()
+        boleto_stats = {
+            'total_a_receber': boletos_qs.filter(status=Boleto.Status.PENDENTE).count(),
+            'vencidos': boletos_qs.filter(status=Boleto.Status.PENDENTE, due_date__lt=today).count(),
+            'pagos_hoje': boletos_qs.filter(status=Boleto.Status.PAGO, paid_at__date=today).count(),
+        }
+
+    cobrancas = orders_data + boletos_data
+    cobrancas.sort(key=lambda x: x['created_at'], reverse=True)
+
+    link_stats = {
+        'total': len(orders_data),
+        'pending': sum(1 for o in orders_data if o['status'] == 'PENDING'),
+        'paid': sum(1 for o in orders_data if o['status'] == 'COMPLETED'),
+    }
+
+    sellers = list(SellerModel.objects.filter(
+        tenant=tenant, is_active=True,
+    ).values('uuid', 'name'))
+
+    return render(request, 'dashboard/gestor/cobrancas.html', {
+        'cobrancas_json': cobrancas,
+        'sellers': sellers,
+        'has_boletos': has_boletos,
+        'link_stats_json': link_stats,
+        'boleto_stats_json': boleto_stats,
+    })
+
+
+@login_required
 def gestor_links(request):
     if not _check_role(request, User.Role.MANAGER, User.Role.ADMIN):
         return redirect('dashboard:home')
