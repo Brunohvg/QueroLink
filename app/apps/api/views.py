@@ -333,6 +333,50 @@ class SaleViewSet(viewsets.ModelViewSet):
     @action(detail=False, methods=['post'], permission_classes=[IsAuthenticated, IsManagerOrAdmin], url_path='import/preview')
     def import_preview(self, request):
         file_obj = request.FILES.get('file')
+
+        if not file_obj:
+            return Response({'error': 'Arquivo obrigatorio.'}, status=400)
+
+        # Detectar formato grade (matrix) vs lista
+        import io
+        content_bytes = file_obj.read()
+        file_obj.seek(0)
+
+        from app.apps.sales.services_matrix import detect_import_format, parse_matrix_xlsx
+        fmt = detect_import_format(content_bytes, file_obj.name)
+
+        if fmt == 'matrix':
+            # Converter matrix para formato lista temporario
+            try:
+                matrix_rows = parse_matrix_xlsx(content_bytes, request.user.tenant)
+            except ValueError as exc:
+                return Response({'error': str(exc)}, status=400)
+
+            # Criar CSV em memoria no formato lista
+            import csv
+            csv_buffer = io.StringIO()
+            writer = csv.writer(csv_buffer)
+            writer.writerow(['data', 'vendedor', 'valor', 'observacao'])
+            for row in matrix_rows:
+                val = ''
+                if row['type'] == 'sale':
+                    val = f"{row['amount_cents'] / 100:.2f}"
+                elif row['type'] == 'justification':
+                    val = row['justification']
+                writer.writerow([
+                    row['date'].isoformat(),
+                    row['seller_name'],
+                    val,
+                    '',
+                ])
+            csv_buffer.seek(0)
+
+            # Criar novo file-like object com o CSV
+            from django.core.files.base import ContentFile
+            csv_bytes = csv_buffer.getvalue().encode('utf-8-sig')
+            new_file = ContentFile(csv_bytes, name=file_obj.name.replace('.xlsx', '.csv'))
+            file_obj = new_file
+
         from app.apps.sales.services import create_import_preview
 
         try:

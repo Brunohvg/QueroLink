@@ -642,7 +642,84 @@ def gestor_vendedores(request):
 def gestor_importar_vendas(request):
     if not _check_role(request, User.Role.MANAGER, User.Role.ADMIN):
         return redirect('dashboard:home')
-    return render(request, 'dashboard/gestor/importar_vendas.html')
+
+    tenant = request.user.tenant
+    selector_ctx = {}
+    if tenant:
+        from app.apps.commissions.services import (
+            build_period_selector_context, PeriodNotFound,
+        )
+        try:
+            selector_ctx = build_period_selector_context(request, tenant)
+        except PeriodNotFound:
+            pass
+
+    return render(request, 'dashboard/gestor/importar_vendas.html', {
+        'periods': selector_ctx.get('periods', []),
+        'has_periods': selector_ctx.get('has_periods', False),
+        'selected_period': selector_ctx.get('selected_period'),
+        'selected_period_uuid': selector_ctx.get('selected_period_uuid', ''),
+    })
+
+
+@login_required
+def gestor_download_template(request):
+    if not _check_role(request, User.Role.MANAGER, User.Role.ADMIN):
+        return redirect('dashboard:home')
+
+    tenant = request.user.tenant
+    if not tenant:
+        return redirect('dashboard:home')
+
+    from django.http import HttpResponse
+    from datetime import datetime
+
+    try:
+        start_str = request.GET.get('start')
+        end_str = request.GET.get('end')
+        if start_str and end_str:
+            from datetime import datetime
+            start_date = datetime.strptime(start_str, '%Y-%m-%d').date()
+            end_date = datetime.strptime(end_str, '%Y-%m-%d').date()
+        else:
+            from app.apps.commissions.models import CommissionPeriod
+            period_uuid = request.GET.get('period_uuid')
+            if period_uuid:
+                period = CommissionPeriod.objects.get(uuid=period_uuid, tenant=tenant)
+                start_date = period.start_date
+                end_date = period.end_date
+            else:
+                hoje = timezone.localdate()
+                start_date = hoje.replace(day=1)
+                end_date = hoje
+
+        if end_date < start_date:
+            from django.contrib import messages
+            messages.error(request, 'Data final deve ser posterior a data inicial.')
+            return redirect('dashboard:gestor_importar_vendas')
+
+        max_days = 62
+        if (end_date - start_date).days > max_days:
+            from django.contrib import messages
+            messages.error(request, f'Periodo maximo de {max_days} dias.')
+            return redirect('dashboard:gestor_importar_vendas')
+
+        from app.apps.sales.services_matrix import generate_template_xlsx
+        output = generate_template_xlsx(tenant, start_date, end_date)
+
+        filename = f'modelo_vendas_{start_date.strftime("%Y%m%d")}_{end_date.strftime("%Y%m%d")}.xlsx'
+        response = HttpResponse(
+            output.read(),
+            content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        )
+        response['Content-Disposition'] = f'attachment; filename="{filename}"'
+        return response
+
+    except Exception as e:
+        logger.exception('Erro ao gerar template XLSX')
+        from django.contrib import messages
+        messages.error(request, f'Erro ao gerar template: {e}')
+        return redirect('dashboard:gestor_importar_vendas')
 
 
 @login_required

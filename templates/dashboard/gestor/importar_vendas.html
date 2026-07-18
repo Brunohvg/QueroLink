@@ -10,18 +10,18 @@
       </a>
       <div>
         <h1 class="font-display text-[20px] font-bold text-gray-900 tracking-tight">Importar vendas e justificativas</h1>
-        <p class="text-[13px] text-gray-500">Revise cada classificação antes de confirmar</p>
+        <p class="text-[13px] text-gray-500">Revise cada classificacao antes de confirmar</p>
       </div>
     </div>
   </div>
 
-  <div class="flex items-center justify-center gap-2 mb-8" aria-label="Etapas da importação">
+  <div class="flex items-center justify-center gap-2 mb-8" aria-label="Etapas da importacao">
     <template x-for="(label, idx) in ['Arquivo', 'Preview', 'Confirmar', 'Resultado']" :key="label">
       <div class="flex items-center gap-2">
         <div class="flex items-center gap-1.5">
           <span class="w-7 h-7 rounded-full flex items-center justify-center text-[12px] font-bold border-2"
                 :class="step > idx + 1 ? 'bg-brand-600 text-white border-brand-600' : step === idx + 1 ? 'border-gray-900 text-gray-900' : 'border-gray-200 text-gray-400'"
-                x-text="step > idx + 1 ? '✓' : idx + 1"></span>
+                x-text="step > idx + 1 ? '\u2713' : idx + 1"></span>
           <span class="text-[13px] font-medium hidden sm:inline" :class="step === idx + 1 ? 'text-gray-900' : 'text-gray-400'" x-text="label"></span>
         </div>
         <span x-show="idx < 3" class="w-5 sm:w-10 h-0.5" :class="step > idx + 1 ? 'bg-brand-600' : 'bg-gray-200'"></span>
@@ -30,8 +30,53 @@
   </div>
 
   <section x-show="step === 1" class="surface-card">
-    <p class="text-[13px] text-gray-600 mb-2">Envie CSV UTF-8 ou XLSX com as colunas <strong>data</strong>, <strong>vendedor</strong> e <strong>valor ou ocorrência</strong>.</p>
-    <p class="text-[12px] text-gray-400 mb-4">Até 5 MB e 500 linhas. Ocorrências conhecidas serão apenas sugeridas como justificativas.</p>
+    <div class="flex items-center justify-between mb-4">
+      <div>
+        <p class="text-[13px] text-gray-600 mb-2">Envie CSV UTF-8 ou XLSX com as colunas <strong>data</strong>, <strong>vendedor</strong> e <strong>valor ou ocorrencia</strong>.</p>
+        <p class="text-[12px] text-gray-400 mb-4">Ate 5 MB e 500 linhas. Ocorrencias conhecidas serao apenas sugeridas como justificativas.</p>
+      </div>
+      <div class="flex-shrink-0 flex items-center gap-2" x-data="{modelOpen:false}" @click.outside="modelOpen=false">
+        <button @click="modelOpen=!modelOpen"
+                class="inline-flex items-center gap-1.5 px-3 py-2 bg-gray-900 hover:bg-gray-800 text-white text-sm font-medium rounded-xl transition-colors shadow-sm">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+          Baixar modelo preenchido
+        </button>
+        <div x-show="modelOpen" x-cloak x-transition
+             class="absolute right-6 top-16 mt-2 w-80 bg-white rounded-xl border border-gray-100 shadow-lg z-20 p-4">
+          <p class="text-[13px] font-semibold text-gray-700 mb-3">Selecione o periodo</p>
+          {% if has_periods %}
+          <div class="space-y-2 mb-3">
+            <label class="flex items-center gap-2 text-sm">
+              <input type="radio" x-model="templatePeriodType" value="periodo" checked
+                     class="text-brand-600 focus:ring-brand-500">
+              Competencia
+            </label>
+            <select x-model="templatePeriodUuid" x-show="templatePeriodType==='periodo'"
+                    class="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm">
+              {% for p in periods %}
+              <option value="{{ p.uuid }}">{{ p.display_label }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          {% endif %}
+          <div class="space-y-2 mb-3">
+            <label class="flex items-center gap-2 text-sm">
+              <input type="radio" x-model="templatePeriodType" value="custom"
+                     class="text-brand-600 focus:ring-brand-500">
+              Periodo personalizado
+            </label>
+            <div x-show="templatePeriodType==='custom'" class="grid grid-cols-2 gap-2">
+              <input type="date" x-model="templateStart" class="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm" placeholder="Inicio">
+              <input type="date" x-model="templateEnd" class="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm" placeholder="Fim">
+            </div>
+          </div>
+          <a :href="templateUrl()"
+             class="block w-full text-center px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white text-sm font-medium rounded-xl transition-colors">
+            Baixar modelo XLSX
+          </a>
+        </div>
+      </div>
+    </div>
     <div class="border-2 border-dashed rounded-2xl p-8 text-center transition-colors"
          :class="dragOver ? 'border-brand-400 bg-brand-50/30' : 'border-gray-200 hover:border-brand-300'"
          @dragover.prevent="dragOver=true" @dragleave.prevent="dragOver=false" @drop.prevent="handleDrop($event); dragOver=false">
@@ -162,6 +207,19 @@ function importPage() {
     step: 1, filename: '', file: null, batchUuid: '', fileHash: '', dragOver: false,
     loading: false, importing: false, previewError: '', confirmError: '', results: [],
     counts: {}, alreadyImported: false, forceReimport: false, result: null,
+    templatePeriodType: '{% if has_periods %}periodo{% else %}custom{% endif %}',
+    templatePeriodUuid: '{{ selected_period_uuid }}',
+    templateStart: '', templateEnd: '',
+    templateDownloadUrl: '{% url "dashboard:gestor_download_template" %}',
+    templateUrl() {
+      if (this.templatePeriodType === 'periodo' && this.templatePeriodUuid) {
+        return this.templateDownloadUrl + '?period_uuid=' + this.templatePeriodUuid;
+      }
+      if (this.templatePeriodType === 'custom' && this.templateStart && this.templateEnd) {
+        return this.templateDownloadUrl + '?start=' + this.templateStart + '&end=' + this.templateEnd;
+      }
+      return '#';
+    },
     summaryCards: [
       {key:'SALE',label:'Vendas',color:'text-emerald-700'}, {key:'JUSTIFICATION_SUGGESTION',label:'Justificativas',color:'text-blue-700'},
       {key:'DUPLICATE',label:'Duplicadas',color:'text-amber-700'}, {key:'CONFLICT',label:'Conflitos',color:'text-purple-700'},
