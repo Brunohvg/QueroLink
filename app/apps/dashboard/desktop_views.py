@@ -802,8 +802,8 @@ def gestor_cobrancas(request):
     from app.apps.sellers.models import Seller as SellerModel
     from app.apps.accounts.models import tenant_has_feature
 
-    can_create_links = bool(tenant.pagarme_configured)
-    can_create_boletos = tenant_has_feature(tenant, 'boletos') and tenant.pagarme_configured
+    can_create_links = True
+    can_create_boletos = tenant_has_feature(tenant, 'boletos')
 
     orders = Order.objects.filter(
         tenant=tenant,
