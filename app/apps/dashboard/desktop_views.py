@@ -866,6 +866,11 @@ def gestor_cobrancas(request):
     cobrancas = orders_data + boletos_data
     cobrancas.sort(key=lambda x: x['created_at'], reverse=True)
 
+    logger.info(
+        "gestor_cobrancas: tenant=%s orders=%d boletos=%d total=%d",
+        tenant.pk, len(orders_data), len(boletos_data), len(cobrancas),
+    )
+
     today = timezone.localdate()
     link_awaiting = Order.objects.filter(
         tenant=tenant, status='PENDING',
@@ -916,6 +921,79 @@ def gestor_cobrancas(request):
             'vencidos': boleto_overdue,
             'pagos': boleto_paid,
         },
+    })
+
+
+@login_required
+def gestor_link_new(request):
+    if not _check_role(request, User.Role.MANAGER, User.Role.ADMIN):
+        return redirect('dashboard:home')
+
+    tenant = request.user.tenant
+    if not tenant:
+        return redirect('dashboard:home')
+
+    if request.method == 'POST':
+        from app.apps.orders.services import create_payment_link
+        from app.apps.sellers.models import Seller
+
+        raw_value = request.POST.get('amount', '').replace('R$', '').replace(',', '.').strip()
+        try:
+            total_amount = int(round(float(raw_value) * 100))
+        except (ValueError, TypeError):
+            messages.error(request, 'Valor invalido.')
+            return redirect('dashboard:gestor_link_new')
+
+        if total_amount < 100:
+            messages.error(request, 'Valor minimo e R$ 1,00.')
+            return redirect('dashboard:gestor_link_new')
+
+        customer_name = request.POST.get('customer_name', '').strip()
+        if not customer_name:
+            messages.error(request, 'Nome do cliente e obrigatorio.')
+            return redirect('dashboard:gestor_link_new')
+
+        seller_uuid = request.POST.get('seller_uuid', '')
+        if not seller_uuid:
+            messages.error(request, 'Selecione um vendedor.')
+            return redirect('dashboard:gestor_link_new')
+
+        try:
+            seller = Seller.objects.get(uuid=seller_uuid, tenant=tenant)
+        except Seller.DoesNotExist:
+            messages.error(request, 'Vendedor nao encontrado.')
+            return redirect('dashboard:gestor_link_new')
+
+        installments_str = request.POST.get('installments', '1')
+        try:
+            installments = int(installments_str)
+            installments = max(1, min(installments, 12))
+        except (ValueError, TypeError):
+            installments = 1
+
+        try:
+            order, link_url = create_payment_link(
+                tenant=tenant, seller=seller,
+                customer_name=customer_name,
+                amount_cents=total_amount,
+                installments=installments,
+            )
+            from app.apps.audit.utils import log_action
+            log_action(request, 'order.link_created', instance=order)
+            messages.success(request, 'Link de pagamento gerado com sucesso!')
+            return redirect('dashboard:gestor_link_detalhe', order_uuid=order.uuid)
+        except Exception:
+            logger.exception('Erro ao criar link de pagamento')
+            messages.error(request, 'Erro ao criar link. Tente novamente.')
+            return redirect('dashboard:gestor_link_new')
+
+    from app.apps.sellers.models import Seller as SellerModel
+    sellers = list(SellerModel.objects.filter(
+        tenant=tenant, is_active=True,
+    ).values('uuid', 'name').order_by('name'))
+
+    return render(request, 'dashboard/gestor/links/new.html', {
+        'sellers': sellers,
     })
 
 

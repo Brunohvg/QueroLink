@@ -27,6 +27,7 @@ urlpatterns = [
     path('gestor/webhooks/', desktop_views.gestor_webhooks, name='gestor_webhooks'),
     path('gestor/cobrancas/', desktop_views.gestor_cobrancas, name='gestor_cobrancas'),
     path('gestor/links/', desktop_views.gestor_links, name='gestor_links'),
+    path('gestor/links/novo/', desktop_views.gestor_link_new, name='gestor_link_new'),
     path('gestor/links/<uuid:order_uuid>/', desktop_views.gestor_link_detalhe, name='gestor_link_detalhe'),
     path('gestor/links/<uuid:order_uuid>/cancelar/', desktop_views.gestor_link_cancelar, name='gestor_link_cancelar'),
     path('gestor/links/<uuid:order_uuid>/verificar-pagamento/', desktop_views.gestor_link_verificar_pagamento, name='gestor_link_verificar_pagamento'),
