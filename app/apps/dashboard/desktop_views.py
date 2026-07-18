@@ -918,29 +918,36 @@ def gestor_cobrancas(request):
         'seller', 'created_by',
     ).order_by('-created_at')[:100]
 
-    for b in boletos_qs:
-        seller_name = b.seller.name if b.seller else '-'
-        try:
-            customer_name = b.payer_name
-        except Exception:
-            customer_name = seller_name
-        boletos_data.append({
-            'uuid': str(b.uuid),
-            'type': 'boleto',
-            'type_display': 'Boleto',
-            'customer_name': customer_name,
-            'amount_cents': b.amount_cents,
-            'paid_amount_cents': b.paid_amount_cents,
-            'status': b.status,
-            'status_display': b.get_status_display(),
-            'seller_name': seller_name,
-            'seller_uuid': str(b.seller.uuid) if b.seller else '',
-            'refusal_reason': b.operation_error_message or '',
-            'created_at': b.created_at.isoformat(),
-            'due_date': b.due_date.isoformat(),
-            'paid_at': b.paid_at.isoformat() if b.paid_at else None,
-            'detail_url': f'/dashboard/gestor/boletos/{b.uuid}/',
-        })
+    try:
+        for b in boletos_qs:
+            seller_name = b.seller.name if b.seller else '-'
+            try:
+                customer_name = b.payer_name
+            except Exception:
+                customer_name = seller_name
+            boletos_data.append({
+                'uuid': str(b.uuid),
+                'type': 'boleto',
+                'type_display': 'Boleto',
+                'customer_name': customer_name,
+                'amount_cents': b.amount_cents,
+                'paid_amount_cents': b.paid_amount_cents,
+                'status': b.status,
+                'status_display': b.get_status_display(),
+                'seller_name': seller_name,
+                'seller_uuid': str(b.seller.uuid) if b.seller else '',
+                'refusal_reason': b.operation_error_message or '',
+                'created_at': b.created_at.isoformat(),
+                'due_date': b.due_date.isoformat(),
+                'paid_at': b.paid_at.isoformat() if b.paid_at else None,
+                'detail_url': f'/dashboard/gestor/boletos/{b.uuid}/',
+            })
+    except Exception:
+        logger.warning(
+            'Boleto query failed for tenant %s (missing columns?)', tenant.pk,
+            exc_info=True,
+        )
+        boletos_data = []
 
     cobrancas = orders_data + boletos_data
     cobrancas.sort(key=lambda x: x['created_at'], reverse=True)
@@ -964,13 +971,17 @@ def gestor_cobrancas(request):
     boleto_awaiting = 0
     boleto_paid = 0
     boleto_overdue = 0
-    boleto_base = Boleto.objects.filter(tenant=tenant)
-    boleto_awaiting = boleto_base.filter(status='PENDENTE', due_date__gte=today).count()
-    boleto_overdue = boleto_base.filter(status__in=('PENDENTE', 'VENCIDO'), due_date__lt=today).count()
-    boleto_paid = boleto_base.filter(status='PAGO').count()
-    boleto_canceled = boleto_base.filter(
-        status__in=('CANCELADO', 'FALHOU', 'ESTORNADO', 'CANCEL_PEND', 'CRIANDO'),
-    ).count()
+    boleto_canceled = 0
+    try:
+        boleto_base = Boleto.objects.filter(tenant=tenant)
+        boleto_awaiting = boleto_base.filter(status='PENDENTE', due_date__gte=today).count()
+        boleto_overdue = boleto_base.filter(status__in=('PENDENTE', 'VENCIDO'), due_date__lt=today).count()
+        boleto_paid = boleto_base.filter(status='PAGO').count()
+        boleto_canceled = boleto_base.filter(
+            status__in=('CANCELADO', 'FALHOU', 'ESTORNADO', 'CANCEL_PEND', 'CRIANDO'),
+        ).count()
+    except Exception:
+        logger.warning('Boleto stats query failed for tenant %s', tenant.pk)
 
     unified_stats = {
         'aguardando': link_awaiting + boleto_awaiting,
