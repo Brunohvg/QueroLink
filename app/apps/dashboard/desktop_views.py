@@ -845,11 +845,15 @@ def gestor_cobrancas(request):
 
         for b in boletos_qs:
             seller_name = b.seller.name if b.seller else '-'
+            try:
+                customer_name = b.payer_name
+            except Exception:
+                customer_name = seller_name
             boletos_data.append({
                 'uuid': str(b.uuid),
                 'type': 'boleto',
                 'type_display': 'Boleto',
-                'customer_name': seller_name,
+                'customer_name': customer_name,
                 'amount_cents': b.amount_cents,
                 'paid_amount_cents': b.paid_amount_cents,
                 'status': b.status,
