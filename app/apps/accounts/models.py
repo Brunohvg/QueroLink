@@ -200,7 +200,7 @@ def tenant_has_feature(tenant, feature_name):
     features = getattr(settings, 'PLAN_FEATURES', {}).get(tenant.plan, {})
     plan_has_feature = features.get(feature_name, False)
     if feature_name == 'boletos':
-        return bool(plan_has_feature and tenant.receivables_enabled)
+        return bool(plan_has_feature)
     return plan_has_feature
 
 
