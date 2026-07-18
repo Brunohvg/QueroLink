@@ -42,7 +42,7 @@ class Migration(migrations.Migration):
             name='CustomerActivity',
             fields=[
                 ('uuid', models.UUIDField(default=uuid.uuid4, editable=False, primary_key=True, serialize=False)),
-                ('source', models.CharField(choices=[('BOLETO', 'Boleto')], max_length=20)),
+                ('source', models.CharField(choices=[('BOLETO', 'Boleto'), ('PAYMENT_LINK', 'Payment Link')], max_length=20)),
                 ('source_uuid', models.UUIDField()),
                 ('seller_name', models.CharField(blank=True, max_length=150)),
                 ('amount_cents', models.PositiveIntegerField(default=0)),
@@ -79,5 +79,9 @@ class Migration(migrations.Migration):
         migrations.AddConstraint(
             model_name='customeractivity',
             constraint=models.UniqueConstraint(fields=('tenant', 'source', 'source_uuid'), name='uniq_customer_activity_source'),
+        ),
+        migrations.AddConstraint(
+            model_name='customeridentityconflict',
+            constraint=models.UniqueConstraint(fields=('tenant', 'identifier_type', 'identifier_hash', 'selected_customer', 'conflicting_customer'), name='uniq_customer_identity_conflict'),
         ),
     ]
