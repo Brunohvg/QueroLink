@@ -102,6 +102,19 @@ def gestor_home(request):
     from app.apps.billing.models import Subscription
     sub = Subscription.objects.filter(tenant=tenant).first()
 
+    boleto_home_stats = {}
+    from app.apps.accounts.models import tenant_has_feature
+    if tenant_has_feature(tenant, 'boletos'):
+        from app.apps.receivables.models import Boleto
+        boleto_base = Boleto.objects.filter(tenant=tenant)
+        boleto_home_stats = {
+            'a_receber': boleto_base.filter(status='PENDENTE', due_date__gte=hoje).count(),
+            'vencidos': boleto_base.filter(status__in=('PENDENTE', 'VENCIDO'), due_date__lt=hoje).count(),
+            'pagos_mes': boleto_base.filter(
+                status='PAGO', paid_at__month=hoje.month, paid_at__year=hoje.year,
+            ).count(),
+        }
+
     return render(request, 'dashboard/gestor/home.html', {
         'total_mes': data['total_vendido'],
         'total_mes_fmt': _fmt(data['total_vendido']),
@@ -129,6 +142,8 @@ def gestor_home(request):
         'has_periods': selector_ctx['has_periods'],
         'selected_period': selector_ctx['selected_period'],
         'selected_period_uuid': selector_ctx['selected_period_uuid'],
+        'boleto_home_stats': boleto_home_stats,
+        'has_boletos_home': bool(boleto_home_stats),
     })
 
 
@@ -787,9 +802,8 @@ def gestor_cobrancas(request):
     from app.apps.sellers.models import Seller as SellerModel
     from app.apps.accounts.models import tenant_has_feature
 
-    pagarme_ok = tenant.pagarme_configured
-    can_create_links = pagarme_ok
-    can_create_boletos = tenant_has_feature(tenant, 'boletos') and pagarme_ok
+    can_create_links = bool(tenant.pagarme_configured)
+    can_create_boletos = tenant_has_feature(tenant, 'boletos') and tenant.pagarme_configured
 
     orders = Order.objects.filter(
         tenant=tenant,
@@ -798,7 +812,6 @@ def gestor_cobrancas(request):
     ).order_by('-created_at')[:100]
 
     orders_data = []
-    link_pending = link_paid = link_canceled = 0
     for o in orders:
         payment = o.payments.first()
         refusal = payment.refusal_reason if payment else None
@@ -822,58 +835,68 @@ def gestor_cobrancas(request):
             'paid_at': payment.paid_at.isoformat() if (payment and payment.paid_at) else None,
             'detail_url': f'/dashboard/gestor/links/{o.uuid}/',
         })
-        if o.status == 'PENDING':
-            link_pending += 1
-        elif o.status == 'COMPLETED':
-            link_paid += 1
-        elif o.status in ('CANCELED', 'FAILED', 'EXPIRED'):
-            link_canceled += 1
 
+    has_boletos = tenant_has_feature(tenant, 'boletos')
     boletos_data = []
-    boleto_pending = boleto_paid = boleto_overdue = boleto_canceled = 0
-    boletos_qs = Boleto.objects.filter(tenant=tenant).select_related(
-        'seller', 'created_by',
-    ).order_by('-created_at')[:100]
+    if has_boletos:
+        boletos_qs = Boleto.objects.filter(tenant=tenant).select_related(
+            'seller', 'created_by',
+        ).order_by('-created_at')[:100]
 
-    records_span = boletos_qs.only('created_at')[:1]
-    for b in boletos_qs:
-        boletos_data.append({
-            'uuid': str(b.uuid),
-            'type': 'boleto',
-            'type_display': 'Boleto',
-            'customer_name': b.payer_name,
-            'amount_cents': b.amount_cents,
-            'status': b.status,
-            'status_display': b.get_status_display(),
-            'seller_name': b.seller.name,
-            'seller_uuid': str(b.seller.uuid) if b.seller else '',
-            'refusal_reason': b.operation_error_message or '',
-            'created_at': b.created_at.isoformat(),
-            'due_date': b.due_date.isoformat(),
-            'paid_at': b.paid_at.isoformat() if b.paid_at else None,
-            'detail_url': f'/dashboard/gestor/boletos/{b.uuid}/',
-        })
-        if b.status == 'PENDENTE':
-            today = timezone.localdate()
-            if b.due_date and b.due_date < today:
-                boleto_overdue += 1
-            else:
-                boleto_pending += 1
-        elif b.status == 'PAGO':
-            boleto_paid += 1
-        elif b.status in ('CANCELADO', 'FALHOU', 'VENCIDO', 'ESTORNADO', 'CANCEL_PEND'):
-            boleto_canceled += 1
+        for b in boletos_qs:
+            seller_name = b.seller.name if b.seller else '-'
+            boletos_data.append({
+                'uuid': str(b.uuid),
+                'type': 'boleto',
+                'type_display': 'Boleto',
+                'customer_name': seller_name,
+                'amount_cents': b.amount_cents,
+                'paid_amount_cents': b.paid_amount_cents,
+                'status': b.status,
+                'status_display': b.get_status_display(),
+                'seller_name': seller_name,
+                'seller_uuid': str(b.seller.uuid) if b.seller else '',
+                'refusal_reason': b.operation_error_message or '',
+                'created_at': b.created_at.isoformat(),
+                'due_date': b.due_date.isoformat(),
+                'paid_at': b.paid_at.isoformat() if b.paid_at else None,
+                'detail_url': f'/dashboard/gestor/boletos/{b.uuid}/',
+            })
 
     cobrancas = orders_data + boletos_data
     cobrancas.sort(key=lambda x: x['created_at'], reverse=True)
 
+    today = timezone.localdate()
+    link_awaiting = Order.objects.filter(
+        tenant=tenant, status='PENDING',
+    ).count()
+    link_paid = Order.objects.filter(
+        tenant=tenant, status='COMPLETED',
+    ).count()
+    link_canceled = Order.objects.filter(
+        tenant=tenant, status__in=('CANCELED', 'EXPIRED'),
+    ).count()
+
+    boleto_awaiting = 0
+    boleto_paid = 0
+    boleto_overdue = 0
+    boleto_canceled = 0
+    if has_boletos:
+        boleto_base = Boleto.objects.filter(tenant=tenant)
+        boleto_awaiting = boleto_base.filter(status='PENDENTE', due_date__gte=today).count()
+        boleto_overdue = boleto_base.filter(status__in=('PENDENTE', 'VENCIDO'), due_date__lt=today).count()
+        boleto_paid = boleto_base.filter(status='PAGO').count()
+        boleto_canceled = boleto_base.filter(
+            status__in=('CANCELADO', 'FALHOU', 'ESTORNADO', 'CANCEL_PEND', 'CRIANDO'),
+        ).count()
+
     unified_stats = {
-        'aguardando': link_pending + boleto_pending + boleto_overdue,
+        'aguardando': link_awaiting + boleto_awaiting,
         'pagas': link_paid + boleto_paid,
         'vencidas': boleto_overdue,
         'canceladas': link_canceled + boleto_canceled,
-        'total_links': len(orders_data),
-        'total_boletos': len(boletos_data),
+        'total_links': link_awaiting + link_paid + link_canceled,
+        'total_boletos': boleto_awaiting + boleto_paid + boleto_overdue + boleto_canceled,
     }
 
     sellers = list(SellerModel.objects.filter(
@@ -884,9 +907,15 @@ def gestor_cobrancas(request):
         'cobrancas_json': cobrancas,
         'sellers': sellers,
         'can_create_links': can_create_links,
-        'can_create_boletos': can_create_boletos,
+        'can_create_boletos': can_create_boletos and has_boletos,
         'unified_stats_json': unified_stats,
-        'pagarme_configured': pagarme_ok,
+        'pagarme_configured': tenant.pagarme_configured,
+        'has_boletos': has_boletos,
+        'boleto_stats_json': {
+            'a_receber': boleto_awaiting + boleto_overdue,
+            'vencidos': boleto_overdue,
+            'pagos': boleto_paid,
+        },
     })
 
 

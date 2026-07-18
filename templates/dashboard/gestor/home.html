@@ -295,24 +295,41 @@
     </div>
     <div class="grid grid-cols-4 gap-4">
         <div class="bg-gray-50 rounded-xl p-3">
-            <p class="text-[11px] text-gray-500 font-semibold uppercase tracking-wider">Gerados</p>
+            <p class="text-[11px] text-gray-500 font-semibold uppercase tracking-wider">Links gerados</p>
             <p class="text-[20px] font-bold text-gray-800" x-text="summary?.links_gerados || 0"></p>
             <p class="text-[11px] text-gray-400 mt-0.5" x-text="formatMoneyBRL(summary?.valor_gerado_links || 0)"></p>
         </div>
         <div class="bg-success-50 rounded-xl p-3">
-            <p class="text-[11px] text-success-600 font-semibold uppercase tracking-wider">Pagos</p>
+            <p class="text-[11px] text-success-600 font-semibold uppercase tracking-wider">Links pagos</p>
             <p class="text-[20px] font-bold text-success-700" x-text="summary?.links_pagos || 0"></p>
             <p class="text-[11px] text-success-600/70 mt-0.5" x-text="formatMoneyBRL(summary?.valor_pago_links || 0)"></p>
         </div>
         <div class="bg-warning-50 rounded-xl p-3">
-            <p class="text-[11px] text-warning-600 font-semibold uppercase tracking-wider">Pendentes</p>
+            <p class="text-[11px] text-warning-600 font-semibold uppercase tracking-wider">Links pendentes</p>
             <p class="text-[20px] font-bold text-warning-700" x-text="summary?.links_pendentes || 0"></p>
         </div>
         <div class="bg-danger-50 rounded-xl p-3">
-            <p class="text-[11px] text-danger-600 font-semibold uppercase tracking-wider">Recusados</p>
+            <p class="text-[11px] text-danger-600 font-semibold uppercase tracking-wider">Links recusados</p>
             <p class="text-[20px] font-bold text-danger-700" x-text="summary?.links_recusados || 0"></p>
         </div>
     </div>
+    {% if has_boletos_home %}
+    <div class="grid grid-cols-4 gap-4 mt-3">
+        <div class="bg-violet-50 rounded-xl p-3">
+            <p class="text-[11px] text-violet-600 font-semibold uppercase tracking-wider">Boletos a receber</p>
+            <p class="text-[20px] font-bold text-violet-700">{{ boleto_home_stats.a_receber }}</p>
+        </div>
+        <div class="bg-red-50 rounded-xl p-3">
+            <p class="text-[11px] text-red-600 font-semibold uppercase tracking-wider">Boletos vencidos</p>
+            <p class="text-[20px] font-bold text-red-700">{{ boleto_home_stats.vencidos }}</p>
+        </div>
+        <div class="bg-green-50 rounded-xl p-3">
+            <p class="text-[11px] text-green-600 font-semibold uppercase tracking-wider">Boletos pagos (mes)</p>
+            <p class="text-[20px] font-bold text-green-700">{{ boleto_home_stats.pagos_mes }}</p>
+        </div>
+        <div class="bg-gray-50 rounded-xl p-3"></div>
+    </div>
+    {% endif %}
 </div>
 
 <div x-show="summary?.sellers_inativos?.length" class="surface-card border-l-4 border-l-warning-500 mb-6">

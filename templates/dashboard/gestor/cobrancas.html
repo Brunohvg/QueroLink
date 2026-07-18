@@ -9,7 +9,7 @@
         <h1 class="font-display text-[22px] font-bold text-gray-900 tracking-tight">Cobrancas</h1>
         <p class="text-[13px] text-gray-500 mt-0.5">Acompanhe links de pagamento, boletos e recebimentos em um so lugar.</p>
       </div>
-      <div class="flex items-center gap-2" x-data="{open:false}" @click.away="open=false">
+      <div class="flex items-center gap-2" x-data="{open:false}" @click.outside="open=false">
         {% if can_create_links or can_create_boletos %}
         <div class="relative">
           <button @click="open=!open"
@@ -36,14 +36,14 @@
             {% endif %}
             {% if not pagarme_configured %}
             <div class="px-4 py-2 text-xs text-gray-400 italic">
-              Configure a integracao de pagamento para emitir novas cobrancas.
+              Configure a integracao de pagamento para emitir cobrancas.
             </div>
             {% endif %}
           </div>
         </div>
         {% elif not pagarme_configured %}
         <div class="text-xs text-gray-400 italic px-3 py-2 bg-gray-50 rounded-lg">
-          Configure a integracao de pagamento para emitir novas cobrancas.
+          Configure a integracao de pagamento para emitir cobrancas.
         </div>
         {% endif %}
       </div>
@@ -52,31 +52,31 @@
     <div class="flex gap-4 mt-3 text-sm">
       <div class="bg-white rounded-xl px-4 py-2 shadow-sm border border-gray-100">
         <span class="text-gray-500">Aguardando pagamento</span>
-        <span class="ml-2 font-semibold text-brand-600" x-text="stats.aguardando"></span>
+        <span class="ml-2 font-semibold text-brand-600" x-text="kpi.aguardando"></span>
       </div>
       <div class="bg-white rounded-xl px-4 py-2 shadow-sm border border-gray-100">
         <span class="text-gray-500">Pagas</span>
-        <span class="ml-2 font-semibold text-green-600" x-text="stats.pagas"></span>
+        <span class="ml-2 font-semibold text-green-600" x-text="kpi.pagas"></span>
       </div>
       <div class="bg-white rounded-xl px-4 py-2 shadow-sm border border-gray-100">
         <span class="text-gray-500">Vencidas</span>
-        <span class="ml-2 font-semibold text-red-600" x-text="stats.vencidas"></span>
+        <span class="ml-2 font-semibold text-red-600" x-text="kpi.vencidas"></span>
       </div>
       <div class="bg-white rounded-xl px-4 py-2 shadow-sm border border-gray-100">
-        <span class="text-gray-500">Canceladas</span>
-        <span class="ml-2 font-semibold text-gray-500" x-text="stats.canceladas"></span>
+        <span class="text-gray-500">Canceladas / Estornadas</span>
+        <span class="ml-2 font-semibold text-gray-500" x-text="kpi.canceladas"></span>
       </div>
     </div>
   </div>
 
   <div class="flex items-center gap-1 mb-4">
-    <button @click="typeFilter=''; filter()"
+    <button @click="typeFilter=''"
             :class="!typeFilter ? 'bg-brand-50 text-brand-700' : 'text-gray-500 hover:bg-gray-50'"
             class="px-4 py-2 rounded-lg text-sm font-medium transition">Todas</button>
-    <button @click="typeFilter='link'; filter()"
+    <button @click="typeFilter='link'"
             :class="typeFilter==='link' ? 'bg-brand-50 text-brand-700' : 'text-gray-500 hover:bg-gray-50'"
             class="px-4 py-2 rounded-lg text-sm font-medium transition">Links de pagamento</button>
-    <button @click="typeFilter='boleto'; filter()"
+    <button @click="typeFilter='boleto'"
             :class="typeFilter==='boleto' ? 'bg-brand-50 text-brand-700' : 'text-gray-500 hover:bg-gray-50'"
             class="px-4 py-2 rounded-lg text-sm font-medium transition">Boletos</button>
   </div>
@@ -85,12 +85,12 @@
     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
       <div>
         <label class="block text-[11px] font-semibold text-gray-400 uppercase tracking-wider mb-1.5">Buscar cliente</label>
-        <input type="text" x-model="search" @input="filter()" placeholder="Nome do cliente..."
+        <input type="text" x-model="search" placeholder="Nome do cliente..."
                class="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-[13px] outline-none transition-all focus:border-brand-400 focus:ring-2 focus:ring-brand-100">
       </div>
       <div>
         <label class="block text-[11px] font-semibold text-gray-400 uppercase tracking-wider mb-1.5">Vendedor</label>
-        <select x-model="sellerFilter" @change="filter()" class="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-[13px] outline-none transition-all focus:border-brand-400 focus:ring-2 focus:ring-brand-100">
+        <select x-model="sellerFilter" class="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-[13px] outline-none transition-all focus:border-brand-400 focus:ring-2 focus:ring-brand-100">
           <option value="">Todos</option>
           {% for s in sellers %}
           <option value="{{ s.uuid }}">{{ s.name }}</option>
@@ -99,19 +99,20 @@
       </div>
       <div>
         <label class="block text-[11px] font-semibold text-gray-400 uppercase tracking-wider mb-1.5">Status</label>
-        <select x-model="statusFilter" @change="filter()" class="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-[13px] outline-none transition-all focus:border-brand-400 focus:ring-2 focus:ring-brand-100">
+        <select x-model="statusFilter" class="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-[13px] outline-none transition-all focus:border-brand-400 focus:ring-2 focus:ring-brand-100">
           <option value="">Todos</option>
-          <optgroup label="Links">
+          <optgroup label="Links de pagamento">
             <option value="PENDING">Pendente</option>
             <option value="COMPLETED">Pago</option>
             <option value="EXPIRED">Expirado</option>
             <option value="CANCELED">Cancelado</option>
-            <option value="FAILED">Falha</option>
           </optgroup>
           <optgroup label="Boletos">
+            <option value="CRIANDO">Criando</option>
             <option value="PENDENTE">Pendente</option>
             <option value="PAGO">Pago</option>
             <option value="VENCIDO">Vencido</option>
+            <option value="CANCEL_PEND">Cancelamento pendente</option>
             <option value="CANCELADO">Cancelado</option>
             <option value="ESTORNADO">Estornado</option>
             <option value="FALHOU">Falhou</option>
@@ -120,12 +121,13 @@
       </div>
       <div>
         <label class="block text-[11px] font-semibold text-gray-400 uppercase tracking-wider mb-1.5">De</label>
-        <input type="date" x-model="dateStart" @change="filter()"
+        <input type="date" x-model="dateStart"
                class="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-[13px] outline-none transition-all focus:border-brand-400 focus:ring-2 focus:ring-brand-100">
       </div>
       <div>
         <label class="block text-[11px] font-semibold text-gray-400 uppercase tracking-wider mb-1.5">&nbsp;</label>
-        <button @click="resetFilters()" class="w-full px-3 py-2 bg-gray-100 hover:bg-gray-200 text-gray-600 rounded-xl text-[13px] font-medium transition">
+        <button @click="search=''; sellerFilter=''; statusFilter=''; dateStart=''; typeFilter=''"
+                class="w-full px-3 py-2 bg-gray-100 hover:bg-gray-200 text-gray-600 rounded-xl text-[13px] font-medium transition">
           Limpar filtros
         </button>
       </div>
@@ -148,34 +150,32 @@
         </thead>
         <tbody>
           {% verbatim %}
-          <template x-for="c in filteredCobrancas()" :key="c.type + '_' + c.uuid">
+          <template x-for="c in filtered()" :key="c.type + '_' + c.uuid">
             <tr class="border-b border-gray-50 hover:bg-gray-50/50 transition-colors cursor-pointer"
                 @click="window.location.href = c.detail_url">
               <td class="px-4 py-3.5">
-                <span :class="{
-                  'bg-blue-50 text-blue-700': c.type === 'link',
-                  'bg-violet-50 text-violet-700': c.type === 'boleto',
-                }" class="px-2 py-0.5 rounded-full text-[11px] font-semibold" x-text="c.type_display"></span>
+                <span :class="c.type === 'link' ? 'bg-blue-50 text-blue-700' : 'bg-violet-50 text-violet-700'"
+                      class="px-2 py-0.5 rounded-full text-[11px] font-semibold" x-text="c.type_display"></span>
               </td>
               <td class="px-4 py-3.5 text-[13px] text-gray-700 font-medium hidden lg:table-cell" x-text="c.seller_name"></td>
               <td class="px-4 py-3.5">
                 <div class="flex items-center gap-2">
                   <div class="w-8 h-8 rounded-full flex items-center justify-center text-white font-bold text-[12px]"
-                       :class="statusAvatar(c.status)">
-                    <span x-text="(c.customer_name||'?')[0].toUpperCase()"></span>
+                       :class="avatarClass(c.status)">
+                    <span x-text="displayName(c)[0].toUpperCase()"></span>
                   </div>
                   <div>
-                    <p class="text-[14px] font-semibold text-gray-900 leading-tight" x-text="c.customer_name || '-'"></p>
+                    <p class="text-[14px] font-semibold text-gray-900 leading-tight" x-text="displayName(c)"></p>
                     <p class="text-[11px] text-gray-400 lg:hidden" x-text="c.seller_name"></p>
                   </div>
                 </div>
               </td>
-              <td class="px-4 py-3.5 font-semibold text-[14px] text-gray-900 text-right" x-text="formatMoneyBRL(c.amount_cents)"></td>
+              <td class="px-4 py-3.5 font-semibold text-[14px] text-gray-900 text-right" x-text="fmt(c.amount_cents)"></td>
               <td class="px-4 py-3.5">
-                <span :class="statusBadge(c.status)" class="text-[12px] px-2 py-0.5 rounded-full font-medium" x-text="c.status_display"></span>
+                <span :class="badgeClass(c.status)" class="text-[12px] px-2 py-0.5 rounded-full font-medium" x-text="c.status_display"></span>
               </td>
-              <td class="px-4 py-3.5 text-[13px] text-gray-500 hidden md:table-cell" x-text="c.created_at ? c.created_at.split('T')[0].split('-').reverse().join('/') : '-'"></td>
-              <td class="px-4 py-3.5 text-[13px] text-gray-500 hidden md:table-cell" x-text="c.due_date || '-'"></td>
+              <td class="px-4 py-3.5 text-[13px] text-gray-500 hidden md:table-cell" x-text="fmtDate(c.created_at)"></td>
+              <td class="px-4 py-3.5 text-[13px] text-gray-500 hidden md:table-cell" x-text="fmtDate(c.due_date)"></td>
             </tr>
           </template>
           {% endverbatim %}
@@ -185,7 +185,7 @@
         <svg class="w-12 h-12 mx-auto mb-3 text-gray-200" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"/></svg>
         <p class="text-[15px] font-medium text-gray-500">Nenhuma cobranca encontrada.</p>
       </div>
-      <div x-show="cobrancas.length > 0 && filteredCobrancas().length === 0" class="p-8 text-center text-gray-400">
+      <div x-show="cobrancas.length > 0 && filtered().length === 0" class="p-8 text-center text-gray-400">
         Nenhuma cobranca encontrada com os filtros selecionados.
       </div>
     </div>
@@ -194,6 +194,7 @@
 
 {{ cobrancas_json|json_script:"cobrancas-data" }}
 {{ unified_stats_json|json_script:"unified-stats-data" }}
+
 <script>
 function gestorCobrancasPage() {
     return {
@@ -203,73 +204,87 @@ function gestorCobrancasPage() {
         sellerFilter: '',
         statusFilter: '',
         dateStart: '',
-        stats: { aguardando: 0, pagas: 0, vencidas: 0, canceladas: 0 },
+        kpi: { aguardando: 0, pagas: 0, vencidas: 0, canceladas: 0 },
+
         init() {
             var _p = JSON.parse(document.getElementById('cobrancas-data')?.textContent || '[]');
             if (typeof _p === 'string') _p = JSON.parse(_p);
             this.cobrancas = Array.isArray(_p) ? _p : [];
+
             var _s = JSON.parse(document.getElementById('unified-stats-data')?.textContent || '{}');
             if (typeof _s === 'string') _s = JSON.parse(_s);
-            this.stats = _s || { aguardando: 0, pagas: 0, vencidas: 0, canceladas: 0 };
+            this.kpi = _s || { aguardando: 0, pagas: 0, vencidas: 0, canceladas: 0 };
         },
-        statusAvatar(status) {
-            var map = {
+
+        displayName(c) {
+            if (c.type === 'link') return c.customer_name || '-';
+            return c.customer_name || '-';
+        },
+
+        fmt(cents) {
+            var r = Math.floor(cents / 100);
+            var c = Math.abs(cents % 100);
+            return 'R$ ' + r.toLocaleString('pt-BR') + ',' + String(c).padStart(2, '0');
+        },
+
+        fmtDate(iso) {
+            if (!iso) return '-';
+            var parts = iso.split('T')[0].split('-');
+            return parts[2] + '/' + parts[1] + '/' + parts[0];
+        },
+
+        avatarClass(status) {
+            var m = {
                 'PENDING': 'bg-brand-100 text-brand-600',
                 'COMPLETED': 'bg-emerald-100 text-emerald-600',
                 'CANCELED': 'bg-red-100 text-red-600',
-                'FAILED': 'bg-red-100 text-red-600',
                 'EXPIRED': 'bg-red-100 text-red-600',
                 'SUSPENDED': 'bg-amber-100 text-amber-600',
+                'CRIANDO': 'bg-gray-100 text-gray-600',
                 'PENDENTE': 'bg-yellow-100 text-yellow-600',
                 'PAGO': 'bg-green-100 text-green-600',
                 'VENCIDO': 'bg-red-100 text-red-600',
+                'CANCEL_PEND': 'bg-amber-100 text-amber-600',
                 'ESTORNADO': 'bg-purple-100 text-purple-600',
                 'FALHOU': 'bg-red-100 text-red-600',
-                'CANCEL_PEND': 'bg-gray-100 text-gray-600',
             };
-            return map[status] || 'bg-gray-100 text-gray-600';
+            return m[status] || 'bg-gray-100 text-gray-600';
         },
-        statusBadge(status) {
-            var map = {
+
+        badgeClass(status) {
+            var m = {
                 'PENDING': 'text-brand-700 bg-brand-50',
                 'COMPLETED': 'text-emerald-700 bg-emerald-50',
                 'CANCELED': 'text-red-700 bg-red-50',
-                'FAILED': 'text-red-700 bg-red-50',
                 'EXPIRED': 'text-red-700 bg-red-50',
                 'SUSPENDED': 'text-gray-500 bg-gray-50',
+                'CRIANDO': 'text-gray-500 bg-gray-50',
                 'PENDENTE': 'text-yellow-700 bg-yellow-50',
                 'PAGO': 'text-green-700 bg-green-50',
                 'VENCIDO': 'text-red-700 bg-red-50',
+                'CANCEL_PEND': 'text-amber-700 bg-amber-50',
                 'ESTORNADO': 'text-purple-700 bg-purple-50',
                 'FALHOU': 'text-red-700 bg-red-50',
-                'CANCEL_PEND': 'text-gray-500 bg-gray-50',
             };
-            return map[status] || 'text-gray-500 bg-gray-50';
+            return m[status] || 'text-gray-500 bg-gray-50';
         },
-        filteredCobrancas() {
-            return this.cobrancas.filter(c => {
-                if (this.typeFilter && c.type !== this.typeFilter) return false;
-                if (this.statusFilter && c.status !== this.statusFilter) return false;
-                if (this.sellerFilter && c.seller_uuid && c.seller_uuid !== this.sellerFilter) return false;
-                if (this.search) {
-                    var q = this.search.toLowerCase();
-                    var name = (c.customer_name || '').toLowerCase();
-                    if (name.indexOf(q) === -1) return false;
+
+        filtered() {
+            var self = this;
+            return this.cobrancas.filter(function(c) {
+                if (self.typeFilter && c.type !== self.typeFilter) return false;
+                if (self.statusFilter && c.status !== self.statusFilter) return false;
+                if (self.sellerFilter && c.seller_uuid && c.seller_uuid !== self.sellerFilter) return false;
+                if (self.search) {
+                    var q = self.search.toLowerCase();
+                    if ((c.customer_name || '').toLowerCase().indexOf(q) === -1) return false;
                 }
-                if (this.dateStart) {
+                if (self.dateStart) {
                     var d = c.created_at ? c.created_at.split('T')[0] : '';
-                    if (d < this.dateStart) return false;
+                    if (d < self.dateStart) return false;
                 }
                 return true;
             });
-        },
-        filter() {},
-        resetFilters() {
-            this.search = '';
-            this.typeFilter = '';
-            this.sellerFilter = '';
-            this.statusFilter = '';
-            this.dateStart = '';
         }
     };
 }
