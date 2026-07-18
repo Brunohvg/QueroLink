@@ -195,8 +195,15 @@ function novoBoletoPage() {
             if (typeof _p === 'string') _p = JSON.parse(_p);
             this.sellers = Array.isArray(_p) ? _p : [];
             this.idempotencyKey = 'boleto-' + Date.now() + '-' + Math.random().toString(36).slice(2, 8);
-        },
-        submit() {
+            },
+            formatAmount() {
+                var val = this.form.amount_cents;
+                if (val && !isNaN(val)) {
+                    var num = parseFloat(val);
+                    this.form.amount_cents = num.toFixed(2);
+                }
+            },
+            submit() {
             this.error = '';
             this.submitting = true;
             var payload = {};
