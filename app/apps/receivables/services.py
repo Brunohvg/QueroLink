@@ -1,5 +1,7 @@
 from datetime import timedelta
 
+import requests
+from django.core.cache import cache
 from django.core.exceptions import ValidationError
 from django.db import transaction
 from django.utils import timezone
@@ -319,6 +321,78 @@ def fail_outbox_event(event_uuid, error, retry_delay_seconds=60):
         event.last_error = IntegrationOutbox.sanitize_error(error)
         event.save(update_fields=['status', 'available_at', 'last_error', 'updated_at'])
         return event
+
+
+def lookup_cnpj(cnpj):
+    from app.apps.sellers.validators import normalize_and_validate_cpf
+    digits = cnpj.replace('.', '').replace('/', '').replace('-', '')
+    if len(digits) != 14:
+        raise ValueError('CNPJ invalido.')
+
+    cache_key = f'boletos:cnpj:{digits}'
+    cached = cache.get(cache_key)
+    if cached:
+        return cached
+
+    try:
+        resp = requests.get(
+            f'https://brasilapi.com.br/api/cnpj/v1/{digits}',
+            headers={'User-Agent': 'Merito/1.0'},
+            timeout=10,
+        )
+        resp.raise_for_status()
+        raw = resp.json()
+    except Exception as e:
+        raise ValueError(
+            'Nao foi possivel consultar o CNPJ. Preencha os dados manualmente.'
+        ) from e
+
+    result = {
+        'payer_name': raw.get('razao_social') or raw.get('nome_fantasia') or '',
+        'payer_zip_code': ''.join(filter(str.isdigit, raw.get('cep') or '')),
+        'payer_street': raw.get('logradouro') or '',
+        'payer_number': raw.get('numero') or '',
+        'payer_complement': raw.get('complemento') or '',
+        'payer_neighborhood': raw.get('bairro') or '',
+        'payer_city': raw.get('municipio') or '',
+        'payer_state': raw.get('uf') or '',
+        'source': 'brasilapi_cnpj',
+    }
+    cache.set(cache_key, result, 3600 * 24)
+    return result
+
+
+def lookup_cep(cep):
+    digits = ''.join(filter(str.isdigit, cep))
+    if len(digits) != 8:
+        raise ValueError('CEP deve ter 8 digitos.')
+
+    cache_key = f'boletos:cep:{digits}'
+    cached = cache.get(cache_key)
+    if cached:
+        return cached
+
+    try:
+        resp = requests.get(
+            f'https://brasilapi.com.br/api/cep/v1/{digits}',
+            headers={'User-Agent': 'Merito/1.0'},
+            timeout=10,
+        )
+        resp.raise_for_status()
+        raw = resp.json()
+    except Exception:
+        raise ValueError('Nao foi possivel consultar o CEP.')
+
+    result = {
+        'payer_zip_code': digits,
+        'payer_street': raw.get('street') or '',
+        'payer_neighborhood': raw.get('neighborhood') or '',
+        'payer_city': raw.get('city') or '',
+        'payer_state': raw.get('state') or '',
+        'source': 'brasilapi_cep',
+    }
+    cache.set(cache_key, result, 3600 * 24)
+    return result
 
 
 def create_boleto(tenant, seller, created_by, data, idempotency_key):

@@ -190,20 +190,75 @@ function novoBoletoPage() {
         idempotencyKey: '',
         error: '',
         submitting: false,
+        searchingDocument: false,
+        searchingCep: false,
+
         init() {
             var _p = JSON.parse(document.getElementById('sellers-data')?.textContent || '[]');
             if (typeof _p === 'string') _p = JSON.parse(_p);
             this.sellers = Array.isArray(_p) ? _p : [];
             this.idempotencyKey = 'boleto-' + Date.now() + '-' + Math.random().toString(36).slice(2, 8);
-            },
-            formatAmount() {
-                var val = this.form.amount_cents;
-                if (val && !isNaN(val)) {
-                    var num = parseFloat(val);
-                    this.form.amount_cents = num.toFixed(2);
+
+            this.$watch('form.payer_document', function(val) {
+                var doc = (val || '').replace(/[^\d]/g, '');
+                if (doc.length === 14 && this.form.payer_document_type === 'CNPJ') {
+                    this.buscarCnpj(doc);
                 }
-            },
-            submit() {
+            }.bind(this));
+
+            this.$watch('form.payer_zip_code', function(val) {
+                var cep = (val || '').replace(/[^\d]/g, '');
+                if (cep.length === 8) {
+                    this.buscarCep(cep);
+                }
+            }.bind(this));
+        },
+
+        buscarCnpj(digits) {
+            if (this.searchingDocument) return;
+            this.searchingDocument = true;
+            fetch('/api/boletos/cnpj/' + digits + '/')
+                .then(function(r) { return r.json(); })
+                .then(function(data) {
+                    if (data.detail) return;
+                    if (data.payer_name) this.form.payer_name = data.payer_name;
+                    if (data.payer_zip_code) this.form.payer_zip_code = data.payer_zip_code;
+                    if (data.payer_street) this.form.payer_street = data.payer_street;
+                    if (data.payer_number) this.form.payer_number = data.payer_number;
+                    if (data.payer_complement) this.form.payer_complement = data.payer_complement;
+                    if (data.payer_neighborhood) this.form.payer_neighborhood = data.payer_neighborhood;
+                    if (data.payer_city) this.form.payer_city = data.payer_city;
+                    if (data.payer_state) this.form.payer_state = data.payer_state;
+                }.bind(this))
+                .catch(function() {})
+                .finally(function() { this.searchingDocument = false; }.bind(this));
+        },
+
+        buscarCep(digits) {
+            if (this.searchingCep) return;
+            this.searchingCep = true;
+            fetch('/api/boletos/cep/' + digits + '/')
+                .then(function(r) { return r.json(); })
+                .then(function(data) {
+                    if (data.detail) return;
+                    if (data.payer_street) this.form.payer_street = data.payer_street;
+                    if (data.payer_neighborhood) this.form.payer_neighborhood = data.payer_neighborhood;
+                    if (data.payer_city) this.form.payer_city = data.payer_city;
+                    if (data.payer_state) this.form.payer_state = data.payer_state;
+                }.bind(this))
+                .catch(function() {})
+                .finally(function() { this.searchingCep = false; }.bind(this));
+        },
+
+        formatAmount() {
+            var val = this.form.amount_cents;
+            if (val && !isNaN(val)) {
+                var num = parseFloat(val);
+                this.form.amount_cents = num.toFixed(2);
+            }
+        },
+
+        submit() {
             this.error = '';
             this.submitting = true;
             var payload = {};

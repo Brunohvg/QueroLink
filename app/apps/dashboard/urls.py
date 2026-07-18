@@ -37,6 +37,8 @@ urlpatterns = [
     path('gestor/boletos/', receivables_views.gestor_boletos, name='gestor_boletos'),
     path('gestor/boletos/novo/', receivables_views.gestor_boleto_new, name='gestor_boleto_new'),
     path('gestor/boletos/<uuid:boleto_uuid>/', receivables_views.gestor_boleto_detalhe, name='gestor_boleto_detalhe'),
+    path('api/boletos/cnpj/<str:cnpj>/', receivables_views.api_cnpj_lookup, name='api_cnpj_lookup'),
+    path('api/boletos/cep/<str:cep>/', receivables_views.api_cep_lookup, name='api_cep_lookup'),
 
     path('financeiro/fila/', desktop_views.financeiro_fila, name='financeiro_fila'),
     path('financeiro/historico/', desktop_views.financeiro_historico, name='financeiro_historico'),

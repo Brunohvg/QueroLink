@@ -1,11 +1,13 @@
 import logging
 
 from django.contrib.auth.decorators import login_required
+from django.http import JsonResponse
 from django.shortcuts import render, redirect
 
 from app.apps.accounts.models import User, tenant_has_feature
 
 from .models import Boleto
+from .services import lookup_cnpj, lookup_cep
 
 
 logger = logging.getLogger(__name__)
@@ -25,23 +27,29 @@ def gestor_boletos(request):
         return redirect('dashboard:gestor_home')
 
     tenant = request.user.tenant
-    boletos_qs = Boleto.objects.filter(tenant=tenant).select_related(
-        'seller', 'created_by',
-    ).order_by('-created_at')[:200]
-
     boletos_data = []
-    for b in boletos_qs:
-        boletos_data.append({
-            'uuid': str(b.uuid),
-            'seller_name': b.seller.name,
-            'amount_cents': b.amount_cents,
-            'status': b.status,
-            'status_display': b.get_status_display(),
-            'due_date': b.due_date.isoformat(),
-            'paid_at': b.paid_at.isoformat() if b.paid_at else None,
-            'paid_amount_cents': b.paid_amount_cents,
-            'created_at': b.created_at.isoformat(),
-        })
+    try:
+        boletos_qs = Boleto.objects.filter(tenant=tenant).select_related(
+            'seller', 'created_by',
+        ).order_by('-created_at')[:200]
+
+        for b in boletos_qs:
+            boletos_data.append({
+                'uuid': str(b.uuid),
+                'seller_name': b.seller.name,
+                'amount_cents': b.amount_cents,
+                'status': b.status,
+                'status_display': b.get_status_display(),
+                'due_date': b.due_date.isoformat(),
+                'paid_at': b.paid_at.isoformat() if b.paid_at else None,
+                'paid_amount_cents': b.paid_amount_cents,
+                'created_at': b.created_at.isoformat(),
+            })
+    except Exception:
+        logger.warning(
+            'gestor_boletos query failed for tenant %s (missing columns?)',
+            tenant.pk, exc_info=True,
+        )
 
     stats_qs = Boleto.objects.filter(tenant=tenant)
     today = timezone.localdate()
@@ -120,6 +128,32 @@ def gestor_boleto_new(request):
     return render(request, 'dashboard/gestor/boletos/new.html', {
         'sellers_json': list(sellers),
     })
+
+
+@login_required
+def api_cnpj_lookup(request, cnpj):
+    if not _check_role(request, User.Role.MANAGER, User.Role.ADMIN, User.Role.SELLER):
+        return JsonResponse({'detail': 'Acesso nao permitido.'}, status=403)
+    if not tenant_has_feature(request.user.tenant, 'boletos'):
+        return JsonResponse({'detail': 'Recurso indisponivel no plano.'}, status=403)
+    try:
+        data = lookup_cnpj(cnpj)
+        return JsonResponse(data)
+    except ValueError as e:
+        return JsonResponse({'detail': str(e)}, status=400)
+
+
+@login_required
+def api_cep_lookup(request, cep):
+    if not _check_role(request, User.Role.MANAGER, User.Role.ADMIN, User.Role.SELLER):
+        return JsonResponse({'detail': 'Acesso nao permitido.'}, status=403)
+    if not tenant_has_feature(request.user.tenant, 'boletos'):
+        return JsonResponse({'detail': 'Recurso indisponivel no plano.'}, status=403)
+    try:
+        data = lookup_cep(cep)
+        return JsonResponse(data)
+    except ValueError as e:
+        return JsonResponse({'detail': str(e)}, status=400)
 
 
 from django.utils import timezone
