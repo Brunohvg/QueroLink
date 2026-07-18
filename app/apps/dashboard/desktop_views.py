@@ -979,6 +979,16 @@ def gestor_link_new(request):
             )
             from app.apps.audit.utils import log_action
             log_action(request, 'order.link_created', instance=order)
+
+            try:
+                from app.apps.notifications.tasks import notify_seller_link_status
+                notify_seller_link_status(seller, order, 'link_created')
+            except Exception:
+                logger.error(
+                    'Failed to send link_created notification for order %s',
+                    order.uuid, exc_info=True,
+                )
+
             messages.success(request, 'Link de pagamento gerado com sucesso!')
             return redirect('dashboard:gestor_link_detalhe', order_uuid=order.uuid)
         except Exception:
