@@ -73,16 +73,20 @@
           <span x-text="b.provider_url"></span>
         </a>
       </div>
-      <div x-show="b.provider_barcode">
+      <div x-show="b.provider_digitable_line">
         <p class="text-gray-500 text-sm mb-1">Linha Digitavel</p>
         <div class="flex items-center gap-2">
-          <code class="text-sm bg-gray-50 px-3 py-1.5 rounded-lg border border-gray-200 flex-1 break-all" x-text="b.provider_barcode"></code>
+          <code class="text-sm bg-gray-50 px-3 py-1.5 rounded-lg border border-gray-200 flex-1 break-all" x-text="b.provider_digitable_line"></code>
           <button @click="copyBarcode()" class="text-xs text-brand-600 hover:text-brand-800 font-medium flex-shrink-0">
             Copiar
           </button>
         </div>
       </div>
-      <div x-show="!b.provider_url && !b.provider_barcode && b.status === 'PENDENTE'" class="bg-amber-50 text-amber-700 text-sm rounded-lg px-4 py-3">
+      <div x-show="b.provider_barcode">
+        <p class="text-gray-500 text-sm mb-1">Codigo de barras</p>
+        <code class="text-sm bg-gray-50 px-3 py-1.5 rounded-lg border border-gray-200 block break-all" x-text="b.provider_barcode"></code>
+      </div>
+      <div x-show="!b.provider_url && !b.provider_digitable_line && b.status === 'PENDENTE'" class="bg-amber-50 text-amber-700 text-sm rounded-lg px-4 py-3">
         Boleto aguardando confirmacao. Tente novamente em alguns instantes.
       </div>
       <div class="flex gap-3 pt-3">
@@ -110,9 +114,9 @@ function gestorBoletoDetalhe() {
             this.b = parseJsonScript('boleto-data', {});
         },
         copyBarcode() {
-            if (!this.b.provider_barcode) return;
+            if (!this.b.provider_digitable_line) return;
             if (navigator.clipboard && navigator.clipboard.writeText) {
-                navigator.clipboard.writeText(this.b.provider_barcode);
+                navigator.clipboard.writeText(this.b.provider_digitable_line);
             }
         },
     }

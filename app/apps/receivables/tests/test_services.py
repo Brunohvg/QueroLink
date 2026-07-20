@@ -186,7 +186,7 @@ class CreateBoletoTests(TransactionTestCase):
         self.assertEqual(error.exception.boleto.status, Boleto.Status.FALHOU)
 
     @patch('app.apps.receivables.services.get_provider')
-    def test_barcode_and_url_persisted(self, get_provider):
+    def test_barcode_digitable_line_and_url_persisted(self, get_provider):
         provider = self.provider()
         provider.create.return_value = ProviderResult(
             provider='PAGARME',
@@ -194,6 +194,7 @@ class CreateBoletoTests(TransactionTestCase):
             charge_id='ch_barcode',
             status=ProviderStatus.PENDING,
             barcode='12345678901234567890123456789012345678901234',
+            digitable_line='12345.67890 12345.678901 1 12345678901234',
             url='https://pagarme.me/boleto/test',
         )
         get_provider.return_value = provider
@@ -207,6 +208,10 @@ class CreateBoletoTests(TransactionTestCase):
         )
         self.assertEqual(
             boleto.provider_url, 'https://pagarme.me/boleto/test',
+        )
+        self.assertEqual(
+            boleto.provider_digitable_line,
+            '12345.67890 12345.678901 1 12345678901234',
         )
 
     @patch('app.apps.receivables.services.get_provider')

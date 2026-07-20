@@ -18,6 +18,7 @@ class ReceivablesAPITests(TestCase):
             company_name='API Tenant',
             plan='PRO',
             receivables_enabled=True,
+            pagarme_api_key='sk_test_receivables',
         )
         self.manager = User.objects.create_user(
             username='api-manager',
@@ -103,12 +104,28 @@ class ReceivablesAPITests(TestCase):
 
     # ── Feature flag ─────────────────────────────────────────
 
-    def test_feature_disabled_returns_403(self):
+    def test_feature_disabled_does_not_hide_history(self):
         self.tenant.receivables_enabled = False
         self.tenant.save(update_fields=['receivables_enabled'])
         self._login(self.manager)
         response = self.client.get(self._url('boleto-list-create'))
-        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data['results']), 2)
+
+    def test_provider_missing_does_not_hide_history_but_blocks_creation(self):
+        self.tenant.pagarme_api_key = ''
+        self.tenant.save(update_fields=['pagarme_api_key'])
+        self._login(self.manager)
+
+        history = self.client.get(self._url('boleto-list-create'))
+        creation = self.client.post(
+            self._url('boleto-list-create'), {}, format='json',
+            HTTP_X_IDEMPOTENCY_KEY='provider-missing',
+        )
+
+        self.assertEqual(history.status_code, status.HTTP_200_OK)
+        self.assertEqual(creation.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertEqual(creation.data['code'], 'issuance_unavailable')
 
     # ── List boletos ─────────────────────────────────────────
 
@@ -162,6 +179,9 @@ class ReceivablesAPITests(TestCase):
             response.data['amount_cents'], self.boleto.amount_cents
         )
         self.assertEqual(response.data['status'], 'PENDENTE')
+        self.assertIn('digitable_line', response.data)
+        self.assertIn('barcode', response.data)
+        self.assertIn('boleto_url', response.data)
 
     def test_seller_can_view_own_boleto_detail(self):
         self._login(self.seller.user)

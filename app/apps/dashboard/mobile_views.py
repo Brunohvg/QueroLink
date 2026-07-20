@@ -1145,7 +1145,8 @@ def mobile_boletos(request):
         return seller
     if not seller:
         return redirect('dashboard:mobile_home')
-    if not tenant_has_feature(request.user.tenant, 'boletos'):
+    from app.apps.accounts.models import can_view_receivables_history
+    if not can_view_receivables_history(request.user, request.user.tenant):
         return redirect('dashboard:mobile_home')
 
     boletos = Boleto.objects.filter(
@@ -1163,6 +1164,9 @@ def mobile_boletos(request):
             'paid_at': b.paid_at.isoformat() if b.paid_at else None,
             'paid_amount_cents': b.paid_amount_cents,
             'created_at': b.created_at.isoformat(),
+            'provider_url': b.provider_url,
+            'barcode': b.provider_barcode,
+            'digitable_line': b.provider_digitable_line,
         })
 
     return render(request, 'mobile/boletos/list.html', {
@@ -1178,7 +1182,8 @@ def mobile_boleto_new(request):
         return seller
     if not seller:
         return redirect('dashboard:mobile_home')
-    if not tenant_has_feature(request.user.tenant, 'boletos'):
+    from app.apps.accounts.models import can_create_receivable
+    if not can_create_receivable(request.user, request.user.tenant):
         return redirect('dashboard:mobile_home')
 
     return render(request, 'mobile/boletos/new.html', {
@@ -1195,12 +1200,14 @@ def mobile_cobrancas(request):
         return redirect('dashboard:mobile_home')
 
     from app.apps.orders.models import Order
-    from app.apps.accounts.models import tenant_has_feature
+    from app.apps.accounts.models import can_create_receivable
 
     cobrancas, _, boletos_data = build_charge_center(
         request.user.tenant, seller=seller,
     )
-    can_create_boletos = tenant_has_feature(request.user.tenant, 'boletos')
+    can_create_boletos = can_create_receivable(
+        request.user, request.user.tenant
+    )
 
     return render(request, 'mobile/cobrancas.html', {
         'seller': seller,

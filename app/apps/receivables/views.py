@@ -3,8 +3,12 @@ import logging
 from django.contrib.auth.decorators import login_required
 from django.http import JsonResponse
 from django.shortcuts import render, redirect
+from django.utils import timezone
 
-from app.apps.accounts.models import User, tenant_has_feature
+from app.apps.accounts.models import (
+    User, can_create_receivable, can_view_receivables_history,
+)
+from app.apps.accounts.fields import compute_hash
 
 from .models import Boleto
 from .services import lookup_cnpj, lookup_cep
@@ -23,7 +27,7 @@ def _check_role(request, *roles):
 def gestor_boletos(request):
     if not _check_role(request, User.Role.MANAGER, User.Role.ADMIN):
         return redirect('dashboard:home')
-    if not tenant_has_feature(request.user.tenant, 'boletos'):
+    if not can_view_receivables_history(request.user, request.user.tenant):
         return redirect('dashboard:gestor_home')
 
     tenant = request.user.tenant
@@ -69,7 +73,7 @@ def gestor_boletos(request):
 def gestor_boleto_detalhe(request, boleto_uuid):
     if not _check_role(request, User.Role.MANAGER, User.Role.ADMIN):
         return redirect('dashboard:home')
-    if not tenant_has_feature(request.user.tenant, 'boletos'):
+    if not can_view_receivables_history(request.user, request.user.tenant):
         return redirect('dashboard:gestor_home')
 
     from django.shortcuts import get_object_or_404
@@ -95,6 +99,7 @@ def gestor_boleto_detalhe(request, boleto_uuid):
         'operation_error_code': boleto.operation_error_code,
         'operation_error_message': boleto.operation_error_message,
         'provider_barcode': boleto.provider_barcode,
+        'provider_digitable_line': boleto.provider_digitable_line,
         'provider_url': boleto.provider_url,
         'has_invoice_pdf': bool(boleto.invoice_pdf.name),
         'has_invoice_xml': bool(boleto.invoice_xml.name),
@@ -111,7 +116,7 @@ def gestor_boleto_detalhe(request, boleto_uuid):
 def gestor_boleto_new(request):
     if not _check_role(request, User.Role.MANAGER, User.Role.ADMIN):
         return redirect('dashboard:home')
-    if not tenant_has_feature(request.user.tenant, 'boletos'):
+    if not can_create_receivable(request.user, request.user.tenant):
         return redirect('dashboard:gestor_home')
 
     from app.apps.sellers.models import Seller
@@ -128,7 +133,7 @@ def gestor_boleto_new(request):
 def api_cnpj_lookup(request, cnpj):
     if not _check_role(request, User.Role.MANAGER, User.Role.ADMIN, User.Role.SELLER):
         return JsonResponse({'detail': 'Acesso nao permitido.'}, status=403)
-    if not tenant_has_feature(request.user.tenant, 'boletos'):
+    if not can_create_receivable(request.user, request.user.tenant):
         return JsonResponse({'detail': 'Recurso indisponivel no plano.'}, status=403)
     try:
         data = lookup_cnpj(cnpj)
@@ -141,13 +146,40 @@ def api_cnpj_lookup(request, cnpj):
 def api_cep_lookup(request, cep):
     if not _check_role(request, User.Role.MANAGER, User.Role.ADMIN, User.Role.SELLER):
         return JsonResponse({'detail': 'Acesso nao permitido.'}, status=403)
-    if not tenant_has_feature(request.user.tenant, 'boletos'):
+    if not can_create_receivable(request.user, request.user.tenant):
         return JsonResponse({'detail': 'Recurso indisponivel no plano.'}, status=403)
     try:
         data = lookup_cep(cep)
         return JsonResponse(data)
     except ValueError as e:
         return JsonResponse({'detail': str(e)}, status=400)
+
+
+@login_required
+def api_customer_lookup(request, document):
+    if not can_create_receivable(request.user, request.user.tenant):
+        return JsonResponse({'detail': 'Acesso nao permitido.'}, status=403)
+
+    digits = ''.join(filter(str.isdigit, document or ''))
+    if len(digits) not in (11, 14):
+        return JsonResponse({'detail': 'Documento invalido.'}, status=400)
+
+    from app.apps.customers.models import Customer
+    customer = Customer.objects.filter(
+        tenant=request.user.tenant,
+        document_hash=compute_hash(digits),
+    ).only('uuid', 'name', 'document_type', 'email', 'phone').first()
+    if customer is None:
+        return JsonResponse({'found': False})
+
+    return JsonResponse({
+        'found': True,
+        'customer_uuid': str(customer.uuid),
+        'payer_name': customer.name,
+        'payer_document_type': customer.document_type,
+        'payer_email': customer.email,
+        'payer_phone': customer.phone,
+    })
 
 
 from django.utils import timezone

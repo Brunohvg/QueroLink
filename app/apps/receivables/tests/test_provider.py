@@ -50,7 +50,11 @@ class PagarmeProviderTests(SimpleTestCase):
             'charges': [{
                 'id': 'ch_123',
                 'status': 'pending',
-                'last_transaction': {'line': '123456', 'url': 'https://example.test'},
+                'last_transaction': {
+                    'line': '123456',
+                    'barcode': '987654',
+                    'url': 'https://example.test',
+                },
             }],
         }
         data = self.boleto_data()
@@ -68,6 +72,8 @@ class PagarmeProviderTests(SimpleTestCase):
         self.assertEqual(result.order_id, 'or_123')
         self.assertEqual(result.charge_id, 'ch_123')
         self.assertEqual(result.status, ProviderStatus.PENDING)
+        self.assertEqual(result.digitable_line, '123456')
+        self.assertEqual(result.barcode, '987654')
 
     def test_phone_with_ten_digits(self):
         self.assertEqual(self.provider._phone('1133334444'), {

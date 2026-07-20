@@ -4,7 +4,9 @@ from django.test import TestCase, Client
 from django.urls import reverse
 from django.utils import timezone
 
+from app.apps.accounts.fields import compute_hash
 from app.apps.accounts.models import Tenant, User
+from app.apps.customers.models import Customer
 from app.apps.receivables.models import Boleto
 from app.apps.sellers.models import Seller
 
@@ -16,6 +18,7 @@ class GestorBoletoViewsTest(TestCase):
             company_name='Gestor Tenant',
             plan='PRO',
             receivables_enabled=True,
+            pagarme_api_key='sk_test_receivables',
         )
         self.manager = User.objects.create_user(
             username='gestor-manager',
@@ -73,12 +76,12 @@ class GestorBoletoViewsTest(TestCase):
         response = self.client.get(reverse('dashboard:gestor_boletos'))
         self.assertNotEqual(response.status_code, 200)
 
-    def test_list_page_redirects_when_disabled(self):
+    def test_list_page_keeps_history_when_disabled(self):
         self.tenant.receivables_enabled = False
         self.tenant.save(update_fields=['receivables_enabled'])
         self._login()
         response = self.client.get(reverse('dashboard:gestor_boletos'))
-        self.assertIn(response.status_code, (302,))
+        self.assertEqual(response.status_code, 200)
 
     # ── Detail page ──────────────────────────────────────────
 
@@ -164,3 +167,35 @@ class GestorBoletoViewsTest(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json()['payer_street'], 'Avenida Paulista')
         self.assertEqual(response.json()['payer_state'], 'SP')
+
+    def test_customer_lookup_is_exact_and_tenant_scoped(self):
+        customer = Customer.objects.create(
+            tenant=self.tenant,
+            name='Cliente Existente',
+            document='52998224725',
+            document_type='CPF',
+            document_hash=compute_hash('52998224725'),
+            email='cliente@example.com',
+            phone='11988887777',
+        )
+        other_tenant = Tenant.objects.create(company_name='Customer Other')
+        Customer.objects.create(
+            tenant=other_tenant,
+            name='Outro Tenant',
+            document='11222333000181',
+            document_type='CNPJ',
+            document_hash=compute_hash('11222333000181'),
+        )
+        self._login()
+
+        found = self.client.get(reverse(
+            'dashboard:api_boleto_customer_lookup', args=['52998224725'],
+        ))
+        isolated = self.client.get(reverse(
+            'dashboard:api_boleto_customer_lookup', args=['11222333000181'],
+        ))
+
+        self.assertEqual(found.status_code, 200)
+        self.assertEqual(found.json()['customer_uuid'], str(customer.uuid))
+        self.assertEqual(found.json()['payer_name'], 'Cliente Existente')
+        self.assertEqual(isolated.json(), {'found': False})

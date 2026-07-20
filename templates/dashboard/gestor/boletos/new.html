@@ -1,4 +1,5 @@
 {% extends 'dashboard/base_desktop.html' %}
+{% load static %}
 {% block title %}Novo Boleto — Mérito{% endblock %}
 {% block content %}
 <div x-data="novoBoletoPage()" x-init="init()" class="max-w-2xl mx-auto">
@@ -142,7 +143,7 @@
     </div>
 
     <!-- Error message -->
-    <div x-show="error" x-cloak class="bg-red-50 border border-red-100 text-red-700 text-sm rounded-xl px-5 py-3.5 flex items-start gap-3">
+    <div x-show="error" x-cloak role="alert" aria-live="polite" class="bg-red-50 border border-red-100 text-red-700 text-sm rounded-xl px-5 py-3.5 flex items-start gap-3">
       <svg class="w-5 h-5 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
       <span x-text="error"></span>
     </div>
@@ -164,6 +165,7 @@
 </div>
 
 {{ sellers_json|json_script:"sellers-data" }}
+<script src="{% static 'js/boleto-form.js' %}"></script>
 <script>
 function novoBoletoPage() {
     return {
@@ -195,10 +197,11 @@ function novoBoletoPage() {
 
         init() {
             this.sellers = parseJsonScript('sellers-data', []);
-            this.idempotencyKey = 'boleto-' + Date.now() + '-' + Math.random().toString(36).slice(2, 8);
+            this.idempotencyKey = MeritoBoleto.idempotencyKey();
 
             this.$watch('form.payer_document', function(val) {
                 var doc = (val || '').replace(/[^\d]/g, '');
+                if (doc.length === 11 || doc.length === 14) this.buscarCliente(doc);
                 if (doc.length === 14 && this.form.payer_document_type === 'CNPJ') {
                     this.buscarCnpj(doc);
                 }
@@ -212,39 +215,33 @@ function novoBoletoPage() {
             }.bind(this));
         },
 
+        buscarCliente(digits) {
+            MeritoBoleto.lookup('/api/boletos/customer/' + digits + '/')
+                .then(function(data) {
+                    if (data.found) MeritoBoleto.fillEmpty(this.form, data, ['payer_name', 'payer_email', 'payer_phone']);
+                }.bind(this))
+                .catch(function() {});
+        },
+
         buscarCnpj(digits) {
             if (this.searchingDocument) return;
             this.searchingDocument = true;
-            fetch('/api/boletos/cnpj/' + digits + '/')
-                .then(function(r) { return r.json(); })
+            MeritoBoleto.lookup('/api/boletos/cnpj/' + digits + '/')
                 .then(function(data) {
-                    if (data.detail) return;
-                    if (data.payer_name) this.form.payer_name = data.payer_name;
-                    if (data.payer_zip_code) this.form.payer_zip_code = data.payer_zip_code;
-                    if (data.payer_street) this.form.payer_street = data.payer_street;
-                    if (data.payer_number) this.form.payer_number = data.payer_number;
-                    if (data.payer_complement) this.form.payer_complement = data.payer_complement;
-                    if (data.payer_neighborhood) this.form.payer_neighborhood = data.payer_neighborhood;
-                    if (data.payer_city) this.form.payer_city = data.payer_city;
-                    if (data.payer_state) this.form.payer_state = data.payer_state;
+                    MeritoBoleto.fillEmpty(this.form, data, ['payer_name', 'payer_zip_code', 'payer_street', 'payer_number', 'payer_complement', 'payer_neighborhood', 'payer_city', 'payer_state']);
                 }.bind(this))
-                .catch(function() {})
+                .catch(function(error) { this.error = error.message; }.bind(this))
                 .finally(function() { this.searchingDocument = false; }.bind(this));
         },
 
         buscarCep(digits) {
             if (this.searchingCep) return;
             this.searchingCep = true;
-            fetch('/api/boletos/cep/' + digits + '/')
-                .then(function(r) { return r.json(); })
+            MeritoBoleto.lookup('/api/boletos/cep/' + digits + '/')
                 .then(function(data) {
-                    if (data.detail) return;
-                    if (data.payer_street) this.form.payer_street = data.payer_street;
-                    if (data.payer_neighborhood) this.form.payer_neighborhood = data.payer_neighborhood;
-                    if (data.payer_city) this.form.payer_city = data.payer_city;
-                    if (data.payer_state) this.form.payer_state = data.payer_state;
+                    MeritoBoleto.fillEmpty(this.form, data, ['payer_street', 'payer_neighborhood', 'payer_city', 'payer_state']);
                 }.bind(this))
-                .catch(function() {})
+                .catch(function(error) { this.error = error.message; }.bind(this))
                 .finally(function() { this.searchingCep = false; }.bind(this));
         },
 

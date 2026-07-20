@@ -104,7 +104,8 @@ def _deliver_boleto_created(outbox_event):
         'seller_name': boleto.seller.name,
         'amount': _format_brl(boleto.amount_cents),
         'due_date': boleto.due_date.isoformat(),
-        'provider_barcode': boleto.provider_barcode,
+        'digitable_line': boleto.provider_digitable_line,
+        'barcode': boleto.provider_barcode,
         'provider_url': boleto.provider_url,
     }
     sent_count = 0

@@ -13,7 +13,8 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
 from app.apps.accounts.models import (
-    User, can_manage_receivable, tenant_has_feature,
+    User, can_allocate_boleto, can_cancel_boleto, can_create_receivable,
+    can_view_receivables_history,
 )
 from app.apps.audit.utils import log_action
 
@@ -56,12 +57,6 @@ class ReviewPagination(PageNumberPagination):
     max_page_size = 200
 
 
-def _tenant_enabled(request):
-    if not tenant_has_feature(request.user.tenant, 'boletos'):
-        return False
-    return True
-
-
 def _is_gestor(user):
     return user.role in (User.Role.ADMIN, User.Role.MANAGER)
 
@@ -77,9 +72,11 @@ def _get_boleto_queryset(user):
 @permission_classes([IsAuthenticated])
 @throttle_classes([BoletoCreateThrottle])
 def boleto_list_create(request):
-    if not _tenant_enabled(request):
+    if request.method == 'GET' and not can_view_receivables_history(
+        request.user, request.user.tenant
+    ):
         return Response(
-            {'detail': 'Funcionalidade nao disponivel.'},
+            {'code': 'forbidden', 'detail': 'Acesso negado.'},
             status=status.HTTP_403_FORBIDDEN,
         )
 
@@ -97,16 +94,19 @@ def boleto_list_create(request):
         serializer = BoletoListSerializer(page, many=True)
         return paginator.get_paginated_response(serializer.data)
 
-    if request.user.role == User.Role.FINANCEIRO:
+    if not can_create_receivable(request.user, request.user.tenant):
         return Response(
-            {'detail': 'Acesso negado.'},
+            {
+                'code': 'issuance_unavailable',
+                'detail': 'Emissao de boleto indisponivel. Verifique plano, ativacao e provider.',
+            },
             status=status.HTTP_403_FORBIDDEN,
         )
 
     idempotency_key = request.headers.get('X-Idempotency-Key')
     if not idempotency_key:
         return Response(
-            {'detail': 'Cabecalho X-Idempotency-Key obrigatorio.'},
+            {'code': 'idempotency_required', 'detail': 'Cabecalho X-Idempotency-Key obrigatorio.'},
             status=status.HTTP_400_BAD_REQUEST,
         )
 
@@ -140,8 +140,9 @@ def boleto_list_create(request):
             idempotency_key=idempotency_key,
         )
     except BoletoServiceError as e:
+        boleto_uuid = str(e.boleto.pk) if e.boleto is not None else None
         return Response(
-            {'detail': str(e), 'boleto_uuid': str(e.boleto.pk)},
+            {'code': 'issuance_failed', 'detail': str(e), 'boleto_uuid': boleto_uuid},
             status=status.HTTP_422_UNPROCESSABLE_ENTITY,
         )
 
@@ -157,7 +158,7 @@ def boleto_list_create(request):
 @permission_classes([IsAuthenticated])
 @throttle_classes([BoletoCancelThrottle])
 def boleto_detail_cancel(request, boleto_uuid):
-    if not _tenant_enabled(request):
+    if not can_view_receivables_history(request.user, request.user.tenant):
         return Response(
             {'detail': 'Funcionalidade nao disponivel.'},
             status=status.HTTP_403_FORBIDDEN,
@@ -171,7 +172,7 @@ def boleto_detail_cancel(request, boleto_uuid):
         serializer = BoletoDetailSerializer(boleto)
         return Response(serializer.data)
 
-    if not _is_gestor(request.user):
+    if not can_cancel_boleto(request.user, request.user.tenant):
         return Response(
             {'detail': 'Acesso negado.'},
             status=status.HTTP_403_FORBIDDEN,
@@ -201,12 +202,14 @@ def boleto_detail_cancel(request, boleto_uuid):
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def boleto_stats(request):
-    if not _tenant_enabled(request):
+    if not can_view_receivables_history(request.user, request.user.tenant):
         return Response(
-            {'detail': 'Funcionalidade nao disponivel.'},
+            {'detail': 'Acesso negado.'},
             status=status.HTTP_403_FORBIDDEN,
         )
-    if not _is_gestor(request.user):
+    if request.user.role not in (
+        User.Role.ADMIN, User.Role.MANAGER, User.Role.FINANCEIRO
+    ):
         return Response(
             {'detail': 'Acesso negado.'},
             status=status.HTTP_403_FORBIDDEN,
@@ -247,13 +250,7 @@ def boleto_stats(request):
 @api_view(['GET', 'POST'])
 @permission_classes([IsAuthenticated])
 def allocation_list_create(request):
-    if not _tenant_enabled(request):
-        return Response(
-            {'detail': 'Funcionalidade nao disponivel.'},
-            status=status.HTTP_403_FORBIDDEN,
-        )
-
-    if not can_manage_receivable(request.user, request.user.tenant):
+    if not can_allocate_boleto(request.user, request.user.tenant):
         return Response(
             {'detail': 'Acesso negado.'},
             status=status.HTTP_403_FORBIDDEN,
@@ -301,11 +298,6 @@ def allocation_list_create(request):
 @api_view(['GET', 'POST'])
 @permission_classes([IsAuthenticated])
 def impact_review_list_approve(request):
-    if not _tenant_enabled(request):
-        return Response(
-            {'detail': 'Funcionalidade nao disponivel.'},
-            status=status.HTTP_403_FORBIDDEN,
-        )
     if not _is_gestor(request.user):
         return Response(
             {'detail': 'Acesso negado.'},

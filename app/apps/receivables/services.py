@@ -272,6 +272,8 @@ def apply_reconciliation_result(boleto, result):
     }
     if result.barcode and not reconciled.provider_barcode:
         update_kwargs['provider_barcode'] = result.barcode[:255]
+    if result.digitable_line and not reconciled.provider_digitable_line:
+        update_kwargs['provider_digitable_line'] = result.digitable_line[:255]
     if result.url and not reconciled.provider_url:
         update_kwargs['provider_url'] = result.url[:500]
     Boleto.objects.filter(pk=reconciled.pk).update(**update_kwargs)
@@ -324,10 +326,9 @@ def fail_outbox_event(event_uuid, error, retry_delay_seconds=60):
 
 
 def lookup_cnpj(cnpj):
-    from app.apps.sellers.validators import normalize_and_validate_cpf
-    digits = cnpj.replace('.', '').replace('/', '').replace('-', '')
-    if len(digits) != 14:
-        raise ValueError('CNPJ invalido.')
+    from .models import _validate_cnpj
+    digits = ''.join(filter(str.isdigit, cnpj or ''))
+    digits = _validate_cnpj(digits)
 
     cache_key = f'boletos:cnpj:{digits}'
     cached = cache.get(cache_key)
@@ -472,6 +473,7 @@ def create_boleto(tenant, seller, created_by, data, idempotency_key):
             locked.operation_error_code = ''
             locked.operation_error_message = ''
             locked.provider_barcode = (result.barcode or '')[:255]
+            locked.provider_digitable_line = (result.digitable_line or '')[:255]
             locked.provider_url = (result.url or '')[:500]
             locked.transition_to(Boleto.Status.PENDENTE)
             locked.save(update_fields=[
@@ -483,11 +485,16 @@ def create_boleto(tenant, seller, created_by, data, idempotency_key):
                 'operation_error_code',
                 'operation_error_message',
                 'provider_barcode',
+                'provider_digitable_line',
                 'provider_url',
                 'status',
                 'updated_at',
             ])
-            if locked.provider_barcode or locked.provider_url:
+            if (
+                locked.provider_digitable_line
+                or locked.provider_barcode
+                or locked.provider_url
+            ):
                 _outbox_event(
                     locked,
                     'boleto.created',
