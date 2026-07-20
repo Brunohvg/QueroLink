@@ -25,6 +25,11 @@ class ReceivablesAPITests(TestCase):
             role=User.Role.MANAGER,
             password='testpass',
         )
+        self.financial = User.objects.create_user(
+            username='api-financial',
+            tenant=self.tenant,
+            role=User.Role.FINANCEIRO,
+        )
         seller_user = User.objects.create_user(
             username='api-seller',
             tenant=self.tenant,
@@ -187,6 +192,30 @@ class ReceivablesAPITests(TestCase):
         response = self.client.get(self._url('boleto-stats'))
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
+    def test_seller_cannot_access_financial_allocations(self):
+        self._login(self.seller.user)
+        response = self.client.get(self._url('allocation-list-create'))
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        response = self.client.post(
+            self._url('allocation-list-create'),
+            {'boleto_uuid': str(self.boleto.uuid)},
+            format='json',
+        )
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_financial_can_list_allocations_but_cannot_issue_boleto(self):
+        self._login(self.financial)
+        response = self.client.get(self._url('allocation-list-create'))
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        response = self.client.post(
+            self._url('boleto-list-create'),
+            {},
+            format='json',
+            HTTP_X_IDEMPOTENCY_KEY='financial-cannot-create',
+        )
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
     # ── Cancel boleto ────────────────────────────────────────
 
     @patch('app.apps.receivables.api.cancel_boleto')
@@ -240,6 +269,37 @@ class ReceivablesAPITests(TestCase):
             HTTP_X_IDEMPOTENCY_KEY='test-key-123',
         )
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+
+    @patch('app.apps.receivables.api.create_boleto')
+    def test_seller_cannot_select_another_seller(self, mock_create):
+        self._login(self.seller.user)
+        data = {
+            'seller_uuid': str(self.other_seller.uuid),
+            'payer_name': 'New Payer',
+            'payer_document': '52998224725',
+            'payer_document_type': 'CPF',
+            'payer_phone': '11988887777',
+            'payer_zip_code': '01310100',
+            'payer_street': 'Rua Nova',
+            'payer_number': '50',
+            'payer_neighborhood': 'Centro',
+            'payer_city': 'Sao Paulo',
+            'payer_state': 'SP',
+            'amount_cents': 100000,
+            'due_date': (
+                timezone.localdate() + timezone.timedelta(days=30)
+            ).isoformat(),
+        }
+
+        response = self.client.post(
+            self._url('boleto-list-create'),
+            data,
+            format='json',
+            HTTP_X_IDEMPOTENCY_KEY='seller-authority-test',
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        mock_create.assert_not_called()
 
     def test_create_boleto_unauthorized_when_disabled(self):
         self.tenant.receivables_enabled = False

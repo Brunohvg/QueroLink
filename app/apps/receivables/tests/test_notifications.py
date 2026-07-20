@@ -13,6 +13,7 @@ from app.apps.receivables.notification_services import (
     deliver_outbox_event,
     _delivery_key,
 )
+from app.apps.receivables.tasks import send_boleto_due_reminders
 from app.apps.sellers.models import Seller
 
 
@@ -154,3 +155,76 @@ class DeliveryTests(TestCase):
             deliveries.first().status,
             ReceivableNotificationDelivery.Status.SENT,
         )
+
+    @patch('app.services.messaging.whatsapp.WhatsappClient.send_message')
+    def test_due_reminder_is_sent_before_marking_delivery_sent(self, mock_send):
+        self.tenant.whatsapp_instance_id = 'delivery-instance'
+        self.tenant.whatsapp_token = 'delivery-token'
+        self.tenant.save(update_fields=[
+            'whatsapp_instance_id', 'whatsapp_token',
+        ])
+        self.boleto.due_date = timezone.localdate() + timezone.timedelta(days=1)
+        self.boleto.save(update_fields=['due_date'])
+
+        self.assertEqual(send_boleto_due_reminders(), 1)
+
+        delivery = ReceivableNotificationDelivery.objects.get(
+            channel='whatsapp', outbox_event__isnull=True,
+        )
+        self.assertEqual(delivery.status, ReceivableNotificationDelivery.Status.SENT)
+        self.assertEqual(delivery.attempt_count, 1)
+        mock_send.assert_called_once()
+
+    @patch(
+        'app.services.messaging.whatsapp.WhatsappClient.send_message',
+        side_effect=RuntimeError('provider unavailable'),
+    )
+    def test_due_reminder_failure_is_not_recorded_as_sent(self, mock_send):
+        self.tenant.whatsapp_instance_id = 'delivery-instance'
+        self.tenant.whatsapp_token = 'delivery-token'
+        self.tenant.save(update_fields=[
+            'whatsapp_instance_id', 'whatsapp_token',
+        ])
+        self.boleto.due_date = timezone.localdate() + timezone.timedelta(days=1)
+        self.boleto.save(update_fields=['due_date'])
+
+        self.assertEqual(send_boleto_due_reminders(), 0)
+
+        delivery = ReceivableNotificationDelivery.objects.get(
+            channel='whatsapp', outbox_event__isnull=True,
+        )
+        self.assertEqual(
+            delivery.status, ReceivableNotificationDelivery.Status.FAILED,
+        )
+        self.assertIsNone(delivery.sent_at)
+
+    @patch('app.services.messaging.whatsapp.WhatsappClient.send_message')
+    def test_due_reminder_retry_reuses_delivery_and_is_idempotent(self, mock_send):
+        self.tenant.whatsapp_instance_id = 'delivery-instance'
+        self.tenant.whatsapp_token = 'delivery-token'
+        self.tenant.save(update_fields=[
+            'whatsapp_instance_id', 'whatsapp_token',
+        ])
+        self.boleto.due_date = timezone.localdate() + timezone.timedelta(days=1)
+        self.boleto.save(update_fields=['due_date'])
+        mock_send.side_effect = [RuntimeError('temporary failure'), None]
+
+        self.assertEqual(send_boleto_due_reminders(), 0)
+        delivery = ReceivableNotificationDelivery.objects.get(
+            channel='whatsapp', outbox_event__isnull=True,
+        )
+        delivery.next_attempt_at = timezone.now() - timezone.timedelta(minutes=1)
+        delivery.save(update_fields=['next_attempt_at'])
+
+        self.assertEqual(send_boleto_due_reminders(), 1)
+        self.assertEqual(send_boleto_due_reminders(), 0)
+        delivery.refresh_from_db()
+        self.assertEqual(delivery.status, ReceivableNotificationDelivery.Status.SENT)
+        self.assertEqual(delivery.attempt_count, 2)
+        self.assertEqual(
+            ReceivableNotificationDelivery.objects.filter(
+                channel='whatsapp', outbox_event__isnull=True,
+            ).count(),
+            1,
+        )
+        self.assertEqual(mock_send.call_count, 2)

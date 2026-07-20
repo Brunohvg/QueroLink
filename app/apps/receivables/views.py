@@ -28,28 +28,22 @@ def gestor_boletos(request):
 
     tenant = request.user.tenant
     boletos_data = []
-    try:
-        boletos_qs = Boleto.objects.filter(tenant=tenant).select_related(
-            'seller', 'created_by',
-        ).order_by('-created_at')[:200]
+    boletos_qs = Boleto.objects.filter(tenant=tenant).select_related(
+        'seller', 'created_by',
+    ).order_by('-created_at', '-uuid')[:200]
 
-        for b in boletos_qs:
-            boletos_data.append({
-                'uuid': str(b.uuid),
-                'seller_name': b.seller.name,
-                'amount_cents': b.amount_cents,
-                'status': b.status,
-                'status_display': b.get_status_display(),
-                'due_date': b.due_date.isoformat(),
-                'paid_at': b.paid_at.isoformat() if b.paid_at else None,
-                'paid_amount_cents': b.paid_amount_cents,
-                'created_at': b.created_at.isoformat(),
-            })
-    except Exception:
-        logger.warning(
-            'gestor_boletos query failed for tenant %s (missing columns?)',
-            tenant.pk, exc_info=True,
-        )
+    for b in boletos_qs:
+        boletos_data.append({
+            'uuid': str(b.uuid),
+            'seller_name': b.seller.name,
+            'amount_cents': b.amount_cents,
+            'status': b.status,
+            'status_display': b.get_status_display(),
+            'due_date': b.due_date.isoformat(),
+            'paid_at': b.paid_at.isoformat() if b.paid_at else None,
+            'paid_amount_cents': b.paid_amount_cents,
+            'created_at': b.created_at.isoformat(),
+        })
 
     stats_qs = Boleto.objects.filter(tenant=tenant)
     today = timezone.localdate()

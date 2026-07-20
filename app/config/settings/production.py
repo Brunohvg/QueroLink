@@ -1,7 +1,19 @@
 import dj_database_url
 import os
 from celery.schedules import crontab
+from django.core.exceptions import ImproperlyConfigured
 from .base import *
+
+_jwt_signing_key = config('JWT_SIGNING_KEY', default='').strip()
+if not _jwt_signing_key:
+    raise ImproperlyConfigured(
+        'JWT_SIGNING_KEY e obrigatoria em producao e deve ser distinta da SECRET_KEY.'
+    )
+if _jwt_signing_key == SECRET_KEY:
+    raise ImproperlyConfigured(
+        'JWT_SIGNING_KEY deve ser distinta da SECRET_KEY em producao.'
+    )
+SIMPLE_JWT['SIGNING_KEY'] = _jwt_signing_key
 
 DEBUG = config('DEBUG', default=False, cast=bool)
 

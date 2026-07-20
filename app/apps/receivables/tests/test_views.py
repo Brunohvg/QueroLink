@@ -1,3 +1,5 @@
+from unittest.mock import patch
+
 from django.test import TestCase, Client
 from django.urls import reverse
 from django.utils import timezone
@@ -123,3 +125,42 @@ class GestorBoletoViewsTest(TestCase):
         self.assertTemplateUsed(
             response, 'dashboard/gestor/boletos/new.html'
         )
+
+    @patch('app.apps.receivables.views.lookup_cnpj')
+    def test_cnpj_autocomplete_returns_creation_fields(self, mock_lookup):
+        mock_lookup.return_value = {
+            'payer_name': 'Empresa Teste',
+            'payer_zip_code': '01310100',
+            'payer_street': 'Avenida Paulista',
+            'payer_neighborhood': 'Bela Vista',
+            'payer_city': 'Sao Paulo',
+            'payer_state': 'SP',
+        }
+        self._login()
+
+        response = self.client.get(reverse(
+            'dashboard:api_cnpj_lookup', args=['11222333000181'],
+        ))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()['payer_name'], 'Empresa Teste')
+        self.assertEqual(response.json()['payer_zip_code'], '01310100')
+
+    @patch('app.apps.receivables.views.lookup_cep')
+    def test_cep_autocomplete_returns_creation_fields(self, mock_lookup):
+        mock_lookup.return_value = {
+            'payer_zip_code': '01310100',
+            'payer_street': 'Avenida Paulista',
+            'payer_neighborhood': 'Bela Vista',
+            'payer_city': 'Sao Paulo',
+            'payer_state': 'SP',
+        }
+        self._login('gestor-seller', 'testpass')
+
+        response = self.client.get(reverse(
+            'dashboard:api_cep_lookup', args=['01310100'],
+        ))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()['payer_street'], 'Avenida Paulista')
+        self.assertEqual(response.json()['payer_state'], 'SP')

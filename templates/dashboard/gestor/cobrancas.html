@@ -207,13 +207,11 @@ function gestorCobrancasPage() {
         kpi: { aguardando: 0, pagas: 0, vencidas: 0, canceladas: 0 },
 
         init() {
-            var _p = JSON.parse(document.getElementById('cobrancas-data')?.textContent || '[]');
-            if (typeof _p === 'string') _p = JSON.parse(_p);
-            this.cobrancas = Array.isArray(_p) ? _p : [];
-
-            var _s = JSON.parse(document.getElementById('unified-stats-data')?.textContent || '{}');
-            if (typeof _s === 'string') _s = JSON.parse(_s);
-            this.kpi = _s || { aguardando: 0, pagas: 0, vencidas: 0, canceladas: 0 };
+            this.cobrancas = parseJsonScript('cobrancas-data', []);
+            this.kpi = parseJsonScript(
+                'unified-stats-data',
+                { aguardando: 0, pagas: 0, vencidas: 0, canceladas: 0 }
+            );
             console.debug('cobrancas_data:', this.cobrancas.length, 'items, kpi:', this.kpi);
         },
 

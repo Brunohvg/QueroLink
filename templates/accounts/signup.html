@@ -12,7 +12,8 @@
             var s = c[t]||c.error;
             var el = document.createElement('div');
             el.className = 'pointer-events-auto flex items-start gap-3 px-4 py-3 rounded-2xl border shadow-lg fixed top-4 right-4 z-[9999] max-w-sm w-full animate-slide-in ' + s.bg + ' ' + s.border;
-            el.innerHTML = '<div class="flex-shrink-0 mt-0.5">' + s.icon + '</div><div class="flex-1"><p class="text-sm font-medium ' + s.text + '">' + m + '</p></div><button onclick="this.parentElement.remove()" class="flex-shrink-0 ml-1"><svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg></button>';
+            el.innerHTML = '<div class="flex-shrink-0 mt-0.5">' + s.icon + '</div><div class="flex-1"><p class="text-sm font-medium ' + s.text + '"></p></div><button onclick="this.parentElement.remove()" class="flex-shrink-0 ml-1"><svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg></button>';
+            el.querySelector('p').textContent = m;
             document.body.appendChild(el);
             setTimeout(function(){if(el.parentNode)el.remove();},4000);
         }

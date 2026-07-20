@@ -200,8 +200,41 @@ def tenant_has_feature(tenant, feature_name):
     features = getattr(settings, 'PLAN_FEATURES', {}).get(tenant.plan, {})
     plan_has_feature = features.get(feature_name, False)
     if feature_name == 'boletos':
-        return bool(plan_has_feature)
+        return bool(plan_has_feature and tenant.receivables_enabled)
     return plan_has_feature
+
+
+def can_view_receivables_history(user, tenant):
+    return bool(
+        user.is_authenticated
+        and user.tenant_id == tenant.pk
+        and user.role in (
+            User.Role.ADMIN,
+            User.Role.MANAGER,
+            User.Role.FINANCEIRO,
+            User.Role.SELLER,
+        )
+    )
+
+
+def can_create_receivable(user, tenant):
+    return bool(
+        can_view_receivables_history(user, tenant)
+        and user.role in (User.Role.ADMIN, User.Role.MANAGER, User.Role.SELLER)
+        and tenant_has_feature(tenant, 'boletos')
+    )
+
+
+def can_manage_receivable(user, tenant):
+    return bool(
+        can_view_receivables_history(user, tenant)
+        and user.role in (
+            User.Role.ADMIN,
+            User.Role.MANAGER,
+            User.Role.FINANCEIRO,
+        )
+        and tenant_has_feature(tenant, 'boletos')
+    )
 
 
 def mark_onboarding_step(tenant, step_name):

@@ -155,11 +155,7 @@ function gestorLinksPage() {
         dateEnd: '',
 
         init() {
-            try {
-                var _parsed = JSON.parse(document.getElementById('orders-data')?.textContent || '[]');
-                this.orders = typeof _parsed === 'string' ? JSON.parse(_parsed) : _parsed;
-                if (!Array.isArray(this.orders)) this.orders = [];
-            } catch(e) { this.orders = []; }
+            this.orders = parseJsonScript('orders-data', []);
             this.filter();
         },
 
