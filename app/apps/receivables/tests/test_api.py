@@ -8,6 +8,7 @@ from rest_framework.test import APIClient
 
 from app.apps.accounts.models import Tenant, User
 from app.apps.receivables.models import Boleto
+from app.apps.receivables.services import IdempotencyConflictError
 from app.apps.sellers.models import Seller
 
 
@@ -289,6 +290,36 @@ class ReceivablesAPITests(TestCase):
             HTTP_X_IDEMPOTENCY_KEY='test-key-123',
         )
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+
+    @patch('app.apps.receivables.api.create_boleto')
+    def test_idempotency_conflict_returns_409(self, mock_create):
+        mock_create.side_effect = IdempotencyConflictError
+        self._login(self.manager)
+        data = {
+            'seller_uuid': str(self.seller.uuid),
+            'payer_name': 'New Payer',
+            'payer_document': '52998224725',
+            'payer_document_type': 'CPF',
+            'payer_phone': '11988887777',
+            'payer_zip_code': '01310100',
+            'payer_street': 'Rua Nova',
+            'payer_number': '50',
+            'payer_neighborhood': 'Centro',
+            'payer_city': 'Sao Paulo',
+            'payer_state': 'SP',
+            'amount_cents': 100000,
+            'due_date': (
+                timezone.localdate() + timezone.timedelta(days=30)
+            ).isoformat(),
+        }
+
+        response = self.client.post(
+            self._url('boleto-list-create'), data, format='json',
+            HTTP_X_IDEMPOTENCY_KEY='conflicting-key',
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_409_CONFLICT)
+        self.assertEqual(response.data['code'], 'IDEMPOTENCY_CONFLICT')
 
     @patch('app.apps.receivables.api.create_boleto')
     def test_seller_cannot_select_another_seller(self, mock_create):

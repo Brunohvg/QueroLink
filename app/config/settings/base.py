@@ -229,6 +229,9 @@ REST_FRAMEWORK = {
         'anon': '100/hour',
         'boleto_create': '10/hour',
         'boleto_cancel': '5/hour',
+        'boleto_lookup_cnpj': '30/minute',
+        'boleto_lookup_cep': '60/minute',
+        'boleto_lookup_customer': '60/minute',
     },
     'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
 }

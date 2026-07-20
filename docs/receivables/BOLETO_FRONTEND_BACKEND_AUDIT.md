@@ -37,8 +37,10 @@
 4. **Resolvido:** cliente é localizado por documento exato, tenant e hash, sem merge ou atualização silenciosa.
 5. **Resolvido:** capacidades operacionais foram separadas e aplicadas nas entradas principais.
 6. **Resolvido:** CNPJ/CEP têm feedback e preservam valores já digitados.
-7. **Parcial:** erros de emissão ganharam códigos estáveis; validações DRF continuam no formato padrão para compatibilidade.
-8. **Pendente não bloqueante:** formulário visual por etapas e tela mobile dedicada de sucesso podem ser evoluídos sem alterar o contrato estabilizado.
+7. **Resolvido:** conflito idempotente possui exceção de domínio, resposta HTTP 409 e não chama novamente o provider.
+8. **Resolvido:** desktop e mobile exigem revisão explícita antes da emissão.
+9. **Resolvido:** CNPJ, CEP e cliente possuem throttles configuráveis, separados por tenant e usuário.
+10. **Pendente não bloqueante:** tela mobile dedicada de sucesso e chave persistida após reload podem ser evoluídas sem alterar o contrato estabilizado.
 
 ## Decisão da auditoria
 
@@ -46,8 +48,8 @@ O adendo é útil e está alinhado ao produto. A implementação foi inicialment
 
 ## Evidências finais
 
-- 960 testes completos: OK.
-- 45 testes focados de API, views, provider e services: OK.
+- 964 testes completos: OK.
+- 39 testes focados de API, views e services do fechamento P0/P1: OK.
 - 10 testes focados de notificações: OK.
 - instalação limpa no PostgreSQL `test_querolink_boleto_alignment_clean_20260720_02`: OK.
 - segunda execução de `migrate --noinput`: nenhuma migration a aplicar.

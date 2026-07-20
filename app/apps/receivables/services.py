@@ -22,6 +22,10 @@ class BoletoServiceError(Exception):
         self.boleto = boleto
 
 
+class IdempotencyConflictError(Exception):
+    """A logical operation key was reused with a different payload."""
+
+
 def _outbox_event(boleto, event_type, payload):
     event, _ = IntegrationOutbox.objects.get_or_create(
         tenant=boleto.tenant,
@@ -412,6 +416,10 @@ def create_boleto(tenant, seller, created_by, data, idempotency_key):
             tenant=tenant, idempotency_key=key,
         ).select_for_update().first()
         if existing:
+            if existing.seller_id != seller.pk:
+                raise IdempotencyConflictError(
+                    'Esta chave de idempotencia ja foi utilizada com dados diferentes.'
+                )
             compare_fields = {
                 k for k in data.keys()
                 if k not in ('status',)
@@ -422,8 +430,8 @@ def create_boleto(tenant, seller, created_by, data, idempotency_key):
                 if str(existing_val) != str(new_val) or (
                     existing_val is None and new_val is not None
                 ):
-                    raise ValidationError(
-                        {'idempotency_key': 'Chave de idempotencia ja utilizada com dados diferentes.'}
+                    raise IdempotencyConflictError(
+                        'Esta chave de idempotencia ja foi utilizada com dados diferentes.'
                     )
             return existing
 

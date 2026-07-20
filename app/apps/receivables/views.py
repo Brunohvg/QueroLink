@@ -4,6 +4,7 @@ from django.contrib.auth.decorators import login_required
 from django.http import JsonResponse
 from django.shortcuts import render, redirect
 from django.utils import timezone
+from rest_framework.decorators import api_view, throttle_classes
 
 from app.apps.accounts.models import (
     User, can_create_receivable, can_view_receivables_history,
@@ -12,6 +13,9 @@ from app.apps.accounts.fields import compute_hash
 
 from .models import Boleto
 from .services import lookup_cnpj, lookup_cep
+from .throttles import (
+    CepLookupThrottle, CnpjLookupThrottle, CustomerLookupThrottle,
+)
 
 
 logger = logging.getLogger(__name__)
@@ -130,6 +134,8 @@ def gestor_boleto_new(request):
 
 
 @login_required
+@api_view(['GET'])
+@throttle_classes([CnpjLookupThrottle])
 def api_cnpj_lookup(request, cnpj):
     if not _check_role(request, User.Role.MANAGER, User.Role.ADMIN, User.Role.SELLER):
         return JsonResponse({'detail': 'Acesso nao permitido.'}, status=403)
@@ -143,6 +149,8 @@ def api_cnpj_lookup(request, cnpj):
 
 
 @login_required
+@api_view(['GET'])
+@throttle_classes([CepLookupThrottle])
 def api_cep_lookup(request, cep):
     if not _check_role(request, User.Role.MANAGER, User.Role.ADMIN, User.Role.SELLER):
         return JsonResponse({'detail': 'Acesso nao permitido.'}, status=403)
@@ -156,6 +164,8 @@ def api_cep_lookup(request, cep):
 
 
 @login_required
+@api_view(['GET'])
+@throttle_classes([CustomerLookupThrottle])
 def api_customer_lookup(request, document):
     if not can_create_receivable(request.user, request.user.tenant):
         return JsonResponse({'detail': 'Acesso nao permitido.'}, status=403)

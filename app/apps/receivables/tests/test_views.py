@@ -1,5 +1,6 @@
 from unittest.mock import patch
 
+from django.core.cache import cache
 from django.test import TestCase, Client
 from django.urls import reverse
 from django.utils import timezone
@@ -8,6 +9,7 @@ from app.apps.accounts.fields import compute_hash
 from app.apps.accounts.models import Tenant, User
 from app.apps.customers.models import Customer
 from app.apps.receivables.models import Boleto
+from app.apps.receivables.throttles import CnpjLookupThrottle
 from app.apps.sellers.models import Seller
 
 
@@ -128,6 +130,16 @@ class GestorBoletoViewsTest(TestCase):
         self.assertTemplateUsed(
             response, 'dashboard/gestor/boletos/new.html'
         )
+        self.assertContains(response, 'Revise antes de emitir')
+        self.assertContains(response, 'Confirmar e emitir')
+
+    def test_mobile_new_page_requires_review_before_submit(self):
+        self._login('gestor-seller', 'testpass')
+        response = self.client.get(reverse('dashboard:mobile_boleto_new'))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'Revise antes de emitir')
+        self.assertContains(response, 'if (!this.reviewing)')
 
     @patch('app.apps.receivables.views.lookup_cnpj')
     def test_cnpj_autocomplete_returns_creation_fields(self, mock_lookup):
@@ -199,3 +211,17 @@ class GestorBoletoViewsTest(TestCase):
         self.assertEqual(found.json()['customer_uuid'], str(customer.uuid))
         self.assertEqual(found.json()['payer_name'], 'Cliente Existente')
         self.assertEqual(isolated.json(), {'found': False})
+
+    @patch.object(CnpjLookupThrottle, 'get_rate', return_value='1/minute')
+    @patch('app.apps.receivables.views.lookup_cnpj')
+    def test_cnpj_lookup_has_specific_throttle(self, mock_lookup, _rate):
+        cache.clear()
+        mock_lookup.return_value = {'payer_name': 'Empresa Teste'}
+        self._login()
+        url = reverse('dashboard:api_cnpj_lookup', args=['11222333000181'])
+
+        first = self.client.get(url)
+        second = self.client.get(url)
+
+        self.assertEqual(first.status_code, 200)
+        self.assertEqual(second.status_code, 429)

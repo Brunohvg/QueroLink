@@ -32,7 +32,10 @@ from .serializers import (
     AllocationCreateSerializer,
     CommissionImpactReviewSerializer,
 )
-from .services import create_boleto, cancel_boleto, BoletoServiceError
+from .services import (
+    BoletoServiceError, IdempotencyConflictError, cancel_boleto,
+    create_boleto,
+)
 from .throttles import BoletoCreateThrottle, BoletoCancelThrottle
 
 
@@ -138,6 +141,16 @@ def boleto_list_create(request):
             created_by=request.user,
             data=data,
             idempotency_key=idempotency_key,
+        )
+    except IdempotencyConflictError:
+        message = 'Esta chave de idempotencia ja foi utilizada com dados diferentes.'
+        return Response(
+            {
+                'code': 'IDEMPOTENCY_CONFLICT',
+                'message': message,
+                'detail': message,
+            },
+            status=status.HTTP_409_CONFLICT,
         )
     except BoletoServiceError as e:
         boleto_uuid = str(e.boleto.pk) if e.boleto is not None else None

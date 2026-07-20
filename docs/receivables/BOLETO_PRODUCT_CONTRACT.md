@@ -20,8 +20,11 @@ Data de referência: 20/07/2026, America/Sao_Paulo.
 
 - O pagador é identificado por CPF/CNPJ exato dentro do tenant; nome semelhante nunca autoriza merge.
 - CNPJ e CEP são assistências opcionais. Falha externa não bloqueia preenchimento manual e nunca sobrescreve silenciosamente dados já digitados.
+- CNPJ, CEP e cliente possuem throttling configurável e separado por tenant e usuário.
 - Valores trafegam em centavos; vencimento permitido entre amanhã e 180 dias.
+- Desktop e mobile exigem uma etapa explícita de revisão antes do POST de emissão.
 - A chave de idempotência é um UUID estável por tentativa lógica e deve ser reutilizada em retry.
+- Reutilizar a mesma chave com payload ou vendedor diferente retorna `409 IDEMPOTENCY_CONFLICT` sem nova chamada ao provider.
 - O backend é autoridade para tenant, papel e vendedor.
 - Sucesso deve devolver UUID local, status, URL real do boleto, linha digitável e código de barras reais. IDs do provider não são URLs.
 - Erros públicos devem ser estáveis e não expor mensagens internas do provider ou PII.
