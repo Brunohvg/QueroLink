@@ -22,14 +22,14 @@ class ChargeCenterTests(TestCase):
             tenant=self.tenant,
             role=User.Role.MANAGER,
         )
-        seller_user = User.objects.create_user(
+        self.seller_user = User.objects.create_user(
             username='charge-seller',
             tenant=self.tenant,
             role=User.Role.SELLER,
         )
         self.seller = Seller.objects.create(
             tenant=self.tenant,
-            user=seller_user,
+            user=self.seller_user,
             name='Charge Seller',
             phone='11999999999',
         )
@@ -90,6 +90,14 @@ class ChargeCenterTests(TestCase):
         ]
         self.assertEqual(len(link_rows), 1)
         self.assertEqual(link_rows[0]['link_url'], 'https://pay.example/real-link')
+
+    def test_mobile_charge_center_renders_for_seller(self):
+        self.client.force_login(self.seller_user)
+
+        response = self.client.get(reverse('dashboard:mobile_cobrancas'))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.context['cobrancas_json']), 2)
 
     def test_query_service_lists_both_aggregates_in_three_queries(self):
         with self.assertNumQueries(3):

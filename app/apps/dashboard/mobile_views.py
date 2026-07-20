@@ -1201,6 +1201,7 @@ def mobile_cobrancas(request):
 
     from app.apps.orders.models import Order
     from app.apps.accounts.models import can_create_receivable
+    from app.apps.dashboard.charge_center import build_charge_center
 
     cobrancas, _, boletos_data = build_charge_center(
         request.user.tenant, seller=seller,
