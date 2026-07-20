@@ -36,6 +36,9 @@ FERNET_KEY = config('FERNET_KEY', default='')
 VAPID_PUBLIC_KEY = config('VAPID_PUBLIC_KEY', default='')
 VAPID_PRIVATE_KEY = config('VAPID_PRIVATE_KEY', default='')
 VAPID_CONTACT_EMAIL = config('VAPID_CONTACT_EMAIL', default='contato@vidalys.com.br')
+CUSTOMER_LEDGER_UI_ENABLED = config(
+    'CUSTOMER_LEDGER_UI_ENABLED', default=False, cast=bool
+)
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = config('DEBUG', default=False, cast=bool)
