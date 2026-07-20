@@ -398,9 +398,9 @@ class TestWebhookIdempotency(TransactionTestCase):
         second = self._post(second_payload)
 
         self.assertEqual(first.status_code, 200)
-        self.assertEqual(first.json()['status'], 'received')
+        self.assertTrue(first.json()['received'])
         self.assertEqual(second.status_code, 200)
-        self.assertEqual(second.json()['status'], 'received')
+        self.assertTrue(second.json()['received'])
         self.assertEqual(
             WebhookEvent.objects.filter(
                 gateway='pagarme',
@@ -577,7 +577,7 @@ class TestWebhookIdempotency(TransactionTestCase):
         response = self._post(payload)
 
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.json()['status'], 'received')
+        self.assertTrue(response.json()['received'])
         self.assertTrue(WebhookEvent.objects.filter(
             gateway='pagarme',
             gateway_event_id='evt_known_expired',

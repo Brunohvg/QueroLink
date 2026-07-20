@@ -1,4 +1,5 @@
 import logging
+import uuid as uuid_module
 from dataclasses import dataclass
 
 from django.db import transaction
@@ -33,6 +34,37 @@ class PagarmePaymentResult:
     financial_changed: bool = False
     notify_event_type: str = ''
     message: str = ''
+
+
+def generate_receipt_id() -> str:
+    return f'whr_{uuid_module.uuid4().hex[:16]}'
+
+
+def generate_correlation_id() -> str:
+    return uuid_module.uuid4().hex[:12]
+
+
+def build_effect_reference(tenant_id, provider_charge_id, effect_type='paid'):
+    if not tenant_id or not provider_charge_id:
+        return None
+    return f'pagarme:{tenant_id}:{provider_charge_id}:{effect_type}'
+
+
+def check_effect_applied(tenant_id, provider_charge_id, effect_type='paid'):
+    ref = build_effect_reference(tenant_id, provider_charge_id, effect_type)
+    if not ref:
+        return False
+    return WebhookEvent.objects.filter(
+        effect_reference=ref,
+        status=WebhookEvent.Status.PROCESSED,
+    ).exists()
+
+
+def mark_effect_applied(event, tenant_id, provider_charge_id, effect_type='paid'):
+    ref = build_effect_reference(tenant_id, provider_charge_id, effect_type)
+    if ref:
+        event.effect_reference = ref
+        event.save(update_fields=['effect_reference'])
 
 
 def find_boleto_for_webhook(tenant, normalized):
@@ -137,6 +169,130 @@ def process_receivable_pagarme_event(event_id):
 
     _set_receivable_event_status(event_id, WebhookEvent.Status.PROCESSED)
     return 'processed'
+
+
+def apply_pagarme_payment_event(
+    tenant, event_type, data, *,
+    source='webhook',
+    receipt_id=None,
+    correlation_id=None,
+    dry_run=False,
+):
+    """Servico unico de aplicacao de pagamento Pagar.me.
+    Usado por webhook, retry, verificacao manual e reconciliacao.
+    """
+    if event_type not in PAID_EVENT_TYPES:
+        return PagarmePaymentResult(
+            status='skipped',
+            event_type=event_type,
+            message=f'Evento {event_type} nao e pagamento confirmado.',
+        )
+
+    provider_charge_id = None
+    if event_type == 'charge.paid':
+        provider_charge_id = data.get('id')
+    elif event_type == 'order.paid':
+        charges = data.get('charges', [])
+        if charges and isinstance(charges, list):
+            provider_charge_id = charges[0].get('id')
+
+    if provider_charge_id and check_effect_applied(
+        tenant.uuid, provider_charge_id, 'paid',
+    ):
+        return PagarmePaymentResult(
+            status='duplicate',
+            event_type=event_type,
+            message='Efeito de pagamento ja aplicado.',
+        )
+
+    order = _resolve_order_for_paid_event(event_type, data)
+    if not order:
+        return PagarmePaymentResult(
+            status='skipped',
+            event_type=event_type,
+            message='Order nao encontrada.',
+        )
+
+    if order.tenant_id != tenant.pk:
+        return PagarmePaymentResult(
+            status='skipped',
+            event_type=event_type,
+            order_uuid=str(order.uuid),
+            message='Tenant divergente.',
+        )
+
+    if dry_run:
+        payment = Payment.objects.filter(order=order).order_by('created_at').first()
+        financial_changed = (
+            (payment and payment.status != Payment.Status.PAID)
+            or order.status != Order.Status.COMPLETED
+        )
+        return PagarmePaymentResult(
+            status='dry_run',
+            event_type=event_type,
+            order_uuid=str(order.uuid) if order else '',
+            payment_uuid=str(payment.uuid) if payment else '',
+            financial_changed=financial_changed,
+            notify_event_type='',
+            message='Dry-run sem alteracao.',
+        )
+
+    order = Order.objects.select_for_update(of=('self',)).select_related(
+        'tenant', 'seller',
+    ).get(uuid=order.uuid)
+
+    payment = Payment.objects.select_for_update().filter(
+        order=order,
+    ).order_by('created_at').first()
+    if not payment:
+        return PagarmePaymentResult(
+            status='skipped',
+            event_type=event_type,
+            order_uuid=str(order.uuid),
+            message='Payment ausente.',
+        )
+
+    if payment.status == Payment.Status.PAID and order.status == Order.Status.COMPLETED:
+        return PagarmePaymentResult(
+            status='duplicate',
+            event_type=event_type,
+            order_uuid=str(order.uuid),
+            payment_uuid=str(payment.uuid),
+            financial_changed=False,
+            message='Pagamento ja aplicado.',
+        )
+
+    if payment.status == Payment.Status.REFUNDED:
+        return PagarmePaymentResult(
+            status='skipped',
+            event_type=event_type,
+            order_uuid=str(order.uuid),
+            message='Pagamento ja estornado. Rejeitando paid.',
+        )
+
+    _apply_gateway_ids(payment, data, event_type)
+    if event_type == 'payment-link.finished':
+        if not payment.paid_at:
+            payment.paid_at = timezone.now()
+    else:
+        populate_payment_from_webhook(payment, data, event_type)
+
+    payment.status = Payment.Status.PAID
+    payment.raw_callback_payload = data
+    payment.save()
+
+    order.status = Order.Status.COMPLETED
+    order.save(update_fields=['status', 'updated_at'])
+
+    return PagarmePaymentResult(
+        status='processed',
+        event_type=event_type,
+        order_uuid=str(order.uuid),
+        payment_uuid=str(payment.uuid),
+        financial_changed=True,
+        notify_event_type='payment_paid' if order.seller_id else '',
+        message='Pagamento confirmado.',
+    )
 
 
 def normalize_payment_method(raw_method: str) -> str:
@@ -302,9 +458,8 @@ def _apply_gateway_ids(payment, data, event_type):
 
 def process_paid_pagarme_event(event_id, *, dry_run=False):
     if dry_run:
-        with transaction.atomic():
-            event = WebhookEvent.objects.get(id=event_id, gateway='pagarme')
-            return _process_paid_locked_event(event, dry_run=True)
+        event = WebhookEvent.objects.get(id=event_id, gateway='pagarme')
+        return _inner_process_paid(event, dry_run=True)
 
     try:
         with transaction.atomic():
@@ -312,6 +467,7 @@ def process_paid_pagarme_event(event_id, *, dry_run=False):
             if event.processed or event.status in (
                 WebhookEvent.Status.PROCESSED,
                 WebhookEvent.Status.SKIPPED,
+                WebhookEvent.Status.IGNORED,
             ):
                 return PagarmePaymentResult(
                     status='duplicate',
@@ -328,103 +484,72 @@ def process_paid_pagarme_event(event_id, *, dry_run=False):
                 'attempt_count', 'processing_error',
             ])
 
-            return _process_paid_locked_event(event, dry_run=False)
+            result = _inner_process_paid(event, dry_run=False)
+            if result.status == 'skipped':
+                event.processed = True
+                event.status = WebhookEvent.Status.SKIPPED
+                event.skip_reason = result.message
+                event.processed_at = timezone.now()
+                event.save(update_fields=[
+                    'processed', 'status', 'skip_reason', 'processed_at',
+                ])
+            elif result.status == 'duplicate':
+                event.processed = True
+                event.status = WebhookEvent.Status.PROCESSED
+                event.processed_at = timezone.now()
+                event.save(update_fields=[
+                    'processed', 'status', 'processed_at', 'processing_error',
+                ])
+            elif result.status == 'processed':
+                event.processed = True
+                event.status = WebhookEvent.Status.PROCESSED
+                event.processed_at = timezone.now()
+                event.processing_error = ''
+                event.save(update_fields=[
+                    'processed', 'status', 'processed_at', 'processing_error',
+                ])
+                provider_charge_id = None
+                if result.event_type == 'charge.paid':
+                    provider_charge_id = event.payload.get('data', {}).get('id')
+                elif result.event_type == 'order.paid':
+                    charges = event.payload.get('data', {}).get('charges', [])
+                    if charges:
+                        provider_charge_id = charges[0].get('id')
+                mark_effect_applied(event, event.tenant_id, provider_charge_id, 'paid')
+            return result
     except Exception as exc:
         WebhookEvent.objects.filter(id=event_id, gateway='pagarme').update(
             status=WebhookEvent.Status.FAILED,
-            processing_error=str(exc)[:4000],
+            processing_error=' '.join(str(exc).split())[:4000],
         )
         raise
 
 
-def _process_paid_locked_event(event, *, dry_run):
+def _inner_process_paid(event, *, dry_run):
     payload = event.payload
     if not isinstance(payload, dict):
-        raise ValueError("Payload is not a dictionary")
+        return PagarmePaymentResult(status='error', message='Payload is not a dict')
 
     event_type = payload.get('type')
     data = payload.get('data', {})
     if event_type not in PAID_EVENT_TYPES:
-        raise ValueError(f"Evento {event_type} nao e evento de pagamento confirmado")
-
-    order = _resolve_order_for_paid_event(event_type, data)
-    if not order:
-        if not dry_run:
-            mark_event_skipped(event, "Order nao encontrada para pagamento confirmado")
         return PagarmePaymentResult(
             status='skipped',
             event_type=event_type,
-            message='Order nao encontrada.',
+            message=f'Evento {event_type} nao e pagamento confirmado.',
         )
 
-    if event.tenant_id and order.tenant_id != event.tenant_id:
-        reason = f"Tenant divergente para Order {order.uuid}"
-        if not dry_run:
-            mark_event_skipped(event, reason)
+    tenant = event.tenant
+    if not tenant:
         return PagarmePaymentResult(
-            status='skipped',
-            event_type=event_type,
-            order_uuid=str(order.uuid),
-            message=reason,
+            status='skipped', event_type=event_type,
+            message='Evento sem tenant.',
         )
 
-    order = Order.objects.select_for_update(of=('self',)).select_related(
-        'tenant', 'seller',
-    ).get(uuid=order.uuid)
-
-    payment = Payment.objects.select_for_update().filter(order=order).order_by('created_at').first()
-    if not payment:
-        reason = f"Payment ausente na Order {order.uuid}"
-        if not dry_run:
-            mark_event_skipped(event, reason)
-        return PagarmePaymentResult(
-            status='skipped',
-            event_type=event_type,
-            order_uuid=str(order.uuid),
-            message=reason,
-        )
-
-    financial_changed = payment.status != Payment.Status.PAID or order.status != Order.Status.COMPLETED
-
-    if dry_run:
-        return PagarmePaymentResult(
-            status='dry_run',
-            event_type=event_type,
-            order_uuid=str(order.uuid),
-            payment_uuid=str(payment.uuid),
-            sale_created=False,
-            financial_changed=financial_changed,
-            notify_event_type='payment_paid' if financial_changed and order.seller_id else '',
-            message='Dry-run sem alteracao.',
-        )
-
-    _apply_gateway_ids(payment, data, event_type)
-    if event_type == 'payment-link.finished':
-        if not payment.paid_at:
-            payment.paid_at = timezone.now()
-    else:
-        populate_payment_from_webhook(payment, data, event_type)
-
-    payment.status = Payment.Status.PAID
-    payment.raw_callback_payload = payload
-    payment.save()
-
-    order.status = Order.Status.COMPLETED
-    order.save(update_fields=['status', 'updated_at'])
-
-    event.processed = True
-    event.status = WebhookEvent.Status.PROCESSED
-    event.processed_at = timezone.now()
-    event.processing_error = ''
-    event.save(update_fields=['processed', 'status', 'processed_at', 'processing_error'])
-
-    return PagarmePaymentResult(
-        status='processed',
-        event_type=event_type,
-        order_uuid=str(order.uuid),
-        payment_uuid=str(payment.uuid),
-        sale_created=False,
-        financial_changed=financial_changed,
-        notify_event_type='payment_paid' if financial_changed and order.seller_id else '',
-        message='Pagamento confirmado.',
+    return apply_pagarme_payment_event(
+        tenant, event_type, data,
+        source='webhook',
+        receipt_id=event.receipt_id,
+        correlation_id=event.correlation_id,
+        dry_run=dry_run,
     )

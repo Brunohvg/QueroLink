@@ -4,10 +4,12 @@ from django.db.models import Q
 class WebhookEvent(models.Model):
     class Status(models.TextChoices):
         RECEIVED = 'RECEIVED', 'Received'
+        QUEUED = 'QUEUED', 'Queued'
         PROCESSING = 'PROCESSING', 'Processing'
         PROCESSED = 'PROCESSED', 'Processed'
         FAILED = 'FAILED', 'Failed'
         SKIPPED = 'SKIPPED', 'Skipped'
+        IGNORED = 'IGNORED', 'Ignored'
 
     gateway = models.CharField(max_length=50)
     gateway_event_id = models.CharField(
@@ -25,7 +27,24 @@ class WebhookEvent(models.Model):
         'accounts.Tenant', on_delete=models.CASCADE,
         null=True, blank=True, related_name='webhook_events',
     )
+    receipt_id = models.CharField(
+        max_length=64, blank=True, null=True,
+        help_text="ID de recibo gerado pelo Merito ao aceitar o webhook",
+    )
+    correlation_id = models.CharField(
+        max_length=64, blank=True, null=True,
+        help_text="ID de correlacao para tracing end-to-end",
+    )
+    processor_version = models.CharField(
+        max_length=20, blank=True, null=True, default='v1',
+        help_text="Versao do processador que tratou o evento",
+    )
+    effect_reference = models.CharField(
+        max_length=80, blank=True, null=True,
+        help_text="Referencia do efeito financeiro (ex: pagarme:{tenant}:{charge}:paid)",
+    )
     received_at = models.DateTimeField(auto_now_add=True)
+    queued_at = models.DateTimeField(null=True, blank=True)
     processing_started_at = models.DateTimeField(null=True, blank=True)
     processed_at = models.DateTimeField(null=True, blank=True)
     attempt_count = models.PositiveIntegerField(default=0)
@@ -37,6 +56,7 @@ class WebhookEvent(models.Model):
             models.Index(fields=['processed']),
             models.Index(fields=['gateway', 'status']),
             models.Index(fields=['gateway_event_id']),
+            models.Index(fields=['status', 'processing_started_at']),
         ]
         constraints = [
             models.UniqueConstraint(
