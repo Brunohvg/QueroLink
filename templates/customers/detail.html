@@ -1,0 +1,46 @@
+{% extends 'dashboard/base_desktop.html' %}
+{% load currency_filters %}
+{% block title %}{{ customer.name }} — Clientes{% endblock %}
+{% block content %}
+<div class="max-w-6xl mx-auto space-y-6">
+  <div class="flex items-start gap-3">
+    <a href="{% url 'dashboard:customer_list' %}" class="mt-1 p-2 rounded-xl bg-white border border-gray-100 text-gray-500 hover:text-brand-600" aria-label="Voltar">←</a>
+    <div><p class="text-xs font-semibold text-brand-600 uppercase tracking-wider">Cliente</p><h1 class="font-display text-[24px] font-bold text-gray-900">{{ customer.name }}</h1><p class="text-sm text-gray-500 mt-1">{{ document_masked|default:'Documento não informado' }}</p></div>
+  </div>
+
+  <div class="grid grid-cols-2 lg:grid-cols-5 gap-3">
+    <div class="bg-white rounded-2xl border border-gray-100 p-4"><p class="text-xs text-gray-400">Total cobrado</p><p class="text-lg font-bold text-gray-900 mt-1">{{ totals.total_charged_cents|brl }}</p></div>
+    <div class="bg-white rounded-2xl border border-gray-100 p-4"><p class="text-xs text-gray-400">Total recebido</p><p class="text-lg font-bold text-emerald-600 mt-1">{{ totals.total_paid_cents|brl }}</p></div>
+    <div class="bg-white rounded-2xl border border-gray-100 p-4"><p class="text-xs text-gray-400">Em aberto</p><p class="text-lg font-bold text-amber-600 mt-1">{{ totals.total_open_cents|brl }}</p></div>
+    <div class="bg-white rounded-2xl border border-gray-100 p-4"><p class="text-xs text-gray-400">Vencido</p><p class="text-lg font-bold text-red-600 mt-1">{{ totals.total_overdue_cents|brl }}</p></div>
+    <div class="bg-white rounded-2xl border border-gray-100 p-4 col-span-2 lg:col-span-1"><p class="text-xs text-gray-400">Cobranças</p><p class="text-lg font-bold text-gray-900 mt-1">{{ totals.charge_count }}</p></div>
+  </div>
+
+  <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+    <section class="bg-white rounded-2xl border border-gray-100 p-5 h-fit">
+      <h2 class="font-semibold text-gray-900">Dados operacionais</h2>
+      <dl class="mt-4 space-y-4 text-sm">
+        <div><dt class="text-xs text-gray-400">Telefone</dt><dd class="text-gray-700 mt-1">{{ phone_masked|default:'Não informado' }}</dd></div>
+        <div><dt class="text-xs text-gray-400">E-mail</dt><dd class="text-gray-700 mt-1">{{ email_masked|default:'Não informado' }}</dd></div>
+        <div><dt class="text-xs text-gray-400">Vendedor mais relacionado</dt><dd class="text-gray-700 mt-1">{{ totals.primary_seller_name|default:'Não identificado' }}</dd></div>
+        <div><dt class="text-xs text-gray-400">Última atividade</dt><dd class="text-gray-700 mt-1">{% if totals.last_activity_at %}{{ totals.last_activity_at|date:'d/m/Y H:i' }}{% else %}Sem atividade{% endif %}</dd></div>
+      </dl>
+      <p class="mt-5 pt-4 border-t border-gray-100 text-xs text-gray-400">Dados pessoais são mascarados nesta consulta para reduzir exposição desnecessária.</p>
+    </section>
+
+    <section class="lg:col-span-2 bg-white rounded-2xl border border-gray-100 overflow-hidden">
+      <div class="px-5 py-4 border-b border-gray-100"><h2 class="font-semibold text-gray-900">Histórico de cobranças</h2><p class="text-xs text-gray-400 mt-1">Boletos e links associados a este cliente.</p></div>
+      <div class="divide-y divide-gray-50">
+        {% for row in activities %}
+        {% if row.detail_url %}<a href="{{ row.detail_url }}" class="block p-4 hover:bg-gray-50/70">{% else %}<div class="p-4">{% endif %}
+          <div class="flex items-start justify-between gap-3">
+            <div><div class="flex items-center gap-2"><span class="px-2 py-0.5 rounded-full text-[11px] font-semibold {% if row.activity.source == 'BOLETO' %}bg-violet-50 text-violet-700{% else %}bg-blue-50 text-blue-700{% endif %}">{{ row.activity.get_source_display }}</span><span class="text-xs text-gray-400">{{ row.activity.occurred_at|date:'d/m/Y H:i' }}</span></div><p class="text-sm text-gray-600 mt-2">{{ row.activity.seller_name|default:'Vendedor não identificado' }}</p></div>
+            <div class="text-right"><p class="text-sm font-bold text-gray-900">{{ row.activity.amount_cents|brl }}</p><p class="text-xs text-gray-500 mt-1">{{ row.activity.status|default:'Sem status' }}</p></div>
+          </div>
+        {% if row.detail_url %}</a>{% else %}</div>{% endif %}
+        {% empty %}<div class="p-12 text-center text-sm text-gray-400">Nenhuma cobrança associada.</div>{% endfor %}
+      </div>
+    </section>
+  </div>
+</div>
+{% endblock %}

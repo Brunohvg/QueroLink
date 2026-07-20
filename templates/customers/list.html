@@ -1,0 +1,106 @@
+{% extends 'dashboard/base_desktop.html' %}
+{% load currency_filters %}
+{% block title %}Clientes — Mérito{% endblock %}
+{% block content %}
+<div class="max-w-7xl mx-auto space-y-6">
+  <div>
+    <h1 class="font-display text-[22px] font-bold text-gray-900 tracking-tight">Clientes</h1>
+    <p class="text-[13px] text-gray-500 mt-1">Histórico financeiro consolidado de clientes e cobranças.</p>
+  </div>
+
+  <form method="get" class="bg-white rounded-2xl border border-gray-100 p-5 shadow-sm">
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7 gap-3">
+      <div>
+        <label class="block text-[11px] font-semibold text-gray-400 uppercase tracking-wider mb-1.5">Nome exato</label>
+        <input name="name" value="{{ filters.name }}" placeholder="Nome ou razão social"
+               class="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-[13px] focus:border-brand-400 focus:ring-2 focus:ring-brand-100 outline-none">
+      </div>
+      <div>
+        <label class="block text-[11px] font-semibold text-gray-400 uppercase tracking-wider mb-1.5">CPF/CNPJ</label>
+        <input name="document" value="{{ filters.document }}" inputmode="numeric" placeholder="Somente números"
+               class="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-[13px] focus:border-brand-400 focus:ring-2 focus:ring-brand-100 outline-none">
+      </div>
+      <div>
+        <label class="block text-[11px] font-semibold text-gray-400 uppercase tracking-wider mb-1.5">Telefone</label>
+        <input name="phone" value="{{ filters.phone }}" inputmode="tel" placeholder="DDD + número"
+               class="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-[13px] focus:border-brand-400 focus:ring-2 focus:ring-brand-100 outline-none">
+      </div>
+      <div>
+        <label class="block text-[11px] font-semibold text-gray-400 uppercase tracking-wider mb-1.5">Vendedor</label>
+        <input name="seller" value="{{ filters.seller }}" placeholder="Nome exato"
+               class="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-[13px] focus:border-brand-400 focus:ring-2 focus:ring-brand-100 outline-none">
+      </div>
+      <div>
+        <label class="block text-[11px] font-semibold text-gray-400 uppercase tracking-wider mb-1.5">Pessoa</label>
+        <select name="document_type" class="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-[13px] outline-none">
+          <option value="">Todas</option>
+          <option value="CPF" {% if filters.document_type == 'CPF' %}selected{% endif %}>Física</option>
+          <option value="CNPJ" {% if filters.document_type == 'CNPJ' %}selected{% endif %}>Jurídica</option>
+        </select>
+      </div>
+      <div>
+        <label class="block text-[11px] font-semibold text-gray-400 uppercase tracking-wider mb-1.5">Situação</label>
+        <select name="state" class="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-[13px] outline-none">
+          <option value="">Todas</option>
+          <option value="open" {% if filters.state == 'open' %}selected{% endif %}>Com pendência</option>
+          <option value="overdue" {% if filters.state == 'overdue' %}selected{% endif %}>Com vencida</option>
+        </select>
+      </div>
+      <div class="flex items-end gap-2">
+        <button class="flex-1 px-3 py-2 bg-brand-600 hover:bg-brand-700 text-white rounded-xl text-[13px] font-semibold">Filtrar</button>
+        <a href="{% url 'dashboard:customer_list' %}" class="px-3 py-2 bg-gray-100 hover:bg-gray-200 text-gray-600 rounded-xl text-[13px]">Limpar</a>
+      </div>
+    </div>
+  </form>
+
+  <div class="hidden md:block bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+    <div class="overflow-x-auto">
+      <table class="w-full text-left">
+        <thead><tr class="bg-gray-50/80">
+          <th class="px-4 py-3 text-[11px] font-semibold text-gray-500 uppercase">Cliente</th>
+          <th class="px-4 py-3 text-[11px] font-semibold text-gray-500 uppercase">Contato</th>
+          <th class="px-4 py-3 text-[11px] font-semibold text-gray-500 uppercase">Vendedor recente</th>
+          <th class="px-4 py-3 text-[11px] font-semibold text-gray-500 uppercase text-right">Cobranças</th>
+          <th class="px-4 py-3 text-[11px] font-semibold text-gray-500 uppercase text-right">Cobrado</th>
+          <th class="px-4 py-3 text-[11px] font-semibold text-gray-500 uppercase text-right">Pago</th>
+          <th class="px-4 py-3 text-[11px] font-semibold text-gray-500 uppercase text-right">Pendente</th>
+          <th class="px-4 py-3"></th>
+        </tr></thead>
+        <tbody>
+          {% for row in rows %}
+          <tr class="border-t border-gray-50 hover:bg-gray-50/50">
+            <td class="px-4 py-3.5"><p class="text-sm font-semibold text-gray-900">{{ row.customer.name }}</p><p class="text-xs text-gray-400">{{ row.document_masked|default:'Sem documento' }}</p></td>
+            <td class="px-4 py-3.5"><p class="text-xs text-gray-600">{{ row.phone_masked|default:'—' }}</p><p class="text-xs text-gray-400">{{ row.email_masked|default:'—' }}</p></td>
+            <td class="px-4 py-3.5"><p class="text-sm text-gray-600">{{ row.seller_name|default:'—' }}</p><p class="text-xs text-gray-400 mt-0.5">{% if row.customer.last_activity_at %}{{ row.customer.last_activity_at|date:'d/m/Y H:i' }}{% else %}Sem atividade{% endif %}</p></td>
+            <td class="px-4 py-3.5 text-sm text-gray-700 text-right">{{ row.customer.charge_count }}</td>
+            <td class="px-4 py-3.5 text-sm font-medium text-gray-900 text-right">{{ row.customer.total_charged_cents|brl }}</td>
+            <td class="px-4 py-3.5 text-sm font-medium text-emerald-600 text-right">{{ row.customer.total_paid_cents|brl }}</td>
+            <td class="px-4 py-3.5 text-sm font-medium text-amber-600 text-right">{{ row.customer.total_open_cents|brl }}</td>
+            <td class="px-4 py-3.5 text-right"><a href="{% url 'dashboard:customer_detail' row.customer.uuid %}" class="text-sm font-semibold text-brand-600 hover:text-brand-700">Abrir</a></td>
+          </tr>
+          {% empty %}
+          <tr><td colspan="8" class="px-6 py-14 text-center text-sm text-gray-400">Nenhum cliente encontrado.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="md:hidden space-y-3">
+    {% for row in rows %}
+    <a href="{% url 'dashboard:customer_detail' row.customer.uuid %}" class="block bg-white rounded-2xl border border-gray-100 p-4 shadow-sm">
+      <div class="flex justify-between gap-3"><div><p class="font-semibold text-gray-900">{{ row.customer.name }}</p><p class="text-xs text-gray-400 mt-0.5">{{ row.document_masked|default:'Sem documento' }}</p></div><span class="text-xs text-gray-500">{{ row.customer.charge_count }} cobrança{{ row.customer.charge_count|pluralize }}</span></div>
+      <div class="grid grid-cols-3 gap-2 mt-4 pt-3 border-t border-gray-50 text-xs"><div><p class="text-gray-400">Cobrado</p><p class="font-semibold text-gray-800 mt-1">{{ row.customer.total_charged_cents|brl }}</p></div><div><p class="text-gray-400">Pago</p><p class="font-semibold text-emerald-600 mt-1">{{ row.customer.total_paid_cents|brl }}</p></div><div><p class="text-gray-400">Pendente</p><p class="font-semibold text-amber-600 mt-1">{{ row.customer.total_open_cents|brl }}</p></div></div>
+    </a>
+    {% empty %}<div class="bg-white rounded-2xl p-10 text-center text-sm text-gray-400">Nenhum cliente encontrado.</div>{% endfor %}
+  </div>
+
+  {% if page.paginator.num_pages > 1 %}
+  <nav class="flex items-center justify-center gap-3 text-sm">
+    {% if page.has_previous %}<a class="px-3 py-2 bg-white border border-gray-200 rounded-lg" href="?page={{ page.previous_page_number }}{% for key,value in filters.items %}{% if key != 'page' and value %}&amp;{{ key }}={{ value|urlencode }}{% endif %}{% endfor %}">Anterior</a>{% endif %}
+    <span class="text-gray-500">Página {{ page.number }} de {{ page.paginator.num_pages }}</span>
+    {% if page.has_next %}<a class="px-3 py-2 bg-white border border-gray-200 rounded-lg" href="?page={{ page.next_page_number }}{% for key,value in filters.items %}{% if key != 'page' and value %}&amp;{{ key }}={{ value|urlencode }}{% endif %}{% endfor %}">Próxima</a>{% endif %}
+  </nav>
+  {% endif %}
+</div>
+{% endblock %}

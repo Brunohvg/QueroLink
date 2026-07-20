@@ -1,5 +1,5 @@
-from django.utils import timezone
 from django.conf import settings
+from django.utils import timezone
 
 
 def trial_status(request):
@@ -36,4 +36,7 @@ def trial_status(request):
 def global_context(request):
     return {
         'VAPID_PUBLIC_KEY': getattr(settings, 'VAPID_PUBLIC_KEY', ''),
+        'customer_ledger_ui_enabled': getattr(
+            settings, 'CUSTOMER_LEDGER_UI_ENABLED', False
+        ),
     }
