@@ -61,6 +61,7 @@ class DeliveryTests(TestCase):
             status=Boleto.Status.PENDENTE,
             idempotency_key='del-test-1',
             provider_barcode='12345678901234567890',
+            provider_digitable_line='12345.67890 12345.678901',
             provider_url='https://boleto.test/123',
         )
 

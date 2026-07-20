@@ -1,7 +1,8 @@
 {% extends 'mobile/base_mobile.html' %}
+{% load static %}
 {% block title %}Novo Boleto — Mérito{% endblock %}
 {% block content %}
-<div class="px-4 py-5 fade-up" x-data="mobileNovoBoleto()">
+<div class="px-4 py-5 fade-up" x-data="mobileNovoBoleto()" x-init="init()">
   <!-- Header -->
   <div class="flex items-center gap-3 mb-6">
     <a href="{% url 'dashboard:mobile_boletos' %}" class="w-10 h-10 bg-white rounded-xl card-shadow flex items-center justify-center flex-shrink-0">
@@ -108,8 +109,25 @@
       </div>
     </div>
 
+    <div x-show="reviewing" x-cloak class="bg-brand-50 rounded-2xl border border-brand-100 p-5 space-y-3" aria-live="polite">
+      <div class="flex items-center justify-between">
+        <h2 class="text-[14px] font-semibold text-gray-800">Revise antes de emitir</h2>
+        <button type="button" @click="reviewing = false" class="text-xs font-medium text-brand-700">Editar</button>
+      </div>
+      <dl class="space-y-2 text-sm">
+        <div><dt class="text-gray-500">Pagador</dt><dd class="font-medium text-gray-900" x-text="form.payer_name"></dd></div>
+        <div><dt class="text-gray-500">Documento</dt><dd class="font-medium text-gray-900" x-text="form.payer_document_type + ' ' + form.payer_document"></dd></div>
+        <div class="grid grid-cols-2 gap-3">
+          <div><dt class="text-gray-500">Valor</dt><dd class="font-medium text-gray-900" x-text="reviewAmount()"></dd></div>
+          <div><dt class="text-gray-500">Vencimento</dt><dd class="font-medium text-gray-900" x-text="form.due_date"></dd></div>
+        </div>
+        <div><dt class="text-gray-500">Endereço</dt><dd class="font-medium text-gray-900" x-text="form.payer_street + ', ' + form.payer_number + ' — ' + form.payer_city + '/' + form.payer_state"></dd></div>
+      </dl>
+      <p class="text-xs text-brand-700">A próxima ação emitirá o boleto para o vendedor autenticado.</p>
+    </div>
+
     <!-- Error -->
-    <div x-show="error" x-cloak class="bg-red-50 border border-red-100 text-red-700 text-sm rounded-xl px-4 py-3 flex items-start gap-2.5">
+    <div x-show="error" x-cloak role="alert" aria-live="polite" class="bg-red-50 border border-red-100 text-red-700 text-sm rounded-xl px-4 py-3 flex items-start gap-2.5">
       <svg class="w-5 h-5 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
       <span x-text="error"></span>
     </div>
@@ -117,13 +135,14 @@
     <!-- Submit -->
     <button type="submit" :disabled="submitting" class="w-full py-3.5 bg-brand-600 hover:bg-brand-700 text-white font-semibold rounded-xl transition-all shadow-sm disabled:opacity-50 flex items-center justify-center gap-2">
       <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
-      <span x-show="!submitting">Emitir boleto</span>
+      <span x-show="!submitting" x-text="reviewing ? 'Confirmar e emitir' : 'Revisar boleto'"></span>
       <span x-show="submitting">Emitindo...</span>
     </button>
 
   </form>
 </div>
 
+<script src="{% static 'js/boleto-form.js' %}"></script>
 <script>
 function mobileNovoBoleto() {
     return {
@@ -145,11 +164,57 @@ function mobileNovoBoleto() {
             instructions: '',
             notes: '',
         },
-        idempotencyKey: 'boleto-' + Date.now() + '-' + Math.random().toString(36).slice(2, 8),
+        idempotencyKey: '',
         error: '',
         submitting: false,
+        reviewing: false,
+        searchingDocument: false,
+        searchingCep: false,
+        init() {
+            this.idempotencyKey = MeritoBoleto.idempotencyKey();
+            this.$watch('form.payer_document', function(value) {
+                var digits = String(value || '').replace(/[^\d]/g, '');
+                if (digits.length === 11 || digits.length === 14) this.lookupCustomer(digits);
+                if (digits.length === 14 && this.form.payer_document_type === 'CNPJ') this.lookupCnpj(digits);
+            }.bind(this));
+            this.$watch('form.payer_zip_code', function(value) {
+                var digits = String(value || '').replace(/[^\d]/g, '');
+                if (digits.length === 8) this.lookupCep(digits);
+            }.bind(this));
+        },
+        lookupCustomer(digits) {
+            MeritoBoleto.lookup('/api/boletos/customer/' + digits + '/')
+                .then(function(data) {
+                    if (data.found) MeritoBoleto.fillEmpty(this.form, data, ['payer_name', 'payer_email', 'payer_phone']);
+                }.bind(this))
+                .catch(function() {});
+        },
+        lookupCnpj(digits) {
+            if (this.searchingDocument) return;
+            this.searchingDocument = true;
+            MeritoBoleto.lookup('/api/boletos/cnpj/' + digits + '/')
+                .then(function(data) { MeritoBoleto.fillEmpty(this.form, data, ['payer_name', 'payer_zip_code', 'payer_street', 'payer_number', 'payer_complement', 'payer_neighborhood', 'payer_city', 'payer_state']); }.bind(this))
+                .catch(function(error) { this.error = error.message; }.bind(this))
+                .finally(function() { this.searchingDocument = false; }.bind(this));
+        },
+        lookupCep(digits) {
+            if (this.searchingCep) return;
+            this.searchingCep = true;
+            MeritoBoleto.lookup('/api/boletos/cep/' + digits + '/')
+                .then(function(data) { MeritoBoleto.fillEmpty(this.form, data, ['payer_street', 'payer_neighborhood', 'payer_city', 'payer_state']); }.bind(this))
+                .catch(function(error) { this.error = error.message; }.bind(this))
+                .finally(function() { this.searchingCep = false; }.bind(this));
+        },
+        reviewAmount() {
+            var value = parseFloat(this.form.amount_cents || 0);
+            return value.toLocaleString('pt-BR', {style: 'currency', currency: 'BRL'});
+        },
         submit() {
             this.error = '';
+            if (!this.reviewing) {
+                this.reviewing = true;
+                return;
+            }
             this.submitting = true;
             var payload = {};
             for (var key in this.form) {
@@ -175,7 +240,7 @@ function mobileNovoBoleto() {
             .then(function(r) { return r.json().then(function(d) { return { status: r.status, data: d }; }); })
             .then(function(result) {
                 if (result.status === 201) {
-                    window.location.href = '/dashboard/mobile/boletos/';
+                    window.location.href = '/dashboard/mobile/boletos/?created=' + result.data.uuid;
                 } else {
                     var detail = result.data.detail || JSON.stringify(result.data);
                     this.error = detail;

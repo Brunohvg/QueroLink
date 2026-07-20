@@ -8,8 +8,8 @@
   {% if provider_url %}
   <p><a href="{{ provider_url }}" style="display: inline-block; padding: 10px 20px; background: #1463FF; color: white; text-decoration: none; border-radius: 8px;">Abrir Boleto</a></p>
   {% endif %}
-  {% if provider_barcode %}
-  <p>Linha digitavel: <code style="background: #f5f5f5; padding: 8px; display: block; border-radius: 4px; font-size: 14px;">{{ provider_barcode }}</code></p>
+  {% if digitable_line %}
+  <p>Linha digitavel: <code style="background: #f5f5f5; padding: 8px; display: block; border-radius: 4px; font-size: 14px;">{{ digitable_line }}</code></p>
   {% endif %}
   <hr>
   <p style="color: #999; font-size: 12px;">Merito by Vidalys</p>

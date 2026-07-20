@@ -22,6 +22,7 @@ class ProviderResult:
     charge_id: str
     status: ProviderStatus
     barcode: str = ''
+    digitable_line: str = ''
     url: str = ''
     paid_amount_cents: int | None = None
     paid_at: datetime | None = None

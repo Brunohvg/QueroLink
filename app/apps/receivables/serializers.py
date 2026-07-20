@@ -9,6 +9,11 @@ class BoletoListSerializer(serializers.ModelSerializer):
     seller_name = serializers.CharField(source='seller.name', read_only=True)
     status_display = serializers.SerializerMethodField()
     amount_formatted = serializers.SerializerMethodField()
+    barcode = serializers.CharField(source='provider_barcode', read_only=True)
+    digitable_line = serializers.CharField(
+        source='provider_digitable_line', read_only=True
+    )
+    boleto_url = serializers.URLField(source='provider_url', read_only=True)
 
     class Meta:
         model = Boleto
@@ -17,6 +22,7 @@ class BoletoListSerializer(serializers.ModelSerializer):
             'status', 'status_display', 'due_date', 'paid_at',
             'paid_amount_cents', 'created_at',
             'provider_barcode', 'provider_url',
+            'barcode', 'digitable_line', 'boleto_url',
         ]
 
     def get_status_display(self, obj):
@@ -36,6 +42,11 @@ class BoletoDetailSerializer(serializers.ModelSerializer):
     amount_formatted = serializers.SerializerMethodField()
     has_invoice_pdf = serializers.SerializerMethodField()
     has_invoice_xml = serializers.SerializerMethodField()
+    barcode = serializers.CharField(source='provider_barcode', read_only=True)
+    digitable_line = serializers.CharField(
+        source='provider_digitable_line', read_only=True
+    )
+    boleto_url = serializers.URLField(source='provider_url', read_only=True)
 
     class Meta:
         model = Boleto
@@ -50,6 +61,7 @@ class BoletoDetailSerializer(serializers.ModelSerializer):
             'operation_error_message',
             'has_invoice_pdf', 'has_invoice_xml',
             'provider_barcode', 'provider_url',
+            'barcode', 'digitable_line', 'boleto_url',
             'created_at', 'updated_at',
         ]
 

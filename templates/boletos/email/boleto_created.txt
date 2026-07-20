@@ -4,6 +4,6 @@ Valor: {{ amount }}
 Vencimento: {{ due_date }}
 
 {% if provider_url %}Link do boleto: {{ provider_url }}{% endif %}
-{% if provider_barcode %}Linha digitavel: {{ provider_barcode }}{% endif %}
+{% if digitable_line %}Linha digitavel: {{ digitable_line }}{% endif %}
 
 Merito by Vidalys

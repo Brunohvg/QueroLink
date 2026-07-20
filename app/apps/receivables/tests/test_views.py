@@ -1,11 +1,15 @@
 from unittest.mock import patch
 
+from django.core.cache import cache
 from django.test import TestCase, Client
 from django.urls import reverse
 from django.utils import timezone
 
+from app.apps.accounts.fields import compute_hash
 from app.apps.accounts.models import Tenant, User
+from app.apps.customers.models import Customer
 from app.apps.receivables.models import Boleto
+from app.apps.receivables.throttles import CnpjLookupThrottle
 from app.apps.sellers.models import Seller
 
 
@@ -16,6 +20,7 @@ class GestorBoletoViewsTest(TestCase):
             company_name='Gestor Tenant',
             plan='PRO',
             receivables_enabled=True,
+            pagarme_api_key='sk_test_receivables',
         )
         self.manager = User.objects.create_user(
             username='gestor-manager',
@@ -73,12 +78,12 @@ class GestorBoletoViewsTest(TestCase):
         response = self.client.get(reverse('dashboard:gestor_boletos'))
         self.assertNotEqual(response.status_code, 200)
 
-    def test_list_page_redirects_when_disabled(self):
+    def test_list_page_keeps_history_when_disabled(self):
         self.tenant.receivables_enabled = False
         self.tenant.save(update_fields=['receivables_enabled'])
         self._login()
         response = self.client.get(reverse('dashboard:gestor_boletos'))
-        self.assertIn(response.status_code, (302,))
+        self.assertEqual(response.status_code, 200)
 
     # ── Detail page ──────────────────────────────────────────
 
@@ -125,6 +130,16 @@ class GestorBoletoViewsTest(TestCase):
         self.assertTemplateUsed(
             response, 'dashboard/gestor/boletos/new.html'
         )
+        self.assertContains(response, 'Revise antes de emitir')
+        self.assertContains(response, 'Confirmar e emitir')
+
+    def test_mobile_new_page_requires_review_before_submit(self):
+        self._login('gestor-seller', 'testpass')
+        response = self.client.get(reverse('dashboard:mobile_boleto_new'))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'Revise antes de emitir')
+        self.assertContains(response, 'if (!this.reviewing)')
 
     @patch('app.apps.receivables.views.lookup_cnpj')
     def test_cnpj_autocomplete_returns_creation_fields(self, mock_lookup):
@@ -164,3 +179,49 @@ class GestorBoletoViewsTest(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json()['payer_street'], 'Avenida Paulista')
         self.assertEqual(response.json()['payer_state'], 'SP')
+
+    def test_customer_lookup_is_exact_and_tenant_scoped(self):
+        customer = Customer.objects.create(
+            tenant=self.tenant,
+            name='Cliente Existente',
+            document='52998224725',
+            document_type='CPF',
+            document_hash=compute_hash('52998224725'),
+            email='cliente@example.com',
+            phone='11988887777',
+        )
+        other_tenant = Tenant.objects.create(company_name='Customer Other')
+        Customer.objects.create(
+            tenant=other_tenant,
+            name='Outro Tenant',
+            document='11222333000181',
+            document_type='CNPJ',
+            document_hash=compute_hash('11222333000181'),
+        )
+        self._login()
+
+        found = self.client.get(reverse(
+            'dashboard:api_boleto_customer_lookup', args=['52998224725'],
+        ))
+        isolated = self.client.get(reverse(
+            'dashboard:api_boleto_customer_lookup', args=['11222333000181'],
+        ))
+
+        self.assertEqual(found.status_code, 200)
+        self.assertEqual(found.json()['customer_uuid'], str(customer.uuid))
+        self.assertEqual(found.json()['payer_name'], 'Cliente Existente')
+        self.assertEqual(isolated.json(), {'found': False})
+
+    @patch.object(CnpjLookupThrottle, 'get_rate', return_value='1/minute')
+    @patch('app.apps.receivables.views.lookup_cnpj')
+    def test_cnpj_lookup_has_specific_throttle(self, mock_lookup, _rate):
+        cache.clear()
+        mock_lookup.return_value = {'payer_name': 'Empresa Teste'}
+        self._login()
+        url = reverse('dashboard:api_cnpj_lookup', args=['11222333000181'])
+
+        first = self.client.get(url)
+        second = self.client.get(url)
+
+        self.assertEqual(first.status_code, 200)
+        self.assertEqual(second.status_code, 429)

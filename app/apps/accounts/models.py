@@ -222,6 +222,7 @@ def can_create_receivable(user, tenant):
         can_view_receivables_history(user, tenant)
         and user.role in (User.Role.ADMIN, User.Role.MANAGER, User.Role.SELLER)
         and tenant_has_feature(tenant, 'boletos')
+        and tenant.pagarme_configured
     )
 
 
@@ -234,6 +235,38 @@ def can_manage_receivable(user, tenant):
             User.Role.FINANCEIRO,
         )
         and tenant_has_feature(tenant, 'boletos')
+    )
+
+
+def can_cancel_boleto(user, tenant):
+    return bool(
+        can_view_receivables_history(user, tenant)
+        and user.role in (User.Role.ADMIN, User.Role.MANAGER)
+        and tenant_has_feature(tenant, 'boletos')
+        and tenant.pagarme_configured
+    )
+
+
+def can_allocate_boleto(user, tenant):
+    return bool(
+        can_view_receivables_history(user, tenant)
+        and user.role in (
+            User.Role.ADMIN,
+            User.Role.MANAGER,
+            User.Role.FINANCEIRO,
+        )
+        and tenant_has_feature(tenant, 'boletos')
+    )
+
+
+def can_view_all_sellers(user, tenant):
+    return bool(
+        can_view_receivables_history(user, tenant)
+        and user.role in (
+            User.Role.ADMIN,
+            User.Role.MANAGER,
+            User.Role.FINANCEIRO,
+        )
     )
 
 

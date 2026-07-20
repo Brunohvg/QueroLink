@@ -14,6 +14,7 @@ from app.apps.receivables.providers import (
     ProviderStatus,
 )
 from app.apps.receivables.services import BoletoServiceError, create_boleto
+from app.apps.receivables.services import IdempotencyConflictError
 from app.apps.sellers.models import Seller
 
 
@@ -186,7 +187,7 @@ class CreateBoletoTests(TransactionTestCase):
         self.assertEqual(error.exception.boleto.status, Boleto.Status.FALHOU)
 
     @patch('app.apps.receivables.services.get_provider')
-    def test_barcode_and_url_persisted(self, get_provider):
+    def test_barcode_digitable_line_and_url_persisted(self, get_provider):
         provider = self.provider()
         provider.create.return_value = ProviderResult(
             provider='PAGARME',
@@ -194,6 +195,7 @@ class CreateBoletoTests(TransactionTestCase):
             charge_id='ch_barcode',
             status=ProviderStatus.PENDING,
             barcode='12345678901234567890123456789012345678901234',
+            digitable_line='12345.67890 12345.678901 1 12345678901234',
             url='https://pagarme.me/boleto/test',
         )
         get_provider.return_value = provider
@@ -208,6 +210,10 @@ class CreateBoletoTests(TransactionTestCase):
         self.assertEqual(
             boleto.provider_url, 'https://pagarme.me/boleto/test',
         )
+        self.assertEqual(
+            boleto.provider_digitable_line,
+            '12345.67890 12345.678901 1 12345678901234',
+        )
 
     @patch('app.apps.receivables.services.get_provider')
     def test_same_key_different_payload_raises_error(self, get_provider):
@@ -219,9 +225,34 @@ class CreateBoletoTests(TransactionTestCase):
         )
         diff_data = dict(self.boleto_data())
         diff_data['amount_cents'] = 99999
-        from django.core.exceptions import ValidationError
-        with self.assertRaises(ValidationError):
+        with self.assertRaises(IdempotencyConflictError):
             create_boleto(
                 self.tenant, self.seller, self.user,
                 diff_data, 'conflict-key',
             )
+        self.assertEqual(provider.create.call_count, 1)
+
+    @patch('app.apps.receivables.services.get_provider')
+    def test_same_key_different_seller_raises_without_provider_call(self, get_provider):
+        provider = self.provider()
+        get_provider.return_value = provider
+        create_boleto(
+            self.tenant, self.seller, self.user,
+            self.boleto_data(), 'seller-conflict-key',
+        )
+        other_user = User.objects.create_user(
+            username='provider-seller-two', tenant=self.tenant,
+            role=User.Role.SELLER,
+        )
+        other_seller = Seller.objects.create(
+            tenant=self.tenant, user=other_user, name='Seller Two',
+            phone='11988888888',
+        )
+
+        with self.assertRaises(IdempotencyConflictError):
+            create_boleto(
+                self.tenant, other_seller, self.user,
+                self.boleto_data(), 'seller-conflict-key',
+            )
+
+        self.assertEqual(provider.create.call_count, 1)

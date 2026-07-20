@@ -45,8 +45,8 @@
              class="text-xs text-brand-600 hover:text-brand-800 font-medium">
             Abrir Boleto
           </a>
-          <span x-show="b.provider_barcode" class="text-xs text-gray-400 ml-3 cursor-pointer"
-                @click="copyBarcode(b.provider_barcode)">Copiar linha</span>
+          <span x-show="b.digitable_line" class="text-xs text-gray-400 ml-3 cursor-pointer"
+                @click="copyBarcode(b.digitable_line)">Copiar linha</span>
         </div>
         <div x-show="!b.provider_url && b.status === 'PENDENTE'" class="pt-1 text-xs text-amber-600">
           Aguardando confirmacao...

@@ -5,9 +5,14 @@ from django.urls import reverse
 from django.utils import timezone
 from rest_framework import status
 from rest_framework.test import APIClient
+from rest_framework.test import APIRequestFactory, force_authenticate
 
 from app.apps.accounts.models import Tenant, User
 from app.apps.receivables.models import Boleto
+from app.apps.receivables.services import IdempotencyConflictError
+from app.apps.receivables.throttles import (
+    BoletoCancelThrottle, BoletoCreateThrottle,
+)
 from app.apps.sellers.models import Seller
 
 
@@ -18,6 +23,7 @@ class ReceivablesAPITests(TestCase):
             company_name='API Tenant',
             plan='PRO',
             receivables_enabled=True,
+            pagarme_api_key='sk_test_receivables',
         )
         self.manager = User.objects.create_user(
             username='api-manager',
@@ -103,12 +109,28 @@ class ReceivablesAPITests(TestCase):
 
     # ── Feature flag ─────────────────────────────────────────
 
-    def test_feature_disabled_returns_403(self):
+    def test_feature_disabled_does_not_hide_history(self):
         self.tenant.receivables_enabled = False
         self.tenant.save(update_fields=['receivables_enabled'])
         self._login(self.manager)
         response = self.client.get(self._url('boleto-list-create'))
-        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data['results']), 2)
+
+    def test_provider_missing_does_not_hide_history_but_blocks_creation(self):
+        self.tenant.pagarme_api_key = ''
+        self.tenant.save(update_fields=['pagarme_api_key'])
+        self._login(self.manager)
+
+        history = self.client.get(self._url('boleto-list-create'))
+        creation = self.client.post(
+            self._url('boleto-list-create'), {}, format='json',
+            HTTP_X_IDEMPOTENCY_KEY='provider-missing',
+        )
+
+        self.assertEqual(history.status_code, status.HTTP_200_OK)
+        self.assertEqual(creation.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertEqual(creation.data['code'], 'issuance_unavailable')
 
     # ── List boletos ─────────────────────────────────────────
 
@@ -162,6 +184,9 @@ class ReceivablesAPITests(TestCase):
             response.data['amount_cents'], self.boleto.amount_cents
         )
         self.assertEqual(response.data['status'], 'PENDENTE')
+        self.assertIn('digitable_line', response.data)
+        self.assertIn('barcode', response.data)
+        self.assertIn('boleto_url', response.data)
 
     def test_seller_can_view_own_boleto_detail(self):
         self._login(self.seller.user)
@@ -271,6 +296,36 @@ class ReceivablesAPITests(TestCase):
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
 
     @patch('app.apps.receivables.api.create_boleto')
+    def test_idempotency_conflict_returns_409(self, mock_create):
+        mock_create.side_effect = IdempotencyConflictError
+        self._login(self.manager)
+        data = {
+            'seller_uuid': str(self.seller.uuid),
+            'payer_name': 'New Payer',
+            'payer_document': '52998224725',
+            'payer_document_type': 'CPF',
+            'payer_phone': '11988887777',
+            'payer_zip_code': '01310100',
+            'payer_street': 'Rua Nova',
+            'payer_number': '50',
+            'payer_neighborhood': 'Centro',
+            'payer_city': 'Sao Paulo',
+            'payer_state': 'SP',
+            'amount_cents': 100000,
+            'due_date': (
+                timezone.localdate() + timezone.timedelta(days=30)
+            ).isoformat(),
+        }
+
+        response = self.client.post(
+            self._url('boleto-list-create'), data, format='json',
+            HTTP_X_IDEMPOTENCY_KEY='conflicting-key',
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_409_CONFLICT)
+        self.assertEqual(response.data['code'], 'IDEMPOTENCY_CONFLICT')
+
+    @patch('app.apps.receivables.api.create_boleto')
     def test_seller_cannot_select_another_seller(self, mock_create):
         self._login(self.seller.user)
         data = {
@@ -311,6 +366,22 @@ class ReceivablesAPITests(TestCase):
             format='json',
         )
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_read_requests_do_not_consume_operation_throttles(self):
+        factory = APIRequestFactory()
+        list_request = factory.get('/api/receivables/boletos/')
+        detail_request = factory.get('/api/receivables/boletos/example/')
+        force_authenticate(list_request, user=self.manager)
+        force_authenticate(detail_request, user=self.manager)
+        list_request.user = self.manager
+        detail_request.user = self.manager
+
+        self.assertIsNone(
+            BoletoCreateThrottle().get_cache_key(list_request, None)
+        )
+        self.assertIsNone(
+            BoletoCancelThrottle().get_cache_key(detail_request, None)
+        )
 
     # ── Tenant isolation ─────────────────────────────────────
 
