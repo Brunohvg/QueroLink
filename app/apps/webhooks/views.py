@@ -259,8 +259,13 @@ def pagarme_webhook(request, tenant_slug):
         )
         return JsonResponse({"status": "ignored_foreign"}, status=200)
 
+    from app.apps.webhooks.services import generate_receipt_id, generate_correlation_id
+
     sanitized = scrub_payment_payload(payload)
     gateway_event_id = payload.get('id') or ''
+    receipt_id = generate_receipt_id()
+    correlation_id = generate_correlation_id()
+
     event, created = _get_or_create_webhook_event(
         gateway='pagarme',
         payload=sanitized,
@@ -271,25 +276,72 @@ def pagarme_webhook(request, tenant_slug):
         action = _pagarme_existing_event_action(event)
         if action == 'duplicate':
             logger.info("Webhook duplicado ignorado: gateway_event_id=%s", gateway_event_id)
-            return JsonResponse({"status": "duplicate"}, status=200)
+            return JsonResponse(
+                {"received": True, "processor": "merito-webhooks", "version": "v1",
+                 "event_id": gateway_event_id, "receipt_id": receipt_id,
+                 "correlation_id": correlation_id, "duplicate": True},
+                status=200,
+                headers={
+                    "X-Merito-Webhook": "accepted",
+                    "X-Merito-Receipt-Id": receipt_id,
+                    "X-Correlation-Id": correlation_id,
+                },
+            )
         if action == 'processing':
             logger.info("Webhook ja em processamento: gateway_event_id=%s", gateway_event_id)
-            return JsonResponse({"status": "processing"}, status=200)
+            return JsonResponse(
+                {"received": True, "processor": "merito-webhooks", "version": "v1",
+                 "event_id": gateway_event_id, "receipt_id": receipt_id,
+                 "correlation_id": correlation_id, "duplicate": True},
+                status=200,
+                headers={
+                    "X-Merito-Webhook": "accepted",
+                    "X-Merito-Receipt-Id": receipt_id,
+                    "X-Correlation-Id": correlation_id,
+                },
+            )
 
         if action == 'recover':
             event.status = WebhookEvent.Status.RECEIVED
             event.processing_error = ''
             event.processing_started_at = None
+            event.receipt_id = receipt_id
+            event.correlation_id = correlation_id
             event.save(update_fields=[
                 'status', 'processing_error', 'processing_started_at',
+                'receipt_id', 'correlation_id',
             ])
         from app.apps.webhooks.tasks import process_pagarme_webhook
         process_pagarme_webhook.delay(event.id)
-        return JsonResponse({"status": "received"}, status=200)
+        return JsonResponse(
+            {"received": True, "processor": "merito-webhooks", "version": "v1",
+             "event_id": gateway_event_id, "receipt_id": receipt_id,
+             "correlation_id": correlation_id, "duplicate": False},
+            status=200,
+            headers={
+                "X-Merito-Webhook": "accepted",
+                "X-Merito-Receipt-Id": receipt_id,
+                "X-Correlation-Id": correlation_id,
+            },
+        )
+
+    event.receipt_id = receipt_id
+    event.correlation_id = correlation_id
+    event.save(update_fields=['receipt_id', 'correlation_id'])
 
     from app.apps.webhooks.tasks import process_pagarme_webhook
     process_pagarme_webhook.delay(event.id)
-    return JsonResponse({"status": "received"}, status=200)
+    return JsonResponse(
+        {"received": True, "processor": "merito-webhooks", "version": "v1",
+         "event_id": gateway_event_id, "receipt_id": receipt_id,
+         "correlation_id": correlation_id, "duplicate": False},
+        status=200,
+        headers={
+            "X-Merito-Webhook": "accepted",
+            "X-Merito-Receipt-Id": receipt_id,
+            "X-Correlation-Id": correlation_id,
+        },
+    )
 
 
 @csrf_exempt

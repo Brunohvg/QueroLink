@@ -79,11 +79,35 @@ def _notify_link_status_after_commit(order, event_type, motivo=''):
     time_limit=180,
 )
 def process_pagarme_webhook(event_id):
+    try:
+        _process_pagarme_webhook_impl(event_id)
+    except Exception as exc:
+        logger.exception("Falha ao processar webhook %s", event_id)
+        try:
+            WebhookEvent.objects.filter(pk=event_id, processed=False).update(
+                status=WebhookEvent.Status.FAILED,
+                processing_error=' '.join(str(exc).split())[:4000],
+            )
+        except Exception:
+            logger.exception("Falha ao marcar webhook %s como FAILED", event_id)
+        raise
+
+
+def _process_pagarme_webhook_impl(event_id):
     event_for_routing = WebhookEvent.objects.select_related('tenant').filter(
         id=event_id,
         processed=False,
     ).first()
-    if event_for_routing and webhook_event_belongs_to_boleto(event_for_routing):
+    if not event_for_routing:
+        logger.info("Webhook %s ja processado ou nao encontrado", event_id)
+        return
+
+    WebhookEvent.objects.filter(pk=event_id, processed=False).update(
+        status=WebhookEvent.Status.QUEUED,
+        queued_at=timezone.now(),
+    )
+
+    if webhook_event_belongs_to_boleto(event_for_routing):
         process_receivable_webhook.delay(event_id)
         return
 
@@ -108,7 +132,9 @@ def process_pagarme_webhook(event_id):
                     event_id, event.gateway_event_id,
                 )
                 event.processed = True
-                event.save(update_fields=['processed'])
+                event.status = WebhookEvent.Status.PROCESSED
+                event.processed_at = timezone.now()
+                event.save(update_fields=['processed', 'status', 'processed_at'])
                 return
 
         payload = event.payload
@@ -770,3 +796,105 @@ def cleanup_old_webhook_events():
         total += deleted
     if total:
         logger.info("Cleaned up %d old webhook events", total)
+
+
+@shared_task(soft_time_limit=120, time_limit=180)
+def watchdog_stuck_webhooks():
+    """Recupera eventos travados em PROCESSING ou RECEIVED ha muito tempo."""
+    from datetime import timedelta
+    from django.conf import settings
+
+    processing_timeout_minutes = getattr(settings, 'WEBHOOK_PROCESSING_TIMEOUT_MINUTES', 10)
+    received_timeout_minutes = getattr(settings, 'WEBHOOK_RECEIVED_TIMEOUT_MINUTES', 5)
+    batch_limit = getattr(settings, 'WEBHOOK_WATCHDOG_BATCH_LIMIT', 50)
+
+    processing_cutoff = timezone.now() - timedelta(minutes=processing_timeout_minutes)
+    stuck_processing = WebhookEvent.objects.filter(
+        gateway='pagarme',
+        status=WebhookEvent.Status.PROCESSING,
+        processing_started_at__lt=processing_cutoff,
+        processed=False,
+    ).order_by('processing_started_at')[:batch_limit]
+
+    recovered = 0
+    for event in stuck_processing:
+        logger.warning(
+            "Watchdog: recuperando evento %s travado em PROCESSING desde %s",
+            event.id, event.processing_started_at,
+        )
+        event.status = WebhookEvent.Status.RECEIVED
+        event.processing_error = 'watchdog_recovery'
+        event.processing_started_at = None
+        event.save(update_fields=['status', 'processing_error', 'processing_started_at'])
+        process_pagarme_webhook.delay(event.id)
+        recovered += 1
+
+    received_cutoff = timezone.now() - timedelta(minutes=received_timeout_minutes)
+    stuck_received = WebhookEvent.objects.filter(
+        gateway='pagarme',
+        status=WebhookEvent.Status.RECEIVED,
+        received_at__lt=received_cutoff,
+        processed=False,
+    ).order_by('received_at')[:batch_limit]
+
+    for event in stuck_received:
+        logger.warning(
+            "Watchdog: reenfileirando evento %s RECEIVED sem processamento desde %s",
+            event.id, event.received_at,
+        )
+        process_pagarme_webhook.delay(event.id)
+        recovered += 1
+
+    if recovered:
+        logger.info("Watchdog: %d eventos recuperados", recovered)
+
+
+@shared_task(soft_time_limit=300, time_limit=360)
+def reconcile_pending_boletos():
+    """Reconcilia boletos PENDENTE/VENCIDO consultando o provider."""
+    from datetime import timedelta
+    from django.conf import settings
+
+    from app.apps.receivables.models import Boleto
+    from app.apps.receivables.providers import get_provider, ProviderStatus
+
+    cutoff_start = timezone.now() - timedelta(days=30)
+    min_age_minutes = getattr(settings, 'BOLETO_RECONCILE_MIN_AGE_MINUTES', 15)
+    batch_limit = getattr(settings, 'BOLETO_RECONCILE_BATCH_LIMIT', 100)
+    cutoff_min_age = timezone.now() - timedelta(minutes=min_age_minutes)
+
+    boletos = Boleto.objects.filter(
+        status__in=(Boleto.Status.PENDENTE, Boleto.Status.VENCIDO),
+        created_at__gte=cutoff_start,
+        created_at__lte=cutoff_min_age,
+        provider_order_id__isnull=False,
+    ).select_related('tenant').order_by('created_at')[:batch_limit]
+
+    counted = 0
+    paid = 0
+    for boleto in boletos:
+        counted += 1
+        try:
+            provider = get_provider(boleto.tenant)
+            result = provider.retrieve_status(
+                boleto.tenant,
+                order_id=boleto.provider_order_id,
+                charge_id=boleto.provider_charge_id,
+            )
+            if result.status == ProviderStatus.PAID:
+                from app.apps.receivables.services import mark_paid
+                paid_at = result.paid_at or timezone.now()
+                amount = result.amount or boleto.amount_cents
+                mark_paid(boleto, amount, paid_at)
+                paid += 1
+        except Exception:
+            logger.exception(
+                "Reconciliacao boleto: erro no boleto %s, continuando batch",
+                boleto.uuid,
+            )
+            continue
+
+    logger.info(
+        "Reconciliacao boletos: %d verificados, %d pagos",
+        counted, paid,
+    )
