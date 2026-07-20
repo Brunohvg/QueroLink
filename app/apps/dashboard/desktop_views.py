@@ -883,8 +883,8 @@ def gestor_cobrancas(request):
     from app.apps.sellers.models import Seller as SellerModel
     can_create_links = True
 
-    from app.apps.accounts.models import tenant_has_feature
-    can_create_boletos = tenant_has_feature(tenant, 'boletos')
+    from app.apps.accounts.models import can_create_receivable
+    can_create_boletos = can_create_receivable(request.user, tenant)
 
     cobrancas, orders_data, boletos_data = build_charge_center(tenant)
 
