@@ -79,9 +79,15 @@ class OutboxConsumerTests(TestCase):
             idempotency_key='outbox-test-2',
         )
 
-    def test_send_due_reminders_creates_delivery(self):
+    @patch('app.services.messaging.whatsapp.WhatsappClient.send_message')
+    def test_send_due_reminders_creates_delivery(self, mock_send):
         from app.apps.receivables.models import ReceivableNotificationDelivery
 
+        self.tenant.whatsapp_instance_id = 'outbox-instance'
+        self.tenant.whatsapp_token = 'outbox-token'
+        self.tenant.save(update_fields=[
+            'whatsapp_instance_id', 'whatsapp_token',
+        ])
         result = send_boleto_due_reminders()
         self.assertGreater(result, 0)
         self.assertTrue(
@@ -89,6 +95,7 @@ class OutboxConsumerTests(TestCase):
                 tenant=self.tenant,
             ).exists()
         )
+        self.assertEqual(mock_send.call_count, 2)
 
     def test_reprocess_stuck_outbox_events_processes_none_when_empty(self):
         result = reprocess_stuck_outbox_events()

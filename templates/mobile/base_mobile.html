@@ -43,7 +43,7 @@
             var el = document.createElement('div');
             el.className = 'pointer-events-auto flex items-start gap-3 px-4 py-3 rounded-2xl border shadow-lg toast-enter ' + s.bg + ' ' + s.border;
             el.innerHTML = '<div class="flex-shrink-0 mt-0.5">' + s.icon + '</div>'
-                + '<div class="flex-1 min-w-0"><p class="text-sm font-medium ' + s.text + '">' + message + '</p></div>'
+                + '<div class="flex-1 min-w-0"><p class="text-sm font-medium ' + s.text + '"></p></div>'
                 + '<button onclick="this.closest(\'#toast-container\').querySelectorAll(\'>div\').forEach(function(t){removeToast(t)})" class="flex-shrink-0 ml-1"><svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg></button>'
                 + '<div class="absolute bottom-0 left-0 h-0.5 rounded-full ' + s.bg.replace('bg-','bg-').replace('-50','-500') + '" style="width:100%;animation:shrink ' + duration + 'ms linear forwards;"></div>';
             var container = document.getElementById('toast-container');
@@ -58,6 +58,7 @@
             setTimeout(function() { if (el.parentNode) el.parentNode.removeChild(el); }, 300);
         }
     </script>
+    <script src="{% static 'js/json-script.js' %}"></script>
     <style>
         :root {
             --bottom-nav-height: 72px;

@@ -196,7 +196,7 @@ def parse_matrix_xlsx(content_bytes, tenant):
     """Parseia formato grade. Retorna lista de dicts normalizados."""
     from openpyxl import load_workbook
 
-    wb = load_workbook(content_bytes, read_only=True, data_only=True)
+    wb = load_workbook(io.BytesIO(content_bytes), read_only=True, data_only=True)
     if 'IMPORTACAO' not in wb.sheetnames:
         raise ValueError('Planilha deve conter aba IMPORTACAO.')
 
@@ -350,7 +350,9 @@ def _parse_date_cell(val):
     if isinstance(val, (int, float)):
         from datetime import datetime
         try:
-            return datetime(1899, 12, 30) + timedelta(days=int(val))
+            return (
+                datetime(1899, 12, 30) + timedelta(days=int(val))
+            ).date()
         except (ValueError, OverflowError):
             return None
     s = str(val).strip()
@@ -371,7 +373,9 @@ def detect_import_format(content_bytes, filename):
 
     from openpyxl import load_workbook
     try:
-        wb = load_workbook(content_bytes, read_only=True, data_only=True)
+        wb = load_workbook(
+            io.BytesIO(content_bytes), read_only=True, data_only=True,
+        )
     except Exception:
         return None
 

@@ -95,9 +95,7 @@ function gestorBoletosPage() {
         filterStatus: '',
         stats: { total_a_receber: 0, vencidos: 0, pagos_hoje: 0 },
         init() {
-            var _p = JSON.parse(document.getElementById('boletos-data')?.textContent || '[]');
-            if (typeof _p === 'string') _p = JSON.parse(_p);
-            this.boletos = Array.isArray(_p) ? _p : [];
+            this.boletos = parseJsonScript('boletos-data', []);
             this.stats = {
                 total_a_receber: {{ stats.total_a_receber }},
                 vencidos: {{ stats.vencidos }},

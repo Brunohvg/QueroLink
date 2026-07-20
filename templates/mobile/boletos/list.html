@@ -68,9 +68,7 @@ function mobileBoletos() {
     return {
         boletos: [],
         init() {
-            var _p = JSON.parse(document.getElementById('boletos-data')?.textContent || '[]');
-            if (typeof _p === 'string') _p = JSON.parse(_p);
-            this.boletos = Array.isArray(_p) ? _p : [];
+            this.boletos = parseJsonScript('boletos-data', []);
         },
         copyBarcode(code) {
             if (navigator.clipboard && navigator.clipboard.writeText) {

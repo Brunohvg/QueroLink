@@ -212,44 +212,86 @@ def send_boleto_due_reminders():
             ).select_related('seller')
 
             from .notification_services import (
-                _delivery_key, _register_delivery,
-                _mark_sent, _mark_skipped, _format_brl,
-                _recipient_hash,
+                _delivery_key, _mark_failed, _mark_sent, _recipient_hash,
+                _format_brl,
             )
-            from .models import IntegrationOutbox, ReceivableNotificationDelivery
+            from app.services.messaging.whatsapp import WhatsappClient
+            from .models import ReceivableNotificationDelivery
 
             for boleto in candidates:
                 recipient = boleto.seller.phone or ''
                 if not recipient:
                     continue
-                dk = _delivery_key(
-                    str(boleto.uuid), 'due_reminder', 'whatsapp', recipient,
-                )
-                existing_delivery = ReceivableNotificationDelivery.objects.filter(
-                    tenant=tenant, delivery_key=dk,
-                ).first()
-                if existing_delivery and existing_delivery.status in (
-                    ReceivableNotificationDelivery.Status.SENT,
-                    ReceivableNotificationDelivery.Status.SKIPPED,
-                ):
-                    continue
-                if existing_delivery and existing_delivery.created_at.date() == today:
-                    continue
                 today_dk = _delivery_key(
                     str(boleto.uuid), f'due_reminder_{today.isoformat()}',
                     'whatsapp', recipient,
                 )
-                _, created = ReceivableNotificationDelivery.objects.get_or_create(
+                delivery, _ = ReceivableNotificationDelivery.objects.get_or_create(
                     tenant=tenant,
                     delivery_key=today_dk,
                     defaults={
                         'channel': 'whatsapp',
                         'recipient_hash': _recipient_hash(recipient),
-                        'status': ReceivableNotificationDelivery.Status.SENT,
-                        'sent_at': timezone.now(),
+                        'status': ReceivableNotificationDelivery.Status.PENDING,
                     },
                 )
-                if created:
+                if delivery.status in (
+                    ReceivableNotificationDelivery.Status.SENT,
+                    ReceivableNotificationDelivery.Status.SKIPPED,
+                    ReceivableNotificationDelivery.Status.DEAD,
+                ):
+                    continue
+                if (
+                    delivery.next_attempt_at
+                    and delivery.next_attempt_at > timezone.now()
+                ):
+                    continue
+
+                instance = tenant.whatsapp_instance_id
+                api_key = tenant.whatsapp_token
+                if not instance and getattr(
+                    settings, 'WHATSAPP_ALLOW_SHARED_INSTANCE', False,
+                ):
+                    instance = settings.WHATSAPP_INSTANCE
+                    api_key = api_key or settings.WHATSAPP_API_KEY
+                if not instance:
+                    delivery.status = ReceivableNotificationDelivery.Status.SKIPPED
+                    delivery.skip_reason = 'Tenant sem instancia WhatsApp configurada'
+                    delivery.save(update_fields=[
+                        'status', 'skip_reason', 'updated_at',
+                    ])
+                    continue
+
+                claimed = ReceivableNotificationDelivery.objects.filter(
+                    pk=delivery.pk,
+                    status__in=(
+                        ReceivableNotificationDelivery.Status.PENDING,
+                        ReceivableNotificationDelivery.Status.FAILED,
+                    ),
+                ).update(
+                    status=ReceivableNotificationDelivery.Status.SENDING,
+                    updated_at=timezone.now(),
+                )
+                if not claimed:
+                    continue
+                delivery.refresh_from_db()
+                if boleto.due_date < today:
+                    due_label = f'venceu em {boleto.due_date:%d/%m/%Y}'
+                else:
+                    due_label = f'vence em {boleto.due_date:%d/%m/%Y}'
+                message = (
+                    f'Lembrete: o boleto de {_format_brl(boleto.amount_cents)} '
+                    f'{due_label}.'
+                )
+                try:
+                    WhatsappClient(
+                        instance=instance,
+                        api_key=api_key,
+                    ).send_message(recipient, message)
+                except Exception as exc:
+                    _mark_failed(delivery, exc)
+                else:
+                    _mark_sent(delivery)
                     processed += 1
         except Exception:
             logger.warning('Falha no lote de lembretes tenant=%s', tenant.uuid)

@@ -8,6 +8,7 @@ from django_ratelimit.decorators import ratelimit
 from app.apps.orders.models import Order
 from app.apps.accounts.models import Tenant, User
 from django.db.models import Sum
+from app.apps.accounts.plans import PLAN_DISPLAY_FEATURES
 
 
 @ratelimit(key='ip', rate='10/m', method='POST', block=True)
@@ -125,44 +126,6 @@ def assinatura(request):
             if len(billing_history) >= 12:
                 break
 
-    PLAN_FEATURES = {
-        'STARTER': [
-            'Ate 5 vendedores',
-            'App do vendedor e painel do gestor',
-            'Lancamento e acompanhamento de vendas',
-            'Fechamento de comissoes',
-            'Links de pagamento',
-            'Lembretes automaticos por WhatsApp',
-        ],
-        'PRO': [
-            'Ate 15 vendedores',
-            'Tudo do Essencial',
-            'Importacao de vendas por CSV',
-            'Relatorios em PDF e previa de fechamento',
-            'Pacote contabil automatico por e-mail',
-            'Notificacoes push para vendedores',
-            'Boletos e cobrancas integrados',
-            'Acompanhamento de recebimentos',
-            'Integracao com vendas e comissoes',
-            'Historico de clientes e pagamentos',
-        ],
-        'BUSINESS': [
-            'Ate 50 vendedores',
-            'Tudo do Pro',
-            'Acesso para a equipe financeira',
-            'Auditoria detalhada das operacoes',
-            'Revisao de estornos e impactos em comissoes',
-            'Controles avancados de aprovacao',
-            'Implantacao assistida',
-            'Suporte prioritario',
-        ],
-        'ENTERPRISE': [
-            'Vendedores ilimitados (legado)',
-            'Tudo do Business',
-            'Suporte dedicado',
-        ],
-    }
-
     plan_display_names = {
         'STARTER': 'Essencial',
         'PRO': 'Pro',
@@ -181,7 +144,7 @@ def assinatura(request):
             'seller_limit': limits.get(key, '—'),
             'price_monthly': monthly,
             'price_yearly': yearly,
-            'features': PLAN_FEATURES.get(key, []),
+            'features': PLAN_DISPLAY_FEATURES.get(key, []),
             'is_current': has_active_sub and tenant.plan == key,
         })
 
@@ -230,5 +193,4 @@ def dashboard_home(request):
         'total_revenue': total_revenue_formatted,
         'recent_orders': recent_orders,
     })
-
 

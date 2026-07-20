@@ -194,9 +194,7 @@ function novoBoletoPage() {
         searchingCep: false,
 
         init() {
-            var _p = JSON.parse(document.getElementById('sellers-data')?.textContent || '[]');
-            if (typeof _p === 'string') _p = JSON.parse(_p);
-            this.sellers = Array.isArray(_p) ? _p : [];
+            this.sellers = parseJsonScript('sellers-data', []);
             this.idempotencyKey = 'boleto-' + Date.now() + '-' + Math.random().toString(36).slice(2, 8);
 
             this.$watch('form.payer_document', function(val) {

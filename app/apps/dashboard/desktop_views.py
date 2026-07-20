@@ -149,7 +149,7 @@ def gestor_home(request):
 
 @login_required
 def gestor_configuracoes(request):
-    if not _check_role(request, User.Role.ADMIN):
+    if not _check_role(request, User.Role.ADMIN, User.Role.MANAGER):
         return redirect('dashboard:home')
 
     tenant = request.user.tenant
@@ -383,7 +383,7 @@ def _resolve_tenant_instance(tenant, instance_id):
 
 @login_required
 def whatsapp_instance_status(request):
-    if not _check_role(request, User.Role.ADMIN):
+    if not _check_role(request, User.Role.ADMIN, User.Role.MANAGER):
         return JsonResponse({'error': 'Permissao negada.'}, status=403)
 
     tenant = request.user.tenant
@@ -475,7 +475,7 @@ def whatsapp_instance_status(request):
 
 @login_required
 def whatsapp_connection_state(request):
-    if not _check_role(request, User.Role.ADMIN):
+    if not _check_role(request, User.Role.ADMIN, User.Role.MANAGER):
         return JsonResponse({'error': 'Permissao negada.'}, status=403)
 
     tenant = request.user.tenant
@@ -544,7 +544,7 @@ def whatsapp_connection_state(request):
 
 @login_required
 def whatsapp_disconnect(request):
-    if not _check_role(request, User.Role.ADMIN):
+    if not _check_role(request, User.Role.ADMIN, User.Role.MANAGER):
         return JsonResponse({'error': 'Permissao negada.'}, status=403)
 
     tenant = request.user.tenant
@@ -576,7 +576,7 @@ def whatsapp_disconnect(request):
 
 @login_required
 def whatsapp_delete_instance(request):
-    if not _check_role(request, User.Role.ADMIN):
+    if not _check_role(request, User.Role.ADMIN, User.Role.MANAGER):
         return JsonResponse({'error': 'Permissao negada.'}, status=403)
 
     tenant = request.user.tenant
@@ -715,10 +715,13 @@ def gestor_download_template(request):
         response['Content-Disposition'] = f'attachment; filename="{filename}"'
         return response
 
-    except Exception as e:
+    except Exception:
         logger.exception('Erro ao gerar template XLSX')
         from django.contrib import messages
-        messages.error(request, f'Erro ao gerar template: {e}')
+        messages.error(
+            request,
+            'Nao foi possivel gerar o modelo. Tente novamente.',
+        )
         return redirect('dashboard:gestor_importar_vendas')
 
 
@@ -874,123 +877,23 @@ def gestor_cobrancas(request):
     if not tenant:
         return redirect('dashboard:home')
 
-    from app.apps.orders.models import Order
-    from app.apps.receivables.models import Boleto
+    from app.apps.dashboard.charge_center import (
+        build_charge_center, charge_center_stats,
+    )
     from app.apps.sellers.models import Seller as SellerModel
     can_create_links = True
 
     from app.apps.accounts.models import tenant_has_feature
     can_create_boletos = tenant_has_feature(tenant, 'boletos')
 
-    orders = Order.objects.filter(
-        tenant=tenant,
-    ).select_related('seller', 'payment_link').prefetch_related(
-        'payments',
-    ).order_by('-created_at')[:100]
-
-    orders_data = []
-    for o in orders:
-        payment = o.payments.first()
-        refusal = payment.refusal_reason if payment else None
-        try:
-            customer_name = o.customer_name
-        except Exception:
-            customer_name = ''
-        orders_data.append({
-            'uuid': str(o.uuid),
-            'type': 'link',
-            'type_display': 'Link de Pagamento',
-            'customer_name': customer_name,
-            'amount_cents': o.total_amount,
-            'status': o.status,
-            'status_display': o.status_display_pt,
-            'seller_name': o.seller.name if o.seller else '-',
-            'seller_uuid': str(o.seller.uuid) if o.seller else '',
-            'refusal_reason': refusal,
-            'created_at': o.created_at.isoformat(),
-            'due_date': None,
-            'paid_at': payment.paid_at.isoformat() if (payment and payment.paid_at) else None,
-            'detail_url': f'/dashboard/gestor/links/{o.uuid}/',
-        })
-
-    boletos_data = []
-    boletos_qs = Boleto.objects.filter(tenant=tenant).select_related(
-        'seller', 'created_by',
-    ).order_by('-created_at')[:100]
-
-    try:
-        for b in boletos_qs:
-            seller_name = b.seller.name if b.seller else '-'
-            try:
-                customer_name = b.payer_name
-            except Exception:
-                customer_name = seller_name
-            boletos_data.append({
-                'uuid': str(b.uuid),
-                'type': 'boleto',
-                'type_display': 'Boleto',
-                'customer_name': customer_name,
-                'amount_cents': b.amount_cents,
-                'paid_amount_cents': b.paid_amount_cents,
-                'status': b.status,
-                'status_display': b.get_status_display(),
-                'seller_name': seller_name,
-                'seller_uuid': str(b.seller.uuid) if b.seller else '',
-                'refusal_reason': b.operation_error_message or '',
-                'created_at': b.created_at.isoformat(),
-                'due_date': b.due_date.isoformat(),
-                'paid_at': b.paid_at.isoformat() if b.paid_at else None,
-                'detail_url': f'/dashboard/gestor/boletos/{b.uuid}/',
-            })
-    except Exception:
-        logger.warning(
-            'Boleto query failed for tenant %s (missing columns?)', tenant.pk,
-            exc_info=True,
-        )
-        boletos_data = []
-
-    cobrancas = orders_data + boletos_data
-    cobrancas.sort(key=lambda x: x['created_at'], reverse=True)
+    cobrancas, orders_data, boletos_data = build_charge_center(tenant)
 
     logger.info(
         "gestor_cobrancas: tenant=%s orders=%d boletos=%d total=%d",
         tenant.pk, len(orders_data), len(boletos_data), len(cobrancas),
     )
 
-    today = timezone.localdate()
-    link_awaiting = Order.objects.filter(
-        tenant=tenant, status='PENDING',
-    ).count()
-    link_paid = Order.objects.filter(
-        tenant=tenant, status='COMPLETED',
-    ).count()
-    link_canceled = Order.objects.filter(
-        tenant=tenant, status__in=('CANCELED', 'EXPIRED'),
-    ).count()
-
-    boleto_awaiting = 0
-    boleto_paid = 0
-    boleto_overdue = 0
-    boleto_canceled = 0
-    try:
-        boleto_base = Boleto.objects.filter(tenant=tenant)
-        boleto_awaiting = boleto_base.filter(status='PENDENTE', due_date__gte=today).count()
-        boleto_overdue = boleto_base.filter(status__in=('PENDENTE', 'VENCIDO'), due_date__lt=today).count()
-        boleto_paid = boleto_base.filter(status='PAGO').count()
-        boleto_canceled = boleto_base.filter(
-            status__in=('CANCELADO', 'FALHOU', 'ESTORNADO', 'CANCEL_PEND', 'CRIANDO'),
-        ).count()
-    except Exception:
-        logger.warning('Boleto stats query failed for tenant %s', tenant.pk)
-
-    unified_stats = {
-        'aguardando': link_awaiting + boleto_awaiting,
-        'pagas': link_paid + boleto_paid,
-        'vencidas': boleto_overdue,
-        'canceladas': link_canceled + boleto_canceled,
-        'total_links': link_awaiting + link_paid + link_canceled,
-        'total_boletos': boleto_awaiting + boleto_paid + boleto_overdue + boleto_canceled,
-    }
+    unified_stats = charge_center_stats(tenant)
 
     sellers = list(SellerModel.objects.filter(
         tenant=tenant, is_active=True,
@@ -1004,9 +907,12 @@ def gestor_cobrancas(request):
         'unified_stats_json': unified_stats,
         'pagarme_configured': tenant.pagarme_configured,
         'boleto_stats_json': {
-            'a_receber': boleto_awaiting + boleto_overdue,
-            'vencidos': boleto_overdue,
-            'pagos': boleto_paid,
+            'a_receber': (
+                unified_stats['boleto_awaiting']
+                + unified_stats['boleto_overdue']
+            ),
+            'vencidos': unified_stats['boleto_overdue'],
+            'pagos': unified_stats['boleto_paid'],
         },
     })
 

@@ -12,7 +12,9 @@ from rest_framework.pagination import PageNumberPagination
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
-from app.apps.accounts.models import User, tenant_has_feature
+from app.apps.accounts.models import (
+    User, can_manage_receivable, tenant_has_feature,
+)
 from app.apps.audit.utils import log_action
 
 from .allocation_services import (
@@ -251,12 +253,16 @@ def allocation_list_create(request):
             status=status.HTTP_403_FORBIDDEN,
         )
 
+    if not can_manage_receivable(request.user, request.user.tenant):
+        return Response(
+            {'detail': 'Acesso negado.'},
+            status=status.HTTP_403_FORBIDDEN,
+        )
+
     if request.method == 'GET':
         qs = ReceivableAllocation.objects.filter(
             tenant=request.user.tenant,
         ).select_related('boleto', 'boleto__seller')
-        if request.user.role == User.Role.SELLER:
-            qs = qs.filter(boleto__seller__user=request.user)
         qs = qs.order_by('-allocated_at')
         paginator = AllocationPagination()
         page = paginator.paginate_queryset(qs, request)

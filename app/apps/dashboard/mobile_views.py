@@ -1090,7 +1090,7 @@ def mobile_links(request):
         return seller
     if not seller:
         return redirect('dashboard:mobile_home')
-    from app.apps.orders.models import Order
+    from app.apps.dashboard.charge_center import build_charge_center
     from app.apps.payments.models import Payment
     orders = Order.objects.filter(
         seller=seller, tenant=seller.tenant,
@@ -1197,61 +1197,14 @@ def mobile_cobrancas(request):
     from app.apps.orders.models import Order
     from app.apps.accounts.models import tenant_has_feature
 
-    orders = Order.objects.filter(
-        seller=seller, tenant=seller.tenant,
-    ).select_related('seller').prefetch_related(
-        'payments',
-    ).order_by('-created_at')[:50]
-
-    orders_data = []
-    for o in orders:
-        try:
-            link = o.payment_link
-            link_url = link.gateway_url if link else None
-        except Exception:
-            link_url = None
-        payment = o.payments.first()
-        orders_data.append({
-            'uuid': str(o.uuid),
-            'type': 'link',
-            'type_display': 'Link',
-            'customer_name': o.customer_name,
-            'amount_cents': o.total_amount,
-            'status': o.status,
-            'status_display': o.status_display_pt,
-            'link_url': link_url,
-            'created_at': o.created_at.isoformat(),
-            'detail_url': f'/dashboard/mobile/links/',
-        })
-
-    has_boletos = tenant_has_feature(request.user.tenant, 'boletos')
-    boletos_data = []
-    if has_boletos:
-        boletos = Boleto.objects.filter(
-            tenant=request.user.tenant, seller=seller,
-        ).order_by('-created_at')[:100]
-
-        for b in boletos:
-            boletos_data.append({
-                'uuid': str(b.uuid),
-                'type': 'boleto',
-                'type_display': 'Boleto',
-                'customer_name': seller.name,
-                'amount_cents': b.amount_cents,
-                'status': b.status,
-                'status_display': b.get_status_display(),
-                'due_date': b.due_date.isoformat(),
-                'paid_at': b.paid_at.isoformat() if b.paid_at else None,
-                'paid_amount_cents': b.paid_amount_cents,
-                'created_at': b.created_at.isoformat(),
-                'detail_url': f'/dashboard/mobile/boletos/',
-            })
-
-    cobrancas = orders_data + boletos_data
-    cobrancas.sort(key=lambda x: x['created_at'], reverse=True)
+    cobrancas, _, boletos_data = build_charge_center(
+        request.user.tenant, seller=seller,
+    )
+    can_create_boletos = tenant_has_feature(request.user.tenant, 'boletos')
 
     return render(request, 'mobile/cobrancas.html', {
         'seller': seller,
         'cobrancas_json': cobrancas,
-        'has_boletos': has_boletos,
+        'has_boletos': bool(can_create_boletos or boletos_data),
+        'can_create_boletos': can_create_boletos,
     })

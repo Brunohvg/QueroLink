@@ -363,12 +363,13 @@ class SaleViewSet(viewsets.ModelViewSet):
                     val = f"{row['amount_cents'] / 100:.2f}"
                 elif row['type'] == 'justification':
                     val = row['justification']
-                writer.writerow([
+                from app.services.csv_safety import safe_csv_row
+                writer.writerow(safe_csv_row([
                     row['date'].isoformat(),
                     row['seller_name'],
                     val,
                     '',
-                ])
+                ]))
             csv_buffer.seek(0)
 
             # Criar novo file-like object com o CSV
@@ -1204,14 +1205,15 @@ class CommissionPeriodCsvView(generics.GenericAPIView):
             'Vendedor', 'Total Vendido (R$)', 'Taxa (%)',
             'Comissao (R$)', 'Status',
         ])
+        from app.services.csv_safety import safe_csv_row
         for sc in period.seller_commissions.select_related('seller').all():
-            writer.writerow([
+            writer.writerow(safe_csv_row([
                 sc.seller.name,
                 f'{sc.total_sold_amount / 100:.2f}',
                 f'{float(sc.commission_rate) * 100:.2f}',
                 f'{sc.commission_amount / 100:.2f}',
                 sc.get_status_display(),
-            ])
+            ]))
         response = HttpResponse(
             buf.getvalue(), content_type='text/csv; charset=utf-8',
         )
@@ -1598,14 +1600,15 @@ class SellerReportCsvView(generics.GenericAPIView):
 
         buf = io.StringIO()
         writer = csv.writer(buf)
+        from app.services.csv_safety import safe_csv_row
         writer.writerow(['Data', 'Valor (R$)', 'Observacao'])
         total = 0
         for s in sales:
-            writer.writerow([
+            writer.writerow(safe_csv_row([
                 s.sale_date.isoformat(),
                 f'{s.amount / 100:.2f}',
                 s.notes or '',
-            ])
+            ]))
             total += s.amount
 
         writer.writerow([])
@@ -1627,8 +1630,8 @@ class SellerReportCsvView(generics.GenericAPIView):
                 'Comissão oficial disponível apenas por competência', '', '',
             ])
         writer.writerow([])
-        writer.writerow([f'Vendedor: {seller.name}'])
-        writer.writerow([f'Empresa: {tenant.company_name}'])
+        writer.writerow(safe_csv_row([f'Vendedor: {seller.name}']))
+        writer.writerow(safe_csv_row([f'Empresa: {tenant.company_name}']))
         writer.writerow([f'Periodo: {start.isoformat()} a {end.isoformat()}'])
 
         response = HttpResponse(

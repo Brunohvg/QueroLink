@@ -75,9 +75,7 @@ function mobileCobrancasPage() {
     return {
         cobrancas: [],
         init() {
-            var _p = JSON.parse(document.getElementById('cobrancas-data')?.textContent || '[]');
-            if (typeof _p === 'string') _p = JSON.parse(_p);
-            this.cobrancas = Array.isArray(_p) ? _p : [];
+            this.cobrancas = parseJsonScript('cobrancas-data', []);
         },
         fmt(cents) {
             var reais = Math.floor(cents / 100);

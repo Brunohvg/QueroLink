@@ -107,9 +107,7 @@ function gestorBoletoDetalhe() {
     return {
         b: {},
         init() {
-            var _p = JSON.parse(document.getElementById('boleto-data')?.textContent || '{}');
-            if (typeof _p === 'string') _p = JSON.parse(_p);
-            this.b = _p;
+            this.b = parseJsonScript('boleto-data', {});
         },
         copyBarcode() {
             if (!this.b.provider_barcode) return;

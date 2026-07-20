@@ -15,6 +15,7 @@ from app.apps.commissions.services import (
 from app.apps.sales.models import Sale as SModel
 from app.apps.sellers.models import Seller as SellerM
 from app.apps.commissions.models import CommissionPeriod, SellerCommission, CommissionAdjustment
+from app.services.csv_safety import safe_csv_cell
 
 logger = logging.getLogger(__name__)
 
@@ -46,7 +47,11 @@ def build_accounting_zip(tenant, month_int, year_int, period=None):
             valor = f'{s.amount/100:,.2f}'.replace(',', 'X').replace('.', ',').replace('X', '.')
             origin = 'Importação' if s.origin == SModel.Origin.IMPORTADA else 'Manual'
             status = 'Estornada' if s.status == 'ESTORNADA' else 'Ativa'
-            csv1_lines.append(f'{s.sale_date.strftime("%d/%m/%Y")};{s.seller.name};{cpf};{valor};{origin};{status};{s.notes or ""}')
+            csv1_lines.append(
+                f'{s.sale_date.strftime("%d/%m/%Y")};'
+                f'{safe_csv_cell(s.seller.name)};{safe_csv_cell(cpf)};'
+                f'{valor};{origin};{status};{safe_csv_cell(s.notes or "")}'
+            )
         zf.writestr(f'vendas_{month_int:02d}_{year_int}.csv', '\n'.join(csv1_lines).encode('utf-8-sig'))
 
         csv2_lines = ['Vendedor;CPF Vendedor;Total Vendido (R$);Taxa (%);Comissao Bruta (R$);Ajustes (R$);Comissao Liquida (R$);Status;Data Pagamento']
@@ -76,7 +81,7 @@ def build_accounting_zip(tenant, month_int, year_int, period=None):
             cpf = seller.cpf_formatted or 'Nao informado'
             taxa = f'{float(get_commission_rate(seller))*100:.2f}'.replace('.', ',')
             csv2_lines.append(
-                f'{seller.name};{cpf};'
+                f'{safe_csv_cell(seller.name)};{safe_csv_cell(cpf)};'
                 f'{_fmt_br(total)};{taxa};{_fmt_br(comissao)};{_fmt_br(total_adj)};{_fmt_br(liquida)};{status_label};{payment_date}'
             )
         zf.writestr(f'comissoes_{month_int:02d}_{year_int}.csv', '\n'.join(csv2_lines).encode('utf-8-sig'))

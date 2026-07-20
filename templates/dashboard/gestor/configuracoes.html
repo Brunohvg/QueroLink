@@ -837,8 +837,7 @@ showToast("{{ message|escapejs }}", "{% if message.tags == 'error' %}error{% eli
 <script>
 document.addEventListener('alpine:init', function() {
     Alpine.data('messageEditor', function() {
-        var eventVars = JSON.parse(document.getElementById('event-vars').textContent || '{}');
-        if (typeof eventVars === 'string') eventVars = JSON.parse(eventVars);
+        var eventVars = parseJsonScript('event-vars', {});
         var sampleCtx = {
             vendedor: 'Fulano', usuario: 'fulano', senha: '********',
             periodo: '06/2026', valor: 'R$ 1.234,56',
@@ -1065,10 +1064,7 @@ function configPage() {
     }
 }
 function freightConfig() {
-    var _p = JSON.parse(document.getElementById('freight-presets').textContent || '[]');
-    if (typeof _p === 'string') _p = JSON.parse(_p);
-    if (!Array.isArray(_p)) _p = [];
-    var initialPresets = _p;
+    var initialPresets = parseJsonScript('freight-presets', []);
     return {
         adjustment: {{ tenant.freight_adjustment_percent }},
         motoboyOn: {{ tenant.motoboy_enabled|lower }},

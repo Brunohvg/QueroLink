@@ -57,6 +57,7 @@ jobs:
         env:
           DJANGO_SETTINGS_MODULE: app.config.settings.ci_postgres
           SECRET_KEY: ci-test-secret-key-not-for-production
+          JWT_SIGNING_KEY: ci-test-jwt-signing-key-distinct-from-secret
           DATABASE_URL: postgres://querolink:querolink@localhost:5432/querolink_ci
           REDIS_URL: redis://localhost:6379/0
         run: python manage.py check
@@ -65,6 +66,7 @@ jobs:
         env:
           DJANGO_SETTINGS_MODULE: app.config.settings.production
           SECRET_KEY: ci-test-secret-key-not-for-production
+          JWT_SIGNING_KEY: ci-test-jwt-signing-key-distinct-from-secret
           DATABASE_URL: postgres://querolink:querolink@localhost:5432/querolink_ci
           REDIS_URL: redis://localhost:6379/0
           FERNET_KEY: AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=
@@ -81,6 +83,7 @@ jobs:
         env:
           DJANGO_SETTINGS_MODULE: app.config.settings.ci_postgres
           SECRET_KEY: ci-test-secret-key-not-for-production
+          JWT_SIGNING_KEY: ci-test-jwt-signing-key-distinct-from-secret
           DATABASE_URL: postgres://querolink:querolink@localhost:5432/querolink_ci
           REDIS_URL: redis://localhost:6379/0
         run: python manage.py makemigrations --check --dry-run
@@ -89,6 +92,7 @@ jobs:
         env:
           DJANGO_SETTINGS_MODULE: app.config.settings.ci_postgres
           SECRET_KEY: ci-test-secret-key-not-for-production
+          JWT_SIGNING_KEY: ci-test-jwt-signing-key-distinct-from-secret
           DATABASE_URL: postgres://querolink:querolink@localhost:5432/querolink_ci
           REDIS_URL: redis://localhost:6379/0
         run: python manage.py migrate --plan
