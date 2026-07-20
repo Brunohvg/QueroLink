@@ -5,7 +5,7 @@ class BoletoCreateThrottle(SimpleRateThrottle):
     scope = 'boleto_create'
 
     def get_cache_key(self, request, view):
-        if not request.user.is_authenticated:
+        if request.method != 'POST' or not request.user.is_authenticated:
             return None
         return self.cache_format % {
             'scope': self.scope,
@@ -17,7 +17,7 @@ class BoletoCancelThrottle(SimpleRateThrottle):
     scope = 'boleto_cancel'
 
     def get_cache_key(self, request, view):
-        if not request.user.is_authenticated:
+        if request.method != 'POST' or not request.user.is_authenticated:
             return None
         return self.cache_format % {
             'scope': self.scope,

@@ -5,10 +5,14 @@ from django.urls import reverse
 from django.utils import timezone
 from rest_framework import status
 from rest_framework.test import APIClient
+from rest_framework.test import APIRequestFactory, force_authenticate
 
 from app.apps.accounts.models import Tenant, User
 from app.apps.receivables.models import Boleto
 from app.apps.receivables.services import IdempotencyConflictError
+from app.apps.receivables.throttles import (
+    BoletoCancelThrottle, BoletoCreateThrottle,
+)
 from app.apps.sellers.models import Seller
 
 
@@ -362,6 +366,22 @@ class ReceivablesAPITests(TestCase):
             format='json',
         )
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_read_requests_do_not_consume_operation_throttles(self):
+        factory = APIRequestFactory()
+        list_request = factory.get('/api/receivables/boletos/')
+        detail_request = factory.get('/api/receivables/boletos/example/')
+        force_authenticate(list_request, user=self.manager)
+        force_authenticate(detail_request, user=self.manager)
+        list_request.user = self.manager
+        detail_request.user = self.manager
+
+        self.assertIsNone(
+            BoletoCreateThrottle().get_cache_key(list_request, None)
+        )
+        self.assertIsNone(
+            BoletoCancelThrottle().get_cache_key(detail_request, None)
+        )
 
     # ── Tenant isolation ─────────────────────────────────────
 
